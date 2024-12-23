@@ -1,3 +1,14 @@
 (library
  (name optimus)
  (libraries))
+
+(menhir
+ (modules Tokens)
+ (explain false)
+ (flags --only-tokens))
+
+(menhir
+ (modules Parser Tokens)
+ (merge_into Parser)
+ (explain true)
+ (flags --external-tokens Tokens --unused-tokens))

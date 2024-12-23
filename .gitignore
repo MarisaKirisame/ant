@@ -1,3 +1,6 @@
+.vscode/
+*.code-workspace
+
 *.annot
 *.cmo
 *.cma
