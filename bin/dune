@@ -1,0 +1,9 @@
+(executable
+ (public_name optimus)
+ (name main)
+ (libraries optimus))
+
+(env
+ (dev
+  (flags
+   (:standard -warn-error -A))))
