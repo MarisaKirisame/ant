@@ -2,6 +2,8 @@
  (name optimus)
  (libraries))
 
+(ocamllex Lexer)
+
 (menhir
  (modules Tokens)
  (explain false)
@@ -11,4 +13,4 @@
  (modules Parser Tokens)
  (merge_into Parser)
  (explain true)
- (flags --external-tokens Tokens --unused-tokens))
+ (flags --external-tokens Tokens --unused-tokens --unused-precedence-levels))

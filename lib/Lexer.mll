@@ -18,6 +18,11 @@ let convert_escaped c =
   | 'f' -> '\012'
   | _   -> c
 
+let builtin_table = Hashtbl.of_seq @@ List.to_seq
+    [ ("print_endline"      , ())
+    ; ("print_string"       , ())
+    ]
+
 let keywords_table = Hashtbl.of_seq @@ List.to_seq
     [ ("if"         , TK_IF)
     ; ("then"       , TK_THEN)
@@ -88,7 +93,7 @@ let identifier    = (smallcaps | '_') (alphanum | '_') *
 let ctor          = capital (alphanum | '_') *
 let int_lit       = ddigit+
 let bool_lit      = "true" | "false"
-let escaped       = ['\\' '\'' '\"' 'n' 't' 'r' 'f' 'b']
+let escaped       = ['\\' '\'' '"' 'n' 't' 'r' 'f' 'b']
 let sops          = ['.' ',' ':' ';' '^' '_' '#' '(' ')' '{' '}' '[' ']' '+' '-' '*' '/' '%' '=' '>' '<' '!' '|' '\'' '~' '\\']
 let mops          = "<-" | "->" | "=>" | "==" | "!=" | ">=" | "<=" | "&&" | "||" | ";;"
 
@@ -105,7 +110,11 @@ rule tokenize = parse
   | identifier as x  { 
                       match Hashtbl.find_opt keywords_table x with
                       | Some token -> token
-                      | None       -> TK_ID x
+                      | None       -> (
+                        match Hashtbl.find_opt builtin_table x with
+                        | Some _ -> TK_BUILTIN x
+                        | None   -> TK_ID x
+                      )
                     }
   | mops as op      { Option.get @@ Hashtbl.find_opt mops_table op}
   | sops as op      { Option.get @@ Hashtbl.find_opt sops_table op }
@@ -117,7 +126,7 @@ and comment = parse
 
 and string buffer = parse
   | '"'                 { () }
-  | '\' (escaped as c)  { Buffer.add_char buffer (convert_escaped c) ; string buffer lexbuf }
-  | '\' _ | newline     { raise @@ Error (InvalidStringLiteral, lexeme_start_p lexbuf) }
+  | '\\' (escaped as c)  { Buffer.add_char buffer (convert_escaped c) ; string buffer lexbuf }
+  | '\\' _ | newline     { raise @@ Error (InvalidStringLiteral, lexeme_start_p lexbuf) }
   | _ as c              { Buffer.add_char buffer c; string buffer lexbuf }
   | eof                 { raise @@ Error (UnexpectedEof "string literal doesn't terminate", lexeme_start_p lexbuf)}

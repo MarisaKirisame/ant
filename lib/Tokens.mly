@@ -53,8 +53,6 @@
 %token TK_LE            "<="
 %token TK_LAND          "&&"
 %token TK_LOR           "||"
-%token TK_BLAMBDA       "/\\"
-%token TK_FORALL        "\\/"
 %token TK_LNOT          "!"
 %token TK_OR            "|"
 %token TK_SQUOTE        "'"
