@@ -12,6 +12,8 @@ bug-reports: "https://github.com/username/reponame/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.16"}
+  "pprint"
+  "cmdliner"
   "odoc" {with-doc}
 ]
 build: [

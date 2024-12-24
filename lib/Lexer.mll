@@ -7,6 +7,11 @@ type error =
   | UnexpectedEof of string 
   | InvalidStringLiteral
 
+let string_of_error = function
+  | UnexpectedToken s -> "Unexpected token: " ^ s
+  | UnexpectedEof s -> "Unexpected end of file: " ^ s
+  | InvalidStringLiteral -> "Invalid string literal"
+
 exception Error of error * position
 
 let convert_escaped c =
@@ -31,10 +36,12 @@ let keywords_table = Hashtbl.of_seq @@ List.to_seq
     ; ("match"      , TK_MATCH)
     ; ("case"       , TK_CASE)
     ; ("of"         , TK_OF)
+    ; ("with"       , TK_WITH)
     ; ("let"        , TK_LET)
     ; ("in"         , TK_IN)
     ; ("type"       , TK_TYPE)
     ; ("fun"        , TK_FUN)
+    ; ("rec"        , TK_REC)
     ]
 
 let sops_table = Hashtbl.of_seq @@ List.to_seq
@@ -101,13 +108,14 @@ rule tokenize = parse
   | eof             { TK_EOF }
   | whitespace      { tokenize lexbuf }
   | newline         { new_line lexbuf; tokenize lexbuf }
-  | "//"            { comment lexbuf }
+  | "(*"            { comment 0 lexbuf }
+  | "\""            { string (Buffer.create 16) lexbuf }
   | int_lit   as x  { TK_INT_LITERAL (int_of_string x) }
   | bool_lit  as x  { TK_BOOL_LITERAL (bool_of_string x) }
   | ctor      as x  {
                       TK_CTOR x
                     }
-  | identifier as x  { 
+  | identifier as x { 
                       match Hashtbl.find_opt keywords_table x with
                       | Some token -> token
                       | None       -> (
@@ -116,17 +124,23 @@ rule tokenize = parse
                         | None   -> TK_ID x
                       )
                     }
-  | mops as op      { Option.get @@ Hashtbl.find_opt mops_table op}
+  | mops as op      { Option.get @@ Hashtbl.find_opt mops_table op }
   | sops as op      { Option.get @@ Hashtbl.find_opt sops_table op }
-  | _               { raise @@ Error (UnexpectedToken "unexpected token", lexeme_start_p lexbuf) }
+  | _ as ch         { raise @@ Error (UnexpectedToken (String.make 1 ch), lexeme_start_p lexbuf) }
 
-and comment = parse
+and comment level = parse
   | newline     { new_line lexbuf; tokenize lexbuf }
-  | _           { comment lexbuf }
+  | "(*"        { comment (level + 1) lexbuf }
+  | "*)"        { 
+                  if level = 0 then tokenize lexbuf
+                  else comment (level - 1) lexbuf
+                }
+  | eof         { raise @@ Error (UnexpectedEof "comment doesn't terminate", lexeme_start_p lexbuf) }
+  | _           { comment level lexbuf }
 
 and string buffer = parse
-  | '"'                 { () }
-  | '\\' (escaped as c)  { Buffer.add_char buffer (convert_escaped c) ; string buffer lexbuf }
-  | '\\' _ | newline     { raise @@ Error (InvalidStringLiteral, lexeme_start_p lexbuf) }
+  | '"'                 { TK_STRING_LITERAL (Buffer.contents buffer) }
+  | '\\' (escaped as c) { Buffer.add_char buffer (convert_escaped c) ; string buffer lexbuf }
+  | '\\' _ | newline    { raise @@ Error (InvalidStringLiteral, lexeme_start_p lexbuf) }
   | _ as c              { Buffer.add_char buffer c; string buffer lexbuf }
   | eof                 { raise @@ Error (UnexpectedEof "string literal doesn't terminate", lexeme_start_p lexbuf)}

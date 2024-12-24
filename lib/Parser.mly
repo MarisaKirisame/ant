@@ -9,7 +9,7 @@ open Syntax
 %nonassoc below_SEMI
 %nonassoc ";"
 %nonassoc "let"
-%nonassoc "of" "fun"
+%nonassoc "of" "fun" "with"
 %nonassoc "then"
 %nonassoc "else"
 %left "|"
@@ -87,8 +87,9 @@ rev_preceded_or_sep_llist1(D, X):
 // Grammar of the Optimus language
 
 pattern:
-  | "_" { PAny }
-  | "<id>" { PVar $1 }
+  | "<int>" { PInt $1 }
+  | "<bool>" { PBool $1 }
+  | "<id>" { if $1 = "_" then PAny else PVar $1 }
   | "<ctor>" { PApp ($1, None) }
   | "<ctor>" pattern { PApp ($1, Some $2) }
   | "(" ")" { PUnit }
@@ -128,11 +129,15 @@ case : pattern "->" expr { ($1, $3) }
   | "/" { "/" }
 
 simple_expr:
-  | "(" seq_expr ")" { $2 }
-  | "[" expr_semi_list "]" { Arr $2 }
+  | "(" ")" { Unit }
   | "<id>" { Var $1 }
   | "<ctor>" { CApp (Ctor ($1, None), []) }
   | "<int>" { Int $1 }
+  | "<bool>" { Bool $1 }
+  | "<str>" { Str $1 }
+  | "<builtin>" { Builtin (Builtin $1) }
+  | "(" seq_expr ")" { $2 }
+  | "[" expr_semi_list "]" { Arr $2 }
   | simple_expr "." "<id>" { Sel ($1, $3) }
 
 expr:
@@ -142,7 +147,8 @@ expr:
   | expr infix_op1 expr { Op ($2, $1, $3) }
   | expr infix_op2 expr { Op ($2, $1, $3) }
   | "let" simple_pattern "=" expr "in" expr { Let (BOne ($2, $4), $6) }
-  | "match" expr "of" cases { Match ($2, (MatchPattern $4)) }
+  | "let" "rec" simple_pattern "=" expr "in" expr { Let (BRec [($3, $5)], $7) }
+  | "match" expr "with" cases { Match ($2, (MatchPattern $4)) }
   | "fun" simple_pattern+ "->" expr { Lam ($2, $4) }
   | "if" expr "then" expr "else" expr { If ($2, $4, $6) }
   | "if" expr "then" expr { If ($2, $4, Unit) }
