@@ -1,6 +1,7 @@
 /* Literals and Identifier */
 %token <int>    TK_INT_LITERAL      "<int>"
 %token <bool>   TK_BOOL_LITERAL     "<bool>"
+%token <string> TK_STRING_LITERAL   "<str>"
 %token <string> TK_ID               "<id>"
 %token <string> TK_CTOR             "<ctor>"
 %token <string> TK_BUILTIN          "<builtin>"
@@ -16,10 +17,12 @@
 %token TK_CASE          "case"
 %token TK_MATCH         "match"
 %token TK_OF            "of"
+%token TK_WITH          "with"
 %token TK_LET           "let"
 %token TK_IN            "in"
 %token TK_TYPE          "type"
 %token TK_FUN           "fun"
+%token TK_REC           "rec"
 
 /* Symbols */
 %token TK_DOT           "."
