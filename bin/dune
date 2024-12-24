@@ -1,7 +1,7 @@
 (executable
  (public_name optimus)
  (name main)
- (libraries optimus))
+ (libraries optimus cmdliner))
 
 (env
  (dev

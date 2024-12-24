@@ -1,6 +1,14 @@
 (library
  (name optimus)
- (libraries))
+ (libraries pprint)
+ (modules
+   Lexer
+   Tokens
+   Parser
+   Syntax)
+ (preprocess
+   (staged_pps
+     ppx_string)))
 
 (ocamllex Lexer)
 
@@ -13,4 +21,4 @@
  (modules Parser Tokens)
  (merge_into Parser)
  (explain true)
- (flags --external-tokens Tokens --unused-tokens --unused-precedence-levels))
+ (flags --external-tokens Tokens --unused-tokens --unused-precedence-levels --exn-carries-state))
