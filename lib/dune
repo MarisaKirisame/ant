@@ -1,5 +1,5 @@
 (library
- (name optimus)
+ (name ant)
  (libraries pprint)
  (modules
    Lexer
