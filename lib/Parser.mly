@@ -84,7 +84,7 @@ rev_preceded_or_sep_llist1(D, X):
 %inline preceded_or_sep_llist1(D, X):
   | xs = rev(rev_preceded_or_sep_llist1(D, X)) { xs }
 
-// Grammar of the Optimus language
+// Grammar of the ant language
 
 pattern:
   | "<int>" { PInt $1 }

@@ -1,7 +1,7 @@
 (lang dune 3.16)
 (using menhir 3.0)
 
-(name optimus)
+(name ant)
 
 (generate_opam_files true)
 
@@ -17,7 +17,7 @@
 (documentation https://url/to/documentation)
 
 (package
- (name optimus)
+ (name ant)
  (synopsis "A short synopsis")
  (description "A longer description")
  (depends ocaml dune pprint cmdliner)
