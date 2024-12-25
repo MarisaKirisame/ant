@@ -1,5 +1,5 @@
 open Cmdliner
-open Optimus
+open Ant
 
 let read_all file = In_channel.with_open_text file In_channel.input_all
 
@@ -38,9 +38,9 @@ let print_ast =
   Arg.(value & flag & info ["p"; "print-ast"] ~doc)
 
 let cmd =
-  let doc = "Optimus Compiler" in
+  let doc = "ant Compiler" in
   let man = [ `S Manpage.s_bugs ] in
-  let info = Cmd.info "optimus" ~version:"0.1" ~doc ~man in
+  let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
   Cmd.v info Term.(const driver $ input $ print_ast)
 
 let () = exit (Cmd.eval cmd)
