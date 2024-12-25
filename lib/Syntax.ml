@@ -65,10 +65,17 @@ let pp_pattern =
 
 let pp_expr =
   let fc pf ef (p, e) =
-    break 1 ^^ group @@ string "|" ^^ space ^^ pf p ^^ space ^^ string "->" ^^ break 1 ^^ nest 2 @@ ef true e
+    break 1 ^^ group @@ align @@ string "|" ^^ space ^^ pf p ^^ space ^^ string "->" ^^ nest 2 @@ break 1 ^^ ef true e
   in
-  let fm ef e inf = string "match" ^^ space ^^ ef false e ^^ space ^^ string "with" ^^ nest 2 @@ inf in
+  let fm ef e inf = group @@ align @@ string "match" ^^ space ^^ ef false e ^^ space ^^ string "with" ^^ inf in
   let fd dflt ef = match dflt with Some x -> fc (fun _ -> underscore) ef ((), x) | None -> empty in
+  let fl pro lhs rhs tail =
+    align @@ group
+    @@ (group @@ pro
+       ^^ (nest 2 @@ break 1 ^^ align @@ lhs ^^ space ^^ string "=" ^^ space ^^ rhs)
+       ^^ break 1 ^^ string "in")
+    ^^ break 1 ^^ tail
+  in
   let rec f c (expr : expr) =
     let pp inner = if c then parens inner else inner in
     match expr with
@@ -86,20 +93,14 @@ let pp_expr =
     | Op (op, lhs, rhs) -> f true lhs ^^ space ^^ string op ^^ space ^^ f true rhs |> pp
     | Tup xs -> separate_map (comma ^^ space) (f true) xs |> parens
     | Lam (xs, e) ->
-        group @@ align @@ string "fun" ^^ space ^^ separate_map space pp_pattern xs ^^ space ^^ string "->" ^^ nest 2 @@ break 1
-        ^^ f true e
+        group @@ align @@ string "fun" ^^ space ^^ separate_map space pp_pattern xs ^^ space ^^ string "->" ^^ nest 2
+        @@ break 1 ^^ f true e
         |> pp
     | Arr xs -> separate_map (semi ^^ space) (f true) xs |> brackets
-    | Let (BOne (x, e1), e2) ->
-        align @@ string "let" ^^ space
-        ^^ (group @@ align @@ nest 2 @@ pp_pattern x ^^ space ^^ string "=" ^^ space ^^ f false e1 ^^ break 1)
-        ^^ string "in" ^^ break 1 ^^ f false e2
+    | Let (BOne (x, e1), e2) -> fl (string "let") (pp_pattern x) (f false e1) (f false e2)
     | Let (BSeq e1, e2) -> align @@ f false e1 ^^ semi ^^ break 1 ^^ f false e2
     | Let (BRec [], _) -> failwith "Empty recursive group"
-    | Let (BRec [ (x, e1) ], e2) ->
-        align @@ string "let" ^^ space ^^ string "rec" ^^ space
-        ^^ group (pp_pattern x ^^ space ^^ string "=" ^^ space ^^ f false e1 ^^ break 1)
-        ^^ string "in" ^^ break 1 ^^ f false e2
+    | Let (BRec [ (x, e1) ], e2) -> fl (string "let rec") (pp_pattern x) (f false e1) (f false e2)
     | Let (BRec _xs, _e2) -> failwith "Not implemented"
     | If (e, e1, e2) ->
         group @@ align
@@ -124,7 +125,7 @@ let pp_stmt =
     | Type _ -> failwith "Not implemented"
     | Term (x, tm) ->
         let name = match x with Some x -> pp_pattern x | None -> underscore in
-        string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ pp_expr tm ^^ string ";;"
+        string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group @@ pp_expr tm ^^ string ";;"
   in
   f
 
