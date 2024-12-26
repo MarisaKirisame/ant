@@ -1,17 +1,9 @@
 (library
  (name ant)
  (libraries pprint)
- (modules
-   Lexer
-   Tokens
-   Parser
-   Syntax
-   Tyck)
+ (modules Lexer Tokens Parser Syntax Tyck)
  (preprocess
-   (pps
-     ppx_string
-     ppx_let
-     ppx_deriving.show)))
+  (pps ppx_string ppx_let ppx_deriving.show)))
 
 (ocamllex Lexer)
 
@@ -24,4 +16,9 @@
  (modules Parser Tokens)
  (merge_into Parser)
  (explain true)
- (flags --external-tokens Tokens --unused-tokens --unused-precedence-levels --exn-carries-state))
+ (flags
+  --external-tokens
+  Tokens
+  --unused-tokens
+  --unused-precedence-levels
+  --exn-carries-state))

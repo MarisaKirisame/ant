@@ -44,7 +44,7 @@ let cmd =
   Cmd.v info Term.(const driver $ input $ print_ast)
 
 let () = exit (Cmd.eval cmd)
-=======
+
 module Fg = BatFingerTree
 
 let () = Printf.printf "\n"
