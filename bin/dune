@@ -1,7 +1,7 @@
 (executable
  (public_name ant)
  (name main)
- (libraries ant cmdliner))
+ (libraries ant cmdliner core batteries))
 
 (env
  (dev

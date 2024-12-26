@@ -228,9 +228,9 @@ and instl ctx eva = function
           [%string "unbound existential variable %{eva}"]
   | t -> Env.no_rule_applicable [%string "instl: no rule applicable for %{show_ty t}"]
 
-and instr ctx eva = function t -> Env.no_rule_applicable "g"
+and instr ctx eva = function t -> ignore ctx; ignore eva; ignore t; Env.no_rule_applicable "g"
 
 
-let rec check ctx e ta = Env.no_rule_applicable "g"
-and infer ctx e = Env.no_rule_applicable "g"
-and infer_app ctx ta e = Env.no_rule_applicable "g"
+let check ctx e ta = ignore ctx; ignore e; ignore ta; Env.no_rule_applicable "g"
+and infer ctx e = ignore ctx; ignore e; Env.no_rule_applicable "g"
+and infer_app ctx ta e = ignore ctx; ignore ta; ignore e; Env.no_rule_applicable "g"
