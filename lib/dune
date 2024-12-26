@@ -5,10 +5,13 @@
    Lexer
    Tokens
    Parser
-   Syntax)
+   Syntax
+   Tyck)
  (preprocess
-   (staged_pps
-     ppx_string)))
+   (pps
+     ppx_string
+     ppx_let
+     ppx_deriving.show)))
 
 (ocamllex Lexer)
 
