@@ -1,5 +1,5 @@
-type ctor = Ctor of string * int option
-type builtin = Builtin of string
+type ctor = Ctor of string * int option [@@deriving show]
+type builtin = Builtin of string [@@deriving show]
 
 type pattern =
   | PAny
@@ -9,11 +9,13 @@ type pattern =
   | PUnit
   | PTup of pattern list
   | PApp of string * pattern option
+  [@@deriving show]
 
 type binding =
   | BSeq of expr
   | BOne of pattern * expr
   | BRec of (pattern * expr) list
+  [@@deriving show]
 
 and expr =
   | Unit
@@ -33,11 +35,13 @@ and expr =
   | Sel of expr * string
   | If of expr * expr * expr
   | Match of expr * cases
+  [@@deriving show]
 
 and cases =
   | SwitchCtor of (ctor * expr) list * expr option
   | SwitchBool of (bool * expr) list * expr option
   | MatchPattern of (pattern * expr) list
+  [@@deriving show]
 
 type ty =
   | TUnit
@@ -47,9 +51,10 @@ type ty =
   | TArrow of ty list * ty
   | TTuple of ty list
   | TVar of ty ref
+  [@@deriving show]
 
-type stmt = Type of ty | Term of pattern option * expr
-type prog = stmt list
+type stmt = Type of ty | Term of pattern option * expr [@@deriving show]
+type prog = stmt list [@@deriving show]
 
 open PPrint
 
