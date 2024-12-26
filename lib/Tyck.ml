@@ -35,6 +35,7 @@ module Ctx = struct
   type t = entry list [@@deriving show]
 
   let find_map = List.find_map
+  let filter_map = List.filter_map
   let exists pred = List.exists (fun e -> Option.is_some (pred e))
 
   (*
@@ -156,21 +157,27 @@ end
 
 open Env.Let_syntax
 
+(* Under input context Γ, type A is a subtype of B, with output context Δ *)
 let rec subtype ctx a b =
   match (a, b) with
+  (* Unit *)
   | TUnit, TUnit -> Env.return ctx
+  (* Var *)
   | TVar x1, TVar x2 when String.equal x1 x2 ->
       if Ctx.exists (Ctx.tvar_named x1) ctx then Env.return ctx
       else Env.non_wellformed_context [%string "unbound type variable %{x1}"]
+  (* Exvar *)
   | TExVar x1, TExVar x2 when String.equal x1 x2 ->
       if Ctx.exists (Ctx.exvar_unsolved x1) ctx then Env.return ctx
       else
         Env.non_wellformed_context
           [%string "unbound existential variable %{x1}"]
+  (* → *)
   | TLam (a1, a2), TLam (b1, b2) ->
       let%bind ctx' = subtype ctx b1 a1 in
       let%bind ctx'' = subtype ctx' (Ctx.apply ctx' a2) (Ctx.apply ctx' b2) in
       Env.return ctx''
+  (* ∀L *)
   | TForall (x, a), b -> (
       let%bind ev = Env.fresh_exvar in
       let ctx' = Ctx.CEExVar ev :: Ctx.CEMarker ev :: ctx in
@@ -181,6 +188,7 @@ let rec subtype ctx a b =
           Env.non_wellformed_context
             [%string
               "unable to split: missing marker for existential variable %{ev}"])
+  (* ∀R *)
   | a, TForall (x, b) -> (
       let ctx' = Ctx.CETVar x :: ctx in
       let%bind ctx'' = subtype ctx' a b in
@@ -189,6 +197,7 @@ let rec subtype ctx a b =
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: missing type variable %{x}"])
+  (* InstantiateL *)
   | TExVar eva, a ->
       if occur_check eva a then
         Env.found_circularity [%string "found circularity of %{eva}"]
@@ -196,6 +205,7 @@ let rec subtype ctx a b =
       else
         Env.non_wellformed_context
           [%string "existential variable %{eva} is missing or solved"]
+  (* InstantiateR *)
   | a, TExVar eva ->
       if occur_check eva a then
         Env.found_circularity [%string "found circularity of %{eva}"]
@@ -207,7 +217,9 @@ let rec subtype ctx a b =
       Env.no_rule_applicable
         [%string "subtype: no rule applicable for %{show_ty a} <: %{show_ty b}"]
 
+(* Under input context Γ, instantiate α-hat such that α-hat <: A, with output context Δ *)
 and instl ctx eva = function
+  (* InstLSolve *)
   | t when is_monotype t -> (
       match Ctx.split (Ctx.exvar_unsolved eva) ctx with
       | Some (ctx2, _, ctx1) ->
@@ -219,6 +231,7 @@ and instl ctx eva = function
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: %{eva} is unbound or solved"])
+  (* InstLReach *)
   | TExVar evb -> (
       match
         Ctx.split2 (Ctx.exvar_unsolved evb) (Ctx.exvar_unsolved eva) ctx
@@ -233,6 +246,7 @@ and instl ctx eva = function
             [%string
               "unable to split2: existential variable %{eva}, %{evb} is \
                unbound or solved"])
+  (* InstLArr *)
   | TLam (a1, a2) -> (
       match Ctx.split (Ctx.exvar_unsolved eva) ctx with
       | Some (ctx2, _, ctx1) ->
@@ -249,6 +263,7 @@ and instl ctx eva = function
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: unbound existential variable %{eva}"])
+  (* InstLAllR *)
   | TForall (tvb, b) ->
       if Ctx.exists (Ctx.exvar_unsolved eva) ctx then
         let ctx' = Ctx.CETVar tvb :: ctx in
@@ -265,7 +280,9 @@ and instl ctx eva = function
       Env.no_rule_applicable
         [%string "instl: no rule applicable for %{show_ty t}"]
 
+(* Under input context Γ, instantiate α-hat such that A <: α-hat, with output context Δ *)
 and instr ctx eva = function
+  (* InstLSolve *)
   | t when is_monotype t -> (
       match Ctx.split (Ctx.exvar_unsolved eva) ctx with
       | Some (ctx2, _, ctx1) ->
@@ -277,6 +294,7 @@ and instr ctx eva = function
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: %{eva} is unbound or solved"])
+  (* InstRReach *)
   | TExVar evb -> (
       match
         Ctx.split2 (Ctx.exvar_unsolved evb) (Ctx.exvar_unsolved eva) ctx
@@ -291,6 +309,7 @@ and instr ctx eva = function
             [%string
               "unable to split2: existential variable %{eva}, %{evb} is \
                unbound or solved"])
+  (* InstRArr *)
   | TLam (a1, a2) -> (
       match Ctx.split (Ctx.exvar_unsolved eva) ctx with
       | Some (ctx2, _, ctx1) ->
@@ -307,6 +326,7 @@ and instr ctx eva = function
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: unbound existential variable %{eva}"])
+  (* InstRAllL *)
   | TForall (tvb, b) ->
       if Ctx.exists (Ctx.exvar_unsolved eva) ctx then
         let ctx' = Ctx.CEExVar tvb :: Ctx.CEMarker tvb :: ctx in
@@ -325,9 +345,12 @@ and instr ctx eva = function
       Env.no_rule_applicable
         [%string "instr: no rule applicable for %{show_ty t}"]
 
+(* Under input context Γ, e checks against input type A, with output context Δ *)
 let rec check ctx e ta =
   match (e, ta) with
+  (* 1I *)
   | Syntax.Unit, TUnit -> Env.return ctx
+  (* ∀I *)
   | e, TForall (tva, a) -> (
       let%bind ctx' = check (Ctx.CETVar tva :: ctx) e a in
       match Ctx.split (Ctx.tvar_named tva) ctx' with
@@ -335,6 +358,7 @@ let rec check ctx e ta =
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: missing type variable %{tva}"])
+  (* →I *)
   | Syntax.Lam ([ Syntax.PVar x ], e), TLam (ta, tb) -> (
       let%bind ctx' = check (Ctx.CEVar (x, ta) :: ctx) e tb in
       match Ctx.split (Ctx.var_named x) ctx' with
@@ -342,17 +366,22 @@ let rec check ctx e ta =
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: missing variable %{x}"])
+  (* Sub *)
   | e, b ->
       let%bind a, ctx' = infer ctx e in
       subtype ctx' (Ctx.apply ctx' a) (Ctx.apply ctx' b)
 
+(* Under input context Γ, e synthesizes output type A, with output context Δ *)
 and infer ctx e =
   match e with
+  (* 1I⇒ *)
   | Syntax.Unit -> Env.return (TUnit, ctx)
+  (* Var *)
   | Syntax.Var x -> (
       match Ctx.find_map (Ctx.var_named x) ctx with
       | Some t -> Env.return (t, ctx)
       | None -> Env.non_wellformed_context [%string "unbound variable %{x}"])
+  (* →I⇒ *)
   | Syntax.Lam ([ Syntax.PVar x ], e) -> (
       let%bind eva = Env.fresh_exvar in
       let%bind evb = Env.fresh_exvar in
@@ -365,6 +394,7 @@ and infer ctx e =
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: missing variable %{x}"])
+  (* →E *)
   | Syntax.App (e1, [ e2 ]) ->
       let%bind a, ctx' = infer ctx e1 in
       infer_app ctx' (Ctx.apply ctx' a) e2
@@ -372,10 +402,13 @@ and infer ctx e =
       Env.no_rule_applicable
         [%string "infer: no rule applicable for %{Syntax.show_expr t}"]
 
+(* Under input context Γ, applying a function of type Ato e synthesizes type C, with output context Δ *)
 and infer_app ctx ta e =
   match ta with
+  (* ∀App *)
   | TForall (tva, a) ->
       infer_app (Ctx.CEExVar tva :: ctx) (replace_tvar tva tva a) e
+  (* α-hat App *)
   | TExVar eva -> (
       match Ctx.split (Ctx.exvar_unsolved eva) ctx with
       | Some (ctx2, _, ctx1) ->
@@ -391,6 +424,7 @@ and infer_app ctx ta e =
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: unbound existential variable %{eva}"])
+  (* →App *)
   | TLam (a, c) ->
       let%bind ctx' = check ctx e a in
       Env.return (c, ctx')
