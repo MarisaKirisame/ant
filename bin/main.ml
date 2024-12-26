@@ -44,3 +44,37 @@ let cmd =
   Cmd.v info Term.(const driver $ input $ print_ast)
 
 let () = exit (Cmd.eval cmd)
+=======
+module Fg = BatFingerTree
+
+let () = Printf.printf "\n"
+
+let time f s =
+  let t = Sys.time () in
+  let fx = f () in
+  Printf.printf "%s Time: %fms\n" s (1000. *. (Sys.time () -. t));
+  fx
+
+let times = 1000 * 1000
+let rec build_seq n aux = if n == 0 then aux else build_seq (n - 1) (Fg.cons aux 1)
+let rec build_list n aux = if n == 0 then aux else build_list (n - 1) (0 :: aux)
+let () = time (fun _ -> ignore (build_seq times Fg.empty)) "seq  cons"
+let () = time (fun _ -> ignore (build_list times [])) "list cons"
+let seq = build_seq times Fg.empty
+let list = build_list times []
+
+open Core
+let bb = Hashtbl.create (module Int)
+let () =
+  time
+    (fun _ ->
+      let rec insert n =
+        if n != 0 then (Hashtbl.add_exn bb n n;
+        insert (n - 1))
+      in
+      insert times)
+    ""
+
+let () = time (fun _ -> ignore (Fg.fold_left ( + ) 0 seq)) "seq  fold"
+let () = time (fun _ -> ignore (List.length list)) "list fold"
+let () = print_endline "Hello, World!"

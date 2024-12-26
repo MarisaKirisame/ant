@@ -1,5 +1,6 @@
 exception EXN of string
 
+(*
 let panic msg = raise (EXN msg)
 let todo msg = panic ("todo: " ^ msg)
 
@@ -32,19 +33,31 @@ let todo msg = panic ("todo: " ^ msg)
   might worth expanding all case so it only do 1 match.
 *)
 
-type 'a seq = Empty | Unit of 'a | More of 'a some * 'a tuple seq * 'a some
-and 'a some = One of 'a | Two of 'a * 'a | Three of 'a * 'a * 'a
-and 'a tuple = Pair of 'a * 'a | Triple of 'a * 'a * 'a
+type ('v, 'a) seq = Empty | Unit of 'a | More of 'v * 'a some * ('v, ('v, 'a) tuple) seq * 'a some
+and ('v, 'a) some = One of 'v * 'a | Two of 'v * 'a * 'a | Three of 'v * 'a * 'a * 'a
+and ('v, 'a) tuple = Pair of 'v * 'a * 'a | Triple of 'v * 'a * 'a * 'a
 
-let rec cons : 'a. 'a -> 'a seq -> 'a seq =
- fun x xs ->
+type 'v monoid = { mempty : 'v; mappend : 'v -> 'v -> 'v }
+type ('v, 'a) measurement = { measure : 'a -> 'v; m : 'v monoid }
+
+let rec cons_aux : 'v 'a. 'v monoid -> 'v -> 'a -> ('v, 'a) seq -> ('v, 'a) seq =
+  fun m xv x xs ->
+   match xs with
+   | Empty -> Unit x
+   | Unit y -> More (m.mappend (xv) (m.measure y), One x, Empty, One y)
+   | More (v, One y, q, u) -> More (m.mappend (xv) v, Two (x, y), q, u)
+   | More (v, Two (y, z), q, u) -> More (m.mappend (xv) v, Three (x, y, z), q, u)
+   | More (v, Three (y, z, w), q, u) -> More (m.mappend (xv) v, Two (x, y), cons (Pair (z, w)) q, u) 
+
+let rec cons : 'v 'a. ('v, 'a) measurement -> 'a -> ('v, 'a) seq -> ('v, 'a) seq =
+ fun m x xs ->
   match xs with
   | Empty -> Unit x
-  | Unit y -> More (One x, Empty, One y)
-  | More (One y, q, u) -> More (Two (x, y), q, u)
-  | More (Two (y, z), q, u) -> More (Three (x, y, z), q, u)
-  | More (Three (y, z, w), q, u) -> More (Two (x, y), cons (Pair (z, w)) q, u)
-
+  | Unit y -> More (m.m.mappend (m.measure x) (m.measure y), One x, Empty, One y)
+  | More (v, One y, q, u) -> More (m.m.mappend (m.measure x) v, Two (x, y), q, u)
+  | More (v, Two (y, z), q, u) -> More (m.m.mappend (m.measure x) v, Three (x, y, z), q, u)
+  | More (v, Three (y, z, w), q, u) -> More (m.m.mappend (m.measure x) v, Two (x, y), cons (Pair (z, w)) q, u)
+(*
 let rec snoc : 'a. 'a seq -> 'a -> 'a seq =
  fun xs x ->
   match xs with
@@ -112,3 +125,5 @@ and toList (x : 'a some) : 'a list =
   match x with One y -> [ y ] | Two (y, z) -> [ y; z ] | Three (y, z, w) -> [ y; z; w ]
 
 let append (x : 'a seq) (y : 'a seq) : 'a seq = glue x [] y
+*)
+*)
