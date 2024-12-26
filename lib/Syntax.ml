@@ -9,13 +9,13 @@ type pattern =
   | PUnit
   | PTup of pattern list
   | PApp of string * pattern option
-  [@@deriving show]
+[@@deriving show]
 
 type binding =
   | BSeq of expr
   | BOne of pattern * expr
   | BRec of (pattern * expr) list
-  [@@deriving show]
+[@@deriving show]
 
 and expr =
   | Unit
@@ -35,26 +35,32 @@ and expr =
   | Sel of expr * string
   | If of expr * expr * expr
   | Match of expr * cases
-  [@@deriving show]
+[@@deriving show]
 
 and cases =
   | SwitchCtor of (ctor * expr) list * expr option
   | SwitchBool of (bool * expr) list * expr option
   | MatchPattern of (pattern * expr) list
-  [@@deriving show]
+[@@deriving show]
 
 type ty =
   | TUnit
   | TInt
   | TFloat
   | TBool
-  | TArrow of ty list * ty
+  | TApply of ty * ty list
+  | TArrow of ty * ty
   | TTuple of ty list
   | TVar of ty ref
-  [@@deriving show]
+  | TNamed of string
+  | TNamedVar of string (* this is the surface syntax used during parsing *)
 
-type stmt = Type of ty | Term of pattern option * expr [@@deriving show]
-type prog = stmt list [@@deriving show]
+type ty_decl =
+  | Enum of string * (string * ty list) list
+  | Record of string * (string * ty) list
+
+type stmt = Type of ty_decl | Term of pattern option * expr
+type prog = stmt list
 
 open PPrint
 
@@ -152,10 +158,42 @@ let pp_expr =
   in
   f false
 
+let pp_ty =
+  let rec f c (ty : ty) =
+    let pp inner = if c then parens inner else inner in
+    match ty with
+    | TUnit -> string "unit"
+    | TInt -> string "int"
+    | TFloat -> string "float"
+    | TBool -> string "bool"
+    | TApply (ty, []) -> f c ty
+    | TApply (ty, tys) ->
+        separate_map space (f true) tys ^^ space ^^ f c ty ^^ space |> pp
+    | TArrow (ty1, ty2) ->
+        f true ty1 ^^ space ^^ string "->" ^^ space ^^ f true ty2 |> pp
+    | TTuple tys -> separate_map (comma ^^ space) (f true) tys |> parens
+    | TVar { contents = ty } -> f c ty (* TODO: cycle *)
+    | TNamedVar name -> string ("'" ^ name)
+    | TNamed name -> string name
+  in
+  f false
+
 let pp_stmt =
   let f (s : stmt) =
     match s with
-    | Type _ -> failwith "Not implemented"
+    | Type (Enum (name, ctors)) ->
+        let pp_ctor (ctor, tys) =
+          string ctor
+          ^^
+          match tys with
+          | [] -> empty
+          | _ -> space ^^ string "of" ^^ space ^^ separate_map space pp_ty tys
+        in
+        group @@ align @@ string "type" ^^ space ^^ string name ^^ space
+        ^^ string "=" ^^ nest 2 @@ break 1 ^^ string "|" ^^ space
+        ^^ separate_map (break 1 ^^ string "|" ^^ space) pp_ctor ctors
+        ^^ string ";;"
+    | Type (Record (_name, _fields)) -> failwith "Not implemented"
     | Term (x, tm) ->
         let name = match x with Some x -> pp_pattern x | None -> underscore in
         string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
