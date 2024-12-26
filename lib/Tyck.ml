@@ -183,8 +183,14 @@ and instl ctx eva = function
   | t when is_monotype t -> (
       match Ctx.split (Ctx.exvar_unsolved eva) ctx with
       | Some (ctx2, _, ctx1) ->
-          Env.return (List.rev_append ctx2 (Ctx.CESolved (eva, t) :: ctx1))
-      | None -> Env.non_wellformed_context "123")
+          if Ctx.is_wellformed_ty ctx1 t then
+            Env.return (List.rev_append ctx2 (Ctx.CESolved (eva, t) :: ctx1))
+          else
+            Env.non_wellformed_context
+              [%string "non wellformed type %{show_ty t}"]
+      | None ->
+          Env.non_wellformed_context
+            [%string "unable to split: %{eva} is unbound or solved"])
   | TExVar evb -> (
       match
         Ctx.split2 (Ctx.exvar_unsolved evb) (Ctx.exvar_unsolved eva) ctx
@@ -198,7 +204,7 @@ and instl ctx eva = function
           Env.non_wellformed_context
             [%string
               "unable to split2: existential variable %{eva}, %{evb} is \
-               unbound or already solved"])
+               unbound or solved"])
   | TLam (a1, a2) -> (
       match Ctx.split (Ctx.exvar_unsolved eva) ctx with
       | Some (ctx2, _, ctx1) ->
@@ -232,25 +238,132 @@ and instl ctx eva = function
         [%string "instl: no rule applicable for %{show_ty t}"]
 
 and instr ctx eva = function
+  | t when is_monotype t -> (
+      match Ctx.split (Ctx.exvar_unsolved eva) ctx with
+      | Some (ctx2, _, ctx1) ->
+          if Ctx.is_wellformed_ty ctx1 t then
+            Env.return (List.rev_append ctx2 (Ctx.CESolved (eva, t) :: ctx1))
+          else
+            Env.non_wellformed_context
+              [%string "non wellformed type %{show_ty t}"]
+      | None ->
+          Env.non_wellformed_context
+            [%string "unable to split: %{eva} is unbound or solved"])
+  | TExVar evb -> (
+      match
+        Ctx.split2 (Ctx.exvar_unsolved evb) (Ctx.exvar_unsolved eva) ctx
+      with
+      | Some (ctx3, _, ctx2, e1, ctx1) ->
+          Env.return
+            (List.rev_append ctx3
+               (Ctx.CESolved (evb, TExVar eva)
+               :: List.rev_append ctx2 (e1 :: ctx1)))
+      | None ->
+          Env.non_wellformed_context
+            [%string
+              "unable to split2: existential variable %{eva}, %{evb} is \
+               unbound or solved"])
+  | TLam (a1, a2) -> (
+      match Ctx.split (Ctx.exvar_unsolved eva) ctx with
+      | Some (ctx2, _, ctx1) ->
+          let%bind ev1 = Env.fresh_exvar in
+          let%bind ev2 = Env.fresh_exvar in
+          let ctx' =
+            List.rev_append ctx2
+              (Ctx.CESolved (eva, TLam (TExVar ev1, TExVar ev2))
+              :: Ctx.CEExVar ev1 :: Ctx.CEExVar ev2 :: ctx1)
+          in
+          let%bind ctx'' = instl ctx' ev1 a1 in
+          let%bind ctx''' = instr ctx'' ev2 (Ctx.apply ctx'' a2) in
+          Env.return ctx'''
+      | None ->
+          Env.non_wellformed_context
+            [%string "unable to split: unbound existential variable %{eva}"])
+  | TForall (tvb, b) ->
+      if Ctx.exists (Ctx.exvar_unsolved eva) ctx then
+        let ctx' = Ctx.CEExVar tvb :: Ctx.CEMarker tvb :: ctx in
+        let%bind ctx'' = instr ctx' eva (replace_tvar tvb tvb b) in
+        match Ctx.split (Ctx.marker_named tvb) ctx'' with
+        | Some (_, _, ctx1) -> Env.return ctx1
+        | None ->
+            Env.non_wellformed_context
+              [%string
+                "unable to split: missing marker for existential variable \
+                 %{tvb}"]
+      else
+        Env.non_wellformed_context
+          [%string "unbound existential variable %{eva}"]
   | t ->
-      ignore ctx;
-      ignore eva;
-      ignore t;
-      Env.no_rule_applicable "g"
+      Env.no_rule_applicable
+        [%string "instr: no rule applicable for %{show_ty t}"]
 
-let check ctx e ta =
-  ignore ctx;
-  ignore e;
-  ignore ta;
-  Env.no_rule_applicable "g"
+let rec check ctx e ta =
+  match (e, ta) with
+  | Syntax.Unit, TUnit -> Env.return ctx
+  | e, TForall (tva, a) -> (
+      let%bind ctx' = check (Ctx.CETVar tva :: ctx) e a in
+      match Ctx.split (Ctx.tvar_named tva) ctx' with
+      | Some (_, _, ctx1) -> Env.return ctx1
+      | None ->
+          Env.non_wellformed_context
+            [%string "unable to split: missing type variable %{tva}"])
+  | Syntax.Lam ([ Syntax.PVar x ], e), TLam (ta, tb) -> (
+      let%bind ctx' = check (Ctx.CEVar (x, ta) :: ctx) e tb in
+      match Ctx.split (Ctx.var_named x) ctx' with
+      | Some (_, _, ctx1) -> Env.return ctx1
+      | None ->
+          Env.non_wellformed_context
+            [%string "unable to split: missing variable %{x}"])
+  | e, b ->
+      let%bind a, ctx' = infer ctx e in
+      subtype ctx' (Ctx.apply ctx' a) (Ctx.apply ctx' b)
 
 and infer ctx e =
-  ignore ctx;
-  ignore e;
-  Env.no_rule_applicable "g"
+  match e with
+  | Syntax.Unit -> Env.return (TUnit, ctx)
+  | Syntax.Var x -> (
+      match Ctx.find_map (Ctx.var_named x) ctx with
+      | Some t -> Env.return (t, ctx)
+      | None -> Env.non_wellformed_context [%string "unbound variable %{x}"])
+  | Syntax.Lam ([ Syntax.PVar x ], e) -> (
+      let%bind eva = Env.fresh_exvar in
+      let%bind evb = Env.fresh_exvar in
+      let ctx' =
+        Ctx.CEVar (x, TExVar eva) :: Ctx.CEExVar evb :: Ctx.CEExVar eva :: ctx
+      in
+      let%bind ctx'' = check ctx' e (TExVar evb) in
+      match Ctx.split (Ctx.var_named x) ctx'' with
+      | Some (_, _, ctx1) -> Env.return (TLam (TExVar eva, TExVar evb), ctx1)
+      | None ->
+          Env.non_wellformed_context
+            [%string "unable to split: missing variable %{x}"])
+  | Syntax.App (e1, [ e2 ]) ->
+      let%bind a, ctx' = infer ctx e1 in
+      infer_app ctx' (Ctx.apply ctx' a) e2
+  | t -> Env.no_rule_applicable [%string "infer: no rule applicable for %{Syntax.show_expr t}"]
 
 and infer_app ctx ta e =
-  ignore ctx;
-  ignore ta;
-  ignore e;
-  Env.no_rule_applicable "g"
+  match ta with
+  | TForall (tva, a) ->
+      infer_app (Ctx.CEExVar tva :: ctx) (replace_tvar tva tva a) e
+  | TExVar eva -> (
+      match Ctx.split (Ctx.exvar_unsolved eva) ctx with
+      | Some (ctx2, _, ctx1) ->
+          let%bind eva1 = Env.fresh_exvar in
+          let%bind eva2 = Env.fresh_exvar in
+          let ctx' =
+            List.rev_append ctx2
+              (Ctx.CESolved (eva, TLam (TExVar eva1, TExVar eva2))
+              :: Ctx.CEExVar eva1 :: Ctx.CEExVar eva2 :: ctx1)
+          in
+          let%bind ctx'' = check ctx' e (TExVar eva1) in
+          Env.return (TExVar eva2, ctx'')
+      | None ->
+          Env.non_wellformed_context
+            [%string "unable to split: unbound existential variable %{eva}"])
+  | TLam (a, c) ->
+      let%bind ctx' = check ctx e a in
+      Env.return (c, ctx')
+  | t ->
+      Env.no_rule_applicable
+        [%string "infer_app: no rule applicable for %{show_ty t}"]
