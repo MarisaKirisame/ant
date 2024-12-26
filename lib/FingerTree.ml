@@ -1,8 +1,4 @@
-exception EXN of string
-
 (*
-let panic msg = raise (EXN msg)
-let todo msg = panic ("todo: " ^ msg)
 
 (*We are writing our own finger tree, instead of using the one at batteries, for performance reason.
 
