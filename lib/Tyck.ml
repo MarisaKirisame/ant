@@ -4,7 +4,7 @@ type ty =
   | TExVar of string
   | TForall of string * ty
   | TLam of ty * ty
-  [@@deriving show]
+[@@deriving show]
 
 let rec is_monotype = function
   | TForall (_, _) -> false
@@ -24,7 +24,7 @@ module Ctx = struct
     | CEExVar of string
     | CESolved of string * ty
     | CEMarker of string
-    [@@deriving show]
+  [@@deriving show]
 
   type t = entry list [@@deriving show]
 
@@ -124,7 +124,6 @@ module Env = struct
   let fresh_exvar s = (Success ("ev" ^ string_of_int s), s + 1)
   let non_wellformed_context m s = (NonWellformedContext m, s)
   let no_rule_applicable m s = (NoRuleApplicable m, s)
-
   let run s e = fst (e s)
 
   module Let_syntax = struct
@@ -176,7 +175,9 @@ let rec subtype ctx a b =
           Env.non_wellformed_context
             [%string "unable to split: missing type variable %{x}"])
   (* todo: instl & instr *)
-  | _ -> Env.no_rule_applicable [%string "subtype: no rule applicable for %{show_ty a} <: %{show_ty b}"]
+  | _ ->
+      Env.no_rule_applicable
+        [%string "subtype: no rule applicable for %{show_ty a} <: %{show_ty b}"]
 
 and instl ctx eva = function
   | t when is_monotype t -> (
@@ -226,11 +227,30 @@ and instl ctx eva = function
       else
         Env.non_wellformed_context
           [%string "unbound existential variable %{eva}"]
-  | t -> Env.no_rule_applicable [%string "instl: no rule applicable for %{show_ty t}"]
+  | t ->
+      Env.no_rule_applicable
+        [%string "instl: no rule applicable for %{show_ty t}"]
 
-and instr ctx eva = function t -> ignore ctx; ignore eva; ignore t; Env.no_rule_applicable "g"
+and instr ctx eva = function
+  | t ->
+      ignore ctx;
+      ignore eva;
+      ignore t;
+      Env.no_rule_applicable "g"
 
+let check ctx e ta =
+  ignore ctx;
+  ignore e;
+  ignore ta;
+  Env.no_rule_applicable "g"
 
-let check ctx e ta = ignore ctx; ignore e; ignore ta; Env.no_rule_applicable "g"
-and infer ctx e = ignore ctx; ignore e; Env.no_rule_applicable "g"
-and infer_app ctx ta e = ignore ctx; ignore ta; ignore e; Env.no_rule_applicable "g"
+and infer ctx e =
+  ignore ctx;
+  ignore e;
+  Env.no_rule_applicable "g"
+
+and infer_app ctx ta e =
+  ignore ctx;
+  ignore ta;
+  ignore e;
+  Env.no_rule_applicable "g"
