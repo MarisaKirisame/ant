@@ -11,8 +11,14 @@ let rec is_monotype = function
   | TLam (a, b) -> is_monotype a && is_monotype b
   | _ -> true
 
+let rec occur_check ev = function
+  | TExVar ev' when String.equal ev ev' -> true
+  | TForall (_, b) -> occur_check ev b
+  | TLam (a, b) -> occur_check ev a || occur_check ev b
+  | _ -> false
+
 let rec replace_tvar n ev = function
-  | TVar n' when n == n' -> TExVar ev
+  | TVar n' when String.equal n n' -> TExVar ev
   | TLam (a, b) -> TLam (replace_tvar n ev a, replace_tvar n ev b)
   | TForall (x, b) -> TForall (x, replace_tvar n ev b)
   | t -> t
@@ -58,24 +64,29 @@ module Ctx = struct
         | None -> None)
     | None -> None
 
-  let var_named x = function CEVar (x', b) when x == x' -> Some b | _ -> None
-  let tvar_named x = function CETVar x' when x == x' -> Some () | _ -> None
+  let var_named x = function
+    | CEVar (x', b) when String.equal x x' -> Some b
+    | _ -> None
+
+  let tvar_named x = function
+    | CETVar x' when String.equal x x' -> Some ()
+    | _ -> None
 
   let exvar_named x = function
-    | CEExVar x' when x == x' -> Some None
-    | CESolved (x', b) when x == x' -> Some (Some b)
+    | CEExVar x' when String.equal x x' -> Some None
+    | CESolved (x', b) when String.equal x x' -> Some (Some b)
     | _ -> None
 
   let exvar_unsolved x = function
-    | CEExVar x' when x == x' -> Some ()
+    | CEExVar x' when String.equal x x' -> Some ()
     | _ -> None
 
   let exvar_solved x = function
-    | CESolved (x', b) when x == x' -> Some b
+    | CESolved (x', b) when String.equal x x' -> Some b
     | _ -> None
 
   let marker_named x = function
-    | CEMarker x' when x == x' -> Some ()
+    | CEMarker x' when String.equal x x' -> Some ()
     | _ -> None
 
   let rec is_wellformed_ty ctx = function
@@ -100,6 +111,7 @@ module Env = struct
     | Success of 'a
     | NonWellformedContext of string
     | NoRuleApplicable of string
+    | FoundCircularity of string
 
   (* exvar_cnt *)
   type s = int
@@ -113,6 +125,7 @@ module Env = struct
     | Success r -> f r s'
     | NonWellformedContext m -> (NonWellformedContext m, s')
     | NoRuleApplicable m -> (NoRuleApplicable m, s')
+    | FoundCircularity m -> (FoundCircularity m, s')
 
   let map x ~f s =
     let a, s' = x s in
@@ -120,10 +133,12 @@ module Env = struct
     | Success r -> (f r, s')
     | NonWellformedContext m -> (NonWellformedContext m, s')
     | NoRuleApplicable m -> (NoRuleApplicable m, s')
+    | FoundCircularity m -> (FoundCircularity m, s')
 
   let fresh_exvar s = (Success ("ev" ^ string_of_int s), s + 1)
   let non_wellformed_context m s = (NonWellformedContext m, s)
   let no_rule_applicable m s = (NoRuleApplicable m, s)
+  let found_circularity m s = (FoundCircularity m, s)
   let run s e = fst (e s)
 
   module Let_syntax = struct
@@ -144,10 +159,10 @@ open Env.Let_syntax
 let rec subtype ctx a b =
   match (a, b) with
   | TUnit, TUnit -> Env.return ctx
-  | TVar x1, TVar x2 when x1 == x2 ->
+  | TVar x1, TVar x2 when String.equal x1 x2 ->
       if Ctx.exists (Ctx.tvar_named x1) ctx then Env.return ctx
       else Env.non_wellformed_context [%string "unbound type variable %{x1}"]
-  | TExVar x1, TExVar x2 when x1 == x2 ->
+  | TExVar x1, TExVar x2 when String.equal x1 x2 ->
       if Ctx.exists (Ctx.exvar_unsolved x1) ctx then Env.return ctx
       else
         Env.non_wellformed_context
@@ -174,7 +189,20 @@ let rec subtype ctx a b =
       | None ->
           Env.non_wellformed_context
             [%string "unable to split: missing type variable %{x}"])
-  (* todo: instl & instr *)
+  | TExVar eva, a ->
+      if occur_check eva a then
+        Env.found_circularity [%string "found circularity of %{eva}"]
+      else if Ctx.exists (Ctx.exvar_unsolved eva) ctx then instl ctx eva a
+      else
+        Env.non_wellformed_context
+          [%string "existential variable %{eva} is missing or solved"]
+  | a, TExVar eva ->
+      if occur_check eva a then
+        Env.found_circularity [%string "found circularity of %{eva}"]
+      else if Ctx.exists (Ctx.exvar_unsolved eva) ctx then instr ctx eva a
+      else
+        Env.non_wellformed_context
+          [%string "existential variable %{eva} is missing or solved"]
   | _ ->
       Env.no_rule_applicable
         [%string "subtype: no rule applicable for %{show_ty a} <: %{show_ty b}"]
@@ -340,7 +368,9 @@ and infer ctx e =
   | Syntax.App (e1, [ e2 ]) ->
       let%bind a, ctx' = infer ctx e1 in
       infer_app ctx' (Ctx.apply ctx' a) e2
-  | t -> Env.no_rule_applicable [%string "infer: no rule applicable for %{Syntax.show_expr t}"]
+  | t ->
+      Env.no_rule_applicable
+        [%string "infer: no rule applicable for %{Syntax.show_expr t}"]
 
 and infer_app ctx ta e =
   match ta with
@@ -367,3 +397,5 @@ and infer_app ctx ta e =
   | t ->
       Env.no_rule_applicable
         [%string "infer_app: no rule applicable for %{show_ty t}"]
+
+let e1 = Syntax.Lam ([ Syntax.PVar "x" ], Syntax.Var "x")
