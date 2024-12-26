@@ -14,6 +14,8 @@ depends: [
   "dune" {>= "3.16"}
   "pprint"
   "cmdliner"
+  "batteries"
+  "core"
   "odoc" {with-doc}
 ]
 build: [
