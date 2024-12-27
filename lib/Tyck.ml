@@ -447,7 +447,6 @@ and infer ctx e =
           let mt = Ctx.apply ctx2 (TLam (TExVar eva, TExVar evb)) in
           let evs = Ctx.filter_map Ctx.exvar_unsolved ctx2 in
           let%bind evns = Env.fresh_tvars evs in
-          print_endline [%string "ctx2=%{Ctx.show ctx2}"];
           if is_monotype mt then Env.return (gen_exvars mt evns, ctx1)
           else
             Env.no_rule_applicable
