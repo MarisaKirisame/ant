@@ -151,6 +151,10 @@ module Env = struct
     | NoRuleApplicable m -> (NoRuleApplicable m, s')
     | FoundCircularity m -> (FoundCircularity m, s')
 
+  let or_else x y s =
+    let a, s' = x s in
+    match a with Success r -> (Success r, s') | _ -> y s
+
   module Let_syntax = struct
     module Let_syntax = struct
       let return = return
@@ -165,7 +169,9 @@ module Env = struct
 
   open Let_syntax
 
-  let fresh_exvar (evc, tvc) = (Success ("ev" ^ string_of_int evc), (evc + 1, tvc))
+  let fresh_exvar (evc, tvc) =
+    (Success ("ev" ^ string_of_int evc), (evc + 1, tvc))
+
   let fresh_tvar (evc, tvc) = (Success ("t" ^ string_of_int tvc), (evc, tvc + 1))
 
   let rec fresh_tvars = function
@@ -185,7 +191,9 @@ open Env.Let_syntax
 
 (* Under input context Γ, type A is a subtype of B, with output context Δ *)
 let rec subtype ctx a b =
-  (* print_endline [%string "subtype:\n  ctx=%{Ctx.show ctx}\n  a=%{show_ty a}\n  b=%{show_ty b}\n"]; *)
+  print_endline
+    [%string
+      "subtype:\n  ctx=%{Ctx.show ctx}\n  a=%{show_ty a}\n  b=%{show_ty b}\n"];
   match (a, b) with
   (* Unit *)
   | TUnit, TUnit -> Env.return ctx
@@ -246,7 +254,8 @@ let rec subtype ctx a b =
 
 (* Under input context Γ, instantiate α-hat such that α-hat <: A, with output context Δ *)
 and instl ctx eva t =
-  (* print_endline [%string "instl:\n  ctx=%{Ctx.show ctx}\n  eva=%{eva}\n  t=%{show_ty t}\n"]; *)
+  print_endline
+    [%string "instl:\n  ctx=%{Ctx.show ctx}\n  eva=%{eva}\n  t=%{show_ty t}\n"];
   match t with
   (* InstLReach *)
   | TExVar evb -> (
@@ -265,7 +274,8 @@ and instl ctx eva t =
           Env.non_wellformed_context
             [%string
               "unable to split2: existential variable %{eva}, %{evb} is \
-               unbound or solved"])
+               unbound or solved\n\
+               ctx=%{Ctx.show ctx}"])
   (* InstLArr *)
   | TLam (a1, a2) -> (
       match Ctx.split (Ctx.exvar_unsolved_named eva) ctx with
@@ -307,14 +317,17 @@ and instl ctx eva t =
               [%string "non wellformed type %{show_ty t}"]
       | None ->
           Env.non_wellformed_context
-            [%string "unable to split: %{eva} is unbound or solved"])
+            [%string
+              "unable to split: %{eva} is unbound or solved\n\
+               ctx=%{Ctx.show ctx}"])
   | t ->
       Env.no_rule_applicable
         [%string "instl: no rule applicable for %{show_ty t}"]
 
 (* Under input context Γ, instantiate α-hat such that A <: α-hat, with output context Δ *)
 and instr ctx eva t =
-  (* print_endline [%string "instr:\n  ctx=%{Ctx.show ctx}\n  eva=%{eva}\n  t=%{show_ty t}\n"]; *)
+  print_endline
+    [%string "instr:\n  ctx=%{Ctx.show ctx}\n  eva=%{eva}\n  t=%{show_ty t}\n"];
   match t with
   (* InstRReach *)
   | TExVar evb -> (
@@ -333,7 +346,8 @@ and instr ctx eva t =
           Env.non_wellformed_context
             [%string
               "unable to split2: existential variable %{eva}, %{evb} is \
-               unbound or solved"])
+               unbound or solved\n\
+               ctx=%{Ctx.show ctx}"])
   (* InstRArr *)
   | TLam (a1, a2) -> (
       match Ctx.split (Ctx.exvar_unsolved_named eva) ctx with
@@ -377,14 +391,21 @@ and instr ctx eva t =
               [%string "non wellformed type %{show_ty t}"]
       | None ->
           Env.non_wellformed_context
-            [%string "unable to split: %{eva} is unbound or solved"])
+            [%string
+              "unable to split: %{eva} is unbound or solved\n\
+               ctx=%{Ctx.show ctx}"])
   | t ->
       Env.no_rule_applicable
         [%string "instr: no rule applicable for %{show_ty t}"]
 
 (* Under input context Γ, e checks against input type A, with output context Δ *)
 let rec check ctx e ta =
-  (* print_endline [%string "check:\n  ctx=%{Ctx.show ctx}\n  e=%{Syntax.show_expr e}\n  ta=%{show_ty ta}\n"]; *)
+  print_endline
+    [%string
+      "check:\n\
+      \  ctx=%{Ctx.show ctx}\n\
+      \  e=%{Syntax.show_expr e}\n\
+      \  ta=%{show_ty ta}\n"];
   match (e, ta) with
   (* 1I *)
   | Syntax.Unit, TUnit -> Env.return ctx
@@ -411,7 +432,8 @@ let rec check ctx e ta =
 
 (* Under input context Γ, e synthesizes output type A, with output context Δ *)
 and infer ctx e =
-  (* print_endline [%string "infer:\n  ctx=%{Ctx.show ctx}\n  e=%{Syntax.show_expr e}\n"]; *)
+  print_endline
+    [%string "infer:\n  ctx=%{Ctx.show ctx}\n  e=%{Syntax.show_expr e}\n"];
   match e with
   (* 1I⇒ *)
   | Syntax.Unit -> Env.return (TUnit, ctx)
@@ -466,7 +488,12 @@ and infer ctx e =
 
 (* Under input context Γ, applying a function of type Ato e synthesizes type C, with output context Δ *)
 and infer_app ctx ta e =
-  (* print_endline [%string "infer_app:\n  ctx=%{Ctx.show ctx}\n  e=%{Syntax.show_expr e}\n  ta=%{show_ty ta}\n"]; *)
+  print_endline
+    [%string
+      "infer_app:\n\
+      \  ctx=%{Ctx.show ctx}\n\
+      \  e=%{Syntax.show_expr e}\n\
+      \  ta=%{show_ty ta}\n"];
   match ta with
   (* ∀App *)
   | TForall (tva, a) ->
@@ -496,3 +523,18 @@ and infer_app ctx ta e =
         [%string "infer_app: no rule applicable for %{show_ty t}"]
 
 let e1 = Syntax.Lam ([ Syntax.PVar "x" ], Syntax.Var "x")
+
+let e2 =
+  Syntax.Lam
+    ( [ Syntax.PVar "x" ],
+      Syntax.Lam
+        ([ Syntax.PVar "y" ], Syntax.App (Syntax.Var "x", [ Syntax.Var "y" ]))
+    )
+
+let t2 =
+  TForall
+    ( "a",
+      TForall ("b", TLam (TLam (TLam (TVar "a", TVar "b"), TVar "a"), TVar "b"))
+    )
+
+(* let f x y = x y *)
