@@ -1,7 +1,7 @@
 (library
  (name ant)
  (libraries pprint batteries)
- (modules Lexer Tokens Parser Syntax Tyck)
+ (modules Lexer Tokens Parser Syntax Tyck Seq)
  (preprocess
   (pps ppx_string ppx_let ppx_deriving.show)))
 
