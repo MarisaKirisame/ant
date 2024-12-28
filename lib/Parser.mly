@@ -64,12 +64,11 @@ rev_sep_llist1(S, X):
 
 // reversed left-recursive list with separator and at least two elements
 rev_sep_llist2(S, X):
-  | x1 = X S x2 = X { [x1; x2] }
+  | x1 = X S x2 = X { [x2; x1] }
   | xs = rev_sep_llist2(S, X) S x = X { x :: xs }
 
-sep_llist2(S, X):
-  | x1 = X S x2 = X { [x1; x2] }
-  | xs = sep_llist2(S, X) S x = X { x :: xs }
+%inline sep_llist2(S, X):
+  | xs = rev(rev_sep_llist2(S, X)) { xs }
 
 // right-recursive list with separator and an optional terminator
 sep_or_terminated_rlist1(D, X):
