@@ -73,6 +73,10 @@ let monoid : measure monoid =
 
 let constructor_degree_table : int Dynarray.t = Dynarray.create ()
 
+let set_constructor_degree (ctag : int) (degree : int) : unit =
+  assert (Dynarray.length constructor_degree_table == ctag);
+  Dynarray.add_last constructor_degree_table degree
+
 let measure (w : Word.t) : measure =
   let degree =
     match Word.get_tag w with
@@ -84,12 +88,18 @@ let measure (w : Word.t) : measure =
 
 type seq = (Word.t, measure) Generic.fg
 
+let from_constructor (ctag : int) : seq =
+  Generic.singleton (Word.make Word.constructor_tag ctag)
+
+let from_int (i : int) : seq = Generic.singleton (Word.make Word.int_tag i)
 let summary (s : seq) : measure = Generic.measure ~monoid ~measure s
 let length (s : seq) : int = (summary s).length
 let degree (s : seq) : int = (summary s).degree
 let max_degree (s : seq) : int = (summary s).max_degree
+let is_empty (s : seq) = Generic.is_empty s
 let empty : seq = Generic.empty
 let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
+let appends (x : seq list) : seq = List.fold_right append x empty
 let cons (x : Word.t) (y : seq) : seq = Generic.cons ~monoid ~measure y x
 
 let list_match (x : seq) : (Word.t * seq) option =
@@ -104,3 +114,9 @@ let pop (s : seq) = pop_n s 1
 
 let split (s : seq) (l : int) : seq * seq =
   Generic.split ~monoid ~measure (fun m -> m.length < l) s
+
+let rec splits (x : seq) : seq list =
+  if is_empty x then []
+  else
+    let h, t = pop x in
+    h :: splits t

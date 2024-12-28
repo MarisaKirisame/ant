@@ -28,8 +28,7 @@ let driver input print_ast print_ant =
   let _ =
     if print_ast then
       PPrint.ToChannel.pretty 0.8 120 stdout (Syntax.pp_prog ast);
-    if print_ant then
-      PPrint.ToChannel.pretty 0.8 120 stdout (Syntax.pp_ant ast)
+    if print_ant then PPrint.ToChannel.pretty 0.8 120 stdout (Syntax.pp_ant ast)
   in
   ()
 
@@ -38,14 +37,14 @@ let input =
   let docv = "INPUT" in
   Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
 
-  let print_ast =
-    let doc = "Print the AST" in
-    Arg.(value & flag & info [ "p"; "print-ast" ] ~doc)
+let print_ast =
+  let doc = "Print the AST" in
+  Arg.(value & flag & info [ "p"; "print-ast" ] ~doc)
 
-    let print_ant =
-      let doc = "Print the AST in ant" in
-      Arg.(value & flag & info [ "a"; "print-ant" ] ~doc)
-      
+let print_ant =
+  let doc = "Print the AST in ant" in
+  Arg.(value & flag & info [ "a"; "print-ant" ] ~doc)
+
 let cmd =
   let doc = "ant Compiler" in
   let man = [ `S Manpage.s_bugs ] in

@@ -54,15 +54,14 @@ type ty =
   | TVar of ty ref
   | TNamed of string
   | TNamedVar of string (* this is the surface syntax used during parsing *)
-  [@@deriving show]
+[@@deriving show]
 
 type ty_decl =
   | Enum of string * (string * ty list) list
   | Record of string * (string * ty) list
-  [@@deriving show]
+[@@deriving show]
 
 type stmt = Type of ty_decl | Term of pattern option * expr [@@deriving show]
-
 type prog = stmt list
 
 open PPrint
@@ -206,9 +205,126 @@ let pp_stmt =
 
 let pp_prog = separate_map (break 1) pp_stmt
 
-let ant_pp_stmt (s : stmt) = 
+module Hashtbl = Core.Hashtbl
+
+type env = { arity : (string, int) Hashtbl.t; ctag : (string, int) Hashtbl.t }
+
+let new_env () : env =
+  {
+    arity = Hashtbl.create (module Core.String);
+    ctag = Hashtbl.create (module Core.String);
+  }
+
+let ant_pp_ocaml_adt adt_name ctors =
+  string
+    ("type ocaml_" ^ adt_name ^ " = "
+    ^ String.concat " | "
+        (List.map
+           (fun (con_name, types) ->
+             if List.length types == 0 then con_name
+             else
+               con_name ^ " of "
+               ^ String.concat " * "
+                   (List.map
+                      (fun ty ->
+                        match ty with
+                        | TNamed "int" -> "int"
+                        | TNamed _ -> "seq"
+                        | _ -> failwith (show_ty ty))
+                      types))
+           ctors)
+    ^ ";")
+
+let ant_pp_adt_constructors (e : env) adt_name ctors =
+  separate_map (break 1)
+    (fun (con_name, types) ->
+      Hashtbl.add_exn ~key:con_name ~data:(List.length types) e.arity;
+      let set_constructor_degree =
+        string
+          ("set_constructor_degree" ^ " "
+          ^ string_of_int (Hashtbl.length e.ctag)
+          ^ " "
+          ^ string_of_int (1 - List.length types)
+          ^ ";")
+      in
+      Hashtbl.add_exn ~key:con_name ~data:(Hashtbl.length e.ctag) e.ctag;
+      let register_constructor =
+        string
+          ("let " ^ adt_name ^ "_" ^ con_name ^ " "
+          ^ String.concat " "
+              (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
+          ^ ": seq = Seq.appends ["
+          ^ String.concat ";"
+              (("from_constructor "
+               ^ string_of_int (Hashtbl.find_exn e.ctag con_name))
+              :: List.mapi
+                   (fun i ty ->
+                     let argname = "x" ^ string_of_int i in
+                     match ty with
+                     | TNamed "int" -> "from_int " ^ argname
+                     | TNamed _ -> argname
+                     | _ -> failwith (show_ty ty))
+                   types)
+          ^ "];")
+      in
+      set_constructor_degree ^^ break 1 ^^ register_constructor)
+    ctors
+
+let ant_pp_adt_ffi e adt_name ctors =
+  ignore e;
+  string
+    ("let from_ocaml_" ^ adt_name ^ " x = match x with | "
+    ^ String.concat " | "
+        (List.map
+           (fun (con_name, types) ->
+             let args = List.mapi (fun i _ -> "x" ^ string_of_int i) types in
+             (if List.length types == 0 then con_name
+              else con_name ^ "(" ^ String.concat ", " args ^ ")")
+             ^ " -> " ^ adt_name ^ "_" ^ con_name ^ " " ^ String.concat " " args)
+           ctors))
+  ^^ break 1
+  ^^ string
+       ("let to_ocaml_" ^ adt_name
+      ^ " x = let (h, t) = Option.value (Seq.list_match x) in match \
+         (Word.get_value h) with | "
+       ^ String.concat " | "
+           (List.map
+              (fun (con_name, types) ->
+                string_of_int (Hashtbl.find_exn e.ctag con_name)
+                ^ " -> "
+                ^
+                if List.length types == 0 then con_name
+                else
+                  "let ["
+                  ^ String.concat ";"
+                      (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
+                  ^ "] = Seq.splits t in " ^ con_name ^ "("
+                  ^ String.concat ","
+                      (List.mapi
+                         (fun i ty ->
+                           match ty with
+                           | TNamed "int" ->
+                               "from_int(" ^ "x" ^ string_of_int i ^ ")"
+                           | TNamed _ -> "x" ^ string_of_int i
+                           | _ -> failwith (show_ty ty))
+                         types)
+                  ^ ")")
+              ctors))
+
+let ant_pp_adt (e : env) adt_name ctors =
+  (*force evaluation order via let*)
+  let generate_ocaml_adt = ant_pp_ocaml_adt adt_name ctors in
+  let generate_adt_constructors = ant_pp_adt_constructors e adt_name ctors in
+  generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1
+  ^^ ant_pp_adt_ffi e adt_name ctors
+
+let ant_pp_stmt (e : env) (s : stmt) : document =
   match s with
-  | Type(Enum(name, _)) -> failwith name
+  | Type (Enum (adt_name, ctors)) -> ant_pp_adt e adt_name ctors
+  | Term (x, tm) ->
+      let name = match x with Some x -> pp_pattern x | None -> underscore in
+      string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
+      @@ pp_expr tm ^^ string ";;"
   | _ -> failwith (show_stmt s)
 
-let pp_ant = separate_map (break 1) ant_pp_stmt
+let pp_ant = separate_map (break 1) (ant_pp_stmt (new_env ()))
