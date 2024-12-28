@@ -5,4 +5,4 @@ type int_list =
 let list_incr = fun l ->
   match l with
   | Nil -> Nil
-  | Cons (x, l) -> Cons ((x + 1), l)
+  | Cons (x, l) -> Cons ((x + 1), list_incr l)
