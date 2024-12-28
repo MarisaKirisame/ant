@@ -90,14 +90,14 @@ let degree (s : seq) : int = (summary s).degree
 let max_degree (s : seq) : int = (summary s).max_degree
 let empty : seq = Generic.empty
 let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
-let cons (x : Word.t) (y : seq) : seq = Generic.cons ~monoid ~measure x y
+let cons (x : Word.t) (y : seq) : seq = Generic.cons ~monoid ~measure y x
 
-let pop_n (s : seq) (n : i) : seq * seq =
-  let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree < i) s in
+let pop_n (s : seq) (n : int) : seq * seq =
+  let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree < n) s in
   let r, w = Generic.front_exn ~monoid ~measure y in
   (Generic.snoc ~monoid ~measure x w, r)
 
-let pop (s: seq) = pop_n s i
+let pop (s : seq) = pop_n s 1
 
 let split (s : seq) (l : int) : seq * seq =
   Generic.split ~monoid ~measure (fun m -> m.length < l) s
