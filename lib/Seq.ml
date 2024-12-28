@@ -92,6 +92,9 @@ let empty : seq = Generic.empty
 let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
 let cons (x : Word.t) (y : seq) : seq = Generic.cons ~monoid ~measure y x
 
+let list_match (x : seq) : (Word.t * seq) option =
+  Option.map (fun (x, y) -> (y, x)) (Generic.front ~monoid ~measure x)
+
 let pop_n (s : seq) (n : int) : seq * seq =
   let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree < n) s in
   let r, w = Generic.front_exn ~monoid ~measure y in
