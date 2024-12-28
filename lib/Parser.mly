@@ -157,10 +157,51 @@ seq_expr:
   | expr %prec below_SEMI { $1 }
   | expr ";" seq_expr { Let (BSeq $1, $3) }
 
+%inline type_args: { [] }
+  | atomic_type { [ $1 ] }
+  | "(" sep_llist2(",", core_type) ")" { $2 }
+
+core_type:
+  | function_type { $1 }
+
+function_type:
+  | tuple_type { $1 }
+  | tuple_type "->" function_type { TArrow ($1, $3) }
+
+tuple_type:
+  | atomic_type { $1 }
+  | sep_llist2("*", atomic_type) { TTuple $1 }
+
+delimited_type:
+  | "(" core_type ")" { $2 }
+
+atomic_type:
+  | delimited_type { $1 }
+  | type_args "<id>" { if $1 = [] then TNamed $2 else TApply (TNamed $2, $1) }
+
+ctor_args:
+  | inline_sep_llist1("*", atomic_type) %prec below_HASH { $1 }
+  // TODO: add support for record types
+
+ctor_decl:
+  | "<ctor>" { ($1, []) }
+  | "<ctor>" "of" ctor_args { ($1, $3) }
+
+ctor_decls:
+  | "|" { [] }
+  | preceded_or_sep_llist1("|", ctor_decl) { $1 }
+
+type_kind:
+  | ctor_decls { fun name -> Enum (name, $1) }
+
+item:
+  | "let" simple_pattern "=" seq_expr { Term (Some $2, $4) }
+  | "type" "<id>" "=" type_kind { Type ($4 $2) }
+  | seq_expr { Term (None, $1) }
+
 items: { [] }
-  | "let" simple_pattern "=" seq_expr ";;" items { Term (Some $2, $4) :: $6 }
-  | seq_expr ";;" items { Term (None, $1) :: $3 }
-  | seq_expr { [Term (None, $1)] }
+  | item ";;" items { $1 :: $3 }
+  | item { [$1] }
 
 prog:
   | items "<eof>" { $1 }

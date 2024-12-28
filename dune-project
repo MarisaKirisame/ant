@@ -20,7 +20,7 @@
  (name ant)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml dune pprint cmdliner)
+ (depends ocaml dune pprint cmdliner batteries core)
  (tags
   (topics "to describe" your project)))
 
