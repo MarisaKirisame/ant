@@ -29,7 +29,7 @@ let driver input print_ast print_ant =
     if print_ast then
       PPrint.ToChannel.pretty 0.8 120 stdout (Syntax.pp_prog ast);
     if print_ant then
-      print_endline "ant"
+      PPrint.ToChannel.pretty 0.8 120 stdout (Syntax.pp_ant ast)
   in
   ()
 
