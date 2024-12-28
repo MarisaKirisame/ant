@@ -54,13 +54,15 @@ type ty =
   | TVar of ty ref
   | TNamed of string
   | TNamedVar of string (* this is the surface syntax used during parsing *)
+[@@deriving show]
 
 type ty_decl =
   | Enum of string * (string * ty list) list
   | Record of string * (string * ty) list
+[@@deriving show]
 
-type stmt = Type of ty_decl | Term of pattern option * expr
-type prog = stmt list
+type stmt = Type of ty_decl | Term of pattern option * expr [@@deriving show]
+type prog = stmt list [@@deriving show]
 
 open PPrint
 
