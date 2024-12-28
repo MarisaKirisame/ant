@@ -22,12 +22,14 @@ let parse content =
       @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input print_ast =
+let driver input print_ast print_ant =
   let src = read_all input in
   let ast = parse src in
   let _ =
     if print_ast then
-      PPrint.ToChannel.pretty 0.8 120 stdout (Syntax.pp_prog ast)
+      PPrint.ToChannel.pretty 0.8 120 stdout (Syntax.pp_prog ast);
+    if print_ant then
+      print_endline "ant"
   in
   ()
 
@@ -36,14 +38,22 @@ let input =
   let docv = "INPUT" in
   Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
 
-let print_ast =
-  let doc = "Print the AST" in
-  Arg.(value & flag & info [ "p"; "print-ast" ] ~doc)
+  let print_ast =
+    let doc = "Print the AST" in
+    Arg.(value & flag & info [ "p"; "print-ast" ] ~doc)
 
+    let print_ant =
+      let doc = "Print the AST in ant" in
+      Arg.(value & flag & info [ "a"; "print-ant" ] ~doc)
+      
 let cmd =
   let doc = "ant Compiler" in
   let man = [ `S Manpage.s_bugs ] in
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
-  Cmd.v info Term.(const driver $ input $ print_ast)
+  Cmd.v info Term.(const driver $ input $ print_ast $ print_ant)
 
-let () = exit (Cmd.eval cmd)
+let i = Cmd.eval cmd
+
+let () =
+  print_endline "";
+  exit i
