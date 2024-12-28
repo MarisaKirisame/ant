@@ -54,12 +54,15 @@ type ty =
   | TVar of ty ref
   | TNamed of string
   | TNamedVar of string (* this is the surface syntax used during parsing *)
+  [@@deriving show]
 
 type ty_decl =
   | Enum of string * (string * ty list) list
   | Record of string * (string * ty) list
+  [@@deriving show]
 
-type stmt = Type of ty_decl | Term of pattern option * expr
+type stmt = Type of ty_decl | Term of pattern option * expr [@@deriving show]
+
 type prog = stmt list
 
 open PPrint
@@ -202,3 +205,10 @@ let pp_stmt =
   f
 
 let pp_prog = separate_map (break 1) pp_stmt
+
+let ant_pp_stmt (s : stmt) = 
+  match s with
+  | Type(Enum(name, _)) -> failwith name
+  | _ -> failwith (show_stmt s)
+
+let pp_ant = separate_map (break 1) ant_pp_stmt
