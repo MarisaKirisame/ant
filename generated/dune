@@ -1,6 +1,6 @@
-(library
- (name generated)
- (modules Test)
+(executable
+ (public_name GeneratedMain)
+ (name GeneratedMain)
  (libraries ant))
 
 (env

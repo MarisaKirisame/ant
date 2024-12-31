@@ -34,7 +34,7 @@ module Word = struct
   let tag_to_bitmask (t : tag) : t = t lsl tag_bitmask_distance
   let bitmask_to_tag (t : tag) : t = t lsr tag_bitmask_distance
   let make (t : tag) (v : value) : t = v lor tag_to_bitmask t
-  let get_bitmask (t : t) : tag = t lor tag_to_bitmask max_tag
+  let get_bitmask (t : t) : tag = t land tag_to_bitmask max_tag
   let get_tag (t : t) : tag = bitmask_to_tag (get_bitmask t)
   let get_value (t : t) : value = t land lnot (tag_to_bitmask max_tag)
 
@@ -111,14 +111,15 @@ let list_match (x : seq) : (Word.t * seq) option =
   Option.map (fun (x, y) -> (y, x)) (Generic.front ~monoid ~measure x)
 
 let pop_n (s : seq) (n : int) : seq * seq =
-  let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree < n) s in
+  let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
   let r, w = Generic.front_exn ~monoid ~measure y in
-  (Generic.snoc ~monoid ~measure x w, r)
+  let l = Generic.snoc ~monoid ~measure x w in
+  (l, r)
 
 let pop (s : seq) = pop_n s 1
 
 let split (s : seq) (l : int) : seq * seq =
-  Generic.split ~monoid ~measure (fun m -> m.length < l) s
+  Generic.split ~monoid ~measure (fun m -> m.length > l) s
 
 let rec splits (x : seq) : seq list =
   if is_empty x then []
