@@ -1,0 +1,9 @@
+(library
+ (name generated)
+ (modules Test)
+ (libraries ant))
+
+(env
+ (dev
+  (flags
+   (:standard -warn-error -A))))
