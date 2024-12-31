@@ -37,11 +37,7 @@ and expr =
   | Match of expr * cases
 [@@deriving show]
 
-and cases =
-  | SwitchCtor of (ctor * expr) list * expr option
-  | SwitchBool of (bool * expr) list * expr option
-  | MatchPattern of (pattern * expr) list
-[@@deriving show]
+and cases = MatchPattern of (pattern * expr) list [@@deriving show]
 
 type ty =
   | TUnit
@@ -96,11 +92,6 @@ let pp_expr =
     group @@ align @@ string "match" ^^ space ^^ ef false e ^^ space
     ^^ string "with" ^^ inf
   in
-  let fd dflt ef =
-    match dflt with
-    | Some x -> fc (fun _ -> underscore) ef ((), x)
-    | None -> empty
-  in
   let fl pro lhs rhs tail =
     align @@ group
     @@ (group @@ pro
@@ -149,14 +140,6 @@ let pp_expr =
     | Sel (e, field) -> f true e ^^ dot ^^ string field
     | Match (e, MatchPattern cases) ->
         fm f e @@ concat_map (fc pp_pattern f) cases
-    | Match (e, SwitchBool (cases, default)) ->
-        let g x = string @@ string_of_bool x in
-        fm f e @@ concat_map (fc g f) cases ^^ fd default f
-    | Match (e, SwitchCtor (cases, default)) ->
-        let g x = pp_pattern (PApp (x, Some PAny)) in
-        fm f e
-        @@ concat_map (fc g f) (List.map (fun (Ctor (c, _), e) -> (c, e)) cases)
-        ^^ fd default f
   in
   f false
 
@@ -229,11 +212,10 @@ let ant_pp_ocaml_adt adt_name ctors =
                       (fun ty ->
                         match ty with
                         | TNamed "int" -> "int"
-                        | TNamed _ -> "seq"
+                        | TNamed _ -> "Seq.seq"
                         | _ -> failwith (show_ty ty))
                       types))
-           ctors)
-    ^ ";")
+           ctors))
 
 let ant_pp_adt_constructors (e : env) adt_name ctors =
   separate_map (break 1)
@@ -241,11 +223,11 @@ let ant_pp_adt_constructors (e : env) adt_name ctors =
       Hashtbl.add_exn ~key:con_name ~data:(List.length types) e.arity;
       let set_constructor_degree =
         string
-          ("set_constructor_degree" ^ " "
+          ("let () = Seq.set_constructor_degree" ^ " "
           ^ string_of_int (Hashtbl.length e.ctag)
-          ^ " "
+          ^ "("
           ^ string_of_int (1 - List.length types)
-          ^ ";")
+          ^ ")")
       in
       Hashtbl.add_exn ~key:con_name ~data:(Hashtbl.length e.ctag) e.ctag;
       let register_constructor =
@@ -253,19 +235,19 @@ let ant_pp_adt_constructors (e : env) adt_name ctors =
           ("let " ^ adt_name ^ "_" ^ con_name ^ " "
           ^ String.concat " "
               (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-          ^ ": seq = Seq.appends ["
+          ^ ": Seq.seq = Seq.appends ["
           ^ String.concat ";"
-              (("from_constructor "
+              (("Seq.from_constructor "
                ^ string_of_int (Hashtbl.find_exn e.ctag con_name))
               :: List.mapi
                    (fun i ty ->
                      let argname = "x" ^ string_of_int i in
                      match ty with
-                     | TNamed "int" -> "from_int " ^ argname
+                     | TNamed "int" -> "Seq.from_int " ^ argname
                      | TNamed _ -> argname
                      | _ -> failwith (show_ty ty))
                    types)
-          ^ "];")
+          ^ "]")
       in
       set_constructor_degree ^^ break 1 ^^ register_constructor)
     ctors
@@ -285,7 +267,7 @@ let ant_pp_adt_ffi e adt_name ctors =
   ^^ break 1
   ^^ string
        ("let to_ocaml_" ^ adt_name
-      ^ " x = let (h, t) = Option.value (Seq.list_match x) in match \
+      ^ " x = let (h, t) = Option.get (Seq.list_match x) in match \
          (Word.get_value h) with | "
        ^ String.concat " | "
            (List.map
@@ -304,7 +286,7 @@ let ant_pp_adt_ffi e adt_name ctors =
                          (fun i ty ->
                            match ty with
                            | TNamed "int" ->
-                               "from_int(" ^ "x" ^ string_of_int i ^ ")"
+                               "Seq.to_int(" ^ "x" ^ string_of_int i ^ ")"
                            | TNamed _ -> "x" ^ string_of_int i
                            | _ -> failwith (show_ty ty))
                          types)
@@ -318,13 +300,49 @@ let ant_pp_adt (e : env) adt_name ctors =
   generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1
   ^^ ant_pp_adt_ffi e adt_name ctors
 
+let rec ant_pp_expr (e : expr) : document =
+  match e with
+  | Lam (xs, e) ->
+      string "fun "
+      ^^ separate_map (string " ") pp_pattern xs
+      ^^ string " -> " ^^ ant_pp_expr e
+  | Match (value, MatchPattern cases) ->
+      string "match (" ^^ string "to_ocaml_int_list" ^^ string " "
+      ^^ ant_pp_expr value ^^ string ") with | "
+      ^^ separate_map
+           (break 1 ^^ string "|")
+           (fun (pat, expr) ->
+             pp_pattern pat ^^ string " -> " ^^ ant_pp_expr expr)
+           cases
+  | Var x -> string x
+  | CApp (Ctor (cname, _), []) -> string "int_list_" ^^ string cname
+  | CApp (Ctor (cname, _), es) ->
+      string "int_list_" ^^ string cname ^^ string "("
+      ^^ separate_map (string ",") ant_pp_expr es
+      ^^ string ")"
+  | App (CApp (Ctor (cname, _), []), [ Tup es ]) ->
+      string "int_list_" ^^ string cname ^^ string " "
+      ^^ separate_map (string " ") ant_pp_expr es
+  | App (f, xs) ->
+      string "("
+      ^^ separate_map (string " ") ant_pp_expr (f :: xs)
+      ^^ string ")"
+  | Op (op, l, r) ->
+      string "(" ^^ ant_pp_expr l ^^ string op ^^ ant_pp_expr r ^^ string ")"
+  | Int i -> string "(" ^^ string (string_of_int i) ^^ string ")"
+  | _ -> failwith (show_expr e)
+
 let ant_pp_stmt (e : env) (s : stmt) : document =
   match s with
   | Type (Enum (adt_name, ctors)) -> ant_pp_adt e adt_name ctors
   | Term (x, tm) ->
       let name = match x with Some x -> pp_pattern x | None -> underscore in
-      string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
-      @@ pp_expr tm ^^ string ";;"
+      string "let rec" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
+      @@ ant_pp_expr tm ^^ string ";;"
   | _ -> failwith (show_stmt s)
 
-let pp_ant = separate_map (break 1) (ant_pp_stmt (new_env ()))
+let pp_ant x =
+  string "open Ant" ^^ break 1
+  ^^ string "module Word = Seq.Word"
+  ^^ break 1
+  ^^ separate_map (break 1) (ant_pp_stmt (new_env ())) x
