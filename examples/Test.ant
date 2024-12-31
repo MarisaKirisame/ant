@@ -1,0 +1,8 @@
+type int_list =
+  | Nil
+  | Cons of int * int_list;;
+
+let list_incr = fun l ->
+  match l with
+  | Nil -> Nil
+  | Cons (x, l) -> Cons((x + 1), list_incr l)
