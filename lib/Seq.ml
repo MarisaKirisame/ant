@@ -92,6 +92,11 @@ let from_constructor (ctag : int) : seq =
   Generic.singleton (Word.make Word.constructor_tag ctag)
 
 let from_int (i : int) : seq = Generic.singleton (Word.make Word.int_tag i)
+
+let to_int (s : seq) : int =
+  assert (Generic.size s == 1);
+  Generic.head_exn s
+
 let summary (s : seq) : measure = Generic.measure ~monoid ~measure s
 let length (s : seq) : int = (summary s).length
 let degree (s : seq) : int = (summary s).degree
