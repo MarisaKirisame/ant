@@ -131,7 +131,7 @@ case : pattern "->" expr { ($1, $3) }
 simple_expr:
   | "(" ")" { Unit }
   | "<id>" { Var $1 }
-  | "<ctor>" { CApp (Ctor ($1, None), []) }
+  | "<ctor>" { Ctor $1 }
   | "<int>" { Int $1 }
   | "<bool>" { Bool $1 }
   | "<str>" { Str $1 }
