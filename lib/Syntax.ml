@@ -1,4 +1,3 @@
-type ctor = Ctor of string * int option [@@deriving show]
 type builtin = Builtin of string [@@deriving show]
 
 type pattern =
@@ -25,8 +24,8 @@ and expr =
   | Str of string
   | Builtin of builtin
   | Var of string
+  | Ctor of string
   | App of expr * expr list
-  | CApp of ctor * expr list
   | Op of string * expr * expr
   | Tup of expr list
   | Arr of expr list
@@ -110,11 +109,9 @@ let pp_expr =
     | Str s -> string (String.escaped s) |> dquotes
     | Builtin (Builtin b) -> string b
     | Var x -> string x
+    | Ctor c -> string c
     | App (fn, []) -> f c fn
     | App (fn, xs) -> f true fn ^^ space ^^ separate_map space (f true) xs |> pp
-    | CApp (Ctor (ct, _arity), []) -> string ct
-    | CApp (Ctor (ct, _arity), xs) ->
-        string ct ^^ space ^^ separate_map space (f true) xs |> pp
     | Op (op, lhs, rhs) ->
         f true lhs ^^ space ^^ string op ^^ space ^^ f true rhs |> pp
     | Tup xs -> separate_map (comma ^^ space) (f true) xs |> parens
@@ -315,14 +312,11 @@ let rec ant_pp_expr (e : expr) : document =
              pp_pattern pat ^^ string " -> " ^^ ant_pp_expr expr)
            cases
   | Var x -> string x
-  | CApp (Ctor (cname, _), []) -> string "int_list_" ^^ string cname
-  | CApp (Ctor (cname, _), es) ->
+  | App (Ctor cname, []) -> string "int_list_" ^^ string cname
+  | App (Ctor cname, es) ->
       string "int_list_" ^^ string cname ^^ string "("
       ^^ separate_map (string ",") ant_pp_expr es
       ^^ string ")"
-  | App (CApp (Ctor (cname, _), []), [ Tup es ]) ->
-      string "int_list_" ^^ string cname ^^ string " "
-      ^^ separate_map (string " ") ant_pp_expr es
   | App (f, xs) ->
       string "("
       ^^ separate_map (string " ") ant_pp_expr (f :: xs)
