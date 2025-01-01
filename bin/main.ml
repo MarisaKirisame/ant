@@ -26,9 +26,8 @@ let driver input print_ast print_ant =
   let src = read_all input in
   let ast = parse src in
   let _ =
-    if print_ast then
-      PPrint.ToChannel.pretty 0.8 120 stdout (Syntax.pp_prog ast);
-    if print_ant then PPrint.ToChannel.pretty 0.8 120 stdout (Syntax.pp_ant ast)
+    if print_ast then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog ast);
+    if print_ant then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_ant ast)
   in
   ()
 

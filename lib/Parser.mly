@@ -1,6 +1,5 @@
 %{
 open Syntax
-
 %}
 
 %start <prog> prog
@@ -143,7 +142,7 @@ simple_expr:
 expr:
   | simple_expr %prec below_HASH { $1 }
   | expr_comma_list %prec below_COMMA { Tup $1 }
-  | simple_expr llist1(simple_expr) { App ($1, $2) }
+  | simple_expr llist1(simple_expr) { List.fold_left (fun acc e -> App (acc, [e])) $1 $2 }
   | expr infix_op1 expr { Op ($2, $1, $3) }
   | expr infix_op2 expr { Op ($2, $1, $3) }
   | "let" simple_pattern "=" expr "in" expr { Let (BOne ($2, $4), $6) }
