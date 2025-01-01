@@ -1,3 +1,5 @@
+[@@@warning "-8"]
+
 open Ant
 module Word = Seq.Word
 
