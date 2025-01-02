@@ -156,9 +156,8 @@ seq_expr:
   | expr %prec below_SEMI { $1 }
   | expr ";" seq_expr { Let (BSeq $1, $3) }
 
-%inline type_args: { [] }
-  | atomic_type { [ $1 ] }
-  | "(" sep_llist2(",", core_type) ")" { $2 }
+type_args: { [] }
+  | llist1(atomic_type) { $1 }
 
 core_type:
   | function_type { $1 }
@@ -168,19 +167,22 @@ function_type:
   | tuple_type "->" function_type { TArrow ($1, $3) }
 
 tuple_type:
-  | atomic_type { $1 }
-  | sep_llist2("*", atomic_type) { TTuple $1 }
+  | applied_type { $1 }
+  | sep_llist2("*", applied_type) { TTuple $1 }
 
 delimited_type:
   | "(" core_type ")" { $2 }
 
+applied_type:
+  | atomic_type type_args { if $2 = [] then $1 else TApply ($1, $2)  }
+
 atomic_type:
   | delimited_type { $1 }
   | "'" "<id>" { TNamedVar $2 }
-  | "<id>" type_args { if $2 = [] then TNamed $1 else TApply (TNamed $1, $2) }
+  | "<id>" { TNamed $1 }
 
 ctor_args:
-  | inline_sep_llist1("*", atomic_type) %prec below_HASH { $1 }
+  | inline_sep_llist1("*", applied_type) %prec below_HASH { $1 }
   // TODO: add support for record types
 
 ctor_decl:

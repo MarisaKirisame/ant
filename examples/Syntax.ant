@@ -93,5 +93,8 @@ type list 'a =
   | Nil
   | Cons of 'a * list 'a;;
 type pair 'a 'b = P of 'a * 'b;;
+type test =
+  | A of list int
+  | B of pair int unit;;
 
 let _ = ()
