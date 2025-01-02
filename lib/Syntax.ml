@@ -52,8 +52,11 @@ type ty =
 [@@deriving show]
 
 type ty_decl =
-  | Enum of string * (string * ty list) list
-  | Record of string * (string * ty) list
+  | Enum of {
+      name : string;
+      params : string list;
+      ctors : (string * ty list) list;
+    }
 [@@deriving show]
 
 type stmt = Type of ty_decl | Term of pattern option * expr [@@deriving show]
@@ -163,19 +166,22 @@ let pp_ty =
 let pp_stmt =
   let f (s : stmt) =
     match s with
-    | Type (Enum (name, ctors)) ->
+    | Type (Enum { name; params; ctors }) ->
         let pp_ctor (ctor, tys) =
           string ctor
           ^^
           match tys with
           | [] -> empty
-          | _ -> space ^^ string "of" ^^ space ^^ separate_map space pp_ty tys
+          | _ ->
+              space ^^ string "of" ^^ space
+              ^^ separate_map (space ^^ string "*" ^^ space) pp_ty tys
         in
-        group @@ align @@ string "type" ^^ space ^^ string name ^^ space
-        ^^ string "=" ^^ nest 2 @@ break 1 ^^ string "|" ^^ space
+        group @@ align @@ string "type" ^^ space
+        ^^ concat_map (fun param -> string "'" ^^ string param ^^ space) params
+        ^^ string name ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ string "|"
+        ^^ space
         ^^ separate_map (break 1 ^^ string "|" ^^ space) pp_ctor ctors
         ^^ string ";;"
-    | Type (Record (_name, _fields)) -> failwith "Not implemented"
     | Term (x, tm) ->
         let name = match x with Some x -> pp_pattern x | None -> underscore in
         string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
@@ -328,12 +334,12 @@ let rec ant_pp_expr (e : expr) : document =
 
 let ant_pp_stmt (e : env) (s : stmt) : document =
   match s with
-  | Type (Enum (adt_name, ctors)) -> ant_pp_adt e adt_name ctors
+  | Type (Enum { name; params = _; ctors }) ->
+      (* TODO *) ant_pp_adt e name ctors
   | Term (x, tm) ->
       let name = match x with Some x -> pp_pattern x | None -> underscore in
       string "let rec" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
       @@ ant_pp_expr tm ^^ string ";;"
-  | _ -> failwith (show_stmt s)
 
 let pp_ant x =
   string "open Ant" ^^ break 1

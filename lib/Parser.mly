@@ -176,7 +176,8 @@ delimited_type:
 
 atomic_type:
   | delimited_type { $1 }
-  | type_args "<id>" { if $1 = [] then TNamed $2 else TApply (TNamed $2, $1) }
+  | "'" "<id>" { TNamedVar $2 }
+  | "<id>" type_args { if $2 = [] then TNamed $1 else TApply (TNamed $1, $2) }
 
 ctor_args:
   | inline_sep_llist1("*", atomic_type) %prec below_HASH { $1 }
@@ -190,12 +191,18 @@ ctor_decls:
   | "|" { [] }
   | preceded_or_sep_llist1("|", ctor_decl) { $1 }
 
+type_parameter:
+  | "'" "<id>" { $2 }
+
+type_parameters:
+  | llist(type_parameter) { $1 }
+
 type_kind:
-  | ctor_decls { fun name -> Enum (name, $1) }
+  | ctor_decls { fun name params -> Enum { name; params; ctors = $1 } }
 
 item:
   | "let" simple_pattern "=" seq_expr { Term (Some $2, $4) }
-  | "type" "<id>" "=" type_kind { Type ($4 $2) }
+  | "type" "<id>" type_parameters "=" type_kind { Type ($5 $2 $3) }
   | seq_expr { Term (None, $1) }
 
 items: { [] }
