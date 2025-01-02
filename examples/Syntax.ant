@@ -88,4 +88,10 @@ type nat =
   | S of nat
   | Z;;
 
+(* type application *)
+type list 'a =
+  | Nil
+  | Cons of 'a * list 'a;;
+type pair 'a 'b = P of 'a * 'b;;
+
 let _ = ()
