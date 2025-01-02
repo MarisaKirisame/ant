@@ -152,11 +152,13 @@ let pp_ty =
     | TFloat -> string "float"
     | TBool -> string "bool"
     | TApply (ty, []) -> f c ty
+    | TApply (ty, [ ty2 ]) -> f true ty ^^ space ^^ f c ty2
     | TApply (ty, tys) ->
-        separate_map space (f true) tys ^^ space ^^ f c ty ^^ space |> pp
+        (parens @@ separate_map (string ",") (f true) tys) ^^ space ^^ f c ty
+        |> pp
     | TArrow (ty1, ty2) ->
         f true ty1 ^^ space ^^ string "->" ^^ space ^^ f true ty2 |> pp
-    | TTuple tys -> separate_map (comma ^^ space) (f true) tys |> parens
+    | TTuple tys -> separate_map (string "*") (f true) tys |> parens
     | TVar { contents = ty } -> f c ty (* TODO: cycle *)
     | TNamedVar name -> string ("'" ^ name)
     | TNamed name -> string name
@@ -177,7 +179,15 @@ let pp_stmt =
               ^^ separate_map (space ^^ string "*" ^^ space) pp_ty tys
         in
         group @@ align @@ string "type" ^^ space
-        ^^ concat_map (fun param -> string "'" ^^ string param ^^ space) params
+        ^^ (match params with
+           | [] -> empty
+           | [ x ] -> string "'" ^^ string x ^^ space
+           | _ ->
+               (parens
+               @@ separate_map (string ",")
+                    (fun param -> string "'" ^^ string param)
+                    params)
+               ^^ space)
         ^^ string name ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ string "|"
         ^^ space
         ^^ separate_map (break 1 ^^ string "|" ^^ space) pp_ctor ctors
