@@ -14,6 +14,8 @@ type binding =
   | BSeq of expr
   | BOne of pattern * expr
   | BRec of (pattern * expr) list
+  | BCont of pattern * expr
+  | BRecC of (pattern * expr) list
 [@@deriving show]
 
 and expr =
@@ -134,10 +136,10 @@ let pp_expr =
         ^^ space ^^ string "->" ^^ nest 2 @@ break 1 ^^ f true e
         |> pp
     | Arr xs -> separate_map (semi ^^ space) (f true) xs |> brackets
-    | Let (BOne (x, e1), e2) -> fl (pp_pattern x) (f false e1) (f false e2)
+    | Let ((BOne (x, e1) | BCont (x, e1)), e2) -> fl (pp_pattern x) (f false e1) (f false e2)
     | Let (BSeq e1, e2) -> align @@ f false e1 ^^ semi ^^ break 1 ^^ f false e2
-    | Let (BRec [], _) -> failwith "Empty recursive group"
-    | Let (BRec xs, e2) ->
+    | Let ((BRec [] | BRecC []), _) -> failwith "Empty recursive group"
+    | Let ((BRec xs | BRecC xs), e2) ->
         let lhs, rhs = List.hd xs in
         flr (pp_pattern lhs) (f false rhs)
           (List.map (fun (lhs, rhs) -> (pp_pattern lhs, f false rhs))

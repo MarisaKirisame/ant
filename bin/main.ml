@@ -22,12 +22,14 @@ let parse content =
       @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input print_ast print_ant =
+let driver input print_ast print_ant print_cps_transformed =
   let src = read_all input in
   let ast = parse src in
   let _ =
     if print_ast then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog ast);
-    if print_ant then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_ant ast)
+    if print_ant then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_ant ast);
+    if print_cps_transformed then
+      PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog (Transform.cps_prog ast))
   in
   ()
 
@@ -44,11 +46,16 @@ let print_ant =
   let doc = "Print the AST in ant" in
   Arg.(value & flag & info [ "a"; "print-ant" ] ~doc)
 
+let print_cps_transformed =
+  let doc = "Print the AST after CPS transformation" in
+  Arg.(value & flag & info [ "c"; "print-cps" ] ~doc)
+
 let cmd =
   let doc = "ant Compiler" in
   let man = [ `S Manpage.s_bugs ] in
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
-  Cmd.v info Term.(const driver $ input $ print_ast $ print_ant)
+  Cmd.v info
+    Term.(const driver $ input $ print_ast $ print_ant $ print_cps_transformed)
 
 let i = Cmd.eval cmd
 

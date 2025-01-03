@@ -121,11 +121,14 @@ case : pattern "->" expr { ($1, $3) }
 %inline expr_semi_list:
   sep_or_terminated_rlist1(";", expr) { $1 }
 
-%inline infix_op1:
+%inline infix_op0:
+  | "=" { "=" }
+
+%inline infix_op2:
   | "+" { "+" }
   | "-" { "-" }
 
-%inline infix_op2:
+%inline infix_op3:
   | "*" { "*" }
   | "/" { "/" }
 
@@ -151,8 +154,9 @@ expr:
   | simple_expr %prec below_HASH { $1 }
   | expr_comma_list %prec below_COMMA { Tup $1 }
   | simple_expr llist1(simple_expr) { List.fold_left (fun acc e -> App (acc, [e])) $1 $2 }
-  | expr infix_op1 expr { Op ($2, $1, $3) }
+  | expr infix_op0 expr { Op ($2, $1, $3) }
   | expr infix_op2 expr { Op ($2, $1, $3) }
+  | expr infix_op3 expr { Op ($2, $1, $3) }
   | "let" binding "in" expr { let (p, e) = $2 in Let (BOne (p, e), $4) }
   | "let" "rec" binding and_binding* "in" expr { Let (BRec ($3 :: $4), $6) }
   | "match" expr "with" cases { Match ($2, (MatchPattern $4)) }
