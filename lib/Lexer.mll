@@ -42,6 +42,7 @@ let keywords_table = Hashtbl.of_seq @@ List.to_seq
     ; ("type"       , TK_TYPE)
     ; ("fun"        , TK_FUN)
     ; ("rec"        , TK_REC)
+    ; ("and"        , TK_AND)
     ]
 
 let sops_table = Hashtbl.of_seq @@ List.to_seq
