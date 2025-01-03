@@ -23,6 +23,7 @@
 %token TK_TYPE          "type"
 %token TK_FUN           "fun"
 %token TK_REC           "rec"
+%token TK_AND           "and"
 
 /* Symbols */
 %token TK_DOT           "."

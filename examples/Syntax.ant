@@ -49,6 +49,18 @@ let _ =
   in
   f;;
 
+(* let rec *)
+let (even, odd) = 
+  let rec even = fun x y ->
+    match x with
+    | S x -> odd x y
+    | Z -> true
+  and odd = fun x y ->
+    match x with
+    | S x -> even x y
+    | Z -> false
+  in (even, odd);;
+
 (* selection *)
 let _ = x.m;;
 
@@ -96,5 +108,10 @@ type pair 'a 'b = P of 'a * 'b;;
 type test =
   | A of list int
   | B of pair int unit;;
+
+type a =
+  | KA of a
+and b =
+  | KB of b;;
 
 let _ = ()

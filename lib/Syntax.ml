@@ -51,15 +51,16 @@ type ty =
   | TNamedVar of string (* this is the surface syntax used during parsing *)
 [@@deriving show]
 
-type ty_decl =
-  | Enum of {
-      name : string;
-      params : string list;
-      ctors : (string * ty list) list;
-    }
+type ty_kind =
+  | Enum of { params : string list; ctors : (string * ty list) list }
 [@@deriving show]
 
-type stmt = Type of ty_decl | Term of pattern option * expr [@@deriving show]
+type ty_binding = TBOne of string * ty_kind | TBRec of (string * ty_kind) list
+[@@deriving show]
+
+type stmt = Type of ty_binding | Term of pattern option * expr
+[@@deriving show]
+
 type prog = stmt list
 
 open PPrint
@@ -94,13 +95,22 @@ let pp_expr =
     group @@ align @@ string "match" ^^ space ^^ ef false e ^^ space
     ^^ string "with" ^^ inf
   in
-  let fl pro lhs rhs tail =
+  let fsb pro lhs rhs =
+    group @@ pro ^^ nest 2 @@ break 1 ^^ align @@ lhs ^^ space ^^ string "="
+    ^^ space ^^ rhs
+  in
+  let fl lhs rhs tail =
     align @@ group
-    @@ (group @@ pro
-       ^^ (nest 2 @@ break 1 ^^ align @@ lhs ^^ space ^^ string "=" ^^ space
-         ^^ rhs)
-       ^^ break 1 ^^ string "in")
-    ^^ break 1 ^^ tail
+    @@ fsb (string "let") lhs rhs
+    ^^ break 1 ^^ string "in" ^^ break 1 ^^ tail
+  in
+  let flr lhs rhs others tail =
+    align @@ group
+    @@ (fsb (string "let rec") lhs rhs
+       ^^ concat_map
+            (fun (lhs, rhs) -> break 1 ^^ fsb (string "and") lhs rhs)
+            others)
+    ^^ break 1 ^^ string "in" ^^ break 1 ^^ tail
   in
   let rec f c (expr : expr) =
     let pp inner = if c then parens inner else inner in
@@ -124,13 +134,15 @@ let pp_expr =
         ^^ space ^^ string "->" ^^ nest 2 @@ break 1 ^^ f true e
         |> pp
     | Arr xs -> separate_map (semi ^^ space) (f true) xs |> brackets
-    | Let (BOne (x, e1), e2) ->
-        fl (string "let") (pp_pattern x) (f false e1) (f false e2)
+    | Let (BOne (x, e1), e2) -> fl (pp_pattern x) (f false e1) (f false e2)
     | Let (BSeq e1, e2) -> align @@ f false e1 ^^ semi ^^ break 1 ^^ f false e2
     | Let (BRec [], _) -> failwith "Empty recursive group"
-    | Let (BRec [ (x, e1) ], e2) ->
-        fl (string "let rec") (pp_pattern x) (f false e1) (f false e2)
-    | Let (BRec _xs, _e2) -> failwith "Not implemented"
+    | Let (BRec xs, e2) ->
+        let lhs, rhs = List.hd xs in
+        flr (pp_pattern lhs) (f false rhs)
+          (List.map (fun (lhs, rhs) -> (pp_pattern lhs, f false rhs))
+          @@ List.tl xs)
+          (f false e2)
     | If (e, e1, e2) ->
         group @@ align
         @@ (group @@ string "if" ^^ nest 2 @@ break 1 ^^ f true e)
@@ -167,30 +179,40 @@ let pp_ty =
 
 let pp_stmt =
   let f (s : stmt) =
+    let pp_ctor (ctor, tys) =
+      string ctor
+      ^^
+      match tys with
+      | [] -> empty
+      | _ ->
+          space ^^ string "of" ^^ space
+          ^^ separate_map (space ^^ string "*" ^^ space) pp_ty tys
+    in
+    let pp_enum is_and name params ctors =
+      group @@ align
+      @@ (if is_and then string "and" else string "type")
+      ^^ space
+      ^^ (match params with
+         | [] -> empty
+         | [ x ] -> string "'" ^^ string x ^^ space
+         | _ ->
+             (parens
+             @@ separate_map (string ",")
+                  (fun param -> string "'" ^^ string param)
+                  params)
+             ^^ space)
+      ^^ string name ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ string "|"
+      ^^ space
+      ^^ separate_map (break 1 ^^ string "|" ^^ space) pp_ctor ctors
+    in
     match s with
-    | Type (Enum { name; params; ctors }) ->
-        let pp_ctor (ctor, tys) =
-          string ctor
-          ^^
-          match tys with
-          | [] -> empty
-          | _ ->
-              space ^^ string "of" ^^ space
-              ^^ separate_map (space ^^ string "*" ^^ space) pp_ty tys
-        in
-        group @@ align @@ string "type" ^^ space
-        ^^ (match params with
-           | [] -> empty
-           | [ x ] -> string "'" ^^ string x ^^ space
-           | _ ->
-               (parens
-               @@ separate_map (string ",")
-                    (fun param -> string "'" ^^ string param)
-                    params)
-               ^^ space)
-        ^^ string name ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ string "|"
-        ^^ space
-        ^^ separate_map (break 1 ^^ string "|" ^^ space) pp_ctor ctors
+    | Type (TBOne (name, Enum { params; ctors })) ->
+        pp_enum false name params ctors ^^ string ";;"
+    | Type (TBRec tbs) ->
+        separate_map (break 1)
+          (fun (name, Enum { params; ctors }, i) ->
+            pp_enum (i <> 0) name params ctors)
+          (List.mapi (fun i (name, ty) -> (name, ty, i)) tbs)
         ^^ string ";;"
     | Term (x, tm) ->
         let name = match x with Some x -> pp_pattern x | None -> underscore in
@@ -344,8 +366,9 @@ let rec ant_pp_expr (e : expr) : document =
 
 let ant_pp_stmt (e : env) (s : stmt) : document =
   match s with
-  | Type (Enum { name; params = _; ctors }) ->
+  | Type (TBOne (name, Enum { params = _; ctors })) ->
       (* TODO *) ant_pp_adt e name ctors
+  | Type (TBRec _) -> failwith "Not implemented (TODO)"
   | Term (x, tm) ->
       let name = match x with Some x -> pp_pattern x | None -> underscore in
       string "let rec" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
