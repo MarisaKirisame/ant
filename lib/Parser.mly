@@ -160,7 +160,7 @@ expr:
   | "let" binding "in" expr { let (p, e) = $2 in Let (BOne (p, e), $4) }
   | "let" "rec" binding and_binding* "in" expr { Let (BRec ($3 :: $4), $6) }
   | "match" expr "with" cases { Match ($2, (MatchPattern $4)) }
-  | "fun" simple_pattern+ "->" expr { Lam ($2, $4) }
+  | "fun" simple_pattern+ "->" expr { List.fold_right (fun acc e -> Lam ([acc], e)) $2 $4 }
   | "if" expr "then" expr "else" expr { If ($2, $4, $6) }
   | "if" expr "then" expr { If ($2, $4, Unit) }
 

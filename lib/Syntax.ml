@@ -125,6 +125,7 @@ let pp_expr =
     | Builtin (Builtin b) -> string b
     | Var x -> string x
     | Ctor c -> string c
+    | App (Ctor ct, xs) -> f c (App (Var ct, [ Tup xs ])) (* special case for ctor application. for OCaml compatibility *)
     | App (fn, []) -> f c fn
     | App (fn, xs) -> f true fn ^^ space ^^ separate_map space (f true) xs |> pp
     | Op (op, lhs, rhs) ->
@@ -136,7 +137,8 @@ let pp_expr =
         ^^ space ^^ string "->" ^^ nest 2 @@ break 1 ^^ f true e
         |> pp
     | Arr xs -> separate_map (semi ^^ space) (f true) xs |> brackets
-    | Let ((BOne (x, e1) | BCont (x, e1)), e2) -> fl (pp_pattern x) (f false e1) (f false e2)
+    | Let ((BOne (x, e1) | BCont (x, e1)), e2) ->
+        fl (pp_pattern x) (f false e1) (f false e2)
     | Let (BSeq e1, e2) -> align @@ f false e1 ^^ semi ^^ break 1 ^^ f false e2
     | Let ((BRec [] | BRecC []), _) -> failwith "Empty recursive group"
     | Let ((BRec xs | BRecC xs), e2) ->
@@ -166,7 +168,7 @@ let pp_ty =
     | TFloat -> string "float"
     | TBool -> string "bool"
     | TApply (ty, []) -> f c ty
-    | TApply (ty, [ ty2 ]) -> f true ty ^^ space ^^ f c ty2
+    | TApply (ty, [ ty2 ]) -> f c ty2 ^^ space ^^ f c ty
     | TApply (ty, tys) ->
         (parens @@ separate_map (string ",") (f true) tys) ^^ space ^^ f c ty
         |> pp

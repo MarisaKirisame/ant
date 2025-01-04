@@ -1,0 +1,10 @@
+type list 'a =
+  | Nil
+  | Cons of 'a * list 'a;;
+
+let map =
+  let rec map =
+    fun f l -> match l with
+    | Nil -> Nil 
+    | Cons (hd, tl) -> Cons (f hd) (map f tl)
+  in map;;
