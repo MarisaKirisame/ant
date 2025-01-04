@@ -125,7 +125,9 @@ let pp_expr =
     | Builtin (Builtin b) -> string b
     | Var x -> string x
     | Ctor c -> string c
-    | App (Ctor ct, xs) -> f c (App (Var ct, [ Tup xs ])) (* special case for ctor application. for OCaml compatibility *)
+    | App (Ctor ct, xs) when List.length xs > 1 ->
+        (* special case for ctor application. for OCaml compatibility *)
+        f c (App (Var ct, [ Tup xs ]))
     | App (fn, []) -> f c fn
     | App (fn, xs) -> f true fn ^^ space ^^ separate_map space (f true) xs |> pp
     | Op (op, lhs, rhs) ->

@@ -5,8 +5,8 @@ module Ctx = Map.Make (String)
 type ctx = int Ctx.t
 
 let cps ctx (expr : expr) =
-  let mk_fresh_param_k () =
-    let k = next_fresh "_'k" in
+  let mk_fresh_param prefix =
+    let k = next_fresh prefix in
     (PVar k, Var k)
   in
   let mk_fresh_params n prefix =
@@ -39,11 +39,14 @@ let cps ctx (expr : expr) =
         if n = 0 then Ctor x
         else
           let pas, vas = mk_fresh_params n "_'a" in
-          let pk, vk = mk_fresh_param_k () in
-          Lam (pas @ [ pk ], App (vk, [ App (Ctor x, vas) ]))
+          let pks, vks = mk_fresh_params n "_'k" in
+          List.fold_right2
+            (fun (pa, _) (pk, vk) acc -> Lam ([ pa; pk ], App (vk, [ acc ])))
+            (List.combine pas vas) (List.combine pks vks)
+            (App (Ctor x, vas))
     | Lam (xs, e) ->
-        let pk, vk = mk_fresh_param_k () in
-        Lam (xs @ [ pk ], cps'' e vk)
+        let pa, va = mk_fresh_param "_'a" in
+        Lam (xs @ [ pa ], cps'' e va)
     | _ -> failwith "not an atom"
   and cps' e k =
     match e with
@@ -52,8 +55,8 @@ let cps ctx (expr : expr) =
         assert (List.length xs <= 1);
         let* f = cps' f in
         let* xs = cps_l' xs in
-        let pk, vk = mk_fresh_param_k () in
-        App (f, xs @ [ Lam ([ pk ], k vk) ])
+        let pa, va = mk_fresh_param "_'a" in
+        App (f, xs @ [ Lam ([ pa ], k va) ])
     | Op (op, e1, e2) ->
         let* e1 = cps' e1 in
         let* e2 = cps' e2 in
@@ -78,12 +81,12 @@ let cps ctx (expr : expr) =
         let* e = cps' e in
         k (Sel (e, x))
     | If (e1, e2, e3) ->
-        let pk, vk = mk_fresh_param_k () in
-        let pk2, vk2 = mk_fresh_param_k () in
+        let pa, va = mk_fresh_param "_'a" in
+        let pa2, va2 = mk_fresh_param "_'a" in
         let* e1 = cps' e1 in
         App
-          ( Lam ([ pk ], If (e1, cps'' e2 vk, cps'' e3 vk)),
-            [ Lam ([ pk2 ], k vk2) ] )
+          ( Lam ([ pa ], If (e1, cps'' e2 va, cps'' e3 va)),
+            [ Lam ([ pa2 ], k va2) ] )
     | Match (cond, MatchPattern cases) ->
         let* cond = cps' cond in
         let arms = List.map snd cases in
