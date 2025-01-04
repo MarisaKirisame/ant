@@ -1,10 +1,23 @@
 open Syntax
 open Fresh
+module Ctx = Map.Make (String)
 
-let cps (expr : expr) =
+type ctx = int Ctx.t
+
+let cps ctx (expr : expr) =
   let mk_fresh_param_k () =
-    let k = next_fresh "__k" in
+    let k = next_fresh "_'k" in
     (PVar k, Var k)
+  in
+  let mk_fresh_params n prefix =
+    let rec aux acc acc2 n =
+      if n = 0 then (acc, acc2)
+      else
+        let x = next_fresh prefix in
+        aux (PVar x :: acc) (Var x :: acc2) (n - 1)
+    in
+    let l1, l2 = aux [] [] n in
+    (List.rev l1, List.rev l2)
   in
   let is_atomic = function
     | Unit | Int _ | Float _ | Bool _ | Str _ | Builtin _ | Var _ | Ctor _
@@ -21,7 +34,13 @@ let cps (expr : expr) =
     | Str s -> Str s
     | Builtin b -> Builtin b
     | Var x -> Var x
-    | Ctor x -> Ctor x
+    | Ctor x ->
+        let n = Ctx.find x ctx in
+        if n = 0 then Ctor x
+        else
+          let pas, vas = mk_fresh_params n "_'a" in
+          let pk, vk = mk_fresh_param_k () in
+          Lam (pas @ [ pk ], App (vk, [ App (Ctor x, vas) ]))
     | Lam (xs, e) ->
         let pk, vk = mk_fresh_param_k () in
         Lam (xs @ [ pk ], cps'' e vk)
@@ -119,4 +138,27 @@ let cps (expr : expr) =
   cps' expr (fun x -> x)
 
 let cps_prog (prog : prog) =
-  List.map (function Type _ as x -> x | Term (p, e) -> Term (p, cps e)) prog
+  let scan_ctors_arity ctx =
+    let aux ctx (kind : ty_kind) =
+      match kind with
+      | Enum { ctors; _ } ->
+          List.fold_left
+            (fun ctx (name, params) ->
+              assert (not @@ Ctx.mem name ctx);
+              Ctx.add name (List.length params) ctx)
+            ctx ctors
+    in
+    function
+    | TBOne (_, kind) -> aux ctx kind
+    | TBRec kinds ->
+        List.fold_left (fun ctx (_, kind) -> aux ctx kind) ctx kinds
+  in
+  let _, prog =
+    List.fold_left_map
+      (fun ctx item ->
+        match item with
+        | Type tb -> (scan_ctors_arity ctx tb, item)
+        | Term (p, e) -> (ctx, Term (p, cps ctx e)))
+      Ctx.empty prog
+  in
+  prog

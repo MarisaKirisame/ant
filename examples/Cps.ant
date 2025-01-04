@@ -18,3 +18,7 @@ let (even, odd) =
     | S x -> even x
     | Z -> false
   in (even, odd);;
+let _ = even (S (S Z));;
+let s = S;;
+let z = Z;;
+let _ = even (s (s z));;
