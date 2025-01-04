@@ -5,3 +5,16 @@ let fact =
       if n = 0 then 1 else n * (fact (n - 1))
   in
   fact;;
+type nat =
+  | S of nat
+  | Z;;
+let (even, odd) = 
+  let rec even = fun x ->
+    match x with
+    | S x -> odd x
+    | Z -> true
+  and odd = fun x ->
+    match x with
+    | S x -> even x
+    | Z -> false
+  in (even, odd);;
