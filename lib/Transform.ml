@@ -65,7 +65,11 @@ let cps (expr : expr) =
         App
           ( Lam ([ pk ], If (e1, cps'' e2 vk, cps'' e3 vk)),
             [ Lam ([ pk2 ], k vk2) ] )
-    | Match (_, MatchPattern _) -> failwith "not implemented"
+    | Match (cond, MatchPattern cases) ->
+        let* cond = cps' cond in
+        let arms = List.map snd cases in
+        let* arms = cps_l' arms in
+        Match (cond, MatchPattern (List.combine (List.map fst cases) arms))
     | _ -> failwith "not an valid expr"
   and cps_l' es k =
     match es with
@@ -105,7 +109,11 @@ let cps (expr : expr) =
     | If (e1, e2, e3) ->
         let* e1 = cps' e1 in
         If (e1, cps'' e2 cont, cps'' e3 cont)
-    | Match (_, MatchPattern _) -> failwith "not implemented"
+    | Match (cond, MatchPattern cases) ->
+        let* cond = cps' cond in
+        let arms = List.map snd cases in
+        let arms = List.map (fun e -> cps'' e cont) arms in
+        Match (cond, MatchPattern (List.combine (List.map fst cases) arms))
     | _ -> failwith "not an valid expr"
   in
   cps' expr (fun x -> x)
