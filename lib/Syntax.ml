@@ -107,16 +107,18 @@ let pp_expr =
   in
   let fl lhs rhs tail =
     align @@ group
-    @@ fsb (string "let") lhs rhs
-    ^^ break 1 ^^ string "in" ^^ break 1 ^^ tail
+    @@ group (fsb (string "let") lhs rhs ^^ break 1 ^^ string "in")
+    ^^ break 1 ^^ tail
   in
   let flr lhs rhs others tail =
     align @@ group
-    @@ (fsb (string "let rec") lhs rhs
-       ^^ concat_map
-            (fun (lhs, rhs) -> break 1 ^^ fsb (string "and") lhs rhs)
-            others)
-    ^^ break 1 ^^ string "in" ^^ break 1 ^^ tail
+    @@ group
+         ((fsb (string "let rec") lhs rhs
+          ^^ concat_map
+               (fun (lhs, rhs) -> break 1 ^^ fsb (string "and") lhs rhs)
+               others)
+         ^^ break 1 ^^ string "in")
+    ^^ break 1 ^^ tail
   in
   let rec f c (expr : expr) =
     let pp inner = if c then parens inner else inner in
@@ -226,12 +228,13 @@ let pp_stmt =
         ^^ string ";;"
     | Term (x, tm) ->
         let name = match x with Some x -> pp_pattern x | None -> underscore in
-        string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
-        @@ pp_expr tm ^^ string ";;"
+        string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ nest 2
+        @@ break 1 ^^ group @@ pp_expr tm ^^ string ";;"
     | Fun (name, args, body) ->
         string "let rec" ^^ space ^^ string name ^^ space
         ^^ separate_map space pp_pattern args
-        ^^ space ^^ string "=" ^^ space ^^ group @@ pp_expr body ^^ string ";;"
+        ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr body
+        ^^ string ";;"
   in
   f
 
