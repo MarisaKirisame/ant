@@ -113,9 +113,8 @@ rule tokenize = parse
   | "\""            { string (Buffer.create 16) lexbuf }
   | int_lit   as x  { TK_INT_LITERAL (int_of_string x) }
   | bool_lit  as x  { TK_BOOL_LITERAL (bool_of_string x) }
-  | ctor      as x  {
-                      TK_CTOR x
-                    }
+  | '`' (ctor as x)  { TK_RAW_CTOR x }
+  | ctor      as x  { TK_CTOR x }
   | identifier as x { 
                       match Hashtbl.find_opt keywords_table x with
                       | Some token -> token
@@ -130,7 +129,7 @@ rule tokenize = parse
   | _ as ch         { raise @@ Error (UnexpectedToken (String.make 1 ch), lexeme_start_p lexbuf) }
 
 and comment level = parse
-  | newline     { new_line lexbuf; tokenize lexbuf }
+  | newline     { new_line lexbuf; comment level lexbuf }
   | "(*"        { comment (level + 1) lexbuf }
   | "*)"        { 
                   if level = 0 then tokenize lexbuf
