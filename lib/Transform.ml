@@ -4,7 +4,7 @@ module Ctx = Map.Make (String)
 
 type ctx = int Ctx.t
 
-let cps ctx (expr : expr) =
+let cps ctx expr =
   let mk_fresh_param prefix =
     let k = next_fresh prefix in
     (PVar k, Var k)
@@ -45,8 +45,8 @@ let cps ctx (expr : expr) =
             (List.combine pas vas) (List.combine pks vks)
             (App (Ctor x, vas))
     | Lam (xs, e) ->
-        let pa, va = mk_fresh_param "_'a" in
-        Lam (xs @ [ pa ], cps'' e va)
+        let pk, vk = mk_fresh_param "_'k" in
+        Lam (xs @ [ pk ], cps'' e vk)
     | _ -> failwith "not an atom"
   and cps' e k =
     match e with
@@ -56,7 +56,8 @@ let cps ctx (expr : expr) =
         let* f = cps' f in
         let* xs = cps_l' xs in
         let pa, va = mk_fresh_param "_'a" in
-        App (f, xs @ [ Lam ([ pa ], k va) ])
+        let pc, vc = mk_fresh_param "_'cont" in
+        Let (BCont (pc, Lam ([ pa ], k va)), App (f, xs @ [ vc ]))
     | Op (op, e1, e2) ->
         let* e1 = cps' e1 in
         let* e2 = cps' e2 in
@@ -81,12 +82,13 @@ let cps ctx (expr : expr) =
         let* e = cps' e in
         k (Sel (e, x))
     | If (e1, e2, e3) ->
+        let pk, vk = mk_fresh_param "_'k" in
         let pa, va = mk_fresh_param "_'a" in
-        let pa2, va2 = mk_fresh_param "_'a" in
+        let pc, vc = mk_fresh_param "_'cont" in
         let* e1 = cps' e1 in
-        App
-          ( Lam ([ pa ], If (e1, cps'' e2 va, cps'' e3 va)),
-            [ Lam ([ pa2 ], k va2) ] )
+        Let
+          ( BCont (pc, Lam ([ pa ], k va)),
+            App (Lam ([ pk ], If (e1, cps'' e2 vk, cps'' e3 vk)), [ vc ]) )
     | Match (cond, MatchPattern cases) ->
         let* cond = cps' cond in
         let arms = List.map snd cases in
@@ -161,7 +163,8 @@ let cps_prog (prog : prog) =
       (fun ctx item ->
         match item with
         | Type tb -> (scan_ctors_arity ctx tb, item)
-        | Term (p, e) -> (ctx, Term (p, cps ctx e)))
+        | Term (p, e) -> (ctx, Term (p, cps ctx e))
+        | _ -> failwith "Unsuppored item")
       Ctx.empty prog
   in
   prog
