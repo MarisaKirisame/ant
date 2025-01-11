@@ -40,7 +40,7 @@ let free, free_p =
   in
   (do_expr SSet.empty, do_pattern SSet.empty)
 
-type ctx = int Ctx.t
+type cps_ctx = int Ctx.t
 
 let cps ctx expr =
   let mk_fresh prefix =
@@ -207,14 +207,15 @@ let cps_prog (prog : prog) =
   in
   prog
 
+type defunc_ctx = string Ctx.t
+
 let defunc ctx expr =
   (* this is too restrictive *)
   (* https://ocaml.org/manual/5.0/letrecvalues.html *)
-  let allowed_rhs_for_let_rec bv expr =
-    SSet.disjoint (free expr) bv
-    || match expr with Var _ | Lam _ -> true | _ -> false
+  let allowed_rhs_for_let_rec expr =
+    match expr with Lam _ -> true | _ -> false
   in
-  let rec aux (ctx : ctx) (expr : expr) =
+  let rec aux (ctx : defunc_ctx) (expr : expr) =
     match expr with
     | Unit -> (Unit, [])
     | Int i -> (Int i, [])
@@ -222,7 +223,10 @@ let defunc ctx expr =
     | Bool b -> (Bool b, [])
     | Str s -> (Str s, [])
     | Builtin b -> (Builtin b, [])
-    | Var x -> (Var x, [])
+    | Var x -> (
+        match Ctx.find_opt x ctx with
+        | Some c -> (Ctor c, [])
+        | None -> (Var x, []))
     | Ctor x -> (Ctor x, [])
     | Op (op, e1, e2) ->
         let e1, l1 = aux ctx e1 in
@@ -234,14 +238,24 @@ let defunc ctx expr =
     | Arr es ->
         let es, ls = List.split @@ List.map (aux ctx) es in
         (Arr es, List.concat ls)
-    | Let (BOne (x, e1), e2) ->
+    | Let (BSeq e1, e2) ->
         let e1, l1 = aux ctx e1 in
         let e2, l2 = aux ctx e2 in
-        (Let (BOne (x, e1), e2), l1 @ l2)
+        (Let (BSeq e1, e2), l1 @ l2)
+    | Let (BOne (x, e1), e2) ->
+        let x, e1, e2, l = de_single_binding x e1 e2 in
+        (Let (BOne (x, e1), e2), l)
+    | Let (BCont (x, e1), e2) ->
+        let x, e1, e2, l = de_single_binding x e1 e2 in
+        (Let (BCont (x, e1), e2), l)
     | Let (BRec xs, e2) ->
         let xs, ls = de_rec_bindings ctx xs in
         let e2, l = aux ctx e2 in
         (Let (BRec xs, e2), List.concat ls @ l)
+    | Let (BRecC xs, e2) ->
+        let xs, ls = de_rec_bindings ctx xs in
+        let e2, l = aux ctx e2 in
+        (Let (BRecC xs, e2), List.concat ls @ l)
     | Sel (e, x) ->
         let e, l = aux ctx e in
         (Sel (e, x), l)
@@ -260,13 +274,15 @@ let defunc ctx expr =
             [] cases
         in
         (Match (cond, MatchPattern cases), l @ List.concat ls)
-    | _ -> de ctx expr
-  and de = de_w_bound ~bv:SSet.empty
-  and de_w_bound ctx ~bv (expr : expr) =
+    | App _ -> de_app ctx expr
+    | Lam _ -> de_lam ctx (next_fresh "`C_'lam") expr
+  and de_lam ctx ct (expr : expr) =
     match expr with
     | Lam (ps, x) ->
-        let ct = next_fresh "`C_'lam" in
-        let fvs = SSet.diff (free expr) bv in
+        let fvs =
+          let keys, _ = List.split @@ Ctx.bindings ctx in
+          SSet.diff (free expr) @@ SSet.of_list keys
+        in
         let sorted_fvl = List.map (fun x -> Var x) @@ SSet.elements fvs in
         let sorted_p_fvl = List.map (fun x -> PVar x) @@ SSet.elements fvs in
         let body, l = aux ctx x in
@@ -275,6 +291,9 @@ let defunc ctx expr =
           else (App (Ctor ct, sorted_fvl), PApp (ct, Some (PTup sorted_p_fvl)))
         in
         (abs, (PTup (case :: ps), body) :: l)
+    | _ -> aux ctx expr
+  and de_app ctx (expr : expr) =
+    match expr with
     | App (Ctor x, xs) ->
         let xs, ls = List.split @@ List.map (aux ctx) xs in
         (* constructor application *) (App (Ctor x, xs), List.concat ls)
@@ -283,25 +302,46 @@ let defunc ctx expr =
         let xs, l2 = List.split @@ List.map (aux ctx) xs in
         (App (Var "_'defunc_apply", f :: xs), l1 @ List.concat l2)
     | _ -> aux ctx expr
-  and de_rec_bindings _ctx bindings =
-    let bv =
-      List.fold_left SSet.union SSet.empty
-        (List.map (fun x -> free_p @@ fst x) bindings)
+  and gen_symbol binding =
+    match binding with
+    | PVar x, Lam (_, _) -> (x, next_fresh "`C_'lam")
+    | _, Lam _ ->
+        failwith
+          "Pattern must be a variable in the left-hand side of a let binding \
+           when defunctionalizing"
+    | _ -> failwith "Not a lambda in the right-hand side of a let binding"
+  and de_single_binding x e1 e2 =
+    match e1 with
+    | Lam _ ->
+        let xv, ct = gen_symbol (x, e1) in
+        let new_ctx = Ctx.add xv ct ctx in
+        let e1, l1 = de_lam ctx ct e1 in
+        let e2, l2 = aux new_ctx e2 in
+        (x, e1, e2, l1 @ l2)
+    | _ ->
+        let e1, l1 = aux ctx e1 in
+        let e2, l2 = aux ctx e2 in
+        (x, e1, e2, l1 @ l2)
+  and de_rec_bindings ctx bindings =
+    assert (List.for_all (fun (_, e) -> allowed_rhs_for_let_rec e) bindings);
+    let symbols = List.map gen_symbol bindings in
+    let new_ctx =
+      List.fold_left (fun ctx (x, y) -> Ctx.add x y ctx) ctx symbols
     in
-    assert (List.for_all (fun (_, e) -> allowed_rhs_for_let_rec bv e) bindings);
     let ls, e =
       List.fold_left_map
-        (fun acc (x, e) ->
-          let e, l = de_w_bound ctx ~bv e in
+        (fun acc ((x, e), (_, ct)) ->
+          let e, l = de_lam new_ctx ct e in
           (l :: acc, (x, e)))
-        [] bindings
+        []
+        (List.combine bindings symbols)
     in
     (e, ls)
   in
-  de ctx expr
+  aux ctx expr
 
 let defunc_prog (prog : prog) =
-  let (_, _), prog =
+  let (_, cases), prog =
     List.fold_left_map
       (fun ((ctx, cases) as acc) item ->
         match item with
@@ -312,4 +352,18 @@ let defunc_prog (prog : prog) =
         | _ -> failwith "Unsupported item")
       (Ctx.empty, []) prog
   in
-  prog
+  let defunc_apply =
+    Term
+      ( Some (PVar "_'defunc_apply"),
+        Let
+          ( BRec
+              [
+                ( PVar "_'defunc_apply",
+                  Lam
+                    ( [ PVar "_'f"; PVar "_'a" ],
+                      Match (Tup [ Var "_'f"; Var "_'a" ], MatchPattern cases)
+                    ) );
+              ],
+            Var "_'defunc_apply" ) )
+  in
+  defunc_apply :: prog

@@ -1,0 +1,8 @@
+let id = fun x -> x;;
+
+let main = fun _ ->
+  let _ = id (fun x -> x + 1) 1 in
+  let _ = id 2 in
+  ();;
+
+let _ = main ();;
