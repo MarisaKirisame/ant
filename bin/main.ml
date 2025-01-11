@@ -22,14 +22,22 @@ let parse content =
       @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input print_ast print_ant print_cps_transformed =
+let driver input print_ast print_ant print_cps_transformed print_de print_cps_de
+    =
   let src = read_all input in
   let ast = parse src in
   let _ =
     if print_ast then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog ast);
     if print_ant then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_ant ast);
     if print_cps_transformed then
-      PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog (Transform.cps_prog ast))
+      PPrint.ToChannel.pretty 0.8 80 stdout
+        (Syntax.pp_prog (Transform.cps_prog ast))
+    else if print_de then
+      PPrint.ToChannel.pretty 0.8 80 stdout
+        (Syntax.pp_prog (Transform.defunc_prog ast))
+    else if print_cps_de then
+      PPrint.ToChannel.pretty 0.8 80 stdout
+        (Syntax.pp_prog (Transform.defunc_prog (Transform.cps_prog ast)))
   in
   ()
 
@@ -50,12 +58,22 @@ let print_cps_transformed =
   let doc = "Print the AST after CPS transformation" in
   Arg.(value & flag & info [ "c"; "print-cps" ] ~doc)
 
+let print_de =
+  let doc = "Print the AST after defunctionalization" in
+  Arg.(value & flag & info [ "d"; "print-defunc" ] ~doc)
+
+let print_cps_de =
+  let doc = "Print the AST after CPS transformation and defunctionalization" in
+  Arg.(value & flag & info [ "D"; "print-cps-defunc" ] ~doc)
+
 let cmd =
   let doc = "ant Compiler" in
   let man = [ `S Manpage.s_bugs ] in
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
   Cmd.v info
-    Term.(const driver $ input $ print_ast $ print_ant $ print_cps_transformed)
+    Term.(
+      const driver $ input $ print_ast $ print_ant $ print_cps_transformed
+      $ print_de $ print_cps_de)
 
 let i = Cmd.eval cmd
 

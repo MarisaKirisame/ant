@@ -1,4 +1,4 @@
-type list 'a =
+(* type list 'a =
   | Nil
   | Cons of 'a * list 'a;;
 
@@ -7,7 +7,7 @@ let map =
     fun f -> fun l -> match l with
     | Nil -> `Nil 
     | Cons (hd, tl) -> `Cons (f hd, map f tl)
-  in map;;
+  in map;; *)
 
 (*
 type tree 'a = Leaf of 'a | Node of tree 'a * tree 'a;;
@@ -19,3 +19,10 @@ let flatten = fun t ->
   in
   aux `Nil t
 *)
+
+let id = fun x -> x;;
+
+let main = fun _ ->
+  let _ = id (fun x -> x + 1) 1 in
+  let _ = id 2 in
+  ();;
