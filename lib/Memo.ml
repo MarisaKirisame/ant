@@ -47,4 +47,4 @@ type match_log = Todo
  *   The caller should traverse down this memo tree until it can not find a match,
  *     then execute the function.
  *)
-type memo
+type memo = Todo
