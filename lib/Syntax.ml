@@ -60,14 +60,18 @@ type ty_kind =
 type ty_binding = TBOne of string * ty_kind | TBRec of (string * ty_kind) list
 [@@deriving show]
 
-type stmt = Type of ty_binding | Term of pattern option * expr
+type stmt =
+  | Type of ty_binding
+  | Term of pattern option * expr
+  | Fun of string * pattern list * expr
 [@@deriving show]
 
 type prog = stmt list
 
 open PPrint
 
-let pp_pattern =
+(* pp_pattern' adds explicit parenthesis around the tuple *)
+let pp_pattern, pp_pattern' =
   let rec f c (pat : pattern) =
     let pp inner = if c then parens inner else inner in
     match pat with
@@ -86,7 +90,7 @@ let pp_pattern =
         pp inner
     | PVar x -> string x
   in
-  f false
+  (f false, f true)
 
 let pp_expr =
   let fc pf ef (p, e) =
@@ -98,21 +102,23 @@ let pp_expr =
     ^^ string "with" ^^ inf
   in
   let fsb pro lhs rhs =
-    group @@ pro ^^ nest 2 @@ break 1 ^^ align @@ lhs ^^ space ^^ string "="
-    ^^ space ^^ rhs
+    group @@ align @@ pro ^^ space ^^ lhs ^^ space ^^ string "=" ^^ nest 2
+    @@ break 1 ^^ rhs
   in
   let fl lhs rhs tail =
     align @@ group
-    @@ fsb (string "let") lhs rhs
-    ^^ break 1 ^^ string "in" ^^ break 1 ^^ tail
+    @@ group (fsb (string "let") lhs rhs ^^ break 1 ^^ string "in")
+    ^^ break 1 ^^ tail
   in
   let flr lhs rhs others tail =
     align @@ group
-    @@ (fsb (string "let rec") lhs rhs
-       ^^ concat_map
-            (fun (lhs, rhs) -> break 1 ^^ fsb (string "and") lhs rhs)
-            others)
-    ^^ break 1 ^^ string "in" ^^ break 1 ^^ tail
+    @@ group
+         ((fsb (string "let rec") lhs rhs
+          ^^ concat_map
+               (fun (lhs, rhs) -> break 1 ^^ fsb (string "and") lhs rhs)
+               others)
+         ^^ break 1 ^^ string "in")
+    ^^ break 1 ^^ tail
   in
   let rec f c (expr : expr) =
     let pp inner = if c then parens inner else inner in
@@ -125,6 +131,9 @@ let pp_expr =
     | Builtin (Builtin b) -> string b
     | Var x -> string x
     | Ctor c -> string c
+    | App (Ctor ct, xs) when List.length xs > 1 ->
+        (* special case for ctor application. for OCaml compatibility *)
+        f c (App (Var ct, [ Tup xs ]))
     | App (fn, []) -> f c fn
     | App (fn, xs) -> f true fn ^^ space ^^ separate_map space (f true) xs |> pp
     | Op (op, lhs, rhs) ->
@@ -132,7 +141,7 @@ let pp_expr =
     | Tup xs -> separate_map (comma ^^ space) (f true) xs |> parens
     | Lam (xs, e) ->
         group @@ align @@ string "fun" ^^ space
-        ^^ separate_map space pp_pattern xs
+        ^^ separate_map space pp_pattern' xs
         ^^ space ^^ string "->" ^^ nest 2 @@ break 1 ^^ f true e
         |> pp
     | Arr xs -> separate_map (semi ^^ space) (f true) xs |> brackets
@@ -167,7 +176,7 @@ let pp_ty =
     | TFloat -> string "float"
     | TBool -> string "bool"
     | TApply (ty, []) -> f c ty
-    | TApply (ty, [ ty2 ]) -> f true ty ^^ space ^^ f c ty2
+    | TApply (ty, [ ty2 ]) -> f c ty2 ^^ space ^^ f c ty
     | TApply (ty, tys) ->
         (parens @@ separate_map (string ",") (f true) tys) ^^ space ^^ f c ty
         |> pp
@@ -219,8 +228,13 @@ let pp_stmt =
         ^^ string ";;"
     | Term (x, tm) ->
         let name = match x with Some x -> pp_pattern x | None -> underscore in
-        string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
-        @@ pp_expr tm ^^ string ";;"
+        string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ nest 2
+        @@ break 1 ^^ group @@ pp_expr tm ^^ string ";;"
+    | Fun (name, args, body) ->
+        string "let rec" ^^ space ^^ string name ^^ space
+        ^^ separate_map space pp_pattern args
+        ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr body
+        ^^ string ";;"
   in
   f
 
@@ -342,7 +356,7 @@ let rec ant_pp_expr (e : expr) : document =
   match e with
   | Lam (xs, e) ->
       string "fun "
-      ^^ separate_map (string " ") pp_pattern xs
+      ^^ separate_map space pp_pattern' xs
       ^^ string " -> " ^^ ant_pp_expr e
   | Match (value, MatchPattern cases) ->
       string "match (" ^^ string "to_ocaml_int_list" ^^ string " "
@@ -376,6 +390,7 @@ let ant_pp_stmt (e : env) (s : stmt) : document =
       let name = match x with Some x -> pp_pattern x | None -> underscore in
       string "let rec" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
       @@ ant_pp_expr tm ^^ string ";;"
+  | Fun (_name, _args, _body) -> failwith "Not implemented (TODO)"
 
 let pp_ant x =
   string "open Ant" ^^ break 1

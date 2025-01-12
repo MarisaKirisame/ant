@@ -5,3 +5,31 @@ let fact =
       if n = 0 then 1 else n * (fact (n - 1))
   in
   fact;;
+type nat =
+  | S of nat
+  | Z;;
+let (even, odd) = 
+  let rec even = fun x ->
+    match x with
+    | S x -> odd x
+    | Z -> true
+  and odd = fun x ->
+    match x with
+    | S x -> even x
+    | Z -> false
+  in (even, odd);;
+let _ = even (S (S Z));;
+let s = S;;
+let z = Z;;
+let _ = even (s (s z));;
+type list 'a =
+  | Nil
+  | Cons of 'a * list 'a;;
+let map =
+  let rec map =
+    fun f l -> match l with
+    | Nil -> Nil 
+    | Cons (hd, tl) -> Cons (f hd) (map f tl)
+  in map;;
+let f = fun x -> x + 1;;
+let _ = map f (Cons 1 (Cons 2 Nil));;

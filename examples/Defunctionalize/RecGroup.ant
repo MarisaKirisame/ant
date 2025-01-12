@@ -1,0 +1,6 @@
+let f =
+  let rec f = fun hof1 -> g (fun x -> hof1 x)
+  and g = fun hof2 -> f (fun x -> hof2 x) in
+  f;;
+
+let _ = f (fun x -> x);;

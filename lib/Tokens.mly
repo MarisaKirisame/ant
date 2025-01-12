@@ -4,6 +4,7 @@
 %token <string> TK_STRING_LITERAL   "<str>"
 %token <string> TK_ID               "<id>"
 %token <string> TK_CTOR             "<ctor>"
+%token <string> TK_RAW_CTOR         "<raw_ctor>"
 %token <string> TK_BUILTIN          "<builtin>"
 
 %token TK_NEWLINE       "<newline>"
