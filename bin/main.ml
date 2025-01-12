@@ -29,7 +29,8 @@ let driver input print_ast print_ant print_cps_transformed =
     if print_ast then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog ast);
     if print_ant then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_ant ast);
     if print_cps_transformed then
-      PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog (Transform.cps_prog ast))
+      PPrint.ToChannel.pretty 0.8 80 stdout
+        (Syntax.pp_prog (Transform.cps_prog ast))
   in
   ()
 
