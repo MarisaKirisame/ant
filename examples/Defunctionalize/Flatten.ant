@@ -1,0 +1,8 @@
+type tree 'a = Leaf of 'a | Node of tree 'a * tree 'a;;
+
+let flatten = fun t ->
+  let rec aux = fun t -> match t with
+    | Leaf x -> fun acc -> `Cons (x, acc)
+    | Node (l, r) -> fun acc -> aux l (aux r acc)
+  in
+  aux `Nil t
