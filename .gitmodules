@@ -1,0 +1,3 @@
+[submodule "lib/hwsl2_core"]
+	path = lib/hwsl2_core
+	url = git@github.com:MarisaKirisame/hwsl2_core.git
