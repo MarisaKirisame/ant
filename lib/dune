@@ -1,7 +1,7 @@
 (library
  (name ant)
  (libraries pprint batteries core)
- (modules Lexer Tokens Parser Syntax Tyck Seq Transform Fresh Memo)
+ (modules Lexer Tokens Parser Syntax Tyck Seq Transform Fresh Memo Word SL2)
  (preprocess
   (pps ppx_string ppx_let ppx_deriving.show))
  (foreign_stubs

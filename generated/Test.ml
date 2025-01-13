@@ -1,7 +1,7 @@
 [@@@warning "-8"]
 
 open Ant
-module Word = Seq.Word
+open Word
 
 type ocaml_int_list = Nil | Cons of int * Seq.seq
 
