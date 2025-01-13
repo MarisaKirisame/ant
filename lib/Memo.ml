@@ -9,6 +9,19 @@
 (* The environment is an array of value*)
 type env = Todo
 
+type exp = {
+    (*one step transition. when done throw an exception.*)
+    func : state -> state;
+    (*pc is an isomorphism to func, and pc -> func is a table lookup.*)
+    pc : int;
+} and 
+kont = Todo and
+state = {
+    c : exp;
+    e : env;
+    k : kont;
+}
+
 (* The Unmatched
  * Ant memoize a fragment of the current environment, and allow skipping to a point,
  *   where the next evaluation step require a value outside of the fragment.
@@ -32,6 +45,8 @@ type value = Todo
  *   Unmatched contain seq from the memoization caller, and matching on it turn it into a matched
  *     (Note that this is not the same as the unmatched type.)
  *   Matched contain an array index into the remaining prefix and suffix, as well as the sequence matched.
+ * Partial matching on consecutive value result in exponentially longer and longer matching length,
+ *   done by pairing each entry in the match log a ref of length, aliased on all match of the same origin, growing exponentially.
  * When a memoization run is finished, we need to fix all value for the caller.
  *   fixing the caller-generated values can be done by having a stack of value and popping from the stack.
  *   fixing the callee-generated values can be done by resolving all the references.
