@@ -22,3 +22,23 @@ From this definition, immediately we have two critical metric which we want to o
 
 Ant identified this two issues and strive to achieve provide a memoization which is both **fast** and **general**.
 
+## Value Representation
+To provide fast and general memoization, Ant use a finger tree of tagged bytes(Words) to represent value. Part of the bytes is stolen for tagging purpose.
+
+- A basic value of less then a byte, e.g. an int, can be represented using one byte, using the remaining unstolen bit. The corresponding finger tree thus contain one element.
+
+- An adt is represented as a finger tree of possibly multiple bytes. 
+
+  The head byte contain only the constructor tag and nothing else, while the rest of the finger tree represent the arguments of the constructor appended into one finger tree (note: without any separators).
+
+  This representation mean retrieving constructor argument require monoid parsing of reverse polish expression.
+
+  We have a monoidal homomorphism from Words to degree.
+
+  Any basica value have a degree of 1, and any constructor of arity x, have a degree of 1-x. Composing is merely addition.
+
+  Then, giving a finger tree obtained by appending multiple values, the amount of values is equal to the degree.
+
+  To select the nth value of this finger tree, define a `max_degree` which is the max degree of all prefixes of the Word sequence.
+
+  This is also a monoid homomorphism, and the nth value start on the earliest occasion where max_degree = n.
