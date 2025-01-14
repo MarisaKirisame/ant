@@ -42,3 +42,6 @@ To provide fast and general memoization, Ant use a finger tree of tagged bytes(W
   To select the nth value of this finger tree, define a `max_degree` which is the max degree of all prefixes of the Word sequence.
 
   This is also a monoid homomorphism, and the nth value start on the earliest occasion where max_degree = n.
+
+## State Representation
+Programs in Ant is compiled into a CEK machine, where C is an int, E is an array of value, and K is a value.
