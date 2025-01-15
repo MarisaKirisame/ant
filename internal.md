@@ -23,11 +23,11 @@ From this definition, immediately we have two critical metric which we want to o
 Ant identified this two issues and strive to achieve provide a memoization which is both **fast** and **general**.
 
 ## Value Representation
-To provide fast and general memoization, Ant use a finger tree of tagged bytes(Words) to represent value. Part of the bytes is stolen for tagging purpose.
+To provide fast and general memoization, Ant use a finger tree of tagged Word(8-bytes) to represent value. Part of the Word is stolen for tagging purpose.
 
-- A basic value of less then a byte, e.g. an int, can be represented using one byte, using the remaining unstolen bit. The corresponding finger tree thus contain one element.
+- A basic value of less then a Word, e.g. an int, can be represented using one Word, using the remaining unstolen bit. The corresponding finger tree thus contain one element.
 
-- An adt is represented as a finger tree of possibly multiple bytes. 
+- An adt is represented as a finger tree of possibly multiple Word. 
 
   The head byte contain only the constructor tag and nothing else, while the rest of the finger tree represent the arguments of the constructor appended into one finger tree (note: without any separators).
 
