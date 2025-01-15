@@ -18,8 +18,6 @@ From this definition, immediately we have two critical metric which we want to o
 
   For example, invalidating `map f x`, by inserting into the middle of the list, require a linear traversal of half of the list to fix it.
 
-  One might be tempted to fix this by memoizing a part of the input (instead of the whole input) with trie, however now matching fragment become linear again.
-
 Ant identified this two issues and strive to achieve provide a memoization which is both **fast** and **general**.
 
 ## Value Representation
