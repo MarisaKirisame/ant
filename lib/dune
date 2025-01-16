@@ -7,7 +7,7 @@
  (foreign_stubs
   (language c)
   (names sl2_stubs)
-  (flags -Wall -mavx2 -msse2 -msse4.1 -mpclmul -O3)))
+  (flags -Wall -march=native -O3 -DSSE2NEON_SUPPRESS_WARNINGS)))
 
 (include_subdirs qualified)
 

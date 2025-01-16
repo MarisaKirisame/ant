@@ -16,8 +16,8 @@ static inline uint8_t *align_upwards_b(uint8_t *stack, uintptr_t align) {
     return (uint8_t *)addr;
 }
 
-gf2p127_t* align(void* x) {
-    return (gf2p127_t*)align_upwards_b(x, 16 * 8);
+psl2_t align(void* x) {
+    return (psl2_t)align_upwards_b(x, 16 * 8);
 }
 
 void sl2_unit_stub(void* a) {
@@ -41,9 +41,9 @@ value sl2_cmp_stub(void* a, void* b) {
 }
 
 void sl2_from_int_stub(void* b, value a) {
-    gf2p127_t* h = align(b);
+    psl2_t h = align(b);
     int64_t i = Long_val(a);
-    sl2_mul_buf_right(h, &i, 8);
+    sl2_mul_buf_right(h, (unsigned char *)&i, 8);
 }
 
 // We are just using the top 64 bit as the hash value. 
