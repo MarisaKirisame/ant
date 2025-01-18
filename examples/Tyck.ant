@@ -1,3 +1,9 @@
 let _ = fun x -> x;;
 
 let _ = fun x -> fun y -> x y;;
+
+let _ = fun x -> x (fun y -> y);;
+
+let _ = (fun x -> x, fun x -> x);;
+
+let _ = (1, 1);;
