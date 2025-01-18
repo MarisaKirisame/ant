@@ -98,3 +98,10 @@ and remain = Todo
  *     then execute the function.
  *)
 type memo = Todo
+
+let rec trace_y (f : (int -> int) -> (int -> int)): int -> int =
+    let rec func x = 
+        let result = f func x in
+        print_endline (string_of_int x ^ " -> " ^ string_of_int result);
+        result in
+    func
