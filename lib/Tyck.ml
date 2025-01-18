@@ -150,7 +150,7 @@ module Ty = struct
     | Forall (x, b) ->
         group
           (flow (break 1)
-             [ utf8string "∀"; Id.pp x; utf8string "→"; nest 2 (pp b) ])
+             [ Id.pp x; utf8string "→"; nest 2 (pp b) ])
     | Func (a, b) ->
         group
           (flow (break 1)
@@ -667,7 +667,7 @@ let rec pp_inferred =
         in
         string "(* " ^^ Ty.pp t ^^ string " *)" ^^ hardline ^^ string "let rec"
         ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
-        @@ Syntax.ant_pp_expr e ^^ string ";;" ^^ hardline
+        @@ Syntax.pp_expr e ^^ string ";;" ^^ hardline
     | _ -> string ""
   in
   function [] -> string "" | i :: is -> pp_one i ^^ pp_inferred is
