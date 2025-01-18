@@ -1,0 +1,3 @@
+let _ = fun x -> x;;
+
+let _ = fun x -> fun y -> x y;;

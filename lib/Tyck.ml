@@ -667,7 +667,7 @@ let rec pp_inferred =
         in
         string "(* " ^^ Ty.pp t ^^ string " *)" ^^ hardline ^^ string "let rec"
         ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
-        @@ Syntax.ant_pp_expr e ^^ string ";;"
+        @@ Syntax.ant_pp_expr e ^^ string ";;" ^^ hardline
     | _ -> string ""
   in
   function [] -> string "" | i :: is -> pp_one i ^^ pp_inferred is
