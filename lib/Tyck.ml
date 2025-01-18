@@ -75,7 +75,7 @@ end
 module Id = struct
   type t = Var of string | TVar of int | ExVar of int
 
-  let lower_letter = [ "a"; "b"; "c"; "d"; "e"; "f"; "g"; "h" ]
+  let lower_letter = [ "α"; "β"; "γ"; "δ"; "ε"; "ζ"; "η"; "θ" ]
 
   let letters_of_int n =
     let rec convert n acc =
@@ -91,7 +91,7 @@ module Id = struct
 
   let pp = function
     | Var x -> string x
-    | TVar x -> string ("'" ^ letters_of_int x)
+    | TVar x -> utf8string (letters_of_int x)
     | ExVar x -> string ("'" ^ string_of_int x)
 end
 
@@ -136,6 +136,7 @@ module Ty = struct
 
   let rec pp_l = function
     | [] -> string ""
+    | [t] -> pp t;
     | t :: ts -> group (flow (break 1) [ pp t; string "*"; pp_l ts ])
 
   and pp = function
@@ -150,7 +151,7 @@ module Ty = struct
     | Forall (x, b) ->
         group
           (flow (break 1)
-             [ Id.pp x; utf8string "→"; nest 2 (pp b) ])
+             [ utf8string "∀"; Id.pp x; utf8string "→"; nest 2 (pp b) ])
     | Func (a, b) ->
         group
           (flow (break 1)
