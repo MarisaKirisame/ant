@@ -647,3 +647,27 @@ and infer_app ctx ta e =
   | t ->
       Env.err
         [%string "infer_app: no rule applicable for %{debug_pp (Ty.pp t)}"]
+
+let rec infer_prog = function
+  | [] -> []
+  | Syntax.Type _ :: ps -> infer_prog ps
+  | Syntax.Term (n, e) :: ps -> (
+      match Env.run (0, 0) (infer [] e) with
+      | Ok ((t, _), _) -> (Syntax.Term (n, e), t) :: infer_prog ps
+      | Error _ -> infer_prog ps (* (Syntax.Term (n, e), ) :: infer_prog ps *))
+  | Syntax.Fun _ :: ps -> infer_prog ps
+
+open PPrint
+
+let rec pp_inferred =
+  let pp_one = function
+    | Syntax.Term (n, e), t ->
+        let name =
+          match n with Some x -> Syntax.pp_pattern x | None -> underscore
+        in
+        string "(* " ^^ Ty.pp t ^^ string " *)" ^^ hardline ^^ string "let rec"
+        ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
+        @@ Syntax.ant_pp_expr e ^^ string ";;"
+    | _ -> string ""
+  in
+  function [] -> string "" | i :: is -> pp_one i ^^ pp_inferred is

@@ -22,13 +22,16 @@ let parse content =
       @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input print_ast print_ant print_cps_transformed print_de print_cps_de
-    =
+let driver input print_ast print_ant tyck print_cps_transformed print_de
+    print_cps_de =
   let src = read_all input in
   let ast = parse src in
   let _ =
     if print_ast then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog ast);
     if print_ant then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_ant ast);
+    if tyck then
+      PPrint.ToChannel.pretty 0.8 80 stdout
+        (Tyck.pp_inferred (Tyck.infer_prog ast));
     if print_cps_transformed then
       PPrint.ToChannel.pretty 0.8 80 stdout
         (Syntax.pp_prog (Transform.cps_prog ast))
@@ -54,6 +57,10 @@ let print_ant =
   let doc = "Print the AST in ant" in
   Arg.(value & flag & info [ "a"; "print-ant" ] ~doc)
 
+let tyck =
+  let doc = "Typechecking" in
+  Arg.(value & flag & info [ "t"; "tyck" ] ~doc)
+
 let print_cps_transformed =
   let doc = "Print the AST after CPS transformation" in
   Arg.(value & flag & info [ "c"; "print-cps" ] ~doc)
@@ -72,8 +79,8 @@ let cmd =
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
   Cmd.v info
     Term.(
-      const driver $ input $ print_ast $ print_ant $ print_cps_transformed
-      $ print_de $ print_cps_de)
+      const driver $ input $ print_ast $ print_ant $ tyck
+      $ print_cps_transformed $ print_de $ print_cps_de)
 
 let i = Cmd.eval cmd
 
