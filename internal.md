@@ -43,3 +43,10 @@ To provide fast and general memoization, Ant use a finger tree of tagged Word(8-
 
 ## State Representation
 Programs in Ant is compiled into a CEK machine, where C is an int, E is an array of value, and K is a value.
+
+Unlike the classical CEK machine, in Ant, `Apply` is a program state instead of a function, keeping all steps a small finite amount of work.
+
+Memoization in Ant thus memoize a fragment of the state, to skip to a state which cannot transit withou reading outside of the fragment.
+
+## Fragment and Match Log
+A matched fragment is a sequence of Words, while the unmatched fragment 
