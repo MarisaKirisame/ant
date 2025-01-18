@@ -102,6 +102,7 @@ module Ty = struct
     | Float
     | Bool
     | Str
+    | Tuple of t list
     | TVar of Id.t
     | ExVar of Id.t
     | Forall of Id.t * t
@@ -133,12 +134,17 @@ module Ty = struct
 
   open PPrint
 
-  let rec pp = function
+  let rec pp_l = function
+    | [] -> string ""
+    | t :: ts -> group (flow (break 1) [ pp t; string "*"; pp_l ts ])
+
+  and pp = function
     | Unit -> string "unit"
     | Int -> string "int"
     | Float -> string "float"
     | Bool -> string "bool"
     | Str -> string "str"
+    | Tuple t -> pp_l t
     | TVar x -> Id.pp x
     | ExVar x -> Id.pp x
     | Forall (x, b) ->
@@ -284,6 +290,14 @@ let rec subtype ctx a b =
   match (a, b) with
   (* Unit *)
   | Ty.Unit, Ty.Unit -> Env.return ctx
+  | Ty.Int, Ty.Int -> Env.return ctx
+  | Ty.Float, Ty.Float -> Env.return ctx
+  | Ty.Bool, Ty.Bool -> Env.return ctx
+  | Ty.Str, Ty.Str -> Env.return ctx
+  | Ty.Tuple [], Ty.Tuple [] -> Env.return ctx
+  | Ty.Tuple (t1 :: ts1), Ty.Tuple (t2 :: ts2) ->
+      let%bind ctx' = subtype ctx t1 t2 in
+      subtype ctx' (Ty.Tuple ts1) (Ty.Tuple ts2)
   (* Var *)
   | Ty.TVar x1, Ty.TVar x2 when x1 = x2 ->
       if Ctx.exists (Ctx.P.tvar_named x1) ctx then Env.return ctx
@@ -499,6 +513,14 @@ let rec check ctx e ta =
   match (e, ta) with
   (* 1I *)
   | Syntax.Unit, Ty.Unit -> Env.return ctx
+  | Syntax.Int _, Ty.Int -> Env.return ctx
+  | Syntax.Float _, Ty.Float -> Env.return ctx
+  | Syntax.Bool _, Ty.Bool -> Env.return ctx
+  | Syntax.Str _, Ty.Str -> Env.return ctx
+  | Syntax.Tup [], Ty.Tuple [] -> Env.return ctx
+  | Syntax.Tup (e1 :: es1), Ty.Tuple (t1 :: ts1) ->
+      let%bind ctx' = check ctx e1 t1 in
+      check ctx' (Syntax.Tup es1) (Ty.Tuple ts1)
   (* ∀I *)
   | e, Ty.Forall (tva, a) -> (
       let%bind ctx' = check (Ctx.TVar tva :: ctx) e a in
@@ -526,6 +548,17 @@ and infer ctx e =
   match e with
   (* 1I⇒ *)
   | Syntax.Unit -> Env.return (Ty.Unit, ctx)
+  | Syntax.Int _ -> Env.return (Ty.Int, ctx)
+  | Syntax.Float _ -> Env.return (Ty.Float, ctx)
+  | Syntax.Bool _ -> Env.return (Ty.Bool, ctx)
+  | Syntax.Str _ -> Env.return (Ty.Str, ctx)
+  | Syntax.Tup [] -> Env.return (Ty.Tuple [], ctx)
+  | Syntax.Tup (e1 :: es1) ->
+      let%bind t1, ctx' = infer ctx e1 in
+      let%bind Ty.Tuple ts1, ctx'' = infer ctx' (Syntax.Tup es1) in
+      Env.return (Ty.Tuple (t1 :: ts1), ctx'')
+  (* | Syntax.Arr [] -> 
+    Env.run *)
   (* Var *)
   | Syntax.Var x -> (
       match Ctx.find_map (Ctx.P.var_named (Id.Var x)) ctx with
@@ -575,7 +608,7 @@ and infer ctx e =
       infer_app ctx' (Ctx.apply ctx' a) e2
   | t -> Env.err [%string "infer: no rule applicable for %{Syntax.show_expr t}"]
 
-(* Under input context Γ, applying a function of type Ato e synthesizes type C, with output context Δ *)
+(* Under input context Γ, applying a function of type A to e synthesizes type C, with output context Δ *)
 and infer_app ctx ta e =
   (* print_endline
     [%string
