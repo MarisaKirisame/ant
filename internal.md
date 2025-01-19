@@ -44,7 +44,7 @@ To provide fast and general memoization, Ant use a finger tree of tagged Word(8-
   Note that a key consequence of using polish expression, is that any string can be decomposed into a sequence of n values,
   alongside a possibly empty prefix of degree 1-x, which create a value after consuming n values.
 
-  A more formal way to say this is that a string of n `max_degree` and n-x `degree` is n values, followed by a prefix which require x+1 values to complete.
+  Formally speaking a string of n `max_degree` and n-x `degree` is n values, followed by a prefix which require x+1 values to complete.
 
 ## State Representation
 Programs in Ant is compiled into a CEK machine, where C is an int, E is an array of value, and K is a value.
