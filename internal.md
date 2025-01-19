@@ -58,5 +58,7 @@ This dynamism is handled via 3 interlocking componenting:
 
 ## Reference Type
 The reference type employ monoid parsing to specify a consecutive sequence of Words.
+
 It consist of a source (an index into the memo input or store), alongside a closed interval
+
 A matched fragment is a sequence of Words, while the unmatched fragment 
