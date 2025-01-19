@@ -29,7 +29,7 @@ To provide fast and general memoization, Ant use a finger tree of tagged Word(8-
 
   The head byte contain only the constructor tag and nothing else, while the rest of the finger tree represent the arguments of the constructor appended into one finger tree (note: without any separators).
 
-  This representation mean retrieving constructor argument require monoid parsing of reverse polish expression.
+  This representation mean retrieving constructor argument require monoid parsing of polish expression.
 
   We have a monoidal homomorphism from Words to degree.
 
@@ -40,6 +40,11 @@ To provide fast and general memoization, Ant use a finger tree of tagged Word(8-
   To select the nth value of this finger tree, define a `max_degree` which is the max degree of all prefixes of the Word sequence.
 
   This is also a monoid homomorphism, and the nth value start on the earliest occasion where max_degree = n.
+
+  Note that a key consequence of using polish expression, is that any string can be decomposed into a sequence of n values,
+  alongside a possibly empty prefix of degree 1-x, which create a value after consuming n values.
+
+  A more formal way to say this is that a string of n `max_degree` and n-x `degree` is n values, followed by a prefix which require x+1 values to complete.
 
 ## State Representation
 Programs in Ant is compiled into a CEK machine, where C is an int, E is an array of value, and K is a value.
@@ -56,9 +61,11 @@ This dynamism is handled via 3 interlocking componenting:
 - A Store, which resolve Reference into value or a match request (if the Reference refer to value from the unmatched memo input).
 - A Memo Tree, which interact with the memo caller to submit match request and skip ahead.
 
+TODO
+
 ## Reference Type
 The reference type employ monoid parsing to specify a consecutive sequence of Words.
 
-It consist of a source (an index into the memo input or store), alongside a closed interval
+It consist of a source (an index into the store or the memoing CEK state), alongside a closed interval
 
 A matched fragment is a sequence of Words, while the unmatched fragment 
