@@ -57,15 +57,44 @@ Memoization in Ant thus memoize a fragment of the state, to skip to a state whic
 A key property in ant is that the fragment to memoize is dynamic - it depend on what part of the values are being read.
 
 This dynamism is handled via 3 interlocking componenting:
-- A Reference Type, which enhance the value type with late binding, to resolve match request dynamically. 
+- A Reference type, which enhance the value type with late binding, to resolve match request dynamically. 
 - A Store, which resolve Reference into value or a match request (if the Reference refer to value from the unmatched memo input).
 - A Memo Tree, which interact with the memo caller to submit match request and skip ahead.
 
-TODO
-
 ## Reference Type
-The reference type employ monoid parsing to specify a consecutive sequence of Words.
+The Reference type refer to a series of values which can possibly be unmatched.
 
-It consist of a source (an index into the store or the memoing CEK state), alongside a closed interval
+It consist of a source (an index into the store or the memoing CEK state), an offset to skip n values, and the amount of values it hold.
 
-A matched fragment is a sequence of Words, while the unmatched fragment 
+It's `degree` and `max_degree` is thus its value amount.
+
+The seq type is then a finger tree of either Word or Reference, to track unmatched values.
+
+## Store
+The Store give name to possibly unmatched fragment, so it can be refered to (via reference), or matched later.
+
+It is an array where entires are either `unmatched` or `matched`. An unmatched entry contain a value from the memo caller, and a matched entry contain a `normal` value.
+
+No entries contain incomplete values. Formally, their `degree` must equal to their `max_degree` and no substring share the same `max_degree`.
+
+This distinction dictate whether an entries is usable (if it is already memoized), or need to be memoized before becoming usable.
+
+A similar mechanism have to be deployed to the CEK states.
+
+Once matched, the value is converted from a `unmatched` to a `matched` with the matched part being Words, and the other part turning into references, to new entries in the store.
+
+## Memo Tree
+The Memo Tree is a Tree where each node have a match request, a transit function, and a hashtable to Memo Tree Node.
+
+To skip fragment, the Memo Tree interact with the memo caller by sending its match request, which is like a reference, containing a unmatched source, an offset, but with a length instead of amount of values. 
+
+The memo caller can then lookup the true value in the source, splitting the previously unmatched source into the prefix/suffix, and the matched in-between. 
+
+The prefix/suffix is appended onto the store, and the in-between is used for lookup in the hashtable.
+
+If the lookup succeed, a new match request will be sent, growing exponentially in length, continuing until a lookup fail.
+
+The latest transit function (a function from CEK state to state) is then applied to finish this sequence of memo lookup.
+
+## Adding new entry
+TODO
