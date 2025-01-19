@@ -48,5 +48,15 @@ Unlike the classical CEK machine, in Ant, `Apply` is a program state instead of 
 
 Memoization in Ant thus memoize a fragment of the state, to skip to a state which cannot transit withou reading outside of the fragment.
 
-## Fragment and Match Log
+## Memoization Overview
+A key property in ant is that the fragment to memoize is dynamic - it depend on what part of the values are being read.
+
+This dynamism is handled via 3 interlocking componenting:
+- A Reference Type, which enhance the value type with late binding, to resolve match request dynamically. 
+- A Store, which resolve Reference into value or a match request (if the Reference refer to value from the unmatched memo input).
+- A Memo Tree, which interact with the memo caller to submit match request and skip ahead.
+
+## Reference Type
+The reference type employ monoid parsing to specify a consecutive sequence of Words.
+It consist of a source (an index into the memo input or store), alongside a closed interval
 A matched fragment is a sequence of Words, while the unmatched fragment 
