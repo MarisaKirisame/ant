@@ -32,6 +32,7 @@ kont = value and
 state = {
     c : exp;
     e : env;
+    s : store;
     k : kont;
 } and
 
@@ -85,7 +86,7 @@ full_measure = {
  *)
 store = {
     (*note that last is not used in the entries, as the whole store is restored at once.*)
-    entries: value Dynarray.t Stack.t;
+    entries: value Dynarray.t;
     last: store option;
  } and
 value = {
