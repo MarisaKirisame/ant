@@ -4,7 +4,6 @@
 
 #include "hwsl2_core/sl2-inl.h"
 
-
 /* Align upwards - bit mask mode (hence _b) */
 static inline uint8_t *align_upwards_b(uint8_t *stack, uintptr_t align) {
     assert(align > 0 && (align & (align - 1)) == 0); /* Power of 2 */
