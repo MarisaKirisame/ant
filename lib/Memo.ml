@@ -9,8 +9,8 @@
  *)
 open BatFingerTree
 open Word
-open SL2
 open Common
+module Hasher = Hash.SL2
 
 type env = value Dynarray.t
 
@@ -65,7 +65,7 @@ and seq = (fg_et, measure) Generic.fg
 and measure = { degree : int; max_degree : int; full : full_measure option }
 
 (* measure have this iff fully fetched (only Word.t, no reference). *)
-and full_measure = { length : int; hash : sl2 }
+and full_measure = { length : int; hash : Hasher.t }
 
 (* The Store
  * When computing under memoization, we need to determine which value is memoized, and which is not.
@@ -128,14 +128,16 @@ and memo_node_t =
 
 and lookup_t = (fetch_result, memo_node_t) Hashtbl.t
 and fetch_request = { r : source; offset : int; word_count : int }
-and fetch_result = sl2
+and fetch_result = Hasher.t
 
-and record_context = Raw | Recording of {
-  memo_node : memo_node_t;
-  lookup : lookup_t;
-  depth : depth_t;
-  last : record_context;
-}
+and record_context =
+  | Raw
+  | Recording of {
+      memo_node : memo_node_t;
+      lookup : lookup_t;
+      depth : depth_t;
+      last : record_context;
+    }
 
 (* If it refer to a value from depth-1, it need a value which had not been fetched yet. 
      We can then flush the current state into the Recording record_context, 
@@ -143,7 +145,7 @@ and record_context = Raw | Recording of {
      Then the memo_node and lookup field in record_context can be replaced with the adequate result.
  * If it refer to a value from < depth-1, it cannot be fetch. 
      We still flush the state but do not change record_context, but throw an exception instead.*)
-let resolve: state * reference -> state * seq = todo "todo"
+let resolve : state * reference -> state * seq = todo "todo"
 
 (*stepping require an unfetched fragment. register the current state.*)
 let register_memo_need_unfetched = todo "register_memo"

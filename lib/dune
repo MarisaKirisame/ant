@@ -12,8 +12,7 @@
   Fresh
   Memo
   Word
-  SL2
-  MCRC32C
+  Hash
   Common)
  (preprocess
   (pps ppx_string ppx_let ppx_deriving.show))
