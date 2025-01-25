@@ -1,10 +1,6 @@
 open BatFingerTree
 open Word
-
-exception EXN of string
-
-let panic msg = raise (EXN msg)
-let todo msg = panic ("todo: " ^ msg)
+open Common
 
 type measure = {
   length : int;

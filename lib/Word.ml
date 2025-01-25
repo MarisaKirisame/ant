@@ -1,4 +1,3 @@
-
 (*The smallest unit in our value representation.
 We steal the 1 bit after the sign bit for tagging.
 Note that ocaml already steal 1 bit, so we are left with 63 - 1 = 62 bits.

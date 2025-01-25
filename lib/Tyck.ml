@@ -136,7 +136,7 @@ module Ty = struct
 
   let rec pp_l = function
     | [] -> string ""
-    | [t] -> pp t;
+    | [ t ] -> pp t
     | t :: ts -> group (flow (break 1) [ pp t; string "*"; pp_l ts ])
 
   and pp = function
