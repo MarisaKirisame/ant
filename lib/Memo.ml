@@ -35,7 +35,6 @@ and kont = value
 and state = {
   c : exp;
   e : env;
-  s : store;
   k : kont;
   r : record_context;
   m : memo_t;
@@ -87,14 +86,12 @@ and full_measure = { length : int; hash : Hasher.t }
 and store = {
   (*note that last is not used in the entries, as the whole store is restored at once.*)
   entries : value Dynarray.t;
-  last : store option;
 }
 
 and value = {
   depth : depth_t;
   seq : seq;
-  tracker : int ref;
-  last : value option;
+  fetch_length : int ref;
 }
 
 (* The memo
@@ -128,11 +125,17 @@ and memo_node_t =
 
 and lookup_t = (fetch_result, memo_node_t) Hashtbl.t
 and fetch_request = { r : source; offset : int; word_count : int }
-and fetch_result = Hasher.t
+and fetch_result = 
+    | FetchPartial of words
+    | FetchSuffix of words
+    | FetchFull of words
+
+and words = seq (*Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation.*)
 
 and record_context =
   | Raw
   | Recording of {
+      s : store;
       memo_node : memo_node_t;
       lookup : lookup_t;
       depth : depth_t;
@@ -153,8 +156,25 @@ let register_memo_need_unfetched = todo "register_memo"
 (*done so no more stepping needed. register the current state.*)
 let register_memo_done = todo "register_memo"
 
+(* Path compression
+
+ *)
+let fetch_seq (x : seq) (offset : int) (word_count : int): seq * words * seq = todo "fetch_seq"
+let shift_et (et : fg_et): fg_et = todo "shift_et"
+
 (*move a value from depth to depth+1*)
-let shift (x: seq): seq = todo "shift"
+(*let shift (x: seq): seq = 
+    match x with
+    | Generic.Nil -> Generic.Nil
+    | Generic.Single et -> Generic.Single (shift_et et)*)
 
 (*move a value from depth to depth-1. if it refer to other value at the current level, unshift them as well.*)
-let unshift = todo "unshift"
+let unshift_et (et : fg_et) = 
+    match et with
+    | Word w -> w
+    | Reference r -> todo "unshift_et_reference" 
+    | Barrier r -> todo "unshift_et_barrier"
+
+let unshift_seq = todo "unshift"
+
+let unshift_value = todo "unshift"
