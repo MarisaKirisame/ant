@@ -154,7 +154,7 @@ let register_memo_need_unfetched = todo "register_memo"
 let register_memo_done = todo "register_memo"
 
 (*move a value from depth to depth+1*)
-let shift = todo "shift"
+let shift (x: seq): seq = todo "shift"
 
-(*move a value from depth to depth-1*)
+(*move a value from depth to depth-1. if it refer to other value at the current level, unshift them as well.*)
 let unshift = todo "unshift"
