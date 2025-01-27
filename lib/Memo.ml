@@ -51,7 +51,14 @@ and kont = value
  * Values also have their own individual depth, which denote when they are created/last fetched.
  *)
 and depth_t = int
-and machines = { c : exp; e : env; k : kont; d : depth_t; last : last_t option }
+
+and machines = {
+  c : exp;
+  e : env;
+  mutable k : kont;
+  d : depth_t;
+  last : last_t option;
+}
 
 (* The Reference
  * To track whether a fragment is fetched or unfetched,
@@ -65,7 +72,7 @@ and machines = { c : exp; e : env; k : kont; d : depth_t; last : last_t option }
  * If a value at depth x have a reference which refer to a value at depth x,
  *   It should path-compress lazily, as it had already been fetched, and the reference is pointless.
  *)
-and reference = { s : source; offset : int; values_count : int }
+and reference = { src : source; offset : int; values_count : int }
 and source = E of int | S of int | K
 
 and last_t = {
@@ -79,8 +86,8 @@ and state = { mac : machines; mem : memo_t }
 
 (*cannot access, as it is an unfetched reference at the memo caller.*)
 and fg_et = Word of Word.t | Reference of reference
-and seq = (fg_et, measure) Generic.fg
-and measure = { degree : int; max_degree : int; full : full_measure option }
+and seq = (fg_et, measure_t) Generic.fg
+and measure_t = { degree : int; max_degree : int; full : full_measure option }
 
 (* measure have this iff fully fetched (only Word.t, no reference). *)
 and full_measure = { length : int; hash : Hasher.t }
@@ -134,16 +141,51 @@ and memo_node_t =
 and lookup_t = (fetch_result, memo_node_t) Hashtbl.t
 and fetch_request = { r : source; offset : int; word_count : int }
 
+(*todo: when the full suffix is fetched, try to extend forward.*)
 and fetch_result =
   | FetchPartial of words
   | FetchSuffix of words
   | FetchFull of words
 
-  and words = seq
+and words = seq
 (*Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation.*)
 
 and record_context =
   | Recording of { s : store; memo_node : memo_node_t; lookup : lookup_t }
+
+let monoid : measure_t monoid = todo "monoid"
+let measure : fg_et -> measure_t = todo "measure"
+
+let pop_n (s : seq) (n : int) : seq * seq =
+  let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
+  let w, v = Generic.front_exn ~monoid ~measure y in
+  let m = Generic.measure ~monoid ~measure x in
+  assert (m.degree == m.max_degree);
+  match v with
+  | Word v ->
+      assert (m.degree + 1 == n);
+      let l = Generic.snoc ~monoid ~measure x (Word v) in
+      (l, w)
+  | Reference v ->
+      assert (m.degree < n);
+      assert (m.degree + v.values_count >= n);
+      let need = n - m.degree in
+      let l =
+        Generic.snoc ~monoid ~measure x
+          (Reference { src = v.src; offset = v.offset; values_count = need })
+      in
+      if v.values_count == need then (l, w)
+      else
+        let r =
+          Generic.cons ~monoid ~measure w
+            (Reference
+               {
+                 src = v.src;
+                 offset = v.offset + need;
+                 values_count = v.values_count - need;
+               })
+        in
+        (l, r)
 
 (* If it refer to a value from depth-1, it need a value which had not been fetched yet. 
      We can then flush the current state into the Recording record_context, 
@@ -170,9 +212,54 @@ let shift_et (et : fg_et) : fg_et = todo "shift_et"
     | Generic.Nil -> Generic.Nil
     | Generic.Single et -> Generic.Single (shift_et et)*)
 
-(*move a value from depth to depth-1. if it refer to other value at the current level, unshift them as well.*)
+(*move a value from depth x to depth x-1. if it refer to other value at the current level, unshift them as well.*)
 let unshift_et (et : fg_et) =
   match et with Word w -> w | Reference r -> todo "unshift_et_reference"
 
-let unshift_seq = todo "unshift"
-let unshift_value = todo "unshift"
+let get_value (l : last_t) (src : source) : value =
+  match src with
+  | E i -> Dynarray.get l.m.e i
+  | S i -> Dynarray.get l.s.entries i
+  | K -> l.m.k
+
+let set_value (l : last_t) (src : source) (v : value) : unit =
+  match src with
+  | E i -> Dynarray.set l.m.e i v
+  | S i -> Dynarray.set l.s.entries i v
+  | K -> l.m.k <- v
+
+let init_fetch_length () : int ref = ref 1
+
+(*assuming this seq is at depth l.m.d+1, convert it to depth l.m.d*)
+let rec unshift_seq (l : last_t) (x : seq) : seq =
+  let lhs, rhs =
+    Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x
+  in
+  assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
+  match Generic.front rhs ~monoid ~measure with
+  | None -> lhs
+  | Some (rest, Reference y) ->
+      Generic.append ~monoid ~measure lhs
+        (Generic.append ~monoid ~measure (unshift_reference l y)
+           (unshift_seq l rest))
+  | _ -> panic "impossible"
+
+and unshift_reference (l : last_t) (r : reference) : seq =
+  let v = unshift_value l r.src in
+  if v.depth == l.m.d then todo "unshift_reference"
+  else Generic.Single (Reference r)
+
+and unshift_value (l : last_t) (src : source) : value =
+  let v = get_value l src in
+  if v.depth > l.m.d then (
+    assert (v.depth == l.m.d + 1);
+    let new_v =
+      {
+        seq = unshift_seq l v.seq;
+        depth = l.m.d;
+        fetch_length = init_fetch_length ();
+      }
+    in
+    set_value l src new_v;
+    new_v)
+  else v
