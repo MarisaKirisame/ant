@@ -14,9 +14,9 @@ module Hasher = Hash.SL2
 
 type env = value Dynarray.t
 
-(* one thing we might want is to have exp as an adt,
- * which allow memoizing exp fragment to incrementalize the program under changes.
- * however, it
+(* One thing we might want is to have exp as an adt,
+ *   which allow memoizing exp fragment to incrementalize the program under changes.
+ * However, it
  *   0 - add extra overhead
  *   1 - we dont really need this for eval
  *   2 - is unclear how we actually do this with recursive function
@@ -32,34 +32,53 @@ and exp = {
 
 and kont = value
 
-and state = {
-  c : exp;
-  e : env;
-  k : kont;
-  r : record_context;
-  m : memo_t;
-}
-
-(* The Reference
- * Ant memoize a fragment of the current environment, and allow skipping to a point,
- *   where the next evaluation step require a value outside of the fragment.
- * To add such entries into the memoization table, we have to run the program in record mode,
- *   which track memoized (and thus usable) fragment, vs unmemoized fragment.
- * The memoized part can be represented as Word.t,
- *   and the unmemoized part is represented as a Unfetched.  
- * Unfetched contain degree/max_degree, as well as where to fetch the value (a reference).
- *)
-and reference = { r : source; offset : int; values_count : int }
-
-(* As ant allow recording inside recording, this nested recording form a call stack.
- *   Depth merely denote the depth of this call stack.
+(* Record Mode:
+ * Adding new entries to the memo require entering record mode,
+ * Which track fetched fragment versus unfetched fragment.
+ * Fetched fragment can be used normally,
+ *   while the unfetched fragment cannot be used(forced).
+ * Upon attempt to force an unfetched fragment, the current recording is completed,
+ *   which will add a new entry to the memo.
+ * Then ant will try to extend the recording by fetching the fragment,
+ *   which will again run until stuck, and a new entries will then be added.
+ * To extend the fetch require us to keep a old copy of the CEK machine.
+ * Additionally, during record mode, ant might enter record mode again,
+ *   to record a more fine-grained entries which will not skip as far, but will fire more often.
+ * This mean that the CEK machine form a non-empty stack, so ant can extend the recording at any level.
+ *
+ * The stack can then be assigned a depth, where the root CEK machine (which does not do recording whatsowever)
+ *   have a depth of 0, and an extension increase the depth by 1.
+ * Values also have their own individual depth, which denote when they are created/last fetched.
  *)
 and depth_t = int
+and machines = { c : exp; e : env; k : kont; d : depth_t; last : last_t option }
+
+(* The Reference
+ * To track whether a fragment is fetched or unfetched,
+ *   ant extend the seq finger tree to include a Reference Type.
+ * For a value at depth x+1, the Reference is an index into the C/E/S/K of the machine at depth x.
+ * A key invariant is that a machine at depth x+1 is only able to fetch value at depth x.
+ *   If the value is at depth < x, it had not been fetched by the machine at x.
+ *   If the value is at depth = x+1, it had been fetched already.
+ *   It is impossible for the value to be at depth > x+1.
+ *
+ * If a value at depth x have a reference which refer to a value at depth x,
+ *   It should path-compress lazily, as it had already been fetched, and the reference is pointless.
+ *)
+and reference = { s : source; offset : int; values_count : int }
+and source = E of int | S of int | K
+
+and last_t = {
+  (*s and r die earlier then m so they are separated.*)
+  s : store;
+  r : record_context;
+  m : machines;
+}
+
+and state = { mac : machines; mem : memo_t }
 
 (*cannot access, as it is an unfetched reference at the memo caller.*)
-and barrier = { values_count : int }
-and source = E of int | S of int | K
-and fg_et = Word of Word.t | Reference of reference | Barrier of reference
+and fg_et = Word of Word.t | Reference of reference
 and seq = (fg_et, measure) Generic.fg
 and measure = { degree : int; max_degree : int; full : full_measure option }
 
@@ -67,32 +86,17 @@ and measure = { degree : int; max_degree : int; full : full_measure option }
 and full_measure = { length : int; hash : Hasher.t }
 
 (* The Store
- * When computing under memoization, we need to determine which value is memoized, and which is not.
- *   To do so, each value is paired with is depth, indicating when it was constructed/fetched.
- *   If the depth match with the current depth, it is usable.
- *   If it is not usable, we require extra fetching to register it.
- * Of course, a fetch can be partial.
- *   the remaining pieces are appended into the Store.
- *   The Store is an array containing two type of value: the fetched and unfetched.
- *   Unfetched contain seq from the memoization caller, and fetching it turn it into a fetched
- *     (Note that this is not the same as the unfetched type.)
- *   Fetched contain an array index into the remaining prefix and suffix, as well as the sequence fetched.
+ * A fetch can be partial, so the remaining fragment need to be fetched again.
+ *   they are appended into the Store.
  * Partial fetching on consecutive value result in exponentially longer and longer fetching length,
- *   done by pairing each entry in the Store a ref of length, aliased on all fetch of the same origin, growing exponentially.
- * When a memoization run is finished, we need to fix all value for the caller.
- *   fixing the caller-generated values can be done by having a stack of value and popping from the stack.
- *   fixing the callee-generated values can be done by resolving all the references.
+ *   done by pairing each value a ref of length, aliased on all fetch of the same origin, growing exponentially.
  *)
 and store = {
   (*note that last is not used in the entries, as the whole store is restored at once.*)
   entries : value Dynarray.t;
 }
 
-and value = {
-  depth : depth_t;
-  seq : seq;
-  fetch_length : int ref;
-}
+and value = { seq : seq; depth : depth_t; fetch_length : int ref }
 
 (* The memo
  * The memo is the key data structure that handle all memoization logic.
@@ -116,31 +120,30 @@ and memo_node_t =
   | Need of {
       request : fetch_request;
       lookup : lookup_t;
-      (*++depth. caller need to setup the store.*)
+      (*++depth.*)
       enter : state -> state;
-      (*--depth*)
+      (* --depth.
+       * When a memoization run is finished, we need to replace the caller (the machine at last_t) with the current machine.
+       *   Doing this require shifting all value of depth x to depth x-1.
+       *   This is done by resolving reference to depth x-1.
+       *)
       exit : state -> state;
     }
   | Done
 
 and lookup_t = (fetch_result, memo_node_t) Hashtbl.t
 and fetch_request = { r : source; offset : int; word_count : int }
-and fetch_result = 
-    | FetchPartial of words
-    | FetchSuffix of words
-    | FetchFull of words
 
-and words = seq (*Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation.*)
+and fetch_result =
+  | FetchPartial of words
+  | FetchSuffix of words
+  | FetchFull of words
+
+and words = seq
+(*Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation.*)
 
 and record_context =
-  | Raw
-  | Recording of {
-      s : store;
-      memo_node : memo_node_t;
-      lookup : lookup_t;
-      depth : depth_t;
-      last : record_context;
-    }
+  | Recording of { s : store; memo_node : memo_node_t; lookup : lookup_t }
 
 (* If it refer to a value from depth-1, it need a value which had not been fetched yet. 
      We can then flush the current state into the Recording record_context, 
@@ -159,8 +162,10 @@ let register_memo_done = todo "register_memo"
 (* Path compression
 
  *)
-let fetch_seq (x : seq) (offset : int) (word_count : int): seq * words * seq = todo "fetch_seq"
-let shift_et (et : fg_et): fg_et = todo "shift_et"
+let fetch_seq (x : seq) (offset : int) (word_count : int) : seq * words * seq =
+  todo "fetch_seq"
+
+let shift_et (et : fg_et) : fg_et = todo "shift_et"
 
 (*move a value from depth to depth+1*)
 (*let shift (x: seq): seq = 
@@ -169,12 +174,8 @@ let shift_et (et : fg_et): fg_et = todo "shift_et"
     | Generic.Single et -> Generic.Single (shift_et et)*)
 
 (*move a value from depth to depth-1. if it refer to other value at the current level, unshift them as well.*)
-let unshift_et (et : fg_et) = 
-    match et with
-    | Word w -> w
-    | Reference r -> todo "unshift_et_reference" 
-    | Barrier r -> todo "unshift_et_barrier"
+let unshift_et (et : fg_et) =
+  match et with Word w -> w | Reference r -> todo "unshift_et_reference"
 
 let unshift_seq = todo "unshift"
-
 let unshift_value = todo "unshift"
