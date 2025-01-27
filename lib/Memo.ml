@@ -183,9 +183,26 @@ let monoid : measure_t monoid =
         });
   }
 
+let constructor_degree_table : int Dynarray.t = Dynarray.create ()
+
+let set_constructor_degree (ctag : int) (degree : int) : unit =
+  assert (Dynarray.length constructor_degree_table == ctag);
+  Dynarray.add_last constructor_degree_table degree
+
 let measure (et : fg_et) : measure_t =
   match et with
-  | Word _ -> todo "word"
+  | Word w ->
+      let degree =
+        match Word.get_tag w with
+        | 0 -> 1
+        | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
+        | _ -> panic "unknown tag"
+      in
+      {
+        degree;
+        max_degree = degree;
+        full = Some { length = 1; hash = Hasher.from_int w };
+      }
   | Reference r ->
       { degree = r.values_count; max_degree = r.values_count; full = None }
 
