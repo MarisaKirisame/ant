@@ -77,11 +77,13 @@ and source = E of int | S of int | K
 
 and last_t = {
   (*s and r die earlier then m so they are separated.*)
+  f : fetch_count;
   s : store;
   r : record_context;
   m : machines;
 }
 
+and fetch_count = int
 and state = { mac : machines; mem : memo_t }
 
 (*cannot access, as it is an unfetched reference at the memo caller.*)
@@ -103,7 +105,14 @@ and store = {
   entries : value Dynarray.t;
 }
 
-and value = { seq : seq; depth : depth_t; fetch_length : int ref }
+and value = {
+  seq : seq;
+  depth : depth_t;
+  fetch_length : int ref;
+  (* If the value at depth x have compressed_since == fetch_count on that depth, it is path_compressed,
+   *   so reference in it does not contain any Word.t*)
+  compressed_since : fetch_count;
+}
 
 (* The memo
  * The memo is the key data structure that handle all memoization logic.
@@ -204,18 +213,6 @@ let register_memo_done = todo "register_memo"
 let fetch_seq (x : seq) (offset : int) (word_count : int) : seq * words * seq =
   todo "fetch_seq"
 
-let shift_et (et : fg_et) : fg_et = todo "shift_et"
-
-(*move a value from depth to depth+1*)
-(*let shift (x: seq): seq = 
-    match x with
-    | Generic.Nil -> Generic.Nil
-    | Generic.Single et -> Generic.Single (shift_et et)*)
-
-(*move a value from depth x to depth x-1. if it refer to other value at the current level, unshift them as well.*)
-let unshift_et (et : fg_et) =
-  match et with Word w -> w | Reference r -> todo "unshift_et_reference"
-
 let get_value (l : last_t) (src : source) : value =
   match src with
   | E i -> Dynarray.get l.m.e i
@@ -227,6 +224,19 @@ let set_value (l : last_t) (src : source) (v : value) : unit =
   | E i -> Dynarray.set l.m.e i v
   | S i -> Dynarray.set l.s.entries i v
   | K -> l.m.k <- v
+
+let shift_et (et : fg_et) : fg_et = todo "shift_et"
+
+(*let shift_value (l : last_t)*)
+(*move a value from depth to depth+1*)
+(*let shift (x: seq): seq = 
+    match x with
+    | Generic.Nil -> Generic.Nil
+    | Generic.Single et -> Generic.Single (shift_et et)*)
+
+(*move a value from depth x to depth x-1. if it refer to other value at the current level, unshift them as well.*)
+let unshift_et (et : fg_et) =
+  match et with Word w -> w | Reference r -> todo "unshift_et_reference"
 
 let init_fetch_length () : int ref = ref 1
 
