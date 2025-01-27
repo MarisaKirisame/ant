@@ -151,19 +151,43 @@ and lookup_t = (fetch_result, memo_node_t) Hashtbl.t
 and fetch_request = { src : source; offset : int; word_count : int }
 
 (*todo: when the full suffix is fetched, try to extend forward.*)
-and fetch_result =
-  | FetchPartial of words
-  | FetchSuffix of words
-  | FetchFull of words
-
+and fetch_result = { fetched : words; have_prefix : bool; have_suffix : bool }
 and words = seq
 (*Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation.*)
 
 and record_context =
   | Recording of { s : store; memo_node : memo_node_t; lookup : lookup_t }
 
-let monoid : measure_t monoid = todo "monoid"
-let measure : fg_et -> measure_t = todo "measure"
+let monoid : measure_t monoid =
+  {
+    zero =
+      {
+        degree = 0;
+        max_degree = 0;
+        full = Some { length = 0; hash = Hasher.unit };
+      };
+    combine =
+      (fun x y ->
+        {
+          degree = x.degree + y.degree;
+          max_degree = max x.max_degree (x.degree + y.max_degree);
+          full =
+            (match (x.full, y.full) with
+            | Some xf, Some yf ->
+                Some
+                  {
+                    length = xf.length + yf.length;
+                    hash = Hasher.mul xf.hash yf.hash;
+                  }
+            | _ -> None);
+        });
+  }
+
+let measure (et : fg_et) : measure_t =
+  match et with
+  | Word _ -> todo "word"
+  | Reference r ->
+      { degree = r.values_count; max_degree = r.values_count; full = None }
 
 let pop_n (s : seq) (n : int) : seq * seq =
   if n == 0 then (Generic.empty, s)
@@ -212,9 +236,6 @@ let register_memo_need_unfetched = todo "register_memo"
 (*done so no more stepping needed. register the current state.*)
 let register_memo_done = todo "register_memo"
 
-let fetch_seq (x : seq) (offset : int) (word_count : int) : seq * words * seq =
-  todo "fetch_seq"
-
 let get_value (l : last_t) (src : source) : value =
   match src with
   | E i -> Dynarray.get l.m.e i
@@ -230,22 +251,34 @@ let set_value (l : last_t) (src : source) (v : value) : unit =
 let path_compress (l : last_t) (src : source) : value = todo "path_compress"
 
 (*move a value from depth to depth+1*)
-let fetch_value (l : last_t) (req : fetch_request) : value =
+let fetch_value (l : last_t) (req : fetch_request) : fetch_result =
   let v = path_compress l req.src in
   let x, y = pop_n v.seq req.offset in
   let words, rest =
     Generic.split ~monoid ~measure
       (fun m ->
-        not(match m.full with None -> false | Some m -> req.word_count <= m.length))
+        not
+          (match m.full with
+          | None -> false
+          | Some m -> req.word_count <= m.length))
       y
   in
-  todo "fetch_value"
-(*let shift (x: seq): seq = 
-    match x with
-    | Generic.Nil -> Generic.Nil
-    | Generic.Single et -> Generic.Single (shift_et et)*)
+  let length =
+    (Option.get (Generic.measure ~monoid ~measure words).full).length
+  in
 
-(*move a value from depth x to depth x-1. if it refer to other value at the current level, unshift them as well.*)
+  if Generic.is_empty x then () else todo "add to store";
+  if Generic.is_empty rest then ( (*todo: match in the reverse direction*) )
+  else if length != req.word_count then
+    (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
+    todo "fetch fail, should exit"
+  else todo "add to store";
+
+  {
+    fetched = words;
+    have_prefix = Generic.is_empty x;
+    have_suffix = Generic.is_empty rest;
+  }
 
 let init_fetch_length () : int ref = ref 1
 
@@ -271,6 +304,7 @@ and unshift_reference (l : last_t) (r : reference) : seq =
     y
   else Generic.Single (Reference r)
 
+(*move a value from depth x to depth x-1. if it refer to other value at the current level, unshift them as well.*)
 and unshift_value (l : last_t) (src : source) : value =
   let v = get_value l src in
   if v.depth > l.m.d then (
