@@ -139,7 +139,7 @@ and fetch_result =
   | FetchSuffix of words
   | FetchFull of words
 
-and words = seq
+  and words = seq
 (*Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation.*)
 
 and record_context =
@@ -159,9 +159,6 @@ let register_memo_need_unfetched = todo "register_memo"
 (*done so no more stepping needed. register the current state.*)
 let register_memo_done = todo "register_memo"
 
-(* Path compression
-
- *)
 let fetch_seq (x : seq) (offset : int) (word_count : int) : seq * words * seq =
   todo "fetch_seq"
 
