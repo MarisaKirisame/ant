@@ -110,7 +110,7 @@ and value = {
   depth : depth_t;
   fetch_length : int ref;
   (* If the value at depth x have compressed_since == fetch_count on that depth, it is path_compressed,
-   *   so reference in it does not contain any Word.t*)
+   *   so reference in it point only to value at depth x-1*)
   compressed_since : fetch_count;
 }
 
@@ -148,7 +148,7 @@ and memo_node_t =
   | Done
 
 and lookup_t = (fetch_result, memo_node_t) Hashtbl.t
-and fetch_request = { r : source; offset : int; word_count : int }
+and fetch_request = { src : source; offset : int; word_count : int }
 
 (*todo: when the full suffix is fetched, try to extend forward.*)
 and fetch_result =
@@ -166,35 +166,37 @@ let monoid : measure_t monoid = todo "monoid"
 let measure : fg_et -> measure_t = todo "measure"
 
 let pop_n (s : seq) (n : int) : seq * seq =
-  let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
-  let w, v = Generic.front_exn ~monoid ~measure y in
-  let m = Generic.measure ~monoid ~measure x in
-  assert (m.degree == m.max_degree);
-  match v with
-  | Word v ->
-      assert (m.degree + 1 == n);
-      let l = Generic.snoc ~monoid ~measure x (Word v) in
-      (l, w)
-  | Reference v ->
-      assert (m.degree < n);
-      assert (m.degree + v.values_count >= n);
-      let need = n - m.degree in
-      let l =
-        Generic.snoc ~monoid ~measure x
-          (Reference { src = v.src; offset = v.offset; values_count = need })
-      in
-      if v.values_count == need then (l, w)
-      else
-        let r =
-          Generic.cons ~monoid ~measure w
-            (Reference
-               {
-                 src = v.src;
-                 offset = v.offset + need;
-                 values_count = v.values_count - need;
-               })
+  if n == 0 then (Generic.empty, s)
+  else
+    let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
+    let w, v = Generic.front_exn ~monoid ~measure y in
+    let m = Generic.measure ~monoid ~measure x in
+    assert (m.degree == m.max_degree);
+    match v with
+    | Word v ->
+        assert (m.degree + 1 == n);
+        let l = Generic.snoc ~monoid ~measure x (Word v) in
+        (l, w)
+    | Reference v ->
+        assert (m.degree < n);
+        assert (m.degree + v.values_count >= n);
+        let need = n - m.degree in
+        let l =
+          Generic.snoc ~monoid ~measure x
+            (Reference { src = v.src; offset = v.offset; values_count = need })
         in
-        (l, r)
+        if v.values_count == need then (l, w)
+        else
+          let r =
+            Generic.cons ~monoid ~measure w
+              (Reference
+                 {
+                   src = v.src;
+                   offset = v.offset + need;
+                   values_count = v.values_count - need;
+                 })
+          in
+          (l, r)
 
 (* If it refer to a value from depth-1, it need a value which had not been fetched yet. 
      We can then flush the current state into the Recording record_context, 
@@ -225,18 +227,25 @@ let set_value (l : last_t) (src : source) (v : value) : unit =
   | S i -> Dynarray.set l.s.entries i v
   | K -> l.m.k <- v
 
-let shift_et (et : fg_et) : fg_et = todo "shift_et"
+let path_compress (l : last_t) (src : source) : value = todo "path_compress"
 
-(*let shift_value (l : last_t)*)
 (*move a value from depth to depth+1*)
+let fetch_value (l : last_t) (req : fetch_request) : value =
+  let v = path_compress l req.src in
+  let x, y = pop_n v.seq req.offset in
+  let words, rest =
+    Generic.split ~monoid ~measure
+      (fun m ->
+        not(match m.full with None -> false | Some m -> req.word_count <= m.length))
+      y
+  in
+  todo "fetch_value"
 (*let shift (x: seq): seq = 
     match x with
     | Generic.Nil -> Generic.Nil
     | Generic.Single et -> Generic.Single (shift_et et)*)
 
 (*move a value from depth x to depth x-1. if it refer to other value at the current level, unshift them as well.*)
-let unshift_et (et : fg_et) =
-  match et with Word w -> w | Reference r -> todo "unshift_et_reference"
 
 let init_fetch_length () : int ref = ref 1
 
@@ -256,7 +265,10 @@ let rec unshift_seq (l : last_t) (x : seq) : seq =
 
 and unshift_reference (l : last_t) (r : reference) : seq =
   let v = unshift_value l r.src in
-  if v.depth == l.m.d then todo "unshift_reference"
+  if v.depth == l.m.d then
+    let _, x = pop_n v.seq r.offset in
+    let y, _ = pop_n x r.values_count in
+    y
   else Generic.Single (Reference r)
 
 and unshift_value (l : last_t) (src : source) : value =
@@ -268,6 +280,7 @@ and unshift_value (l : last_t) (src : source) : value =
         seq = unshift_seq l v.seq;
         depth = l.m.d;
         fetch_length = init_fetch_length ();
+        compressed_since = 0;
       }
     in
     set_value l src new_v;
