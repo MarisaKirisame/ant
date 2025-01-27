@@ -77,7 +77,7 @@ and source = E of int | S of int | K
 
 and last_t = {
   (*s and r die earlier then m so they are separated.*)
-  f : fetch_count;
+  mutable f : fetch_count;
   s : store;
   r : record_context;
   m : machines;
@@ -100,17 +100,15 @@ and full_measure = { length : int; hash : Hasher.t }
  * Partial fetching on consecutive value result in exponentially longer and longer fetching length,
  *   done by pairing each value a ref of length, aliased on all fetch of the same origin, growing exponentially.
  *)
-and store = {
-  (*note that last is not used in the entries, as the whole store is restored at once.*)
-  entries : value Dynarray.t;
-}
+and store = value Dynarray.t
 
 and value = {
   seq : seq;
   depth : depth_t;
   fetch_length : int ref;
-  (* If the value at depth x have compressed_since == fetch_count on that depth, it is path_compressed,
-   *   so reference in it point only to value at depth x-1*)
+  (* A value with depth x is path-compressed iff all the reference refer to value with depth x-1.
+   * If a value with depth x have it's compressed_since == fetch_count on depth x-1, it is path_compressed.
+   *)
   compressed_since : fetch_count;
 }
 
@@ -150,7 +148,7 @@ and memo_node_t =
 and lookup_t = (fetch_result, memo_node_t) Hashtbl.t
 and fetch_request = { src : source; offset : int; word_count : int }
 
-(*todo: when the full suffix is fetched, try to extend forward.*)
+(*todo: when the full suffix is fetched, try to extend at front.*)
 and fetch_result = { fetched : words; have_prefix : bool; have_suffix : bool }
 and words = seq
 (*Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation.*)
@@ -256,19 +254,37 @@ let register_memo_done = todo "register_memo"
 let get_value (l : last_t) (src : source) : value =
   match src with
   | E i -> Dynarray.get l.m.e i
-  | S i -> Dynarray.get l.s.entries i
+  | S i -> Dynarray.get l.s i
   | K -> l.m.k
 
 let set_value (l : last_t) (src : source) (v : value) : unit =
   match src with
   | E i -> Dynarray.set l.m.e i v
-  | S i -> Dynarray.set l.s.entries i v
+  | S i -> Dynarray.set l.s i v
   | K -> l.m.k <- v
 
-let path_compress (l : last_t) (src : source) : value = todo "path_compress"
+let path_compress (l : last_t) (src : source) : value =
+  let v = get_value l src in
+  if (v.depth != l.m.d + 1) || (l.f == v.compressed_since) then v
+  else
+    let new_v = { seq = todo "path_compress"; compressed_since = l.f; depth = v.depth; fetch_length = v.fetch_length; } in
+    set_value l src new_v;
+    new_v
 
-(*move a value from depth to depth+1*)
+let add_to_store (l : last_t) (seq : seq) (fetch_length : int ref) : seq =
+  let v = { depth = l.m.d; seq; compressed_since = 0; fetch_length } in
+  let r = { src = S (Dynarray.length l.s); offset = 0; values_count = 1 } in
+  Dynarray.add_last l.s v;
+  Generic.singleton (Reference r)
+
+(*move a value from depth x to depth x+1*)
 let fetch_value (l : last_t) (req : fetch_request) : fetch_result =
+  let v = get_value l req.src in
+  (* Only value at the right depth can be fetched. 
+   * If higher depth, it is already fetched so pointless to fetch again.
+   * If lower depth, it is not fetched by the last level so we cannot trepass.
+   *)
+  assert (v.depth == l.m.d);
   let v = path_compress l req.src in
   let x, y = pop_n v.seq req.offset in
   let words, rest =
@@ -283,19 +299,34 @@ let fetch_value (l : last_t) (req : fetch_request) : fetch_result =
   let length =
     (Option.get (Generic.measure ~monoid ~measure words).full).length
   in
-
-  if Generic.is_empty x then () else todo "add to store";
-  if Generic.is_empty rest then ( (*todo: match in the reverse direction*) )
-  else if length != req.word_count then
+  if (not (Generic.is_empty rest)) && length != req.word_count then
     (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
     todo "fetch fail, should exit"
-  else todo "add to store";
-
-  {
-    fetched = words;
-    have_prefix = Generic.is_empty x;
-    have_suffix = Generic.is_empty rest;
-  }
+  else
+    let transformed_x =
+      if Generic.is_empty x then Generic.empty
+      else add_to_store l x v.fetch_length
+    in
+    let transformed_rest =
+      if Generic.is_empty rest then Generic.empty
+        (*todo: match in the reverse direction*)
+      else add_to_store l rest v.fetch_length
+    in
+    l.f <- l.f + 1;
+    set_value l req.src
+      {
+        depth = v.depth + 1;
+        fetch_length = v.fetch_length;
+        seq =
+          Generic.append ~monoid ~measure transformed_x
+            (Generic.append ~monoid ~measure words transformed_rest);
+        compressed_since = l.f;
+      };
+    {
+      fetched = words;
+      have_prefix = Generic.is_empty x;
+      have_suffix = Generic.is_empty rest;
+    }
 
 let init_fetch_length () : int ref = ref 1
 
