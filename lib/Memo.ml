@@ -106,7 +106,7 @@ and value = {
   seq : seq;
   depth : depth_t;
   fetch_length : int ref;
-  (* A value with depth x is path-compressed iff all the reference refer to value with depth x-1.
+  (* A value with depth x is path-compressed iff all the reference refer to value with depth < x.
    * If a value with depth x have it's compressed_since == fetch_count on depth x-1, it is path_compressed.
    *)
   compressed_since : fetch_count;
@@ -263,13 +263,54 @@ let set_value (l : last_t) (src : source) (v : value) : unit =
   | S i -> Dynarray.set l.s i v
   | K -> l.m.k <- v
 
-let path_compress (l : last_t) (src : source) : value =
+let rec path_compress (l : last_t) (src : source) : value =
   let v = get_value l src in
-  if (v.depth != l.m.d + 1) || (l.f == v.compressed_since) then v
+  let new_v =
+    if v.depth == 0 then v (*anything at depth 0 is trivially path-compressed*)
+    else if v.depth == l.m.d + 1 then path_compress_value l v
+    else if v.depth == l.m.d then path_compress_value (Option.get l.m.last) v
+    else panic "bad depth"
+  in
+  set_value l src new_v;
+  new_v
+
+(*given a last of depth x, value with depth x+1. path compress*)
+and path_compress_value (l : last_t) (v : value) : value =
+  assert (v.depth == l.m.d + 1);
+  if v.compressed_since == l.f then v
   else
-    let new_v = { seq = todo "path_compress"; compressed_since = l.f; depth = v.depth; fetch_length = v.fetch_length; } in
-    set_value l src new_v;
-    new_v
+    {
+      seq = path_compress_seq l v.seq;
+      compressed_since = l.f;
+      depth = v.depth;
+      fetch_length = v.fetch_length;
+    }
+
+(*path compressing a seq with depth x+1*)
+and path_compress_seq (l : last_t) (x : seq) : seq =
+  let lhs, rhs =
+    Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x
+  in
+  assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
+  match Generic.front rhs ~monoid ~measure with
+  | None -> lhs
+  | Some (rest, Reference y) ->
+      Generic.append ~monoid ~measure lhs
+        (Generic.append ~monoid ~measure
+           (path_compress_reference l y)
+           (path_compress_seq l rest))
+  | _ -> panic "impossible"
+
+(*path compressing reference of depth x+1*)
+and path_compress_reference (l : last_t) (r : reference) : seq =
+  let v = get_value l r.src in
+  if v.depth == l.m.d + 1 then (
+    let v = path_compress_value l v in
+    let _, x = pop_n v.seq r.offset in
+    let y, _ = pop_n x r.values_count in
+    set_value l r.src v;
+    y)
+  else Generic.Single (Reference r)
 
 let add_to_store (l : last_t) (seq : seq) (fetch_length : int ref) : seq =
   let v = { depth = l.m.d; seq; compressed_since = 0; fetch_length } in
