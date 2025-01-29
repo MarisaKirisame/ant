@@ -260,7 +260,7 @@ let pop_n (s : seq) (n : int) : seq * seq =
      Then the memo_node and lookup field in record_context can be replaced with the adequate result.
  * If it refer to a value from < depth-1, it cannot be fetch. 
      We still flush the state but do not change record_context, but throw an exception instead.*)
-let resolve : state * reference -> state * seq = todo "todo"
+let resolve : state * reference -> state * seq = fun _ -> todo "todo"
 
 let get_value (rs : record_state) (src : source) : value =
   match src with
