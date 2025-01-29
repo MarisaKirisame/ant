@@ -4,3 +4,6 @@
 [submodule "lib/monoid_hash"]
 	path = lib/monoid_hash
 	url = git@github.com:waterlens/monoid-hash.git
+[submodule "lib/hashtbl"]
+	path = lib/hashtbl
+	url = git@github.com:waterlens/hashtbl.git

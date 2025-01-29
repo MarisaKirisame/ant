@@ -13,13 +13,14 @@
   Memo
   Word
   Hash
+  Intmap
   Common
   batFingerTree)
  (preprocess
   (pps ppx_string ppx_let ppx_deriving.show))
  (foreign_stubs
   (language c)
-  (names sl2_stubs crc32c_stubs)
+  (names sl2_stubs crc32c_stubs hashtbl_stubs)
   (flags -Wall -march=native -O3 -DSSE2NEON_SUPPRESS_WARNINGS)))
 
 (include_subdirs qualified)
