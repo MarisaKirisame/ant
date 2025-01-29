@@ -17,9 +17,13 @@ HASHMAP_NEW_KIND(i64map, int64_t, int64_t, 8, DEFAULT_ALLOC, DEFAULT_COPY,
 
 #define I64map_val(v) (*((i64map_t **) Data_custom_val(v)))
 
+void intmap_finalize(value map) {
+  i64map_destroy(I64map_val(map));
+}
+
 const static struct custom_operations intmap_ops = {
   "intmap",
-  custom_finalize_default,
+  intmap_finalize,
   custom_compare_default,
   custom_hash_default,
   custom_serialize_default,

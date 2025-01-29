@@ -36,6 +36,29 @@ let bench_intmap () =
                        Hashtbl.add tbl seq.(i) (i + 1)
                      done));
            ];
+         Bench.Test.create_group ~name:"Contains"
+           [
+             Bench.Test.create_indexed ~name:"Intmap.mem" ~args (fun len ->
+                 let im = Intmap.create 32 in
+                 for i = 0 to len - 1 do
+                   Intmap.add im i (i + 1)
+                 done;
+                 let seq = gen_seq len in
+                 Core.Staged.stage (fun () ->
+                     for i = 0 to len - 1 do
+                       ignore (Intmap.mem im seq.(i))
+                     done));
+             Bench.Test.create_indexed ~name:"Hashtbl.mem" ~args (fun len ->
+                 let tbl = Hashtbl.create 32 in
+                 for i = 0 to len - 1 do
+                   Hashtbl.add tbl i (i + 1)
+                 done;
+                 let seq = gen_seq len in
+                 Core.Staged.stage (fun () ->
+                     for i = 0 to len - 1 do
+                       ignore (Hashtbl.mem tbl seq.(i))
+                     done));
+           ];
          Bench.Test.create_group ~name:"Find"
            [
              Bench.Test.create_indexed ~name:"Intmap.find" ~args (fun len ->
@@ -61,7 +84,7 @@ let bench_intmap () =
            ];
          Bench.Test.create_group ~name:"Erase"
            [
-             Bench.Test.create_indexed ~name:"Intmap.erase" ~args (fun len ->
+             Bench.Test.create_indexed ~name:"Intmap.remove" ~args (fun len ->
                  let im = Intmap.create 32 in
                  for i = 0 to len - 1 do
                    Intmap.add im i (i + 1)
@@ -71,7 +94,7 @@ let bench_intmap () =
                      for i = 0 to len - 1 do
                        Intmap.remove im seq.(i)
                      done));
-             Bench.Test.create_indexed ~name:"Hashtbl.erase" ~args (fun len ->
+             Bench.Test.create_indexed ~name:"Hashtbl.remove" ~args (fun len ->
                  let tbl = Hashtbl.create 32 in
                  for i = 0 to len - 1 do
                    Hashtbl.add tbl i (i + 1)
