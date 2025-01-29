@@ -74,7 +74,7 @@ let print_cps_de =
   Arg.(value & flag & info [ "D"; "print-cps-defunc" ] ~doc)
 
 let cmd =
-  let doc = "ant Compiler" in
+  let doc = "Ant Compiler" in
   let man = [ `S Manpage.s_bugs ] in
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
   Cmd.v info

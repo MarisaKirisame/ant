@@ -1,0 +1,5 @@
+(executable
+  (name bench_ant)
+  (link_flags -linkall)
+  (libraries ant core_bench core_bench.inline_benchmarks))
+  
