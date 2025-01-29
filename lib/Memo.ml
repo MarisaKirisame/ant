@@ -52,22 +52,21 @@ and kont = value
  *)
 and depth_t = int
 
-and machines = {
-  c : exp;
-  e : env;
+and state = {
+  mutable c : exp;
+  mutable e : env;
   mutable k : kont;
   d : depth_t;
-  last : last_t option;
+  mutable last : record_state option;
 }
 
 (* The Reference
  * To track whether a fragment is fetched or unfetched,
  *   ant extend the seq finger tree to include a Reference Type.
- * For a value at depth x+1, the Reference is an index into the C/E/S/K of the machine at depth x.
- * A key invariant is that a machine at depth x+1 is only able to fetch value at depth x.
- *   If the value is at depth < x, it had not been fetched by the machine at x.
- *   If the value is at depth = x+1, it had been fetched already.
- *   It is impossible for the value to be at depth > x+1.
+ * For a value with depth x+1, the Reference is an index into the C/E/S/K of the machine at depth x.
+ * A key invariant is that a machine at depth x only contain value with depth x or with depth x+1,
+ *   and a key collary is that machine at depth x is only able to fetch value at depth x-1:
+ *   The machine only contain reference with depth x or x+1, and the latter is already fetched, so cannot be fetched again.
  *
  * If a value at depth x have a reference which refer to a value at depth x,
  *   It should path-compress lazily, as it had already been fetched, and the reference is pointless.
@@ -75,18 +74,16 @@ and machines = {
 and reference = { src : source; offset : int; values_count : int }
 and source = E of int | S of int | K
 
-and last_t = {
-  (*s and r die earlier then m so they are separated.*)
-  mutable f : fetch_count;
+(* Needed in Record Mode *)
+and record_state = {
+  (*s f r die earlier then m so they are separated.*)
+  m : state;
   s : store;
-  r : record_context;
-  m : machines;
+  mutable f : fetch_count;
+  mutable r : record_context;
 }
 
 and fetch_count = int
-and state = { mac : machines; mem : memo_t }
-
-(*cannot access, as it is an unfetched reference at the memo caller.*)
 and fg_et = Word of Word.t | Reference of reference
 and seq = (fg_et, measure_t) Generic.fg
 and measure_t = { degree : int; max_degree : int; full : full_measure option }
@@ -102,6 +99,7 @@ and full_measure = { length : int; hash : Hasher.t }
  *)
 and store = value Dynarray.t
 
+(* Note: Value should not alias. Doing so will mess with the fetch_length, which is bad. *)
 and value = {
   seq : seq;
   depth : depth_t;
@@ -128,33 +126,52 @@ and value = {
  *   The caller should traverse down this memo tree until it can not find a fetch,
  *     then execute the function.
  *)
-and memo_t = memo_node_t Array.t
+and memo_t = memo_node_t ref Array.t
 
 and memo_node_t =
+  (* We know transiting need to resolve a fetch_request to continue. *)
   | Need of {
       request : fetch_request;
       lookup : lookup_t;
-      (*++depth.*)
-      enter : state -> state;
-      (* --depth.
-       * When a memoization run is finished, we need to replace the caller (the machine at last_t) with the current machine.
-       *   Doing this require shifting all value of depth x to depth x-1.
-       *   This is done by resolving reference to depth x-1.
-       *)
-      exit : state -> state;
+      progress : progress_t;
     }
-  | Done
+  (* We know there is no more fetch to be done, as the machine evaluate to a value state. *)
+  | Done of done_t
+  (* We know nothing about what's gonna happen. Will switch to Need or Done.
+   * Another design is to always force it to be a Need/Done before hand.
+   *)
+  | Root
+  (* We are figuring out this entry. *)
+  | BlackHole
 
-and lookup_t = (fetch_result, memo_node_t) Hashtbl.t
+and done_t = { skip : record_state -> state }
+
+(*todo: maybe try janestreet's hashtable. we want lookup to be as fast as possible so it might be worth to ffi some SOTA*)
+and lookup_t = (fetch_result, memo_node_t ref) Hashtbl.t
+
+and progress_t = {
+  (* potential optimization: make enter and exit optional to denote no progress. *)
+  (* ++depth. *)
+  enter : record_state -> state;
+  (* --depth.
+   * When a memoization run is finished, we need to replace the caller (the machine at last_t) with the current machine.
+   *   Doing this require shifting all value of depth x to depth x-1.
+   *   This is done by resolving reference to depth x-1.
+   *)
+  exit : state -> state;
+}
+
 and fetch_request = { src : source; offset : int; word_count : int }
 
-(*todo: when the full suffix is fetched, try to extend at front.*)
+(* todo: when the full suffix is fetched, try to extend at front. *)
 and fetch_result = { fetched : words; have_prefix : bool; have_suffix : bool }
 and words = seq
-(*Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation.*)
+(* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
 
 and record_context =
-  | Recording of { s : store; memo_node : memo_node_t; lookup : lookup_t }
+  | Evaluating of memo_node_t ref
+  | Reentrance of memo_node_t
+  | Building (* Urgh I hate this. It's so easy though. *)
 
 let monoid : measure_t monoid =
   {
@@ -245,49 +262,43 @@ let pop_n (s : seq) (n : int) : seq * seq =
      We still flush the state but do not change record_context, but throw an exception instead.*)
 let resolve : state * reference -> state * seq = todo "todo"
 
-(*stepping require an unfetched fragment. register the current state.*)
-let register_memo_need_unfetched = todo "register_memo"
-
-(*done so no more stepping needed. register the current state.*)
-let register_memo_done = todo "register_memo"
-
-let get_value (l : last_t) (src : source) : value =
+let get_value (rs : record_state) (src : source) : value =
   match src with
-  | E i -> Dynarray.get l.m.e i
-  | S i -> Dynarray.get l.s i
-  | K -> l.m.k
+  | E i -> Dynarray.get rs.m.e i
+  | S i -> Dynarray.get rs.s i
+  | K -> rs.m.k
 
-let set_value (l : last_t) (src : source) (v : value) : unit =
+let set_value (rs : record_state) (src : source) (v : value) : unit =
   match src with
-  | E i -> Dynarray.set l.m.e i v
-  | S i -> Dynarray.set l.s i v
-  | K -> l.m.k <- v
+  | E i -> Dynarray.set rs.m.e i v
+  | S i -> Dynarray.set rs.s i v
+  | K -> rs.m.k <- v
 
-let rec path_compress (l : last_t) (src : source) : value =
-  let v = get_value l src in
+let rec path_compress (rs : record_state) (src : source) : value =
+  let v = get_value rs src in
   let new_v =
     if v.depth == 0 then v (*anything at depth 0 is trivially path-compressed*)
-    else if v.depth == l.m.d + 1 then path_compress_value l v
-    else if v.depth == l.m.d then path_compress_value (Option.get l.m.last) v
+    else if v.depth == rs.m.d + 1 then path_compress_value rs v
+    else if v.depth == rs.m.d then path_compress_value (Option.get rs.m.last) v
     else panic "bad depth"
   in
-  set_value l src new_v;
+  set_value rs src new_v;
   new_v
 
 (*given a last of depth x, value with depth x+1. path compress*)
-and path_compress_value (l : last_t) (v : value) : value =
-  assert (v.depth == l.m.d + 1);
-  if v.compressed_since == l.f then v
+and path_compress_value (rs : record_state) (v : value) : value =
+  assert (v.depth == rs.m.d + 1);
+  if v.compressed_since == rs.f then v
   else
     {
-      seq = path_compress_seq l v.seq;
-      compressed_since = l.f;
+      seq = path_compress_seq rs v.seq;
+      compressed_since = rs.f;
       depth = v.depth;
       fetch_length = v.fetch_length;
     }
 
 (*path compressing a seq with depth x+1*)
-and path_compress_seq (l : last_t) (x : seq) : seq =
+and path_compress_seq (rs : record_state) (x : seq) : seq =
   let lhs, rhs =
     Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x
   in
@@ -297,36 +308,38 @@ and path_compress_seq (l : last_t) (x : seq) : seq =
   | Some (rest, Reference y) ->
       Generic.append ~monoid ~measure lhs
         (Generic.append ~monoid ~measure
-           (path_compress_reference l y)
-           (path_compress_seq l rest))
+           (path_compress_reference rs y)
+           (path_compress_seq rs rest))
   | _ -> panic "impossible"
 
 (*path compressing reference of depth x+1*)
-and path_compress_reference (l : last_t) (r : reference) : seq =
-  let v = get_value l r.src in
-  if v.depth == l.m.d + 1 then (
-    let v = path_compress_value l v in
+and path_compress_reference (rs : record_state) (r : reference) : seq =
+  let v = get_value rs r.src in
+  if v.depth == rs.m.d + 1 then (
+    let v = path_compress_value rs v in
     let _, x = pop_n v.seq r.offset in
     let y, _ = pop_n x r.values_count in
-    set_value l r.src v;
+    set_value rs r.src v;
     y)
   else Generic.Single (Reference r)
 
-let add_to_store (l : last_t) (seq : seq) (fetch_length : int ref) : seq =
-  let v = { depth = l.m.d; seq; compressed_since = 0; fetch_length } in
-  let r = { src = S (Dynarray.length l.s); offset = 0; values_count = 1 } in
-  Dynarray.add_last l.s v;
+let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq
+    =
+  let v = { depth = rs.m.d; seq; compressed_since = 0; fetch_length } in
+  let r = { src = S (Dynarray.length rs.s); offset = 0; values_count = 1 } in
+  Dynarray.add_last rs.s v;
   Generic.singleton (Reference r)
 
 (*move a value from depth x to depth x+1*)
-let fetch_value (l : last_t) (req : fetch_request) : fetch_result =
-  let v = get_value l req.src in
+let fetch_value (rs : record_state) (req : fetch_request) : fetch_result option
+    =
+  let v = get_value rs req.src in
   (* Only value at the right depth can be fetched. 
    * If higher depth, it is already fetched so pointless to fetch again.
    * If lower depth, it is not fetched by the last level so we cannot trepass.
    *)
-  assert (v.depth == l.m.d);
-  let v = path_compress l req.src in
+  assert (v.depth == rs.m.d);
+  let v = path_compress rs req.src in
   let x, y = pop_n v.seq req.offset in
   let words, rest =
     Generic.split ~monoid ~measure
@@ -342,37 +355,38 @@ let fetch_value (l : last_t) (req : fetch_request) : fetch_result =
   in
   if (not (Generic.is_empty rest)) && length != req.word_count then
     (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
-    todo "fetch fail, should exit"
+    None
   else
     let transformed_x =
       if Generic.is_empty x then Generic.empty
-      else add_to_store l x v.fetch_length
+      else add_to_store rs x v.fetch_length
     in
     let transformed_rest =
       if Generic.is_empty rest then Generic.empty
         (*todo: match in the reverse direction*)
-      else add_to_store l rest v.fetch_length
+      else add_to_store rs rest v.fetch_length
     in
-    l.f <- l.f + 1;
-    set_value l req.src
+    rs.f <- rs.f + 1;
+    set_value rs req.src
       {
         depth = v.depth + 1;
         fetch_length = v.fetch_length;
         seq =
           Generic.append ~monoid ~measure transformed_x
             (Generic.append ~monoid ~measure words transformed_rest);
-        compressed_since = l.f;
+        compressed_since = rs.f;
       };
-    {
-      fetched = words;
-      have_prefix = Generic.is_empty x;
-      have_suffix = Generic.is_empty rest;
-    }
+    Some
+      {
+        fetched = words;
+        have_prefix = Generic.is_empty x;
+        have_suffix = Generic.is_empty rest;
+      }
 
 let init_fetch_length () : int ref = ref 1
 
 (*assuming this seq is at depth l.m.d+1, convert it to depth l.m.d*)
-let rec unshift_seq (l : last_t) (x : seq) : seq =
+let rec unshift_seq (rs : record_state) (x : seq) : seq =
   let lhs, rhs =
     Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x
   in
@@ -381,31 +395,180 @@ let rec unshift_seq (l : last_t) (x : seq) : seq =
   | None -> lhs
   | Some (rest, Reference y) ->
       Generic.append ~monoid ~measure lhs
-        (Generic.append ~monoid ~measure (unshift_reference l y)
-           (unshift_seq l rest))
+        (Generic.append ~monoid ~measure (unshift_reference rs y)
+           (unshift_seq rs rest))
   | _ -> panic "impossible"
 
-and unshift_reference (l : last_t) (r : reference) : seq =
-  let v = unshift_value l r.src in
-  if v.depth == l.m.d then
-    let _, x = pop_n v.seq r.offset in
-    let y, _ = pop_n x r.values_count in
-    y
-  else Generic.Single (Reference r)
+and unshift_reference (rs : record_state) (r : reference) : seq =
+  let v = unshift_source rs r.src in
+  assert (v.depth == rs.m.d);
+  let _, x = pop_n v.seq r.offset in
+  let y, _ = pop_n x r.values_count in
+  y
 
 (*move a value from depth x to depth x-1. if it refer to other value at the current level, unshift them as well.*)
-and unshift_value (l : last_t) (src : source) : value =
-  let v = get_value l src in
-  if v.depth > l.m.d then (
-    assert (v.depth == l.m.d + 1);
-    let new_v =
-      {
-        seq = unshift_seq l v.seq;
-        depth = l.m.d;
-        fetch_length = init_fetch_length ();
-        compressed_since = 0;
-      }
-    in
-    set_value l src new_v;
+and unshift_value (rs : record_state) (v : value) : value =
+  if v.depth > rs.m.d then (
+    assert (v.depth == rs.m.d + 1);
+    {
+      seq = unshift_seq rs v.seq;
+      depth = rs.m.d;
+      fetch_length = init_fetch_length ();
+      compressed_since = 0;
+    })
+  else v
+
+and unshift_source (rs : record_state) (src : source) : value =
+  let v = get_value rs src in
+  if v.depth > rs.m.d then (
+    let new_v = unshift_value rs v in
+    set_value rs src new_v;
     new_v)
   else v
+
+let unshift_c (s : state) : exp = s.c
+
+let unshift_all (s : state) : state =
+  let last = Option.get s.last in
+  (* since c is an int theres no shifting needed. todo: make this resilient to change in type *)
+  let c = unshift_c s in
+  let e = Dynarray.map (fun v -> unshift_value last v) s.e in
+  let k = unshift_value last s.k in
+  last.m.c <- c;
+  last.m.e <- e;
+  last.m.k <- k;
+  last.m
+
+let record_memo_exit (s : state) : state = unshift_all s
+let strip_c (c : exp) : exp = c
+
+(* Carefully written to make sure that unneeded values can be freed asap. *)
+let get_enter (s : state) : record_state -> state =
+  let c = strip_c s.c in
+  let e = Dynarray.map (fun v -> v.seq) s.e in
+  let k = s.k.seq in
+  fun rs ->
+    let depth = rs.m.d + 1 in
+    let seq_to_value s =
+      { seq = s; depth; fetch_length = ref 0; compressed_since = 0 }
+    in
+    {
+      c;
+      e = Dynarray.map seq_to_value e;
+      k = seq_to_value k;
+      d = depth;
+      last = Some rs;
+    }
+
+let get_progress (s : state) : progress_t =
+  {
+    enter = get_enter s;
+    (* We might want hint of new values to speedup the exit process, so have it general for now. 
+     * Also good to make explicit the symmetry.
+     *)
+    exit = record_memo_exit;
+  }
+
+(* Stepping require an unfetched fragment. register the current state.
+ * Note that the reference in request does not refer to value in s, but value one level down.
+ *)
+let register_memo_need_unfetched (s : state) (req : fetch_request) : state =
+  let last = Option.get s.last in
+  let lookup =
+    match last.r with
+    | Evaluating ev -> (
+        match !ev with
+        | BlackHole | Root ->
+            let lookup = Hashtbl.create 0 in
+            ev := Need { request = req; lookup; progress = get_progress s };
+            lookup
+        | Need _ | Done _ -> panic "impossible")
+    | Reentrance re -> (
+        match re with
+        | Need n ->
+            assert (req == n.request);
+            n.lookup
+        | BlackHole | Root | Done _ -> panic "impossible")
+    | Building -> panic "impossible"
+  in
+  match fetch_value last req with
+  | Some fr ->
+      let bh = ref BlackHole in
+      assert (not (Hashtbl.mem lookup fr));
+      Hashtbl.add lookup fr bh;
+      last.r <- Evaluating bh;
+      s
+  | None -> record_memo_exit s
+
+let get_done (s : state) : done_t =
+  let p = get_progress s in
+  { skip = (fun rs -> p.exit (p.enter rs)) }
+
+(*done so no more stepping needed. register the current state.*)
+let register_memo_done (s : state) : state =
+  let last = Option.get s.last in
+  (match last.r with
+  | Evaluating ev -> (
+      match !ev with
+      | BlackHole -> ev := Done (get_done s)
+      | _ -> panic "impossible")
+  | _ -> panic "impossible");
+  record_memo_exit s
+
+let lift_c (c : exp) : exp = c
+
+let lift_value (src : source) (d : depth_t) : value =
+  {
+    seq = Generic.singleton (Reference { src; offset = 0; values_count = 1 });
+    depth = d + 1;
+    fetch_length = init_fetch_length ();
+    compressed_since = 0;
+  }
+
+let rec enter_new_memo (s : state) (m : memo_t) : state =
+  enter_new_memo_aux
+    { m = s; s = Dynarray.create (); f = 0; r = Building }
+    (Array.get m s.c.pc) true
+
+(*only enter if there is an existing entries. this is cheaper then enter_new_memo.*)
+and try_match_memo (s : state) (m : memo_t) : state =
+  enter_new_memo_aux
+    { m = s; s = Dynarray.create (); f = 0; r = Building }
+    (Array.get m s.c.pc) false
+
+and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref)
+    (matched : bool) : state =
+  match !m with
+  | BlackHole -> panic "impossible"
+  | Done d ->
+      rs.r <- Reentrance !m;
+      d.skip rs
+  | Root ->
+      if matched then (
+        m := BlackHole;
+        rs.r <- Evaluating m;
+        {
+          c = lift_c rs.m.c;
+          e =
+            Dynarray.init (Dynarray.length rs.m.e) (fun i ->
+                lift_value (E i) rs.m.d);
+          k = lift_value K rs.m.d;
+          d = rs.m.d + 1;
+          last = Some rs;
+        })
+      else rs.m
+  | Need n -> (
+      match fetch_value rs n.request with
+      | Some fr -> (
+          match Hashtbl.find_opt n.lookup fr with
+          | None ->
+              let bh = ref BlackHole in
+              Hashtbl.add n.lookup fr bh;
+              rs.r <- Evaluating bh;
+              n.progress.enter rs
+          | Some m -> enter_new_memo_aux rs m true)
+      | None ->
+          if matched then (
+            rs.r <- Reentrance !m;
+            n.progress.enter rs)
+          else rs.m)
