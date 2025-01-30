@@ -1,6 +1,7 @@
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
 #include <caml/custom.h>
+#include <caml/callback.h>
 #include <caml/memory.h>
 #include <caml/fail.h>
 #include <stdio.h>
@@ -61,9 +62,26 @@ value intmap_add_stub(value map, value key, value val) {
   CAMLreturn(Val_unit);
 }
 
+value intmap_add_untagged_stub(value map, intnat key, intnat val) {
+  CAMLparam1(map);
+  int64_t x = key;
+  i64map_insert_t ins = i64map_insert(Data_custom_val(map), &x);
+  i64map_entry_t *entry = i64map_iter_get(&ins.iter);
+  entry->key = x;
+  entry->val = val;
+  CAMLreturn(Val_unit);
+}
+
 value intmap_remove_stub(value map, value key) {
   CAMLparam2(map, key);
   int64_t x = Long_val(key);
+  i64map_erase(I64map_val(map), &x);
+  CAMLreturn(Val_unit);
+}
+
+value intmap_remove_untagged_stub(value map, intnat key) {
+  CAMLparam1(map);
+  int64_t x = key;
   i64map_erase(I64map_val(map), &x);
   CAMLreturn(Val_unit);
 }
@@ -80,9 +98,33 @@ value intmap_find_stub(value map, value key) {
   }
 }
 
+intnat intmap_find_untagged_stub(value map, intnat key) {
+  CAMLparam1(map);
+  int64_t x = key;
+  i64map_iter_t iter = i64map_find(I64map_val(map), &x);
+  i64map_entry_t *entry = i64map_iter_get(&iter);
+  if (entry == NULL) {
+    caml_raise_not_found();
+  } else {
+    CAMLreturnT(intnat, entry->val);
+  }
+}
+
 value intmap_find_opt_stub(value map, value key) {
   CAMLparam2(map, key);
   int64_t x = Long_val(key);
+  i64map_iter_t iter = i64map_find(I64map_val(map), &x);
+  i64map_entry_t *entry = i64map_iter_get(&iter);
+  if (entry == NULL) {
+    CAMLreturn(Val_none);
+  } else {
+    CAMLreturn(caml_alloc_some(Val_long(entry->val)));
+  }
+}
+
+value intmap_find_opt_untagged_stub(value map, intnat key) {
+  CAMLparam1(map);
+  int64_t x = key;
   i64map_iter_t iter = i64map_find(I64map_val(map), &x);
   i64map_entry_t *entry = i64map_iter_get(&iter);
   if (entry == NULL) {
@@ -98,6 +140,36 @@ value intmap_mem_stub(value map, value key) {
   i64map_iter_t iter = i64map_find(I64map_val(map), &x);
   i64map_entry_t *entry = i64map_iter_get(&iter);
   CAMLreturn(Val_bool(entry != NULL));
+}
+
+intnat intmap_mem_untagged_stub(value map, intnat key) {
+  CAMLparam1(map);
+  int64_t x = key;
+  i64map_iter_t iter = i64map_find(I64map_val(map), &x);
+  i64map_entry_t *entry = i64map_iter_get(&iter);
+  CAMLreturnT(intnat, entry != NULL);
+}
+
+value intmap_iter_stub(value func, value map) {
+  CAMLparam2(map, func);
+  i64map_iter_t iter = i64map_iter(I64map_val(map));
+  i64map_entry_t *entry = i64map_iter_get(&iter);
+  while (entry != NULL) {
+    caml_callback2(func, Val_long(entry->key), Val_long(entry->val));
+    entry = i64map_iter_next(&iter);
+  }
+  CAMLreturn(Val_unit);
+}
+
+value intmap_fold_stub(value func, value map, value acc) {
+  CAMLparam3(func, map, acc);
+  i64map_iter_t iter = i64map_iter(I64map_val(map));
+  i64map_entry_t *entry = i64map_iter_get(&iter);
+  while (entry != NULL) {
+    acc = caml_callback3(func, Val_long(entry->key), Val_long(entry->val), acc);
+    entry = i64map_iter_next(&iter);
+  }
+  CAMLreturn(acc);
 }
 
 value intmap_length_stub(value map) {
