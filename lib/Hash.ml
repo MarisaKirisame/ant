@@ -46,13 +46,13 @@ end
 module MCRC32C : MonoidHash = struct
   type t = Int64.t
 
-  external __unit_stub : unit -> t = "m_crc32c_unit_stub"
+  external __unit : unit -> t = "m_crc32c_unit_stub"
   external mul : t -> t -> t = "m_crc32c_mul_stub"
   external from_int : int -> t = "m_crc32c_from_int_stub"
   external from_char : char -> t = "m_crc32c_from_char_stub"
   external hash : t -> int = "m_crc32c_hash_stub"
 
-  let unit = __unit_stub ()
+  let unit = __unit ()
   let valid _ = true
   let eq x y = Int64.equal x y
   let cmp x y = Int64.compare x y
