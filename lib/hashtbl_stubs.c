@@ -55,7 +55,7 @@ value intmap_reset_stub(value map) {
 value intmap_add_stub(value map, value key, value val) {
   CAMLparam3(map, key, val);
   int64_t x = Long_val(key);
-  i64map_insert_t ins = i64map_insert(Data_custom_val(map), &x);
+  i64map_insert_t ins = i64map_deferred_insert(Data_custom_val(map), &x);
   i64map_entry_t *entry = i64map_iter_get(&ins.iter);
   entry->key = x;
   entry->val = Long_val(val);
@@ -65,7 +65,7 @@ value intmap_add_stub(value map, value key, value val) {
 value intmap_add_untagged_stub(value map, intnat key, intnat val) {
   CAMLparam1(map);
   int64_t x = key;
-  i64map_insert_t ins = i64map_insert(Data_custom_val(map), &x);
+  i64map_insert_t ins = i64map_deferred_insert(Data_custom_val(map), &x);
   i64map_entry_t *entry = i64map_iter_get(&ins.iter);
   entry->key = x;
   entry->val = val;
