@@ -647,3 +647,51 @@ let rec exec_done (s : state) : 'a =
   match s.r with
   | Some _ -> exec_done (register_memo_done s)
   | None -> raise DoneExc
+
+let pc_map : exp Dynarray.t = Dynarray.create ()
+
+let add_exp (f : state -> state) : unit =
+  Dynarray.add_last pc_map { step = f; pc = Dynarray.length pc_map }
+
+let pc_to_exp (pc : int) : exp = Dynarray.get pc_map pc
+
+let exec_cek (c : exp) (e : words Dynarray.t) (k : words) : words =
+  let init_value (w : words) : value =
+    {
+      seq = w;
+      depth = 0;
+      fetch_length = init_fetch_length ();
+      compressed_since = 0;
+    }
+  in
+  let cek =
+    { c; e = Dynarray.map init_value e; k = init_value k; d = 0; r = None }
+  in
+  let rec exec cek =
+    let cek = cek.c.step cek in
+    exec cek
+  in
+  exec cek
+
+let from_constructor (ctag : int) : seq =
+  Generic.singleton (Word (Word.make Word.constructor_tag ctag))
+
+let from_int (i : int) : seq =
+  Generic.singleton (Word (Word.make Word.int_tag i))
+
+let to_int (s : seq) : int =
+  assert (Generic.size s == 1);
+  match Generic.head_exn s with Word w -> w | _ -> panic "to_int"
+
+let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
+let appends (x : seq list) : seq = List.fold_right append x empty
+let pop (s : seq) = pop_n s 1
+
+let rec splits (x : seq) : seq list =
+  if is_empty x then []
+  else
+    let h, t = pop x in
+    h :: splits t
+
+let list_match (x : seq) : (Word.t * seq) option =
+  Option.map (fun (x, Word y) -> (y, x)) (Generic.front ~monoid ~measure x)
