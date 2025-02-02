@@ -16,7 +16,8 @@
   Hash
   Intmap
   Common
-  batFingerTree)
+  batFingerTree
+  GenerateMemo)
  (preprocess
   (pps ppx_string ppx_let ppx_deriving.show))
  (foreign_stubs
