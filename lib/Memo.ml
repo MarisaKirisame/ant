@@ -173,6 +173,12 @@ and record_context =
   | Reentrance of memo_node_t
   | Building (* Urgh I hate this. It's so easy though. *)
 
+let constructor_degree_table : int Dynarray.t = Dynarray.create ()
+
+let set_constructor_degree (ctag : int) (degree : int) : unit =
+  assert (Dynarray.length constructor_degree_table == ctag);
+  Dynarray.add_last constructor_degree_table degree
+
 let monoid : measure_t monoid =
   {
     zero =
@@ -183,26 +189,21 @@ let monoid : measure_t monoid =
       };
     combine =
       (fun x y ->
-        {
-          degree = x.degree + y.degree;
-          max_degree = max x.max_degree (x.degree + y.max_degree);
-          full =
-            (match (x.full, y.full) with
-            | Some xf, Some yf ->
-                Some
-                  {
-                    length = xf.length + yf.length;
-                    hash = Hasher.mul xf.hash yf.hash;
-                  }
-            | _ -> None);
-        });
+        debug "combine" (fun _ ->
+            {
+              degree = x.degree + y.degree;
+              max_degree = max x.max_degree (x.degree + y.max_degree);
+              full =
+                (match (x.full, y.full) with
+                | Some xf, Some yf ->
+                    Some
+                      {
+                        length = xf.length + yf.length;
+                        hash = Hasher.mul xf.hash yf.hash;
+                      }
+                | _ -> None);
+            }));
   }
-
-let constructor_degree_table : int Dynarray.t = Dynarray.create ()
-
-let set_constructor_degree (ctag : int) (degree : int) : unit =
-  assert (Dynarray.length constructor_degree_table == ctag);
-  Dynarray.add_last constructor_degree_table degree
 
 let measure (et : fg_et) : measure_t =
   match et with
@@ -683,7 +684,9 @@ let to_int (s : seq) : int =
   assert (Generic.size s == 1);
   match Generic.head_exn s with Word w -> w | _ -> panic "to_int"
 
-let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
+let append (x : seq) (y : seq) : seq =
+  debug "append" (fun _ -> Generic.append ~monoid ~measure x y)
+
 let appends (x : seq list) : seq = List.fold_right append x empty
 let pop (s : seq) = pop_n s 1
 
