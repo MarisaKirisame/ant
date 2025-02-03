@@ -108,10 +108,7 @@ module Ty = struct
     | Forall of Id.t * t
     | Func of t * t
 
-  let rec is_monotype = function
-    | Forall _ -> false
-    | Func (a, b) -> is_monotype a && is_monotype b
-    | _ -> true
+  let rec is_monotype = function Forall _ -> false | Func (a, b) -> is_monotype a && is_monotype b | _ -> true
 
   let rec occurs_exvar ev = function
     | ExVar ev' when ev = ev' -> true
@@ -129,8 +126,7 @@ module Ty = struct
 
   let rec generalize_exvars e = function
     | [] -> e
-    | (ev, n) :: evns ->
-        Forall (n, generalize_exvars (replace_equals (ExVar ev) (TVar n) e) evns)
+    | (ev, n) :: evns -> Forall (n, generalize_exvars (replace_equals (ExVar ev) (TVar n) e) evns)
 
   open PPrint
 
@@ -148,24 +144,12 @@ module Ty = struct
     | Tuple t -> pp_l t
     | TVar x -> Id.pp x
     | ExVar x -> Id.pp x
-    | Forall (x, b) ->
-        group
-          (flow (break 1)
-             [ utf8string "∀"; Id.pp x; utf8string "→"; nest 2 (pp b) ])
-    | Func (a, b) ->
-        group
-          (flow (break 1)
-             [ string "("; pp a; string ")"; utf8string "→"; nest 2 (pp b) ])
+    | Forall (x, b) -> group (flow (break 1) [ utf8string "∀"; Id.pp x; utf8string "→"; nest 2 (pp b) ])
+    | Func (a, b) -> group (flow (break 1) [ string "("; pp a; string ")"; utf8string "→"; nest 2 (pp b) ])
 end
 
 module Ctx = struct
-  type e =
-    | Var of Id.t * Ty.t
-    | TVar of Id.t
-    | ExVar of Id.t
-    | Solved of Id.t * Ty.t
-    | Marker of Id.t
-
+  type e = Var of Id.t * Ty.t | TVar of Id.t | ExVar of Id.t | Solved of Id.t * Ty.t | Marker of Id.t
   type t = e list
 
   let find_map = List.find_map
@@ -177,10 +161,7 @@ module Ctx = struct
     let rec recurse acc1 acc2 =
       match acc1 with
       | [] -> None
-      | e :: es -> (
-          match pred e with
-          | Some _ -> Some (acc2, e, es)
-          | None -> recurse es (e :: acc2))
+      | e :: es -> ( match pred e with Some _ -> Some (acc2, e, es) | None -> recurse es (e :: acc2))
     in
     recurse ctx []
 
@@ -188,29 +169,19 @@ module Ctx = struct
   let split2 pred2 pred1 ctx =
     match split pred2 ctx with
     | Some (ctx3, e2, ctx') -> (
-        match split pred1 ctx' with
-        | Some (ctx2, e1, ctx1) -> Some (ctx3, e2, ctx2, e1, ctx1)
-        | None -> None)
+        match split pred1 ctx' with Some (ctx2, e1, ctx1) -> Some (ctx3, e2, ctx2, e1, ctx1) | None -> None)
     | None -> None
 
   open PPrint
 
   let pp_e = function
-    | Var (x, t) ->
-        group
-          (flow (break 1)
-             [ string "("; Id.pp x; string ":"; Ty.pp t; string ")" ])
+    | Var (x, t) -> group (flow (break 1) [ string "("; Id.pp x; string ":"; Ty.pp t; string ")" ])
     | TVar x -> Id.pp x
     | ExVar x -> Id.pp x
-    | Solved (x, t) ->
-        group
-          (flow (break 1)
-             [ string "("; Id.pp x; string "="; Ty.pp t; string ")" ])
+    | Solved (x, t) -> group (flow (break 1) [ string "("; Id.pp x; string "="; Ty.pp t; string ")" ])
     | Marker x -> utf8string "➤" ^^ Id.pp x
 
-  let rec pp = function
-    | [] -> string ""
-    | e :: es -> group (flow (break 1) [ pp_e e; string "::"; pp es ])
+  let rec pp = function [] -> string "" | e :: es -> group (flow (break 1) [ pp_e e; string "::"; pp es ])
 
   module P = struct
     let var_named x = function Var (x', b) when x = x' -> Some b | _ -> None
@@ -222,15 +193,8 @@ module Ctx = struct
       | _ -> None
 
     let exvar_unsolved = function ExVar x -> Some x | _ -> None
-
-    let exvar_unsolved_named x = function
-      | ExVar x' when x = x' -> Some ()
-      | _ -> None
-
-    let exvar_solved_named x = function
-      | Solved (x', b) when x = x' -> Some b
-      | _ -> None
-
+    let exvar_unsolved_named x = function ExVar x' when x = x' -> Some () | _ -> None
+    let exvar_solved_named x = function Solved (x', b) when x = x' -> Some b | _ -> None
     let marker_named x = function Marker x' when x = x' -> Some () | _ -> None
   end
 
@@ -306,8 +270,7 @@ let rec subtype ctx a b =
   (* Exvar *)
   | Ty.ExVar x1, Ty.ExVar x2 when x1 = x2 ->
       if Ctx.exists (Ctx.P.exvar_unsolved_named x1) ctx then Env.return ctx
-      else
-        Env.err [%string "unbound existential variable %{debug_pp (Id.pp x1)}"]
+      else Env.err [%string "unbound existential variable %{debug_pp (Id.pp x1)}"]
   (* → *)
   | Ty.Func (a1, a2), Ty.Func (b1, b2) ->
       let%bind ctx' = subtype ctx b1 a1 in
@@ -317,82 +280,47 @@ let rec subtype ctx a b =
   | Ty.Forall (x, a), b -> (
       let%bind ev = Env.fresh_exvar in
       let ctx' = Ctx.ExVar ev :: Ctx.Marker ev :: ctx in
-      let%bind ctx'' =
-        subtype ctx' (Ty.replace_equals (Ty.TVar x) (Ty.ExVar ev) a) b
-      in
+      let%bind ctx'' = subtype ctx' (Ty.replace_equals (Ty.TVar x) (Ty.ExVar ev) a) b in
       match Ctx.split (Ctx.P.marker_named ev) ctx'' with
       | Some (_, _, ctx''') -> Env.return ctx'''
-      | None ->
-          Env.err
-            [%string
-              "unable to split: missing marker for existential variable \
-               %{debug_pp (Id.pp ev)}"])
+      | None -> Env.err [%string "unable to split: missing marker for existential variable %{debug_pp (Id.pp ev)}"])
   (* ∀R *)
   | a, Ty.Forall (x, b) -> (
       let ctx' = Ctx.TVar x :: ctx in
       let%bind ctx'' = subtype ctx' a b in
       match Ctx.split (Ctx.P.tvar_named x) ctx'' with
       | Some (_, _, ctx''') -> Env.return ctx'''
-      | None ->
-          Env.err
-            [%string
-              "unable to split: missing type variable %{debug_pp (Id.pp x)}"])
+      | None -> Env.err [%string "unable to split: missing type variable %{debug_pp (Id.pp x)}"])
   (* InstantiateL *)
   | Ty.ExVar eva, a ->
-      if Ty.occurs_exvar eva a then
-        Env.err [%string "found circularity of %{debug_pp (Id.pp eva)}"]
-      else if Ctx.exists (Ctx.P.exvar_unsolved_named eva) ctx then
-        instl ctx eva a
-      else
-        Env.err
-          [%string
-            "existential variable %{debug_pp (Id.pp eva)} is missing or solved"]
+      if Ty.occurs_exvar eva a then Env.err [%string "found circularity of %{debug_pp (Id.pp eva)}"]
+      else if Ctx.exists (Ctx.P.exvar_unsolved_named eva) ctx then instl ctx eva a
+      else Env.err [%string "existential variable %{debug_pp (Id.pp eva)} is missing or solved"]
   (* InstantiateR *)
   | a, Ty.ExVar eva ->
-      if Ty.occurs_exvar eva a then
-        Env.err [%string "found circularity of %{debug_pp (Id.pp eva)}"]
-      else if Ctx.exists (Ctx.P.exvar_unsolved_named eva) ctx then
-        instr ctx eva a
-      else
-        Env.err
-          [%string
-            "existential variable %{debug_pp (Id.pp eva)} is missing or solved"]
-  | _ ->
-      Env.err
-        [%string
-          "subtype: no rule applicable for %{debug_pp (Ty.pp a)} <: %{debug_pp \
-           (Ty.pp b)}"]
+      if Ty.occurs_exvar eva a then Env.err [%string "found circularity of %{debug_pp (Id.pp eva)}"]
+      else if Ctx.exists (Ctx.P.exvar_unsolved_named eva) ctx then instr ctx eva a
+      else Env.err [%string "existential variable %{debug_pp (Id.pp eva)} is missing or solved"]
+  | _ -> Env.err [%string "subtype: no rule applicable for %{debug_pp (Ty.pp a)} <: %{debug_pp (Ty.pp b)}"]
 
 (* Under input context Γ, instantiate α-hat such that α-hat <: A, with output context Δ *)
 and instl ctx eva t =
   let instl_solve t =
     match Ctx.split (Ctx.P.exvar_unsolved_named eva) ctx with
     | Some (ctx2, _, ctx1) ->
-        if Ctx.is_ty_wellformed ctx1 t then
-          Env.return (List.rev_append ctx2 (Ctx.Solved (eva, t) :: ctx1))
+        if Ctx.is_ty_wellformed ctx1 t then Env.return (List.rev_append ctx2 (Ctx.Solved (eva, t) :: ctx1))
         else Env.err [%string "non wellformed type %{debug_pp (Ty.pp t)}"]
     | None ->
-        Env.err
-          [%string
-            "unable to split: %{debug_pp (Id.pp eva)} is unbound or solved\n\
-             ctx=%{debug_pp (Ctx.pp ctx)}"]
+        Env.err [%string "unable to split: %{debug_pp (Id.pp eva)} is unbound or solved\nctx=%{debug_pp (Ctx.pp ctx)}"]
   in
   (* print_endline
     [%string "instl:\n  ctx=%{Ctx.show ctx}\n  eva=%{eva}\n  t=%{show_ty t}\n"]; *)
   match t with
   (* InstLReach *)
   | Ty.ExVar evb -> (
-      match
-        Ctx.split2
-          (Ctx.P.exvar_unsolved_named evb)
-          (Ctx.P.exvar_unsolved_named eva)
-          ctx
-      with
+      match Ctx.split2 (Ctx.P.exvar_unsolved_named evb) (Ctx.P.exvar_unsolved_named eva) ctx with
       | Some (ctx3, _, ctx2, e1, ctx1) ->
-          Env.return
-            (List.rev_append ctx3
-               (Ctx.Solved (evb, Ty.ExVar eva)
-               :: List.rev_append ctx2 (e1 :: ctx1)))
+          Env.return (List.rev_append ctx3 (Ctx.Solved (evb, Ty.ExVar eva) :: List.rev_append ctx2 (e1 :: ctx1)))
       (* evb cannot be generalized further *)
       | None -> instl_solve t)
   (* InstLArr *)
@@ -403,17 +331,12 @@ and instl ctx eva t =
           let%bind ev2 = Env.fresh_exvar in
           let ctx' =
             List.rev_append ctx2
-              (Ctx.Solved (eva, Ty.Func (Ty.ExVar ev1, Ty.ExVar ev2))
-              :: Ctx.ExVar ev1 :: Ctx.ExVar ev2 :: ctx1)
+              (Ctx.Solved (eva, Ty.Func (Ty.ExVar ev1, Ty.ExVar ev2)) :: Ctx.ExVar ev1 :: Ctx.ExVar ev2 :: ctx1)
           in
           let%bind ctx'' = instr ctx' ev1 a1 in
           let%bind ctx''' = instl ctx'' ev2 (Ctx.apply ctx'' a2) in
           Env.return ctx'''
-      | None ->
-          Env.err
-            [%string
-              "unable to split: unbound existential variable %{debug_pp (Id.pp \
-               eva)}"])
+      | None -> Env.err [%string "unable to split: unbound existential variable %{debug_pp (Id.pp eva)}"])
   (* InstLAllR *)
   | Ty.Forall (tvb, b) ->
       if Ctx.exists (Ctx.P.exvar_unsolved_named eva) ctx then
@@ -421,12 +344,8 @@ and instl ctx eva t =
         let%bind ctx'' = instl ctx' eva b in
         match Ctx.split (Ctx.P.tvar_named tvb) ctx'' with
         | Some (_, _, ctx1) -> Env.return ctx1
-        | None ->
-            Env.err
-              [%string
-                "unable to split: missing type variable %{debug_pp (Id.pp tvb)}"]
-      else
-        Env.err [%string "unbound existential variable %{debug_pp (Id.pp eva)}"]
+        | None -> Env.err [%string "unable to split: missing type variable %{debug_pp (Id.pp tvb)}"]
+      else Env.err [%string "unbound existential variable %{debug_pp (Id.pp eva)}"]
   (* InstLSolve *)
   | t when Ty.is_monotype t -> instl_solve t
   | t -> Env.err [%string "instl: no rule applicable for %{debug_pp (Ty.pp t)}"]
@@ -436,31 +355,19 @@ and instr ctx eva t =
   let instr_solve t =
     match Ctx.split (Ctx.P.exvar_unsolved_named eva) ctx with
     | Some (ctx2, _, ctx1) ->
-        if Ctx.is_ty_wellformed ctx1 t then
-          Env.return (List.rev_append ctx2 (Ctx.Solved (eva, t) :: ctx1))
+        if Ctx.is_ty_wellformed ctx1 t then Env.return (List.rev_append ctx2 (Ctx.Solved (eva, t) :: ctx1))
         else Env.err [%string "non wellformed type %{debug_pp (Ty.pp t)}"]
     | None ->
-        Env.err
-          [%string
-            "unable to split: %{debug_pp (Id.pp eva)} is unbound or solved\n\
-             ctx=%{debug_pp (Ctx.pp ctx)}"]
+        Env.err [%string "unable to split: %{debug_pp (Id.pp eva)} is unbound or solved\nctx=%{debug_pp (Ctx.pp ctx)}"]
   in
   (* print_endline
     [%string "instr:\n  ctx=%{Ctx.show ctx}\n  eva=%{eva}\n  t=%{show_ty t}\n"]; *)
   match t with
   (* InstRReach *)
   | Ty.ExVar evb -> (
-      match
-        Ctx.split2
-          (Ctx.P.exvar_unsolved_named evb)
-          (Ctx.P.exvar_unsolved_named eva)
-          ctx
-      with
+      match Ctx.split2 (Ctx.P.exvar_unsolved_named evb) (Ctx.P.exvar_unsolved_named eva) ctx with
       | Some (ctx3, _, ctx2, e1, ctx1) ->
-          Env.return
-            (List.rev_append ctx3
-               (Ctx.Solved (evb, Ty.ExVar eva)
-               :: List.rev_append ctx2 (e1 :: ctx1)))
+          Env.return (List.rev_append ctx3 (Ctx.Solved (evb, Ty.ExVar eva) :: List.rev_append ctx2 (e1 :: ctx1)))
       (* evb cannot be generalized further *)
       | None -> instr_solve t)
   (* InstRArr *)
@@ -471,34 +378,22 @@ and instr ctx eva t =
           let%bind ev2 = Env.fresh_exvar in
           let ctx' =
             List.rev_append ctx2
-              (Ctx.Solved (eva, Ty.Func (Ty.ExVar ev1, Ty.ExVar ev2))
-              :: Ctx.ExVar ev1 :: Ctx.ExVar ev2 :: ctx1)
+              (Ctx.Solved (eva, Ty.Func (Ty.ExVar ev1, Ty.ExVar ev2)) :: Ctx.ExVar ev1 :: Ctx.ExVar ev2 :: ctx1)
           in
           let%bind ctx'' = instl ctx' ev1 a1 in
           let%bind ctx''' = instr ctx'' ev2 (Ctx.apply ctx'' a2) in
           Env.return ctx'''
-      | None ->
-          Env.err
-            [%string
-              "unable to split: unbound existential variable %{debug_pp (Id.pp \
-               eva)}"])
+      | None -> Env.err [%string "unable to split: unbound existential variable %{debug_pp (Id.pp eva)}"])
   (* InstRAllL *)
   | Ty.Forall (tvb, b) ->
       if Ctx.exists (Ctx.P.exvar_unsolved_named eva) ctx then
         let ctx' = Ctx.ExVar tvb :: Ctx.Marker tvb :: ctx in
         (* TODO: investigate the same name of tvar and exvar *)
-        let%bind ctx'' =
-          instr ctx' eva (Ty.replace_equals (Ty.TVar tvb) (Ty.ExVar tvb) b)
-        in
+        let%bind ctx'' = instr ctx' eva (Ty.replace_equals (Ty.TVar tvb) (Ty.ExVar tvb) b) in
         match Ctx.split (Ctx.P.marker_named tvb) ctx'' with
         | Some (_, _, ctx1) -> Env.return ctx1
-        | None ->
-            Env.err
-              [%string
-                "unable to split: missing marker for existential variable \
-                 %{debug_pp (Id.pp tvb)}"]
-      else
-        Env.err [%string "unbound existential variable %{debug_pp (Id.pp eva)}"]
+        | None -> Env.err [%string "unable to split: missing marker for existential variable %{debug_pp (Id.pp tvb)}"]
+      else Env.err [%string "unbound existential variable %{debug_pp (Id.pp eva)}"]
   (* InstRSolve *)
   | t when Ty.is_monotype t -> instr_solve t
   | t -> Env.err [%string "instr: no rule applicable for %{debug_pp (Ty.pp t)}"]
@@ -527,10 +422,7 @@ let rec check ctx e ta =
       let%bind ctx' = check (Ctx.TVar tva :: ctx) e a in
       match Ctx.split (Ctx.P.tvar_named tva) ctx' with
       | Some (_, _, ctx1) -> Env.return ctx1
-      | None ->
-          Env.err
-            [%string
-              "unable to split: missing type variable %{debug_pp (Id.pp tva)}"])
+      | None -> Env.err [%string "unable to split: missing type variable %{debug_pp (Id.pp tva)}"])
   (* →I *)
   | Syntax.Lam ([ Syntax.PVar x ], e), Ty.Func (ta, tb) -> (
       let%bind ctx' = check (Ctx.Var (Id.Var x, ta) :: ctx) e tb in
@@ -582,27 +474,16 @@ and infer ctx e =
   | Syntax.Lam ([ Syntax.PVar x ], e) -> (
       let%bind eva = Env.fresh_exvar in
       let%bind evb = Env.fresh_exvar in
-      let ctx' =
-        Ctx.Var (Id.Var x, Ty.ExVar eva)
-        :: Ctx.ExVar evb :: Ctx.ExVar eva :: Ctx.Marker eva :: ctx
-      in
+      let ctx' = Ctx.Var (Id.Var x, Ty.ExVar eva) :: Ctx.ExVar evb :: Ctx.ExVar eva :: Ctx.Marker eva :: ctx in
       let%bind ctx'' = check ctx' e (Ty.ExVar evb) in
       match Ctx.split (Ctx.P.marker_named eva) ctx'' with
       | Some (ctx2, _, ctx1) ->
           let mt = Ctx.apply ctx2 (Ty.Func (Ty.ExVar eva, Ty.ExVar evb)) in
           let evs = Ctx.filter_map Ctx.P.exvar_unsolved ctx2 in
           let%bind evns = Env.fresh_tvars evs in
-          if Ty.is_monotype mt then
-            Env.return (Ty.generalize_exvars mt evns, ctx1)
-          else
-            Env.err
-              [%string
-                "infer: →I⇒' failed on non-monotype %{debug_pp (Ty.pp mt)}"]
-      | None ->
-          Env.err
-            [%string
-              "unable to split: missing marker for existential variable \
-               %{debug_pp (Id.pp eva)}"])
+          if Ty.is_monotype mt then Env.return (Ty.generalize_exvars mt evns, ctx1)
+          else Env.err [%string "infer: →I⇒' failed on non-monotype %{debug_pp (Ty.pp mt)}"]
+      | None -> Env.err [%string "unable to split: missing marker for existential variable %{debug_pp (Id.pp eva)}"])
   (* →E *)
   | Syntax.App (e1, [ e2 ]) ->
       let%bind a, ctx' = infer ctx e1 in
@@ -619,10 +500,7 @@ and infer_app ctx ta e =
       \  ta=%{show_ty ta}\n"]; *)
   match ta with
   (* ∀App *)
-  | Ty.Forall (tva, a) ->
-      infer_app (Ctx.ExVar tva :: ctx)
-        (Ty.replace_equals (Ty.TVar tva) (Ty.ExVar tva) a)
-        e
+  | Ty.Forall (tva, a) -> infer_app (Ctx.ExVar tva :: ctx) (Ty.replace_equals (Ty.TVar tva) (Ty.ExVar tva) a) e
   (* α-hat App *)
   | Ty.ExVar eva -> (
       match Ctx.split (Ctx.P.exvar_unsolved_named eva) ctx with
@@ -631,23 +509,16 @@ and infer_app ctx ta e =
           let%bind eva2 = Env.fresh_exvar in
           let ctx' =
             List.rev_append ctx2
-              (Ctx.Solved (eva, Ty.Func (Ty.ExVar eva1, Ty.ExVar eva2))
-              :: Ctx.ExVar eva1 :: Ctx.ExVar eva2 :: ctx1)
+              (Ctx.Solved (eva, Ty.Func (Ty.ExVar eva1, Ty.ExVar eva2)) :: Ctx.ExVar eva1 :: Ctx.ExVar eva2 :: ctx1)
           in
           let%bind ctx'' = check ctx' e (Ty.ExVar eva1) in
           Env.return (Ty.ExVar eva2, ctx'')
-      | None ->
-          Env.err
-            [%string
-              "unable to split: unbound existential variable %{debug_pp (Id.pp \
-               eva)}"])
+      | None -> Env.err [%string "unable to split: unbound existential variable %{debug_pp (Id.pp eva)}"])
   (* →App *)
   | Ty.Func (a, c) ->
       let%bind ctx' = check ctx e a in
       Env.return (c, ctx')
-  | t ->
-      Env.err
-        [%string "infer_app: no rule applicable for %{debug_pp (Ty.pp t)}"]
+  | t -> Env.err [%string "infer_app: no rule applicable for %{debug_pp (Ty.pp t)}"]
 
 let rec infer_prog = function
   | [] -> []
@@ -663,12 +534,9 @@ open PPrint
 let rec pp_inferred =
   let pp_one = function
     | Syntax.Term (n, e), t ->
-        let name =
-          match n with Some x -> Syntax.pp_pattern x | None -> underscore
-        in
-        string "(* " ^^ Ty.pp t ^^ string " *)" ^^ hardline ^^ string "let rec"
-        ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group
-        @@ Syntax.pp_expr e ^^ string ";;" ^^ hardline
+        let name = match n with Some x -> Syntax.pp_pattern x | None -> underscore in
+        string "(* " ^^ Ty.pp t ^^ string " *)" ^^ hardline ^^ string "let rec" ^^ space ^^ name ^^ space ^^ string "="
+        ^^ space ^^ group @@ Syntax.pp_expr e ^^ string ";;" ^^ hardline
     | _ -> string ""
   in
   function [] -> string "" | i :: is -> pp_one i ^^ pp_inferred is

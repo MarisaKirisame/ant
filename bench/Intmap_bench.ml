@@ -14,10 +14,10 @@ let bench_intmap () =
        [
          Bench.Test.create_group ~name:"Create"
            [
-             Bench.Test.create_indexed ~name:"Intmap.create" ~args:size
-               (fun len -> Core.Staged.stage (fun () -> Intmap.create len));
-             Bench.Test.create_indexed ~name:"Hashtbl.create" ~args:size
-               (fun len -> Core.Staged.stage (fun () -> Hashtbl.create len));
+             Bench.Test.create_indexed ~name:"Intmap.create" ~args:size (fun len ->
+                 Core.Staged.stage (fun () -> Intmap.create len));
+             Bench.Test.create_indexed ~name:"Hashtbl.create" ~args:size (fun len ->
+                 Core.Staged.stage (fun () -> Hashtbl.create len));
            ];
          Bench.Test.create_group ~name:"Insert"
            [

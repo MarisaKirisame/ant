@@ -51,14 +51,7 @@ and kont = value
  * Values also have their own individual depth, which denote when they are created/last fetched.
  *)
 and depth_t = int
-
-and state = {
-  mutable c : exp;
-  mutable e : env;
-  mutable k : kont;
-  d : depth_t;
-  mutable r : record_state option;
-}
+and state = { mutable c : exp; mutable e : env; mutable k : kont; d : depth_t; mutable r : record_state option }
 
 (* The Reference
  * To track whether a fragment is fetched or unfetched,
@@ -130,11 +123,7 @@ and memo_t = memo_node_t ref Array.t
 
 and memo_node_t =
   (* We know transiting need to resolve a fetch_request to continue. *)
-  | Need of {
-      request : fetch_request;
-      lookup : lookup_t;
-      progress : progress_t;
-    }
+  | Need of { request : fetch_request; lookup : lookup_t; progress : progress_t }
   (* We know there is no more fetch to be done, as the machine evaluate to a value state. *)
   | Done of done_t
   (* We know nothing about what's gonna happen. Will switch to Need or Done.
@@ -181,28 +170,22 @@ let set_constructor_degree (ctag : int) (degree : int) : unit =
 
 let monoid : measure_t monoid =
   {
-    zero =
-      {
-        degree = 0;
-        max_degree = 0;
-        full = Some { length = 0; hash = Hasher.unit };
-      };
+    zero = { degree = 0; max_degree = 0; full = Some { length = 0; hash = Hasher.unit } };
     combine =
       (fun x y ->
-        debug "combine" (fun _ ->
-            {
-              degree = x.degree + y.degree;
-              max_degree = max x.max_degree (x.degree + y.max_degree);
-              full =
-                (match (x.full, y.full) with
-                | Some xf, Some yf ->
+        {
+          degree = x.degree + y.degree;
+          max_degree = max x.max_degree (x.degree + y.max_degree);
+          full =
+            (match (x.full, y.full) with
+            (*| Some xf, Some yf ->
                     Some
                       {
                         length = xf.length + yf.length;
                         hash = Hasher.mul xf.hash yf.hash;
-                      }
-                | _ -> None);
-            }));
+                      }*)
+            | _ -> None);
+        });
   }
 
 let measure (et : fg_et) : measure_t =
@@ -214,13 +197,8 @@ let measure (et : fg_et) : measure_t =
         | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
         | _ -> panic "unknown tag"
       in
-      {
-        degree;
-        max_degree = degree;
-        full = Some { length = 1; hash = Hasher.from_int w };
-      }
-  | Reference r ->
-      { degree = r.values_count; max_degree = r.values_count; full = None }
+      { degree; max_degree = degree; full = None (*Some { length = 1; hash = Hasher.from_int w }*) }
+  | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
 
 let pop_n (s : seq) (n : int) : seq * seq =
   if n == 0 then (Generic.empty, s)
@@ -238,20 +216,12 @@ let pop_n (s : seq) (n : int) : seq * seq =
         assert (m.degree < n);
         assert (m.degree + v.values_count >= n);
         let need = n - m.degree in
-        let l =
-          Generic.snoc ~monoid ~measure x
-            (Reference { src = v.src; offset = v.offset; values_count = need })
-        in
+        let l = Generic.snoc ~monoid ~measure x (Reference { src = v.src; offset = v.offset; values_count = need }) in
         if v.values_count == need then (l, w)
         else
           let r =
             Generic.cons ~monoid ~measure w
-              (Reference
-                 {
-                   src = v.src;
-                   offset = v.offset + need;
-                   values_count = v.values_count - need;
-                 })
+              (Reference { src = v.src; offset = v.offset + need; values_count = v.values_count - need })
           in
           (l, r)
 
@@ -261,28 +231,16 @@ let slice (seq : seq) (offset : int) (values_count : int) : seq =
   y
 
 let get_value_rs (rs : record_state) (src : source) : value =
-  match src with
-  | E i -> Dynarray.get rs.m.e i
-  | S i -> Dynarray.get rs.s i
-  | K -> rs.m.k
+  match src with E i -> Dynarray.get rs.m.e i | S i -> Dynarray.get rs.s i | K -> rs.m.k
 
 let get_value (s : state) (src : source) : value =
-  match src with
-  | E i -> Dynarray.get s.e i
-  | S _ -> panic "impossible"
-  | K -> s.k
+  match src with E i -> Dynarray.get s.e i | S _ -> panic "impossible" | K -> s.k
 
 let set_value_rs (rs : record_state) (src : source) (v : value) : unit =
-  match src with
-  | E i -> Dynarray.set rs.m.e i v
-  | S i -> Dynarray.set rs.s i v
-  | K -> rs.m.k <- v
+  match src with E i -> Dynarray.set rs.m.e i v | S i -> Dynarray.set rs.s i v | K -> rs.m.k <- v
 
 let set_value (s : state) (src : source) (v : value) : unit =
-  match src with
-  | E i -> Dynarray.set s.e i v
-  | S _ -> panic "impossible"
-  | K -> s.k <- v
+  match src with E i -> Dynarray.set s.e i v | S _ -> panic "impossible" | K -> s.k <- v
 
 let rec path_compress (rs : record_state) (src : source) : value =
   let v = get_value_rs rs src in
@@ -299,27 +257,17 @@ let rec path_compress (rs : record_state) (src : source) : value =
 and path_compress_value (rs : record_state) (v : value) : value =
   assert (v.depth == rs.m.d + 1);
   if v.compressed_since == rs.f then v
-  else
-    {
-      seq = path_compress_seq rs v.seq;
-      compressed_since = rs.f;
-      depth = v.depth;
-      fetch_length = v.fetch_length;
-    }
+  else { seq = path_compress_seq rs v.seq; compressed_since = rs.f; depth = v.depth; fetch_length = v.fetch_length }
 
 (*path compressing a seq with depth x+1*)
 and path_compress_seq (rs : record_state) (x : seq) : seq =
-  let lhs, rhs =
-    Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x
-  in
+  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
   assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
   match Generic.front rhs ~monoid ~measure with
   | None -> lhs
   | Some (rest, Reference y) ->
       Generic.append ~monoid ~measure lhs
-        (Generic.append ~monoid ~measure
-           (path_compress_reference rs y)
-           (path_compress_seq rs rest))
+        (Generic.append ~monoid ~measure (path_compress_reference rs y) (path_compress_seq rs rest))
   | _ -> panic "impossible"
 
 (*path compressing reference of depth x+1*)
@@ -331,16 +279,14 @@ and path_compress_reference (rs : record_state) (r : reference) : seq =
     slice v.seq r.offset r.values_count)
   else Generic.Single (Reference r)
 
-let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq
-    =
+let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq =
   let v = { depth = rs.m.d; seq; compressed_since = 0; fetch_length } in
   let r = { src = S (Dynarray.length rs.s); offset = 0; values_count = 1 } in
   Dynarray.add_last rs.s v;
   Generic.singleton (Reference r)
 
 (*move a value from depth x to depth x+1*)
-let fetch_value (rs : record_state) (req : fetch_request) :
-    (fetch_result * seq) option =
+let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq) option =
   let v = get_value_rs rs req.src in
   (* Only value at the right depth can be fetched. 
    * If higher depth, it is already fetched so pointless to fetch again.
@@ -351,63 +297,35 @@ let fetch_value (rs : record_state) (req : fetch_request) :
   let x, y = pop_n v.seq req.offset in
   let words, rest =
     Generic.split ~monoid ~measure
-      (fun m ->
-        not
-          (match m.full with
-          | None -> false
-          | Some m -> req.word_count <= m.length))
+      (fun m -> not (match m.full with None -> false | Some m -> req.word_count <= m.length))
       y
   in
-  let length =
-    (Option.get (Generic.measure ~monoid ~measure words).full).length
-  in
+  let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
   if (not (Generic.is_empty rest)) && length != req.word_count then
     (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
     None
   else
-    let transformed_x =
-      if Generic.is_empty x then Generic.empty
-      else add_to_store rs x v.fetch_length
-    in
+    let transformed_x = if Generic.is_empty x then Generic.empty else add_to_store rs x v.fetch_length in
     let transformed_rest =
-      if Generic.is_empty rest then Generic.empty
-        (*todo: match in the reverse direction*)
+      if Generic.is_empty rest then Generic.empty (*todo: match in the reverse direction*)
       else add_to_store rs rest v.fetch_length
     in
     rs.f <- rs.f + 1;
-    let seq =
-      Generic.append ~monoid ~measure transformed_x
-        (Generic.append ~monoid ~measure words transformed_rest)
-    in
-    set_value_rs rs req.src
-      {
-        depth = v.depth + 1;
-        fetch_length = v.fetch_length;
-        seq;
-        compressed_since = rs.f;
-      };
-    Some
-      ( {
-          fetched = words;
-          have_prefix = Generic.is_empty x;
-          have_suffix = Generic.is_empty rest;
-        },
-        seq )
+    let seq = Generic.append ~monoid ~measure transformed_x (Generic.append ~monoid ~measure words transformed_rest) in
+    set_value_rs rs req.src { depth = v.depth + 1; fetch_length = v.fetch_length; seq; compressed_since = rs.f };
+    Some ({ fetched = words; have_prefix = Generic.is_empty x; have_suffix = Generic.is_empty rest }, seq)
 
 let init_fetch_length () : int ref = ref 1
 
 (*assuming this seq is at depth l.m.d+1, convert it to depth l.m.d*)
 let rec unshift_seq (rs : record_state) (x : seq) : seq =
-  let lhs, rhs =
-    Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x
-  in
+  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
   assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
   match Generic.front rhs ~monoid ~measure with
   | None -> lhs
   | Some (rest, Reference y) ->
       Generic.append ~monoid ~measure lhs
-        (Generic.append ~monoid ~measure (unshift_reference rs y)
-           (unshift_seq rs rest))
+        (Generic.append ~monoid ~measure (unshift_reference rs y) (unshift_seq rs rest))
   | _ -> panic "impossible"
 
 and unshift_reference (rs : record_state) (r : reference) : seq =
@@ -419,12 +337,7 @@ and unshift_reference (rs : record_state) (r : reference) : seq =
 and unshift_value (rs : record_state) (v : value) : value =
   if v.depth > rs.m.d then (
     assert (v.depth == rs.m.d + 1);
-    {
-      seq = unshift_seq rs v.seq;
-      depth = rs.m.d;
-      fetch_length = init_fetch_length ();
-      compressed_since = 0;
-    })
+    { seq = unshift_seq rs v.seq; depth = rs.m.d; fetch_length = init_fetch_length (); compressed_since = 0 })
   else v
 
 and unshift_source (rs : record_state) (src : source) : value =
@@ -458,16 +371,8 @@ let get_enter (s : state) : record_state -> state =
   let k = s.k.seq in
   fun rs ->
     let depth = rs.m.d + 1 in
-    let seq_to_value s =
-      { seq = s; depth; fetch_length = ref 0; compressed_since = 0 }
-    in
-    {
-      c;
-      e = Dynarray.map seq_to_value e;
-      k = seq_to_value k;
-      d = depth;
-      r = Some rs;
-    }
+    let seq_to_value s = { seq = s; depth; fetch_length = ref 0; compressed_since = 0 } in
+    { c; e = Dynarray.map seq_to_value e; k = seq_to_value k; d = depth; r = Some rs }
 
 let get_progress (s : state) : progress_t =
   {
@@ -481,8 +386,7 @@ let get_progress (s : state) : progress_t =
 (* Stepping require an unfetched fragment. register the current state.
  * Note that the reference in request does not refer to value in s, but value one level down.
  *)
-let register_memo_need_unfetched (s : state) (req : fetch_request) :
-    (fetch_result * seq) option =
+let register_memo_need_unfetched (s : state) (req : fetch_request) : (fetch_result * seq) option =
   let r = Option.get s.r in
   let lookup =
     match r.r with
@@ -518,10 +422,7 @@ let get_done (s : state) : done_t =
 let register_memo_done (s : state) : state =
   let r = Option.get s.r in
   (match r.r with
-  | Evaluating ev -> (
-      match !ev with
-      | BlackHole -> ev := Done (get_done s)
-      | _ -> panic "impossible")
+  | Evaluating ev -> ( match !ev with BlackHole -> ev := Done (get_done s) | _ -> panic "impossible")
   | _ -> panic "impossible");
   record_memo_exit s
 
@@ -536,18 +437,13 @@ let lift_value (src : source) (d : depth_t) : value =
   }
 
 let rec enter_new_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux
-    { m = s; s = Dynarray.create (); f = 0; r = Building }
-    (Array.get m s.c.pc) true
+  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) true
 
 (*only enter if there is an existing entries. this is cheaper then enter_new_memo.*)
 and try_match_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux
-    { m = s; s = Dynarray.create (); f = 0; r = Building }
-    (Array.get m s.c.pc) false
+  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) false
 
-and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref)
-    (matched : bool) : state =
+and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool) : state =
   match !m with
   | BlackHole -> panic "impossible"
   | Done d ->
@@ -559,9 +455,7 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref)
         rs.r <- Evaluating m;
         {
           c = lift_c rs.m.c;
-          e =
-            Dynarray.init (Dynarray.length rs.m.e) (fun i ->
-                lift_value (E i) rs.m.d);
+          e = Dynarray.init (Dynarray.length rs.m.e) (fun i -> lift_value (E i) rs.m.d);
           k = lift_value K rs.m.d;
           d = rs.m.d + 1;
           r = Some rs;
@@ -593,100 +487,72 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref)
  *)
 exception DoneExc
 
-(* Todo: I think we should path-compress lazily all places in the code, just like what we are doing here. *)
-(* Src cannot be a Store, as we are resolving location at the top level, while only non-top-level have store. *)
-let rec resolve (s : state) (src : source) : (Word.t * seq) option =
-  let v = get_value s src in
-  let tl, hd = Generic.front_exn ~monoid ~measure v.seq in
+let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
+  let tl, hd = Generic.front_exn ~monoid ~measure x in
   match hd with
   | Word w -> Some (w, tl)
   | Reference ref ->
       let rs = Option.get s.r in
       let r_v = get_value_rs rs ref.src in
-      if r_v.depth == v.depth then (
-        set_value s src
-          {
-            seq =
-              Generic.append ~monoid ~measure
-                (slice r_v.seq ref.offset ref.values_count)
-                tl;
-            depth = v.depth;
-            fetch_length = v.fetch_length;
-            compressed_since = v.compressed_since;
-          };
-        resolve s src)
+      if r_v.depth == s.d then
+        resolve_seq s (Generic.append ~monoid ~measure (slice r_v.seq ref.offset ref.values_count) tl)
       else (
-        assert (r_v.depth + 1 == v.depth);
-        match
-          fetch_value rs
-            {
-              src = ref.src;
-              offset = ref.offset;
-              word_count = !(r_v.fetch_length);
-            }
-        with
+        assert (r_v.depth + 1 == s.d);
+        match fetch_value rs { src = ref.src; offset = ref.offset; word_count = !(r_v.fetch_length) } with
         | Some (_, seq) -> (
-            let seq_tl, seq_hd =
-              Generic.front_exn ~monoid ~measure
-                (slice seq ref.offset ref.values_count)
-            in
+            let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
             let rest = Generic.append ~monoid ~measure seq_tl tl in
-            match seq_hd with
-            | Word w ->
-                set_value s src
-                  {
-                    seq = Generic.cons ~monoid ~measure rest (Word w);
-                    depth = v.depth;
-                    compressed_since = v.compressed_since;
-                    fetch_length = v.fetch_length;
-                  };
-                Some (w, rest)
-            | Reference _ -> panic "impossible")
+            match seq_hd with Word w -> Some (w, rest) | Reference _ -> panic "impossible")
         | None -> None)
 
-let rec exec_done (s : state) : 'a =
-  match s.r with
-  | Some _ -> exec_done (register_memo_done s)
-  | None -> raise DoneExc
+(* Todo: I think we should path-compress lazily all places in the code, just like what we are doing here. *)
+(* Src cannot be a Store, as we are resolving location at the top level, while only non-top-level have store. *)
+let rec resolve (s : state) (src : source) : (Word.t * seq) option =
+  let v = get_value s src in
+  match resolve_seq s v.seq with
+  | Some ret ->
+      set_value s src
+        {
+          seq = Generic.cons ~monoid ~measure (snd ret) (Word (fst ret));
+          depth = v.depth;
+          compressed_since = v.compressed_since;
+          fetch_length = v.fetch_length;
+        };
+      Some ret
+  | None -> None
 
+let rec exec_done (s : state) : 'a = match s.r with Some _ -> exec_done (register_memo_done s) | None -> raise DoneExc
 let pc_map : exp Dynarray.t = Dynarray.create ()
 
-let add_exp (f : state -> state) : unit =
-  Dynarray.add_last pc_map { step = f; pc = Dynarray.length pc_map }
+let add_exp (f : state -> state) : int =
+  let pc = Dynarray.length pc_map in
+  Dynarray.add_last pc_map { step = f; pc };
+  pc
 
 let pc_to_exp (pc : int) : exp = Dynarray.get pc_map pc
 
+let value_at_depth (seq : seq) (depth : int) : value =
+  { seq; depth; fetch_length = init_fetch_length (); compressed_since = 0 }
+
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) : words =
-  let init_value (w : words) : value =
-    {
-      seq = w;
-      depth = 0;
-      fetch_length = init_fetch_length ();
-      compressed_since = 0;
-    }
-  in
-  let cek =
-    { c; e = Dynarray.map init_value e; k = init_value k; d = 0; r = None }
-  in
+  let init_value (w : words) : value = value_at_depth w 0 in
+  let cek = { c; e = Dynarray.map init_value e; k = init_value k; d = 0; r = None } in
   let rec exec cek =
     let cek = cek.c.step cek in
     exec cek
   in
   exec cek
 
-let from_constructor (ctag : int) : seq =
-  Generic.singleton (Word (Word.make Word.constructor_tag ctag))
-
-let from_int (i : int) : seq =
-  Generic.singleton (Word (Word.make Word.int_tag i))
+let from_constructor (ctag : int) : seq = Generic.singleton (Word (Word.make Word.constructor_tag ctag))
+let from_int (i : int) : seq = Generic.singleton (Word (Word.make Word.int_tag i))
 
 let to_int (s : seq) : int =
+  assert ((Generic.measure ~monoid ~measure s).degree == 1);
+  assert ((Generic.measure ~monoid ~measure s).max_degree == 1);
   assert (Generic.size s == 1);
   match Generic.head_exn s with Word w -> w | _ -> panic "to_int"
 
-let append (x : seq) (y : seq) : seq =
-  debug "append" (fun _ -> Generic.append ~monoid ~measure x y)
-
+let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
 let appends (x : seq list) : seq = List.fold_right append x empty
 let pop (s : seq) = pop_n s 1
 
@@ -698,3 +564,14 @@ let rec splits (x : seq) : seq list =
 
 let list_match (x : seq) : (Word.t * seq) option =
   Option.map (fun (x, Word y) -> (y, x)) (Generic.front ~monoid ~measure x)
+
+let push_env (s : state) (v : value) : unit =
+  assert ((Generic.measure ~monoid ~measure v.seq).degree == 1);
+  assert ((Generic.measure ~monoid ~measure v.seq).max_degree == 1);
+  Dynarray.add_last s.e v
+
+let env_keep_last_n (s : state) (n : int) : seq =
+  let l = Dynarray.length s.e in
+  let ret = appends (List.init (l - n) (fun i -> (Dynarray.get s.e i).seq)) in
+  s.e <- Dynarray.init n (fun i -> Dynarray.get s.e (l - n + i));
+  ret
