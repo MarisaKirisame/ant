@@ -2,6 +2,7 @@ open Common
 open PPrint
 open Syntax
 open Memo
+
 (* As K come with interpretative overhead,
  *   we want to use K as little as possible,
  *   instead storing the computed temporary variables onto the env as a stack,
@@ -14,19 +15,18 @@ type ctx = {
   arity : (string, int) Hashtbl.t;
   ctag : (string, int) Hashtbl.t;
   constructor_degree : int Dynarray.t;
-  conts : (string * (words -> state -> state) code) Dynarray.t;
+  conts : (string * (state -> words -> state) code) Dynarray.t;
   func_pc : (string, int) Hashtbl.t;
 }
 
-let add_cont (ctx : ctx) (name : string) (arity : int) : ctx =
+let add_cont (ctx : ctx) (name : string) (arity : int) (app : (state -> words -> state) code) : unit =
   Hashtbl.add_exn ctx.arity ~key:name ~data:arity;
   Hashtbl.add_exn ctx.ctag ~key:name ~data:(Hashtbl.length ctx.ctag);
   Dynarray.add_last ctx.constructor_degree (1 - arity);
-  Dynarray.add_last ctx.conts (name, string "todo:cont");
-  ctx
+  Dynarray.add_last ctx.conts (name, app)
 
 let new_ctx () : ctx =
-  add_cont
+  let ctx =
     {
       arity = Hashtbl.create (module Core.String);
       ctag = Hashtbl.create (module Core.String);
@@ -34,7 +34,9 @@ let new_ctx () : ctx =
       conts = Dynarray.create ();
       func_pc = Hashtbl.create (module Core.String);
     }
-    "cont_done" 0
+  in
+  add_cont ctx "cont_done" 0 (string "(fun x tl -> exec_done x)");
+  ctx
 
 let codes : document option Dynarray.t = Dynarray.create ()
 
@@ -135,9 +137,21 @@ let ant_pp_adt (e : ctx) adt_name ctors =
 type env = (string, int) Hashtbl.t
 
 let new_env () : env = Hashtbl.create (module Core.String)
+let apply_cont : pc = add_code None
 
-let return (loc : int) : pc =
-  add_code (Some (string "(fun x -> todo \"return last element in env by applying the continuation\"; x)"))
+let return (e : int) : pc =
+  add_code
+    (Some
+       (string
+          ("(fun x -> assert_env_length x " ^ string_of_int e ^ "; return_n x " ^ string_of_int e ^ " (pc_to_exp "
+         ^ string_of_int apply_cont ^ "))")))
+
+let drop (e : int) (n : int) (k : pc) : pc =
+  add_code
+    (Some
+       (string
+          ("(fun x -> assert_env_length x " ^ string_of_int e ^ "; drop_n x " ^ string_of_int e ^ " " ^ string_of_int n
+         ^ " (pc_to_exp " ^ string_of_int k ^ "))")))
 
 let rec ant_pp_expr (ctx : ctx) (env : env) (c : expr) (e : int) (k : pc) : pc =
   match c with
@@ -146,54 +160,80 @@ let rec ant_pp_expr (ctx : ctx) (env : env) (c : expr) (e : int) (k : pc) : pc =
       add_code
         (Some
            (string
-              ("(fun x -> " ^ "Dynarray.add_last x.e (" ^ "Dynarray.get x.e " ^ string_of_int loc ^ ");"
-             ^ "x.c <- pc_to_exp " ^ string_of_int k ^ ";" ^ " x)")))
+              ("(fun x -> assert_env_length x " ^ string_of_int e ^ "; " ^ "push_env x (" ^ "Dynarray.get x.e "
+             ^ string_of_int loc ^ ");" ^ "x.c <- pc_to_exp " ^ string_of_int k ^ ";" ^ " x)")))
   | Match (value, cases) -> ant_pp_expr ctx env value e (ant_pp_cases ctx env cases (e + 1) k)
-  | Ctor cname -> add_code (Some (string ("(fun x -> todo \"" ^ cname ^ "\")")))
+  | Ctor cname ->
+      add_code
+        (Some
+           (string
+              ("(fun x -> assert_env_length x " ^ string_of_int e
+             ^ "; (push_env x (value_at_depth (Memo.from_constructor "
+              ^ string_of_int (Hashtbl.find_exn ctx.ctag cname)
+              ^ ") x.d)); x.c <- pc_to_exp " ^ string_of_int k ^ "; x)")))
   | App (App (Ctor cname, [ x0 ]), [ x1 ]) ->
       ant_pp_expr ctx env x0 e
         (ant_pp_expr ctx env x1 (e + 1)
-           (let let_x1 = string "let x1 = (Dynarray.pop_last x.e).seq in " in
-            let let_x0 = string "let x0 = (Dynarray.pop_last x.e).seq in " in
+           (let let_x1 = string "let x1 = (pop_env x).seq in " in
+            let let_x0 = string "let x0 = (pop_env x).seq in " in
             let add_last =
               string
-                ("Dynarray.add_last x.e " ^ "(value_at_depth (Memo.appends [Memo.from_constructor "
+                ("push_env x " ^ "(value_at_depth (Memo.appends [Memo.from_constructor "
                 ^ string_of_int (Hashtbl.find_exn ctx.ctag cname)
                 ^ ";x0;x1]) x.d)" ^ "; ")
             in
             add_code
               (Some
-                 (string "(fun x -> " ^^ let_x1 ^^ let_x0 ^^ add_last
+                 (string ("(fun x -> assert_env_length x " ^ string_of_int (e + 2) ^ "; ")
+                 ^^ let_x1 ^^ let_x0 ^^ add_last
                  ^^ string ("x.c <- pc_to_exp " ^ string_of_int k ^ "; x)")))))
   | App (Var "list_incr", [ x ]) ->
+      let cont_name = "cont_" ^ string_of_int (Dynarray.length ctx.conts) in
+      (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
+      let keep_length = e in
+      add_cont ctx cont_name (keep_length + 1)
+        (string "(fun x tl -> restore_env x "
+        ^^ string (string_of_int keep_length)
+        ^^ string " tl; x.k <- value_at_depth (get_next_cont tl) x.d; x.c <- pc_to_exp "
+        ^^ string (string_of_int k)
+        ^^ string "; x)");
       ant_pp_expr ctx env x e
         (add_code
            (Some
               (string
-                 ("(fun x -> let sf = env_keep_last_n x 1 in x.c <- pc_to_exp "
+                 ("(fun x -> assert_env_length x "
+                 ^ string_of_int (e + 1)
+                 ^ "; let sf = env_keep_last_n x 1 in x.k <- value_at_depth (Memo.appends [Memo.from_constructor "
+                 ^ string_of_int (Hashtbl.find_exn ctx.ctag cont_name)
+                 ^ "; sf; x.k.seq]) x.d; x.c <- pc_to_exp "
                  ^ string_of_int (Hashtbl.find_exn ctx.func_pc "list_incr")
                  ^ "; x)"))))
   | Op ("+", x0, x1) ->
       ant_pp_expr ctx env x0 e
         (ant_pp_expr ctx env x1 (e + 1)
-           (let let_x1 = string "let x1 = (Dynarray.pop_last x.e).seq in " in
-            let let_x0 = string "let x0 = (Dynarray.pop_last x.e).seq in " in
+           (let let_x1 = string "let x1 = (pop_env x).seq in " in
+            let let_x0 = string "let x0 = (pop_env x).seq in " in
             let add_last =
-              string "Dynarray.add_last x.e (value_at_depth (Memo.from_int (Memo.to_int x0 + Memo.to_int x1)) x.d);"
+              string "push_env x (value_at_depth (Memo.from_int (Memo.to_int x0 + Memo.to_int x1)) x.d);"
             in
             add_code
               (Some
-                 (string "(fun x -> " ^^ let_x1 ^^ let_x0 ^^ add_last
+                 (string ("(fun x -> assert_env_length x " ^ string_of_int (e + 2) ^ "; ")
+                 ^^ let_x1 ^^ let_x0 ^^ add_last
                  ^^ string ("x.c <- pc_to_exp " ^ string_of_int k ^ "; x)")))))
   | Int i ->
-      let add_last = string ("Dynarray.add_last x.e (value_at_depth (Memo.from_int (" ^ string_of_int i ^ ")) x.d);") in
-      add_code (Some (string "(fun x -> " ^^ add_last ^^ string ("x.c <- pc_to_exp " ^ string_of_int k ^ "; x)")))
+      let add_last = string ("push_env x (value_at_depth (Memo.from_int (" ^ string_of_int i ^ ")) x.d);") in
+      add_code
+        (Some
+           (string ("(fun x -> assert_env_length x " ^ string_of_int e ^ "; ")
+           ^^ add_last
+           ^^ string ("x.c <- pc_to_exp " ^ string_of_int k ^ "; x)")))
   | _ -> failwith ("ant_pp_expr: " ^ show_expr c)
 
 and ant_pp_cases ctx (env : env) (MatchPattern c : cases) (e : int) (k : pc) : pc =
   add_code
     (Some
-       (string ("(fun x -> " ^ "let last = (Dynarray.pop_last x.e).seq in ")
+       (string ("(fun x -> assert_env_length x " ^ string_of_int e ^ "; " ^ "let last = (pop_env x).seq in ")
        ^^ break 1
        ^^ string "let (hd, tl) = Option.get (resolve_seq x last) in "
        ^^ break 1 ^^ string " match Word.get_value hd with "
@@ -213,9 +253,12 @@ and ant_pp_cases ctx (env : env) (MatchPattern c : cases) (e : int) (k : pc) : p
                   ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
                   ^^ string " -> "
                   ^^ string
-                       "(let [x0; x1] = Memo.splits tl in Dynarray.add_last x.e (value_at_depth x0 x.d); \
-                        Dynarray.add_last x.e (value_at_depth x1 x.d);"
-                  ^^ string ("x.c <- pc_to_exp " ^ string_of_int (ant_pp_expr ctx env expr (e - 1 + 2) k) ^ ";")
+                       "(let [x0; x1] = Memo.splits tl in push_env x (value_at_depth x0 x.d); push_env x \
+                        (value_at_depth x1 x.d);"
+                  ^^ string
+                       ("x.c <- pc_to_exp "
+                       ^ string_of_int (ant_pp_expr ctx env expr (e - 1 + 2) (drop (e - 1 + 2 + 1) 2 k))
+                       ^ ";")
                   ^^ string " x)"
               | _ -> failwith (show_pattern pat))
             c
@@ -231,7 +274,7 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
         (fun p -> match p with PVar n -> Hashtbl.add_exn env n (Hashtbl.length env) | _ -> failwith (show_pattern p))
         ps;
       let env_length = Hashtbl.length env in
-      let ret_pc = return env_length in
+      let ret_pc = return (env_length + 1) in
       let name = match x with Some (PVar x) -> x in
       let entry_code = add_code None in
       Hashtbl.add_exn ctx.func_pc name entry_code;
@@ -249,9 +292,19 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
   | Fun (_name, _args, _body) -> failwith "Not implemented (TODO)"
   | _ -> failwith (show_stmt s)
 
+let generate_apply_cont ctx =
+  set_code apply_cont
+    (string "(fun x -> let (hd, tl) = Option.get (resolve_seq x x.k.seq) in match Word.get_value hd with "
+    ^^ separate_map (break 1)
+         (fun (name, action) ->
+           string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ") ^^ action ^^ string " x tl")
+         (Dynarray.to_list ctx.conts)
+    ^^ string ")")
+
 let pp_cek_ant x =
   let ctx = new_ctx () in
   let generated_stmt = separate_map (break 1) (ant_pp_stmt ctx) x in
+  generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Common"
   ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
