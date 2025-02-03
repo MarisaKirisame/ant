@@ -1,5 +1,5 @@
-opam switch create megatron --empty || true
-opam switch megatron
+opam switch create ant --empty || true
+opam switch ant
 opam switch set-invariant --update-invariant "ocaml>=5.2" -y
 eval $(opam env)
 opam update
