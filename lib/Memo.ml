@@ -509,6 +509,8 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
 (* Src cannot be a Store, as we are resolving location at the top level, while only non-top-level have store. *)
 let rec resolve (s : state) (src : source) : (Word.t * seq) option =
   let v = get_value s src in
+  assert ((Generic.measure ~monoid ~measure v.seq).degree == 1);
+  assert ((Generic.measure ~monoid ~measure v.seq).max_degree == 1);
   match resolve_seq s v.seq with
   | Some ret ->
       set_value s src
@@ -532,6 +534,10 @@ let add_exp (f : state -> state) : int =
 let pc_to_exp (pc : int) : exp = Dynarray.get pc_map pc
 
 let value_at_depth (seq : seq) (depth : int) : value =
+  let m = Generic.measure ~monoid ~measure seq in
+  if m.degree != 1 then print_endline (string_of_int m.degree);
+  assert (m.degree == 1);
+  assert (m.max_degree == 1);
   { seq; depth; fetch_length = init_fetch_length (); compressed_since = 0 }
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) : words =
@@ -541,7 +547,10 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) : words =
     let cek = cek.c.step cek in
     exec cek
   in
-  exec cek
+  try exec cek
+  with DoneExc ->
+    assert (Dynarray.length cek.e == 1);
+    (Dynarray.get_last cek.e).seq
 
 let from_constructor (ctag : int) : seq = Generic.singleton (Word (Word.make Word.constructor_tag ctag))
 let from_int (i : int) : seq = Generic.singleton (Word (Word.make Word.int_tag i))
@@ -570,8 +579,50 @@ let push_env (s : state) (v : value) : unit =
   assert ((Generic.measure ~monoid ~measure v.seq).max_degree == 1);
   Dynarray.add_last s.e v
 
+let pop_env (s : state) : value =
+  let v = Dynarray.pop_last s.e in
+  assert ((Generic.measure ~monoid ~measure v.seq).degree == 1);
+  assert ((Generic.measure ~monoid ~measure v.seq).max_degree == 1);
+  v
+
 let env_keep_last_n (s : state) (n : int) : seq =
   let l = Dynarray.length s.e in
   let ret = appends (List.init (l - n) (fun i -> (Dynarray.get s.e i).seq)) in
   s.e <- Dynarray.init n (fun i -> Dynarray.get s.e (l - n + i));
+  assert ((Generic.measure ~monoid ~measure ret).degree == l - n);
+  assert ((Generic.measure ~monoid ~measure ret).max_degree == l - n);
   ret
+
+let restore_env (s : state) (n : int) (seqs : seq) : unit =
+  let splitted = List.rev (List.tl (List.rev (splits seqs))) in
+  assert (List.length splitted == n);
+  assert (Dynarray.length s.e == 1);
+  let last = Dynarray.get_last s.e in
+  s.e <- Dynarray.of_list (List.map (fun x -> value_at_depth x s.d) splitted);
+  Dynarray.add_last s.e last
+
+let get_next_cont (seqs : seq) : seq =
+  let splitted = splits seqs in
+  List.hd (List.rev splitted)
+
+let return_n (s : state) (n : int) (return_exp : exp) : state =
+  assert (Dynarray.length s.e == n);
+  s.e <- Dynarray.of_list [ Dynarray.get_last s.e ];
+  s.c <- return_exp;
+  s
+
+let drop_n (s : state) (e : int) (n : int) (return_exp : exp) : state =
+  assert (Dynarray.length s.e == e);
+  let last = Dynarray.pop_last s.e in
+  let rec loop x =
+    if x == n then ()
+    else (
+      Dynarray.remove_last s.e;
+      loop (x + 1))
+  in
+  loop 0;
+  Dynarray.add_last s.e last;
+  s.c <- return_exp;
+  s
+
+let assert_env_length (s : state) (e : int) : unit = assert (Dynarray.length s.e == e)
