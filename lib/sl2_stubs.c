@@ -9,8 +9,10 @@
 
 #define Sl2_val(v) (*((psl2_t *)Data_custom_val(v)))
 
+void sl2_finalize(value sl2) { free(Sl2_val(sl2)); }
+
 const static struct custom_operations sl2_ops = {"sl2",
-                                                 custom_finalize_default,
+                                                 sl2_finalize,
                                                  custom_compare_default,
                                                  custom_hash_default,
                                                  custom_serialize_default,
