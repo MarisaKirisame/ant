@@ -47,9 +47,7 @@ let measure (w : Word.t) : measure =
 
 type seq = (Word.t, measure) Generic.fg
 
-let from_constructor (ctag : int) : seq =
-  Generic.singleton (Word.make Word.constructor_tag ctag)
-
+let from_constructor (ctag : int) : seq = Generic.singleton (Word.make Word.constructor_tag ctag)
 let from_int (i : int) : seq = Generic.singleton (Word.make Word.int_tag i)
 
 let to_int (s : seq) : int =
@@ -65,9 +63,7 @@ let empty : seq = Generic.empty
 let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
 let appends (x : seq list) : seq = List.fold_right append x empty
 let cons (x : Word.t) (y : seq) : seq = Generic.cons ~monoid ~measure y x
-
-let list_match (x : seq) : (Word.t * seq) option =
-  Option.map (fun (x, y) -> (y, x)) (Generic.front ~monoid ~measure x)
+let list_match (x : seq) : (Word.t * seq) option = Option.map (fun (x, y) -> (y, x)) (Generic.front ~monoid ~measure x)
 
 let pop_n (s : seq) (n : int) : seq * seq =
   let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
@@ -76,9 +72,7 @@ let pop_n (s : seq) (n : int) : seq * seq =
   (l, r)
 
 let pop (s : seq) = pop_n s 1
-
-let split (s : seq) (l : int) : seq * seq =
-  Generic.split ~monoid ~measure (fun m -> m.length > l) s
+let split (s : seq) (l : int) : seq * seq = Generic.split ~monoid ~measure (fun m -> m.length > l) s
 
 let rec splits (x : seq) : seq list =
   if is_empty x then []
