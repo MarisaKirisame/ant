@@ -11,36 +11,17 @@ module type MonoidHash = sig
 end
 
 module SL2 : MonoidHash = struct
-  type t = floatarray
+  type t
 
-  (*each sl2 is two int128. additionally to align at 16 bytes we add an extra 16 bytes to ensure enough space.*)
-  let allocate_sl2_internal () : t = Array.Floatarray.create ((2 * 4) + 2)
-
-  external sl2_unit_dps : t -> unit = "sl2_unit_stub"
-
-  let unit : t =
-    let u = allocate_sl2_internal () in
-    sl2_unit_dps u;
-    u
-
-  external sl2_mul_dps : t -> t -> t -> unit = "sl2_mul_stub"
-
-  let mul (x : t) (y : t) : t =
-    let z = allocate_sl2_internal () in
-    sl2_mul_dps z x y;
-    z
-
+  external __unit : unit -> t = "sl2_unit_stub"
+  external mul : t -> t -> t = "sl2_mul_stub"
   external valid : t -> bool = "sl2_valid_stub"
   external eq : t -> t -> bool = "sl2_eq_stub"
   external cmp : t -> t -> int = "sl2_cmp_stub"
-  external sl2_from_int_dps : t -> int -> unit = "sl2_from_int_stub"
-
-  let from_int (i : int) : t =
-    let x = allocate_sl2_internal () in
-    sl2_from_int_dps x i;
-    x
-
+  external from_int : int -> t = "sl2_from_int_stub"
   external hash : t -> int = "sl2_hash_stub"
+
+  let unit = __unit ()
 end
 
 module MCRC32C : MonoidHash = struct

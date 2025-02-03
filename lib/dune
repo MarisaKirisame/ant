@@ -23,7 +23,7 @@
  (foreign_stubs
   (language c)
   (names sl2_stubs crc32c_stubs hashtbl_stubs)
-  (flags -fPIC -Wall -march=native -O3 -DSSE2NEON_SUPPRESS_WARNINGS)))
+  (flags -g -fPIC -Wall -march=native -Og -DSSE2NEON_SUPPRESS_WARNINGS)))
 
 (include_subdirs qualified)
 
