@@ -3,6 +3,8 @@ open Word
 open Memo
 open Common
 
+let memo = Array.init 13 (fun _ -> ref Memo.Root)
+
 type ocaml_int_list = Nil | Cons of int * Memo.seq
 
 let int_list_Nil : Memo.seq = Memo.appends [ Memo.from_constructor 1 ]
@@ -17,20 +19,22 @@ let to_ocaml_int_list x =
       let [ x0; x1 ] = Memo.splits t in
       Cons (Memo.to_int x0, x1)
 
-let rec list_incr (x0 : seq) : seq = exec_cek (pc_to_exp 12) (Dynarray.of_list [ x0 ]) (Memo.from_constructor 0)
+let rec list_incr (x0 : seq) : seq = exec_cek (pc_to_exp 12) (Dynarray.of_list [ x0 ]) (Memo.from_constructor 0) memo
 
 let 0 =
   add_exp (fun x ->
-      let hd, tl = Option.get (resolve_seq x x.k.seq) in
-      match Word.get_value hd with
-      | 0 -> (fun x tl -> exec_done x) x tl
-      | 3 ->
-          (fun x tl ->
-            restore_env x 4 tl;
-            x.k <- value_at_depth (get_next_cont tl) x.d;
-            x.c <- pc_to_exp 5;
-            x)
-            x tl)
+      match resolve_seq x x.k.seq with
+      | None -> raw_step (record_memo_exit x) memo
+      | Some (hd, tl) -> (
+          match Word.get_value hd with
+          | 0 -> (fun x tl -> exec_done x) x tl
+          | 3 ->
+              (fun x tl ->
+                restore_env x 4 tl;
+                x.k <- value_at_depth (get_next_cont tl) x.d;
+                x.c <- pc_to_exp 5;
+                x)
+                x tl))
 
 let 1 =
   add_exp (fun x ->
@@ -81,11 +85,14 @@ let 7 =
 let 8 =
   add_exp (fun x ->
       assert_env_length x 5;
-      let x1 = (pop_env x).seq in
-      let x0 = (pop_env x).seq in
-      push_env x (value_at_depth (Memo.from_int (Memo.to_int x0 + Memo.to_int x1)) x.d);
-      x.c <- pc_to_exp 7;
-      x)
+      match (resolve_seq x (Dynarray.get x.e 3).seq, resolve_seq x (Dynarray.get x.e 4).seq) with
+      | Some (x0, _), Some (x1, _) ->
+          Dynarray.remove_last x.e;
+          Dynarray.remove_last x.e;
+          push_env x (value_at_depth (Memo.from_int (x0 + x1)) x.d);
+          x.c <- pc_to_exp 7;
+          x
+      | _ -> raw_step (record_memo_exit x) memo)
 
 let 9 =
   add_exp (fun x ->
@@ -104,18 +111,21 @@ let 10 =
 let 11 =
   add_exp (fun x ->
       assert_env_length x 2;
-      let last = (pop_env x).seq in
-      let hd, tl = Option.get (resolve_seq x last) in
-      match Word.get_value hd with
-      | 1 ->
-          x.c <- pc_to_exp 3;
-          x
-      | 2 ->
-          let [ x0; x1 ] = Memo.splits tl in
-          push_env x (value_at_depth x0 x.d);
-          push_env x (value_at_depth x1 x.d);
-          x.c <- pc_to_exp 10;
-          x)
+      let last = (Dynarray.get_last x.e).seq in
+      match resolve_seq x last with
+      | None -> raw_step (record_memo_exit x) memo
+      | Some (hd, tl) -> (
+          Dynarray.remove_last x.e;
+          match Word.get_value hd with
+          | 1 ->
+              x.c <- pc_to_exp 3;
+              x
+          | 2 ->
+              let [ x0; x1 ] = Memo.splits tl in
+              push_env x (value_at_depth x0 x.d);
+              push_env x (value_at_depth x1 x.d);
+              x.c <- pc_to_exp 10;
+              x))
 
 let 12 =
   add_exp (fun x ->

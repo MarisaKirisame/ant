@@ -211,16 +211,16 @@ let rec ant_pp_expr (ctx : ctx) (env : env) (c : expr) (e : int) (k : pc) : pc =
   | Op ("+", x0, x1) ->
       ant_pp_expr ctx env x0 e
         (ant_pp_expr ctx env x1 (e + 1)
-           (let let_x1 = string "let x1 = (pop_env x).seq in " in
-            let let_x0 = string "let x0 = (pop_env x).seq in " in
-            let add_last =
-              string "push_env x (value_at_depth (Memo.from_int (Memo.to_int x0 + Memo.to_int x1)) x.d);"
-            in
+           (let x0 = string ("(resolve_seq x (Dynarray.get x.e " ^ string_of_int e ^ ").seq)") in
+            let x1 = string ("(resolve_seq x (Dynarray.get x.e " ^ string_of_int (e + 1) ^ ").seq)") in
+            let add_last = string "push_env x (value_at_depth (Memo.from_int (x0 + x1)) x.d);" in
             add_code
               (Some
-                 (string ("(fun x -> assert_env_length x " ^ string_of_int (e + 2) ^ "; ")
-                 ^^ let_x1 ^^ let_x0 ^^ add_last
-                 ^^ string ("x.c <- pc_to_exp " ^ string_of_int k ^ "; x)")))))
+                 (string ("(fun x -> assert_env_length x " ^ string_of_int (e + 2) ^ "; match ")
+                 ^^ x0 ^^ string ", " ^^ x1
+                 ^^ string " with | Some (x0, _), Some (x1, _) -> (Dynarray.remove_last x.e;Dynarray.remove_last x.e;"
+                 ^^ add_last
+                 ^^ string ("x.c <- pc_to_exp " ^ string_of_int k ^ "; x) | _ -> raw_step (record_memo_exit x) memo)")))))
   | Int i ->
       let add_last = string ("push_env x (value_at_depth (Memo.from_int (" ^ string_of_int i ^ ")) x.d);") in
       add_code
@@ -233,10 +233,13 @@ let rec ant_pp_expr (ctx : ctx) (env : env) (c : expr) (e : int) (k : pc) : pc =
 and ant_pp_cases ctx (env : env) (MatchPattern c : cases) (e : int) (k : pc) : pc =
   add_code
     (Some
-       (string ("(fun x -> assert_env_length x " ^ string_of_int e ^ "; " ^ "let last = (pop_env x).seq in ")
+       (string ("(fun x -> assert_env_length x " ^ string_of_int e ^ "; " ^ "let last = (Dynarray.get_last x.e).seq in ")
        ^^ break 1
-       ^^ string "let (hd, tl) = Option.get (resolve_seq x last) in "
-       ^^ break 1 ^^ string " match Word.get_value hd with "
+       ^^ string
+            "match (resolve_seq x last) with | None -> raw_step (record_memo_exit x) memo | Some (hd, tl) -> \
+             Dynarray.remove_last x.e;"
+       ^^ break 1
+       ^^ string " (match Word.get_value hd with "
        ^^ separate_map (break 1)
             (fun (pat, expr) ->
               (* special casing for now, as pat design need changes. *)
@@ -262,7 +265,7 @@ and ant_pp_cases ctx (env : env) (MatchPattern c : cases) (e : int) (k : pc) : p
                   ^^ string " x)"
               | _ -> failwith (show_pattern pat))
             c
-       ^^ string ")"))
+       ^^ string "))"))
 
 let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
@@ -288,13 +291,15 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
       ^^ separate_map (string ";") (fun i -> string ("(x" ^ string_of_int i ^ ")")) (List.init env_length (fun x -> x))
       ^^ string "]" ^^ string ")" ^^ string "(Memo.from_constructor "
       ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag "cont_done"))
-      ^^ string ")" ^^ string ";;"
+      ^^ string ")" ^^ string " memo"
   | Fun (_name, _args, _body) -> failwith "Not implemented (TODO)"
   | _ -> failwith (show_stmt s)
 
 let generate_apply_cont ctx =
   set_code apply_cont
-    (string "(fun x -> let (hd, tl) = Option.get (resolve_seq x x.k.seq) in match Word.get_value hd with "
+    (string
+       "(fun x -> match resolve_seq x x.k.seq with | None -> raw_step (record_memo_exit x) memo | Some (hd, tl) -> \
+        match Word.get_value hd with "
     ^^ separate_map (break 1)
          (fun (name, action) ->
            string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ") ^^ action ^^ string " x tl")
@@ -306,7 +311,9 @@ let pp_cek_ant x =
   let generated_stmt = separate_map (break 1) (ant_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Common"
-  ^^ break 1 ^^ generated_stmt ^^ break 1
+  ^^ break 1 ^^ string "let memo = Array.init "
+  ^^ string (string_of_int (Dynarray.length codes))
+  ^^ string "(fun _ -> ref Memo.Root)" ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string ("let " ^ string_of_int i ^ " = add_exp ") ^^ Option.get (Dynarray.get codes i)))
