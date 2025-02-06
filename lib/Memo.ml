@@ -11,6 +11,7 @@ open BatFingerTree
 open Word
 open Common
 module Hasher = Hash.SL2
+module Hashtbl = Core.Hashtbl
 
 type env = value Dynarray.t
 
@@ -136,7 +137,7 @@ and memo_node_t =
 and done_t = { skip : record_state -> state }
 
 (*todo: maybe try janestreet's hashtable. we want lookup to be as fast as possible so it might be worth to ffi some SOTA*)
-and lookup_t = (fetch_result, memo_node_t ref) Hashtbl.t
+and lookup_t = (fetch_hash, memo_node_t ref) Hashtbl.t
 
 and progress_t = {
   (* potential optimization: make enter and exit optional to denote no progress. *)
@@ -154,6 +155,7 @@ and fetch_request = { src : source; offset : int; word_count : int }
 
 (* todo: when the full suffix is fetched, try to extend at front. *)
 and fetch_result = { fetched : words; have_prefix : bool; have_suffix : bool }
+and fetch_hash = int
 and words = seq
 (* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
 
@@ -194,6 +196,9 @@ let measure (et : fg_et) : measure_t =
       in
       { degree; max_degree = degree; full = Some { length = 1; hash = Hasher.from_int w } }
   | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
+
+let fr_to_fh (fr : fetch_result) : fetch_hash =
+  Hasher.hash (Option.get (Generic.measure ~measure ~monoid fr.fetched).full).hash
 
 let pop_n (s : seq) (n : int) : seq * seq =
   assert (n >= 0);
@@ -293,34 +298,42 @@ let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq 
 
 (*move a value from depth x to depth x+1*)
 let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq) option =
-  (* Only value at the right depth can be fetched. 
-   * If higher depth, it is already fetched so pointless to fetch again.
-   * If lower depth, it is not fetched by the last level so we cannot trepass.
-   *)
-  assert ((get_value_rs rs req.src).depth == rs.m.d);
-  let v = path_compress rs req.src in
-  let x, y = pop_n v.seq req.offset in
-  let words, rest =
-    Generic.split ~monoid ~measure
-      (fun m -> not (match m.full with None -> false | Some m -> req.word_count <= m.length))
-      y
-  in
-  let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
-  if (not (Generic.is_empty rest)) && length != req.word_count then
-    (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
-    None
-  else
-    let transformed_x = if Generic.is_empty x then Generic.empty else add_to_store rs x v.fetch_length in
-    let transformed_rest =
-      if Generic.is_empty rest then Generic.empty (*todo: match in the reverse direction*)
-      else add_to_store rs rest v.fetch_length
-    in
-    assert ((Generic.measure ~monoid ~measure transformed_rest).degree == (Generic.measure ~monoid ~measure rest).degree);
-    rs.f <- rs.f + 1;
-    let seq = Generic.append ~monoid ~measure transformed_x (Generic.append ~monoid ~measure words transformed_rest) in
-    assert ((Generic.measure ~monoid ~measure seq).degree == (Generic.measure ~monoid ~measure v.seq).degree);
-    set_value_rs rs req.src { depth = v.depth + 1; fetch_length = v.fetch_length; seq; compressed_since = rs.f };
-    Some ({ fetched = words; have_prefix = Generic.is_empty x; have_suffix = Generic.is_empty rest }, seq)
+  match req.src with
+  | S _ -> failwith "fetching from store!"
+  | _ ->
+      ();
+      print_endline ("fetching " ^ string_of_int req.word_count ^ " words");
+      (* Only value at the right depth can be fetched. 
+       * If higher depth, it is already fetched so pointless to fetch again.
+       * If lower depth, it is not fetched by the last level so we cannot trepass.
+       *)
+      assert ((get_value_rs rs req.src).depth == rs.m.d);
+      let v = path_compress rs req.src in
+      let x, y = pop_n v.seq req.offset in
+      let words, rest =
+        Generic.split ~monoid ~measure
+          (fun m -> not (match m.full with None -> false | Some m -> req.word_count <= m.length))
+          y
+      in
+      let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
+      if (not (Generic.is_empty rest)) && length != req.word_count then
+        (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
+        None
+      else
+        let transformed_x = if Generic.is_empty x then Generic.empty else add_to_store rs x v.fetch_length in
+        let transformed_rest =
+          if Generic.is_empty rest then Generic.empty (*todo: match in the reverse direction*)
+          else add_to_store rs rest v.fetch_length
+        in
+        assert (
+          (Generic.measure ~monoid ~measure transformed_rest).degree == (Generic.measure ~monoid ~measure rest).degree);
+        rs.f <- rs.f + 1;
+        let seq =
+          Generic.append ~monoid ~measure transformed_x (Generic.append ~monoid ~measure words transformed_rest)
+        in
+        assert ((Generic.measure ~monoid ~measure seq).degree == (Generic.measure ~monoid ~measure v.seq).degree);
+        set_value_rs rs req.src { depth = v.depth + 1; fetch_length = v.fetch_length; seq; compressed_since = rs.f };
+        Some ({ fetched = words; have_prefix = Generic.is_empty x; have_suffix = Generic.is_empty rest }, seq)
 
 let init_fetch_length () : int ref = ref 1
 
@@ -386,7 +399,7 @@ and get_enter (s : state) : record_state -> state =
   let k = s.k.seq in
   fun rs ->
     let depth = rs.m.d + 1 in
-    let seq_to_value s = { seq = s; depth; fetch_length = ref 0; compressed_since = 0 } in
+    let seq_to_value s = { seq = s; depth; fetch_length = init_fetch_length (); compressed_since = 0 } in
     { c; e = Dynarray.map seq_to_value e; k = seq_to_value k; d = depth; r = Some rs }
 
 and record_memo_exit (s : state) : state =
@@ -414,7 +427,7 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : (fetch_resu
         | Evaluating ev -> (
             match !ev with
             | BlackHole | Root ->
-                let lookup = Hashtbl.create 0 in
+                let lookup = Hashtbl.create (module Core.Int) in
                 ev := Need { request = req; lookup; progress = get_progress s };
                 lookup
             | Need _ -> failwith "impossible case: Need"
@@ -427,10 +440,8 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : (fetch_resu
             | BlackHole | Root | Done _ -> failwith "register_memo_need_unfetched impossible")
         | Building -> failwith "register_memo_need_unfetched impossible"
       in
-
       let bh = ref BlackHole in
-      assert (not (Hashtbl.mem lookup fr));
-      Hashtbl.add lookup fr bh;
+      Hashtbl.add_exn lookup (fr_to_fh fr) bh;
       r.r <- Evaluating bh;
       Some (fr, seq)
   | None -> None
@@ -473,10 +484,10 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
   | Need n -> (
       match fetch_value rs n.request with
       | Some (fr, _) -> (
-          match Hashtbl.find_opt n.lookup fr with
+          match Hashtbl.find n.lookup (fr_to_fh fr) with
           | None ->
               let bh = ref BlackHole in
-              Hashtbl.add n.lookup fr bh;
+              Hashtbl.add_exn n.lookup (fr_to_fh fr) bh;
               rs.r <- Evaluating bh;
               n.progress.enter rs
           | Some m -> enter_new_memo_aux rs m true)
@@ -517,7 +528,7 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
             if fr.have_suffix then r_v.fetch_length := !(r_v.fetch_length) * 2;
             let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
             let rest = Generic.append ~monoid ~measure seq_tl tl in
-            match seq_hd with Word w -> Some (w, rest) | Reference _ -> failwith "impossible")
+            match seq_hd with Word w -> Some (w, rest) | Reference _ -> failwith "impossible: reference")
         | None -> None)
 
 (* Todo: I think we should path-compress lazily all places in the code, just like what we are doing here. *)
@@ -588,12 +599,12 @@ let pop_env (s : state) : value =
   assert ((Generic.measure ~monoid ~measure v.seq).max_degree == 1);
   v
 
-let env_keep_last_n (s : state) (n : int) : seq =
+let env_call (s : state) (keep : int list) (nargs : int) : seq =
   let l = Dynarray.length s.e in
-  let ret = appends (List.init (l - n) (fun i -> (Dynarray.get s.e i).seq)) in
-  s.e <- Dynarray.init n (fun i -> Dynarray.get s.e (l - n + i));
-  assert ((Generic.measure ~monoid ~measure ret).degree == l - n);
-  assert ((Generic.measure ~monoid ~measure ret).max_degree == l - n);
+  let ret = appends (List.map (fun i -> (Dynarray.get s.e i).seq) keep) in
+  s.e <- Dynarray.init nargs (fun i -> Dynarray.get s.e (l - nargs + i));
+  assert ((Generic.measure ~monoid ~measure ret).degree == List.length keep);
+  assert ((Generic.measure ~monoid ~measure ret).max_degree == List.length keep);
   ret
 
 let restore_env (s : state) (n : int) (seqs : seq) : unit =

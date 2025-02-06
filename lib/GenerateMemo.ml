@@ -160,7 +160,16 @@ let extend_s s name =
   Hashtbl.add_exn meta_env name (Some s.env_length);
   { meta_env = make_linear meta_env; env_length = s.env_length + 1 }
 
-let pop_n s n = { meta_env = s.meta_env; env_length = s.env_length - n }
+let drop_s s name =
+  assert (Option.is_some (Hashtbl.find_exn (read_linear s.meta_env) name));
+  let meta_env = write_linear s.meta_env in
+  Hashtbl.remove meta_env name;
+  { meta_env = make_linear meta_env; env_length = s.env_length - 1 }
+
+let pop_n s n =
+  assert (s.env_length >= n);
+  { meta_env = s.meta_env; env_length = s.env_length - n }
+
 let pop_s s = pop_n s 1
 let dup_s s = { meta_env = make_linear (Hashtbl.copy (read_linear s.meta_env)); env_length = s.env_length }
 
@@ -171,12 +180,18 @@ let dup_fv (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t lin
 
 let empty_fv () : (string, unit) Hashtbl.t linear = make_linear (Hashtbl.create (module Core.String))
 
-let drop (s : scope) (n : int) (k : kont) : pc =
+let drop (s : scope) (vars : string list) (k : kont) : pc =
+  let new_s, n =
+    List.fold_left
+      (fun (s, n) var ->
+        match Hashtbl.find_exn (read_linear s.meta_env) var with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
+      (s, 0) vars
+  in
   add_code_k (fun pc ->
       ( string
           ("(fun x -> assert_env_length x " ^ string_of_int s.env_length ^ "; drop_n x " ^ string_of_int s.env_length
          ^ " " ^ string_of_int n ^ " (pc_to_exp "
-          ^ string_of_int (k.k (pop_n s n))
+          ^ string_of_int (k.k new_s)
           ^ "))"),
         pc ))
 
@@ -216,6 +231,28 @@ let rec fv_pat (pat : pattern) (fv : (string, unit) Hashtbl.t linear) : (string,
 
 let fv_cases (MatchPattern c : cases) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
   List.fold_left (fun fv (pat, e) -> fv_pat pat (fv_expr e fv)) fv c
+
+type keep_t = { mutable keep : bool; mutable source : string option }
+
+let keep_only (s : scope) (fv : (string, unit) Hashtbl.t linear) : int Dynarray.t * scope =
+  let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
+  Hashtbl.iteri (read_linear s.meta_env) ~f:(fun ~key ~data ->
+      match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key });
+  Hashtbl.iter_keys (read_linear fv) ~f:(fun v ->
+      let i = Option.get (Hashtbl.find_exn (read_linear s.meta_env) v) in
+      (Dynarray.get keep i).keep <- true);
+  let keep_idx : int Dynarray.t = Dynarray.create () in
+  let meta_env : (string, int option) Hashtbl.t = Hashtbl.create (module Core.String) in
+  Dynarray.iteri
+    (fun i k ->
+      if k.keep then (
+        (match k.source with None -> () | Some v -> Hashtbl.add_exn meta_env v (Some (Dynarray.length keep_idx)));
+        Dynarray.add_last keep_idx i)
+      else ())
+    keep;
+  Hashtbl.iteri (read_linear s.meta_env) ~f:(fun ~key ~data ->
+      if Option.is_some data then ignore (Hashtbl.add meta_env key None));
+  (keep_idx, { meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
 
 let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
   match c with
@@ -269,13 +306,15 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
         }
   | App (Var "list_incr", [ x ]) ->
       let cont_name = "cont_" ^ string_of_int (Dynarray.length ctx.conts) in
+      let keep, keep_s = keep_only s k.fv in
+      print_endline (string_of_int keep_s.env_length);
       (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
-      let keep_length = s.env_length in
+      let keep_length = keep_s.env_length in
       add_cont ctx cont_name (keep_length + 1)
         (string "(fun x tl -> restore_env x "
         ^^ string (string_of_int keep_length)
         ^^ string " tl; x.k <- value_at_depth (get_next_cont tl) x.d; x.c <- pc_to_exp "
-        ^^ string (string_of_int (k.k (push_s (dup_s s))))
+        ^^ string (string_of_int (k.k (push_s keep_s)))
         ^^ string "; x)");
       ant_pp_expr ctx s x
         {
@@ -283,10 +322,11 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
             (fun s ->
               add_code_k (fun pc ->
                   ( string
-                      ("(fun x -> assert_env_length x " ^ string_of_int s.env_length
-                     ^ "; let sf = env_keep_last_n x 1 in x.k <- value_at_depth (Memo.appends [Memo.from_constructor "
+                      ("(fun x -> assert_env_length x " ^ string_of_int s.env_length ^ "; let keep = env_call x ["
+                      ^ String.concat ";" (List.map string_of_int (Dynarray.to_list keep))
+                      ^ "] 1 in x.k <- value_at_depth (Memo.appends [Memo.from_constructor "
                       ^ string_of_int (Hashtbl.find_exn ctx.ctag cont_name)
-                      ^ "; sf; x.k.seq]) x.d; x.c <- pc_to_exp "
+                      ^ "; keep; x.k.seq]) x.d; x.c <- pc_to_exp "
                       ^ string_of_int (Hashtbl.find_exn ctx.func_pc "list_incr")
                       ^ "; x)"),
                     pc )));
@@ -367,7 +407,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : p
                              (ant_pp_expr ctx
                                 (extend_s (extend_s s x0) x1)
                                 expr
-                                { k = (fun s -> drop s 2 k); fv = k.fv })
+                                { k = (fun s -> drop s [ x1; x0 ] k); fv = k.fv })
                          ^ ";")
                     ^^ string " x)"
                 | _ -> failwith (show_pattern pat))
@@ -406,8 +446,8 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
 let generate_apply_cont ctx =
   set_code apply_cont
     (string
-       "(fun x -> match resolve_seq x x.k.seq with | None -> raw_step (record_memo_exit x) memo | Some (hd, tl) -> \
-        match Word.get_value hd with "
+       "(fun x -> assert_env_length x 1; match resolve_seq x x.k.seq with | None -> raw_step (record_memo_exit x) memo \
+        | Some (hd, tl) -> match Word.get_value hd with "
     ^^ separate_map (break 1)
          (fun (name, action) ->
            string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ") ^^ action ^^ string " x tl")
