@@ -41,7 +41,7 @@ let measure (w : Word.t) : measure =
     match Word.get_tag w with
     | 0 -> 1
     | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
-    | _ -> panic "unknown tag"
+    | _ -> failwith "unknown tag"
   in
   { length = 1; degree; max_degree = degree }
 
