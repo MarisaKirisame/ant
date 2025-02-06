@@ -190,7 +190,7 @@ let measure (et : fg_et) : measure_t =
         match Word.get_tag w with
         | 0 -> 1
         | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
-        | _ -> panic "unknown tag"
+        | _ -> failwith "unknown tag"
       in
       { degree; max_degree = degree; full = Some { length = 1; hash = Hasher.from_int w } }
   | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
@@ -238,13 +238,13 @@ let get_value_rs (rs : record_state) (src : source) : value =
   match src with E i -> Dynarray.get rs.m.e i | S i -> Dynarray.get rs.s i | K -> rs.m.k
 
 let get_value (s : state) (src : source) : value =
-  match src with E i -> Dynarray.get s.e i | S _ -> panic "get_value impossible" | K -> s.k
+  match src with E i -> Dynarray.get s.e i | S _ -> failwith "get_value impossible" | K -> s.k
 
 let set_value_rs (rs : record_state) (src : source) (v : value) : unit =
   match src with E i -> Dynarray.set rs.m.e i v | S i -> Dynarray.set rs.s i v | K -> rs.m.k <- v
 
 let set_value (s : state) (src : source) (v : value) : unit =
-  match src with E i -> Dynarray.set s.e i v | S _ -> panic "set_value impossible" | K -> s.k <- v
+  match src with E i -> Dynarray.set s.e i v | S _ -> failwith "set_value impossible" | K -> s.k <- v
 
 let rec path_compress (rs : record_state) (src : source) : value =
   let v = get_value_rs rs src in
@@ -252,7 +252,7 @@ let rec path_compress (rs : record_state) (src : source) : value =
     if v.depth == 0 then v (*anything at depth 0 is trivially path-compressed*)
     else if v.depth == rs.m.d + 1 then path_compress_value rs v
     else if v.depth == rs.m.d then path_compress_value (Option.get rs.m.r) v
-    else panic "bad depth"
+    else failwith "bad depth"
   in
   set_value_rs rs src new_v;
   new_v
@@ -272,7 +272,7 @@ and path_compress_seq (rs : record_state) (x : seq) : seq =
   | Some (rest, Reference y) ->
       Generic.append ~monoid ~measure lhs
         (Generic.append ~monoid ~measure (path_compress_reference rs y) (path_compress_seq rs rest))
-  | _ -> panic "path_compress_seq impossible"
+  | _ -> failwith "path_compress_seq impossible"
 
 (*path compressing reference of depth x+1*)
 and path_compress_reference (rs : record_state) (r : reference) : seq =
@@ -333,7 +333,7 @@ let rec unshift_seq (rs : record_state) (x : seq) : seq =
   | Some (rest, Reference y) ->
       Generic.append ~monoid ~measure lhs
         (Generic.append ~monoid ~measure (unshift_reference rs y) (unshift_seq rs rest))
-  | _ -> panic "unshift_seq impossible"
+  | _ -> failwith "unshift_seq impossible"
 
 and unshift_reference (rs : record_state) (r : reference) : seq =
   let v = unshift_source rs r.src in
@@ -393,9 +393,9 @@ and record_memo_exit (s : state) : state =
   let r = Option.get s.r in
   (match r.r with
   | Evaluating ev -> (
-      match !ev with BlackHole -> ev := Done (get_done s) | _ -> panic "register_memo_done impossible")
+      match !ev with BlackHole -> ev := Done (get_done s) | _ -> failwith "register_memo_done impossible")
   | Reentrance _ -> ()
-  | _ -> panic "register_memo_done impossible");
+  | _ -> failwith "register_memo_done impossible");
   unshift_all s
 
 and get_done (s : state) : done_t =
@@ -417,15 +417,15 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : (fetch_resu
                 let lookup = Hashtbl.create 0 in
                 ev := Need { request = req; lookup; progress = get_progress s };
                 lookup
-            | Need _ -> panic "impossible case: Need"
-            | Done _ -> panic "impossible case: Done")
+            | Need _ -> failwith "impossible case: Need"
+            | Done _ -> failwith "impossible case: Done")
         | Reentrance re -> (
             match re with
             | Need n ->
                 assert (req == n.request);
                 n.lookup
-            | BlackHole | Root | Done _ -> panic "register_memo_need_unfetched impossible")
-        | Building -> panic "register_memo_need_unfetched impossible"
+            | BlackHole | Root | Done _ -> failwith "register_memo_need_unfetched impossible")
+        | Building -> failwith "register_memo_need_unfetched impossible"
       in
 
       let bh = ref BlackHole in
@@ -454,7 +454,7 @@ and try_match_memo (s : state) (m : memo_t) : state =
 
 and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool) : state =
   match !m with
-  | BlackHole -> panic "enter_new_memo_aux BlackHole"
+  | BlackHole -> failwith "enter_new_memo_aux BlackHole"
   | Done d ->
       rs.r <- Reentrance !m;
       d.skip rs
@@ -517,7 +517,7 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
             if fr.have_suffix then r_v.fetch_length := !(r_v.fetch_length) * 2;
             let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
             let rest = Generic.append ~monoid ~measure seq_tl tl in
-            match seq_hd with Word w -> Some (w, rest) | Reference _ -> panic "impossible")
+            match seq_hd with Word w -> Some (w, rest) | Reference _ -> failwith "impossible")
         | None -> None)
 
 (* Todo: I think we should path-compress lazily all places in the code, just like what we are doing here. *)
@@ -562,7 +562,7 @@ let to_int (s : seq) : int =
   assert ((Generic.measure ~monoid ~measure s).degree == 1);
   assert ((Generic.measure ~monoid ~measure s).max_degree == 1);
   assert (Generic.size s == 1);
-  match Generic.head_exn s with Word w -> w | Reference _ -> panic "conveting reference to_int"
+  match Generic.head_exn s with Word w -> w | Reference _ -> failwith "conveting reference to_int"
 
 let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
 let appends (x : seq list) : seq = List.fold_right append x empty
