@@ -8,3 +8,13 @@ let debug str f =
   let ret = f () in
   print_endline ("ok! " ^ str);
   ret
+
+type 'a linear = { mutable value : 'a option }
+
+let make_linear x = { value = Some x }
+let read_linear x = Option.get x.value
+
+let write_linear x =
+  let v = Option.get x.value in
+  x.value <- None;
+  v

@@ -3,7 +3,7 @@ open Word
 open Memo
 open Common
 
-let memo = Array.init 13 (fun _ -> ref Memo.Root)
+let memo = Array.init 14 (fun _ -> ref Memo.Root)
 
 type ocaml_int_list = Nil | Cons of int * Memo.seq
 
@@ -19,7 +19,7 @@ let to_ocaml_int_list x =
       let [ x0; x1 ] = Memo.splits t in
       Cons (Memo.to_int x0, x1)
 
-let rec list_incr (x0 : seq) : seq = exec_cek (pc_to_exp 3) (Dynarray.of_list [ x0 ]) (Memo.from_constructor 0) memo
+let rec list_incr (x0 : seq) : seq = exec_cek (pc_to_exp 2) (Dynarray.of_list [ x0 ]) (Memo.from_constructor 0) memo
 
 let 0 =
   add_exp (fun x ->
@@ -38,22 +38,17 @@ let 0 =
 
 let 1 =
   add_exp (fun x ->
-      assert_env_length x 2;
-      return_n x 2 (pc_to_exp 0))
+      x.c <- pc_to_exp 2;
+      x)
 
 let 2 =
   add_exp (fun x ->
+      assert_env_length x 1;
+      push_env x (Dynarray.get x.e 0);
       x.c <- pc_to_exp 3;
       x)
 
 let 3 =
-  add_exp (fun x ->
-      assert_env_length x 1;
-      push_env x (Dynarray.get x.e 0);
-      x.c <- pc_to_exp 4;
-      x)
-
-let 4 =
   add_exp (fun x ->
       assert_env_length x 2;
       let last = (Dynarray.get_last x.e).seq in
@@ -63,7 +58,7 @@ let 4 =
           Dynarray.remove_last x.e;
           match Word.get_value hd with
           | 1 ->
-              x.c <- pc_to_exp 5;
+              x.c <- pc_to_exp 4;
               x
           | 2 ->
               let [ x0; x1 ] = Memo.splits tl in
@@ -72,12 +67,17 @@ let 4 =
               x.c <- pc_to_exp 6;
               x))
 
-let 5 =
+let 4 =
   add_exp (fun x ->
       assert_env_length x 1;
       push_env x (value_at_depth (Memo.from_constructor 1) x.d);
-      x.c <- pc_to_exp 1;
+      x.c <- pc_to_exp 5;
       x)
+
+let 5 =
+  add_exp (fun x ->
+      assert_env_length x 2;
+      return_n x 2 (pc_to_exp 0))
 
 let 6 =
   add_exp (fun x ->
@@ -101,7 +101,7 @@ let 8 =
           Dynarray.remove_last x.e;
           Dynarray.remove_last x.e;
           push_env x (value_at_depth (Memo.from_int (x0 + x1)) x.d);
-          x.c <- pc_to_exp 11;
+          x.c <- pc_to_exp 12;
           x
       | _ -> raw_step (record_memo_exit x) memo)
 
@@ -117,21 +117,26 @@ let 9 =
 let 10 =
   add_exp (fun x ->
       assert_env_length x 4;
-      drop_n x 4 2 (pc_to_exp 1))
+      drop_n x 4 2 (pc_to_exp 11))
 
 let 11 =
   add_exp (fun x ->
-      assert_env_length x 4;
-      push_env x (Dynarray.get x.e 2);
-      x.c <- pc_to_exp 12;
-      x)
+      assert_env_length x 2;
+      return_n x 2 (pc_to_exp 0))
 
 let 12 =
+  add_exp (fun x ->
+      assert_env_length x 4;
+      push_env x (Dynarray.get x.e 2);
+      x.c <- pc_to_exp 13;
+      x)
+
+let 13 =
   add_exp (fun x ->
       assert_env_length x 5;
       let sf = env_keep_last_n x 1 in
       x.k <- value_at_depth (Memo.appends [ Memo.from_constructor 3; sf; x.k.seq ]) x.d;
-      x.c <- pc_to_exp 2;
+      x.c <- pc_to_exp 1;
       x)
 
 let () = Memo.set_constructor_degree 0 1
