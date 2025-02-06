@@ -13,7 +13,8 @@ typedef struct {
 
 #define Sl2_val(v) (((sl2_wrapper *)Data_custom_val(v))->inner)
 
-#define make_sl2_buf() (caml_alloc_small(sizeof(sl2_wrapper) / sizeof(value) + 1, Abstract_tag))
+#define make_sl2_buf()                                                         \
+  (caml_alloc_small(sizeof(sl2_wrapper) / sizeof(value) + 1, Abstract_tag))
 
 value sl2_unit_stub(value unit) {
   CAMLparam1(unit);
@@ -48,7 +49,8 @@ value sl2_from_int_stub(value i) {
   CAMLparam1(i);
   int64_t x = Long_val(i);
   value res = make_sl2_buf();
-  sl2_mul_buf_right(Sl2_val(res), (unsigned char *)&x, sizeof(x));
+  sl2_unit(Sl2_val(res));
+  sl2_mul_buf_left(Sl2_val(res), (unsigned char *)&x, sizeof(x));
   CAMLreturn(res);
 }
 
