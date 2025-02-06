@@ -164,6 +164,9 @@ and record_context =
   | Reentrance of memo_node_t
   | Building (* Urgh I hate this. It's so easy though. *)
 
+let source_to_string (src : source) =
+  match src with E i -> "E" ^ string_of_int i | S i -> "S" ^ string_of_int i | K -> "K"
+
 let constructor_degree_table : int Dynarray.t = Dynarray.create ()
 
 let set_constructor_degree (ctag : int) (degree : int) : unit =
@@ -198,7 +201,9 @@ let measure (et : fg_et) : measure_t =
   | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
 
 let fr_to_fh (fr : fetch_result) : fetch_hash =
-  Hasher.hash (Option.get (Generic.measure ~measure ~monoid fr.fetched).full).hash
+  let ret = Hasher.hash (Option.get (Generic.measure ~measure ~monoid fr.fetched).full).hash in
+  print_endline ("hash: " ^ string_of_int ret);
+  ret
 
 let pop_n (s : seq) (n : int) : seq * seq =
   assert (n >= 0);
@@ -298,42 +303,38 @@ let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq 
 
 (*move a value from depth x to depth x+1*)
 let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq) option =
-  match req.src with
-  | S _ -> failwith "fetching from store!"
-  | _ ->
-      ();
-      print_endline ("fetching " ^ string_of_int req.word_count ^ " words");
-      (* Only value at the right depth can be fetched. 
-       * If higher depth, it is already fetched so pointless to fetch again.
-       * If lower depth, it is not fetched by the last level so we cannot trepass.
-       *)
-      assert ((get_value_rs rs req.src).depth == rs.m.d);
-      let v = path_compress rs req.src in
-      let x, y = pop_n v.seq req.offset in
-      let words, rest =
-        Generic.split ~monoid ~measure
-          (fun m -> not (match m.full with None -> false | Some m -> req.word_count <= m.length))
-          y
-      in
-      let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
-      if (not (Generic.is_empty rest)) && length != req.word_count then
-        (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
-        None
-      else
-        let transformed_x = if Generic.is_empty x then Generic.empty else add_to_store rs x v.fetch_length in
-        let transformed_rest =
-          if Generic.is_empty rest then Generic.empty (*todo: match in the reverse direction*)
-          else add_to_store rs rest v.fetch_length
-        in
-        assert (
-          (Generic.measure ~monoid ~measure transformed_rest).degree == (Generic.measure ~monoid ~measure rest).degree);
-        rs.f <- rs.f + 1;
-        let seq =
-          Generic.append ~monoid ~measure transformed_x (Generic.append ~monoid ~measure words transformed_rest)
-        in
-        assert ((Generic.measure ~monoid ~measure seq).degree == (Generic.measure ~monoid ~measure v.seq).degree);
-        set_value_rs rs req.src { depth = v.depth + 1; fetch_length = v.fetch_length; seq; compressed_since = rs.f };
-        Some ({ fetched = words; have_prefix = Generic.is_empty x; have_suffix = Generic.is_empty rest }, seq)
+  (match req.src with S _ -> failwith "fetching from store!" | _ -> ());
+  print_endline
+    ("fetching " ^ string_of_int req.word_count ^ " words from " ^ source_to_string req.src ^ " at depth "
+   ^ string_of_int rs.m.d);
+  (* Only value at the right depth can be fetched. 
+   * If higher depth, it is already fetched so pointless to fetch again.
+   * If lower depth, it is not fetched by the last level so we cannot trepass.
+   *)
+  assert ((get_value_rs rs req.src).depth == rs.m.d);
+  let v = path_compress rs req.src in
+  let x, y = pop_n v.seq req.offset in
+  let words, rest =
+    Generic.split ~monoid ~measure
+      (fun m -> not (match m.full with None -> false | Some m -> req.word_count <= m.length))
+      y
+  in
+  let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
+  if (not (Generic.is_empty rest)) && length != req.word_count then
+    (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
+    None
+  else
+    let transformed_x = if Generic.is_empty x then Generic.empty else add_to_store rs x v.fetch_length in
+    let transformed_rest =
+      if Generic.is_empty rest then Generic.empty (*todo: match in the reverse direction*)
+      else add_to_store rs rest v.fetch_length
+    in
+    assert ((Generic.measure ~monoid ~measure transformed_rest).degree == (Generic.measure ~monoid ~measure rest).degree);
+    rs.f <- rs.f + 1;
+    let seq = Generic.append ~monoid ~measure transformed_x (Generic.append ~monoid ~measure words transformed_rest) in
+    assert ((Generic.measure ~monoid ~measure seq).degree == (Generic.measure ~monoid ~measure v.seq).degree);
+    set_value_rs rs req.src { depth = v.depth + 1; fetch_length = v.fetch_length; seq; compressed_since = rs.f };
+    Some ({ fetched = words; have_prefix = Generic.is_empty x; have_suffix = Generic.is_empty rest }, seq)
 
 let init_fetch_length () : int ref = ref 1
 
@@ -403,6 +404,7 @@ and get_enter (s : state) : record_state -> state =
     { c; e = Dynarray.map seq_to_value e; k = seq_to_value k; d = depth; r = Some rs }
 
 and record_memo_exit (s : state) : state =
+  print_endline "memo_exit!";
   let r = Option.get s.r in
   (match r.r with
   | Evaluating ev -> (
@@ -441,7 +443,7 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : (fetch_resu
         | Building -> failwith "register_memo_need_unfetched impossible"
       in
       let bh = ref BlackHole in
-      Hashtbl.add_exn lookup (fr_to_fh fr) bh;
+      Hashtbl.add_exn lookup ~key:(fr_to_fh fr) ~data:bh;
       r.r <- Evaluating bh;
       Some (fr, seq)
   | None -> None
@@ -456,6 +458,13 @@ let lift_value (src : source) (d : depth_t) : value =
     compressed_since = 0;
   }
 
+let print_state (cek : state) msg : unit =
+  print_endline (msg ^ ": pc=" ^ string_of_int cek.c.pc ^ ", d=" ^ string_of_int cek.d)
+
+let rec print_stacktrace (s : state) : unit =
+  print_state s "stacktrace";
+  match s.r with Some s -> print_stacktrace s.m | _ -> ()
+
 let rec enter_new_memo (s : state) (m : memo_t) : state =
   enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) true
 
@@ -465,13 +474,17 @@ and try_match_memo (s : state) (m : memo_t) : state =
 
 and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool) : state =
   match !m with
-  | BlackHole -> failwith "enter_new_memo_aux BlackHole"
+  | BlackHole ->
+      print_stacktrace rs.m;
+      failwith "Blackhole detected"
   | Done d ->
+      assert (rs.r == Building);
       rs.r <- Reentrance !m;
       d.skip rs
   | Root ->
       if matched then (
         m := BlackHole;
+        assert (rs.r == Building);
         rs.r <- Evaluating m;
         {
           c = lift_c rs.m.c;
@@ -487,12 +500,14 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
           match Hashtbl.find n.lookup (fr_to_fh fr) with
           | None ->
               let bh = ref BlackHole in
-              Hashtbl.add_exn n.lookup (fr_to_fh fr) bh;
+              Hashtbl.add_exn n.lookup ~key:(fr_to_fh fr) ~data:bh;
+              assert (rs.r == Building);
               rs.r <- Evaluating bh;
               n.progress.enter rs
           | Some m -> enter_new_memo_aux rs m true)
       | None ->
           if matched then (
+            assert (rs.r == Building);
             rs.r <- Reentrance !m;
             n.progress.enter rs)
           else rs.m)
@@ -647,13 +662,12 @@ let assert_env_length (s : state) (e : int) : unit =
 let raw_step (cek : state) (_ : memo_t) : state = cek.c.step cek
 let memo_step (cek : state) (m : memo_t) : state = raw_step (enter_new_memo cek m) m
 let lookup_step (cek : state) (m : memo_t) : state = raw_step (try_match_memo cek m) m
-let debug_state (cek : state) : unit = print_endline ("debug_state: " ^ string_of_int cek.c.pc)
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let init_value (w : words) : value = value_at_depth w 0 in
   let cek = { c; e = Dynarray.map init_value e; k = init_value k; d = 0; r = None } in
   let rec exec cek =
-    debug_state cek;
+    (*print_state cek "debug_state";*)
     exec (memo_step cek m)
   in
   try exec cek
