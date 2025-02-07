@@ -134,7 +134,7 @@ and memo_node_t =
   (* We know nothing about what's gonna happen. Will switch to Need or Done.
    * Another design is to always force it to be a Need/Done before hand.
    *)
-  | Root
+  | Unknown
   (* We are figuring out this entry. *)
   | BlackHole
 
@@ -170,6 +170,9 @@ and record_context =
 
 let source_to_string (src : source) =
   match src with E i -> "E" ^ string_of_int i | S i -> "S" ^ string_of_int i | K -> "K"
+
+let request_to_string (req : fetch_request) =
+  "at " ^ source_to_string req.src ^ "+" ^ string_of_int req.offset ^ ", " ^ string_of_int req.word_count ^ " words"
 
 let constructor_degree_table : int Dynarray.t = Dynarray.create ()
 
@@ -339,6 +342,7 @@ let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq)
     let seq = Generic.append ~monoid ~measure transformed_x (Generic.append ~monoid ~measure words transformed_rest) in
     assert ((Generic.measure ~monoid ~measure seq).degree = (Generic.measure ~monoid ~measure v.seq).degree);
     set_value_rs rs req.src { depth = v.depth + 1; fetch_length = v.fetch_length; seq; compressed_since = rs.f };
+    if not (Generic.is_empty rest) then v.fetch_length := !(v.fetch_length) * 2 else ();
     Some ({ fetched = words; have_prefix = not (Generic.is_empty x); have_suffix = not (Generic.is_empty rest) }, seq)
 
 (*assuming this seq is at depth l.m.d+1, convert it to depth l.m.d*)
@@ -409,10 +413,8 @@ and get_enter (s : state) : record_state -> state =
 and record_memo_exit (s : state) : state =
   let r = Option.get s.r in
   (match r.r with
-  | Evaluating ev -> (
-      match !ev with BlackHole -> ev := Done (get_done s) | _ -> failwith "register_memo_done impossible")
-  | Reentrance _ -> ()
-  | _ -> failwith "register_memo_done impossible");
+  | Evaluating ev -> ( match !ev with BlackHole -> ev := Unknown | _ -> ())
+  | Reentrance _ | Building -> ());
   unshift_all s
 
 and get_done (s : state) : done_t =
@@ -424,26 +426,27 @@ and get_done (s : state) : done_t =
  *)
 let register_memo_need_unfetched (s : state) (req : fetch_request) : (fetch_result * seq) option =
   let r = Option.get s.r in
+  let lookup =
+    match r.r with
+    | Evaluating ev -> (
+        match !ev with
+        | BlackHole | Unknown ->
+            let lookup = Hashtbl.create (module Core.Int) in
+            ev := Need { request = req; lookup; progress = get_progress s };
+            lookup
+        | Need _ -> failwith "impossible case: Need"
+        | Done _ -> failwith "impossible case: Done")
+    | Reentrance re -> (
+        match re with
+        | Need n ->
+            if req <> n.request then print_endline (request_to_string req ^ " " ^ request_to_string n.request) else ();
+            assert (req = n.request);
+            n.lookup
+        | BlackHole | Unknown | Done _ -> failwith "register_memo_need_unfetched impossible")
+    | Building -> failwith "register_memo_need_unfetched impossible"
+  in
   match fetch_value r req with
   | Some (fr, seq) ->
-      let lookup =
-        match r.r with
-        | Evaluating ev -> (
-            match !ev with
-            | BlackHole | Root ->
-                let lookup = Hashtbl.create (module Core.Int) in
-                ev := Need { request = req; lookup; progress = get_progress s };
-                lookup
-            | Need _ -> failwith "impossible case: Need"
-            | Done _ -> failwith "impossible case: Done")
-        | Reentrance re -> (
-            match re with
-            | Need n ->
-                assert (req = n.request);
-                n.lookup
-            | BlackHole | Root | Done _ -> failwith "register_memo_need_unfetched impossible")
-        | Building -> failwith "register_memo_need_unfetched impossible"
-      in
       let bh = ref BlackHole in
       (*print_endline ("new entry when " ^ source_to_string req.src ^ " word length " ^ string_of_int req.word_count);*)
       Hashtbl.add_exn lookup ~key:(fr_to_fh fr) ~data:bh;
@@ -469,22 +472,23 @@ let rec print_stacktrace (s : state) : unit =
   match s.r with Some s -> print_stacktrace s.m | _ -> ()
 
 let rec enter_new_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) true
+  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) true 0
 
 (*only enter if there is an existing entries. this is cheaper then enter_new_memo.*)
 and try_match_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) false
+  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) false 0
 
-and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool) : state =
+and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool) (depth : int) : state =
   match !m with
   | BlackHole ->
       print_stacktrace rs.m;
       failwith "Blackhole detected"
   | Done d ->
+      (*todo: d.skip should allow rs.r to be in whatever state as it is done.*)
       assert (rs.r = Building);
       rs.r <- Reentrance !m;
       d.skip rs
-  | Root ->
+  | Unknown ->
       if matched then (
         m := BlackHole;
         assert (rs.r = Building);
@@ -502,17 +506,19 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
       | Some (fr, _) -> (
           match Hashtbl.find n.lookup (fr_to_fh fr) with
           | None ->
-              (*print_endline "new entry";*)
+              (*print_endline ("new entry at memo depth " ^ string_of_int depth);*)
               let bh = ref BlackHole in
               Hashtbl.add_exn n.lookup ~key:(fr_to_fh fr) ~data:bh;
               assert (rs.r = Building);
               rs.r <- Evaluating bh;
               n.progress.enter rs
-          | Some m -> enter_new_memo_aux rs m true)
+          | Some m -> enter_new_memo_aux rs m true (depth + 1))
       | None ->
           if matched then (
             assert (rs.r = Building);
             rs.r <- Reentrance !m;
+            (*print_endline
+              ("request " ^ request_to_string n.request ^ " failed, entering memo depth " ^ string_of_int depth);*)
             n.progress.enter rs)
           else rs.m)
 
@@ -544,7 +550,6 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
           register_memo_need_unfetched s { src = ref.src; offset = ref.offset; word_count = !(r_v.fetch_length) }
         with
         | Some (fr, seq) -> (
-            (*if fr.have_suffix then r_v.fetch_length := !(r_v.fetch_length) * 2 else ();*)
             let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
             let rest = Generic.append ~monoid ~measure seq_tl tl in
             match seq_hd with Word w -> Some (w, rest) | Reference _ -> failwith "impossible: reference")
@@ -568,7 +573,16 @@ let rec resolve (s : state) (src : source) : (Word.t * seq) option =
       Some ret
   | None -> None
 
-let rec exec_done (s : state) : 'a = match s.r with Some _ -> exec_done (record_memo_exit s) | None -> raise DoneExc
+let rec exec_done (s : state) : 'a =
+  match s.r with
+  | Some r ->
+      (match r.r with
+      | Evaluating ev -> ( match !ev with BlackHole -> ev := Done (get_done s) | _ -> failwith "exec_done impossible")
+      | Reentrance _ -> ()
+      | _ -> failwith "exec_done impossible");
+      exec_done (unshift_all s)
+  | None -> raise DoneExc
+
 let pc_map : exp Dynarray.t = Dynarray.create ()
 
 let add_exp (f : state -> state) : int =

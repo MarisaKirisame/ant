@@ -350,15 +350,14 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                       let add_last = string "push_env x (value_at_depth (Memo.from_int (x0 + x1)) x.d);" in
                       add_code_k (fun pc ->
                           ( string ("(fun x -> assert_env_length x " ^ string_of_int s.env_length ^ "; match ")
-                            ^^ x0 ^^ string ", " ^^ x1
+                            ^^ x0
+                            ^^ string " with  | None -> raw_step (record_memo_exit x) memo | Some (x0, _) -> match "
+                            ^^ x1
                             ^^ string
-                                 " with | Some (x0, _), Some (x1, _) -> (Dynarray.remove_last x.e;Dynarray.remove_last \
-                                  x.e;"
+                                 " with None -> raw_step (record_memo_exit x) memo | Some (x1, _) -> \
+                                  (Dynarray.remove_last x.e;Dynarray.remove_last x.e;"
                             ^^ add_last
-                            ^^ string
-                                 ("x.c <- pc_to_exp "
-                                 ^ string_of_int (k.k (push_s (pop_s (pop_s s))))
-                                 ^ "; x) | _ -> raw_step (record_memo_exit x) memo)"),
+                            ^^ string ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s (pop_s (pop_s s)))) ^ "; x))"),
                             pc )));
                   fv = fv_expr x1 (dup_fv k.fv);
                 });
@@ -461,7 +460,7 @@ let pp_cek_ant x =
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Common"
   ^^ break 1 ^^ string "let memo = Array.init "
   ^^ string (string_of_int (Dynarray.length codes))
-  ^^ string "(fun _ -> ref Memo.Root)" ^^ break 1 ^^ generated_stmt ^^ break 1
+  ^^ string "(fun _ -> ref Memo.Unknown)" ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string ("let " ^ string_of_int i ^ " = add_exp ") ^^ Option.get (Dynarray.get codes i)))

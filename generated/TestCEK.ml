@@ -5,7 +5,7 @@ open Word
 open Memo
 open Common
 
-let memo = Array.init 14 (fun _ -> ref Memo.Root)
+let memo = Array.init 14 (fun _ -> ref Memo.Unknown)
 
 type ocaml_int_list = Nil | Cons of int * Memo.seq
 
@@ -99,14 +99,17 @@ let 7 =
 let 8 =
   add_exp (fun x ->
       assert_env_length x 5;
-      match (resolve_seq x (Dynarray.get x.e 3).seq, resolve_seq x (Dynarray.get x.e 4).seq) with
-      | Some (x0, _), Some (x1, _) ->
-          Dynarray.remove_last x.e;
-          Dynarray.remove_last x.e;
-          push_env x (value_at_depth (Memo.from_int (x0 + x1)) x.d);
-          x.c <- pc_to_exp 12;
-          x
-      | _ -> raw_step (record_memo_exit x) memo)
+      match resolve_seq x (Dynarray.get x.e 3).seq with
+      | None -> raw_step (record_memo_exit x) memo
+      | Some (x0, _) -> (
+          match resolve_seq x (Dynarray.get x.e 4).seq with
+          | None -> raw_step (record_memo_exit x) memo
+          | Some (x1, _) ->
+              Dynarray.remove_last x.e;
+              Dynarray.remove_last x.e;
+              push_env x (value_at_depth (Memo.from_int (x0 + x1)) x.d);
+              x.c <- pc_to_exp 12;
+              x))
 
 let 9 =
   add_exp (fun x ->
