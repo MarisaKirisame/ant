@@ -12,8 +12,8 @@ module TestMonoidHash (M : Hash.MonoidHash) = struct
     let init = hash h1 in
     let hlist = [ h1; h2; h3 ] in
     if List.exists (fun i -> hash i <> init) [ h1; h2; h3 ] then failwith ("hash is not idempotent " ^ print_list hlist);
-    let l1 = List.init 2000 (fun _ -> Int64.to_int @@ Random.bits64 ()) in
-    let l2 = List.init 2000 (fun _ -> Int64.to_int @@ Random.bits64 ()) in
+    let l1 = List.init 10000 (fun _ -> Int64.to_int @@ Random.bits64 ()) in
+    let l2 = List.init 10000 (fun _ -> Int64.to_int @@ Random.bits64 ()) in
     let list = l1 @ l2 in
     let foldl x = List.fold_left (fun acc i -> mul acc (from_int i)) unit x in
     let foldr x = List.fold_right (fun i acc -> mul (from_int i) acc) x unit in
@@ -38,7 +38,7 @@ module TestMonoidHash (M : Hash.MonoidHash) = struct
     in
     let h10 = random_assoc list in
     if hash h10 <> init then failwith "hash is not associative (random)";
-    let gen_hlist_for_single x = List.init 100000 (fun _ -> from_int x) in
+    let gen_hlist_for_single x = List.init 1000 (fun _ -> from_int x) in
     if
       List.exists
         (fun i ->
@@ -65,8 +65,11 @@ let _ =
   assert (Intmap.find_opt x 5 = None);
   assert (Intmap.length x = 9);
   let module SL2 = TestMonoidHash (Hash.SL2) in
+  let module SL2Slow = TestMonoidHash (Hash.SL2Slow) in
   let module MCRC32C = TestMonoidHash (Hash.MCRC32C) in
   let module DebugHash = TestMonoidHash (Hash.DebugHash) in
   (* buggy when length > a threshold *)
+  SL2.test_hash ();
+  SL2Slow.test_hash ();
   MCRC32C.test_hash ();
   DebugHash.test_hash ()

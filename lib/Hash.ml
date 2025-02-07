@@ -27,6 +27,22 @@ module SL2 : MonoidHash = struct
   let name = "SL2"
 end
 
+module SL2Slow : MonoidHash = struct
+  type t
+
+  external __unit : unit -> t = "sl2_slow_unit_stub"
+  external mul : t -> t -> t = "sl2_slow_mul_stub"
+  external valid : t -> bool = "sl2_slow_valid_stub"
+  external eq : t -> t -> bool = "sl2_slow_eq_stub"
+  external cmp : t -> t -> int = "sl2_slow_cmp_stub"
+  external from_int : int -> t = "sl2_slow_from_int_stub"
+  external hash : t -> int = "sl2_slow_hash_stub"
+
+  let unit = __unit ()
+
+  let name = "SL2Slow"
+end
+
 module MCRC32C : MonoidHash = struct
   type t = Int64.t
 

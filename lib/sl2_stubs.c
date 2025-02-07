@@ -12,6 +12,12 @@ typedef struct {
 } sl2_wrapper;
 
 #define Sl2_val(v) (((sl2_wrapper *)Data_custom_val(v))->inner)
+#define Sl2_Vcheck(sl2, msg)                                                   \
+  do {                                                                         \
+    if (sl2_valid(Sl2_val(sl2)) == 0) {                                        \
+      caml_failwith("invalid sl2 " msg);                                       \
+    }                                                                          \
+  } while (0)
 
 #define make_sl2_buf()                                                         \
   (caml_alloc_small(sizeof(sl2_wrapper) / sizeof(value) + 1, Abstract_tag))
@@ -26,7 +32,7 @@ value sl2_unit_stub(value unit) {
 value sl2_mul_stub(value a, value b) {
   CAMLparam2(a, b);
   value res = make_sl2_buf();
-  sl2_mul(Sl2_val(a), Sl2_val(b), Sl2_val(res));
+  sl2_mul(Sl2_val(res), Sl2_val(a), Sl2_val(b));
   CAMLreturn(res);
 }
 
@@ -61,5 +67,6 @@ value sl2_from_int_stub(value i) {
 // (0) say the worst case is a hash attack, and (1) say it is hard.
 value sl2_hash_stub(value sl2) {
   CAMLparam1(sl2);
-  CAMLreturn(Val_int(*(int64_t *)Sl2_val(sl2)));
+  int64_t *buf = (int64_t *)Sl2_val(sl2);
+  CAMLreturn(Val_int((buf[0] ^ buf[1]) ^ (buf[2] ^ buf[3])));
 }
