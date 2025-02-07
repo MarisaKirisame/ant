@@ -12,6 +12,7 @@ open Word
 open Common
 module Hasher = Hash.MCRC32C
 
+(*module Hasher = Hash.MCRC32*)
 (*module Hasher = Hash.SL2*)
 (*module Hasher = Hash.DebugHash*)
 module Hashtbl = Core.Hashtbl
@@ -217,10 +218,6 @@ let pop_n (s : seq) (n : int) : seq * seq =
     let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
     let w, v = Generic.front_exn ~monoid ~measure y in
     let m = Generic.measure ~monoid ~measure x in
-<<<<<<< HEAD
-    assert (m.degree = m.max_degree);
-=======
->>>>>>> 3e5ec43 (save)
     assert (m.degree < n);
     match v with
     | Word v ->
@@ -328,13 +325,7 @@ let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq)
   in
   let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
   assert (length <= req.word_count);
-<<<<<<< HEAD
-    if (not (Generic.is_empty rest)) && length <> req.word_count then (
-    print_endline "fetch fail";
-=======
-  assert (length <= req.word_count);
   if (not (Generic.is_empty rest)) && length != req.word_count then
->>>>>>> 3e5ec43 (save)
     (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
     None
   else
@@ -348,7 +339,7 @@ let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq)
     let seq = Generic.append ~monoid ~measure transformed_x (Generic.append ~monoid ~measure words transformed_rest) in
     assert ((Generic.measure ~monoid ~measure seq).degree = (Generic.measure ~monoid ~measure v.seq).degree);
     set_value_rs rs req.src { depth = v.depth + 1; fetch_length = v.fetch_length; seq; compressed_since = rs.f };
-    Some ({ fetched = words; have_prefix = Generic.is_empty x; have_suffix = Generic.is_empty rest }, seq))
+    Some ({ fetched = words; have_prefix = not (Generic.is_empty x); have_suffix = not (Generic.is_empty rest) }, seq)
 
 (*assuming this seq is at depth l.m.d+1, convert it to depth l.m.d*)
 let rec unshift_seq (rs : record_state) (x : seq) : seq =
@@ -454,6 +445,7 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : (fetch_resu
         | Building -> failwith "register_memo_need_unfetched impossible"
       in
       let bh = ref BlackHole in
+      (*print_endline ("new entry when " ^ source_to_string req.src ^ " word length " ^ string_of_int req.word_count);*)
       Hashtbl.add_exn lookup ~key:(fr_to_fh fr) ~data:bh;
       r.r <- Evaluating bh;
       Some (fr, seq)
@@ -510,6 +502,7 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
       | Some (fr, _) -> (
           match Hashtbl.find n.lookup (fr_to_fh fr) with
           | None ->
+              (*print_endline "new entry";*)
               let bh = ref BlackHole in
               Hashtbl.add_exn n.lookup ~key:(fr_to_fh fr) ~data:bh;
               assert (rs.r = Building);
@@ -685,10 +678,6 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   in
   try exec (memo_step cek m)
   with DoneExc ->
-<<<<<<< HEAD
     assert (Dynarray.length cek.e = 1);
-=======
-    assert (Dynarray.length cek.e == 1);
     print_endline ("took " ^ string_of_int !i ^ " step");
->>>>>>> 3e5ec43 (save)
     (Dynarray.get_last cek.e).seq
