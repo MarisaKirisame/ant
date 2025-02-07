@@ -46,11 +46,12 @@ module DebugHash : MonoidHash = struct
     match t with Empty -> acc | Single i -> i :: acc | Mult (x, y) -> to_list_aux x (to_list_aux y acc)
 
   let to_list t = to_list_aux t []
+  
   let unit = Empty
   let from_int i = Single i
   let mul x y = Mult (x, y)
   let valid _ = true
   let hash x = Hashtbl.hash (to_list x)
-  let eq x y = to_list x == to_list y
+  let eq x y = to_list x = to_list y
   let cmp x y = compare (to_list x) (to_list y)
 end
