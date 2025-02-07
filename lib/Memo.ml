@@ -544,7 +544,7 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
           register_memo_need_unfetched s { src = ref.src; offset = ref.offset; word_count = !(r_v.fetch_length) }
         with
         | Some (fr, seq) -> (
-            if fr.have_suffix then r_v.fetch_length := !(r_v.fetch_length) * 2 else ();
+            (*if fr.have_suffix then r_v.fetch_length := !(r_v.fetch_length) * 2 else ();*)
             let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
             let rest = Generic.append ~monoid ~measure seq_tl tl in
             match seq_hd with Word w -> Some (w, rest) | Reference _ -> failwith "impossible: reference")
