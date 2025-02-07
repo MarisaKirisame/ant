@@ -205,7 +205,7 @@ let measure (et : fg_et) : measure_t =
 
 let fr_to_fh (fr : fetch_result) : fetch_hash =
   let ret = Hasher.hash (Option.get (Generic.measure ~measure ~monoid fr.fetched).full).hash in
-  print_endline ("hash: " ^ string_of_int ret);
+  (*print_endline ("hash: " ^ string_of_int ret);*)
   ret
 
 let pop_n (s : seq) (n : int) : seq * seq =
@@ -217,7 +217,10 @@ let pop_n (s : seq) (n : int) : seq * seq =
     let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
     let w, v = Generic.front_exn ~monoid ~measure y in
     let m = Generic.measure ~monoid ~measure x in
+<<<<<<< HEAD
     assert (m.degree = m.max_degree);
+=======
+>>>>>>> 3e5ec43 (save)
     assert (m.degree < n);
     match v with
     | Word v ->
@@ -294,12 +297,9 @@ and path_compress_reference (rs : record_state) (r : reference) : seq =
     let v = path_compress_value rs v in
     set_value_rs rs r.src v;
     slice v.seq r.offset r.values_count)
-  else (
-    failwith "here";
-    Generic.Single (Reference r))
+  else Generic.Single (Reference r)
 
 let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq =
-  print_endline "add_to_store";
   let v = { depth = rs.m.d; seq; compressed_since = 0; fetch_length } in
   let r =
     { src = S (Dynarray.length rs.s); offset = 0; values_count = (Generic.measure ~monoid ~measure seq).degree }
@@ -307,11 +307,13 @@ let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq 
   Dynarray.add_last rs.s v;
   Generic.singleton (Reference r)
 
+let init_fetch_length () : int ref = ref 1
+
 (*move a value from depth x to depth x+1*)
 let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq) option =
-  print_endline
+  (*print_endline
     ("fetching " ^ string_of_int req.word_count ^ " words from " ^ source_to_string req.src ^ " offset "
-   ^ string_of_int req.offset ^ " at depth " ^ string_of_int rs.m.d);
+   ^ string_of_int req.offset ^ " at depth " ^ string_of_int rs.m.d);*)
   (* Only value at the right depth can be fetched. 
    * If higher depth, it is already fetched so pointless to fetch again.
    * If lower depth, it is not fetched by the last level so we cannot trepass.
@@ -325,13 +327,17 @@ let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq)
       y
   in
   let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
+  assert (length <= req.word_count);
+<<<<<<< HEAD
     if (not (Generic.is_empty rest)) && length <> req.word_count then (
-      assert (length <= req.word_count);
     print_endline "fetch fail";
+=======
+  assert (length <= req.word_count);
+  if (not (Generic.is_empty rest)) && length != req.word_count then
+>>>>>>> 3e5ec43 (save)
     (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
-    None)
-  else (
-    print_endline "fetch ok!";
+    None
+  else
     let transformed_x = if Generic.is_empty x then Generic.empty else add_to_store rs x v.fetch_length in
     let transformed_rest =
       if Generic.is_empty rest then Generic.empty (*todo: match in the reverse direction*)
@@ -343,8 +349,6 @@ let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq)
     assert ((Generic.measure ~monoid ~measure seq).degree = (Generic.measure ~monoid ~measure v.seq).degree);
     set_value_rs rs req.src { depth = v.depth + 1; fetch_length = v.fetch_length; seq; compressed_since = rs.f };
     Some ({ fetched = words; have_prefix = Generic.is_empty x; have_suffix = Generic.is_empty rest }, seq))
-
-let init_fetch_length () : int ref = ref 1
 
 (*assuming this seq is at depth l.m.d+1, convert it to depth l.m.d*)
 let rec unshift_seq (rs : record_state) (x : seq) : seq =
@@ -412,7 +416,6 @@ and get_enter (s : state) : record_state -> state =
     { c; e = Dynarray.map seq_to_value e; k = seq_to_value k; d = depth; r = Some rs }
 
 and record_memo_exit (s : state) : state =
-  print_endline "memo_exit!";
   let r = Option.get s.r in
   (match r.r with
   | Evaluating ev -> (
@@ -512,9 +515,7 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
               assert (rs.r = Building);
               rs.r <- Evaluating bh;
               n.progress.enter rs
-          | Some m ->
-              print_endline "hit!";
-              enter_new_memo_aux rs m true)
+          | Some m -> enter_new_memo_aux rs m true)
       | None ->
           if matched then (
             assert (rs.r = Building);
@@ -550,9 +551,7 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
           register_memo_need_unfetched s { src = ref.src; offset = ref.offset; word_count = !(r_v.fetch_length) }
         with
         | Some (fr, seq) -> (
-            if fr.have_suffix then (
-              print_endline ("have_suffix, fetchlength " ^ string_of_int !(r_v.fetch_length));
-              r_v.fetch_length := !(r_v.fetch_length) * 2);
+            if fr.have_suffix then r_v.fetch_length := !(r_v.fetch_length) * 2 else ();
             let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
             let rest = Generic.append ~monoid ~measure seq_tl tl in
             match seq_hd with Word w -> Some (w, rest) | Reference _ -> failwith "impossible: reference")
@@ -678,11 +677,18 @@ let lookup_step (cek : state) (m : memo_t) : state = raw_step (try_match_memo ce
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let init_value (w : words) : value = value_at_depth w 0 in
   let cek = { c; e = Dynarray.map init_value e; k = init_value k; d = 0; r = None } in
+  let i = ref 0 in
   let rec exec cek =
     (*print_state cek "debug_state";*)
-    exec (raw_step cek m)
+    i := !i + 1;
+    exec (memo_step cek m)
   in
   try exec (memo_step cek m)
   with DoneExc ->
+<<<<<<< HEAD
     assert (Dynarray.length cek.e = 1);
+=======
+    assert (Dynarray.length cek.e == 1);
+    print_endline ("took " ^ string_of_int !i ^ " step");
+>>>>>>> 3e5ec43 (save)
     (Dynarray.get_last cek.e).seq
