@@ -46,7 +46,7 @@ module TestMonoidHash (M : Hash.MonoidHash) = struct
           let init = hash @@ List.hd hl in
           List.exists (fun h -> hash h <> init) hl)
         list
-    then failwith "hash is not deterministic";
+    then failwith "hash is not deterministic"
 end
 
 let _ =
