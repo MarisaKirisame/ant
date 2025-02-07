@@ -8,6 +8,7 @@ module type MonoidHash = sig
   val eq : t -> t -> bool
   val cmp : t -> t -> int
   val from_int : int -> t
+  val name: string
 end
 
 module SL2 : MonoidHash = struct
@@ -22,6 +23,8 @@ module SL2 : MonoidHash = struct
   external hash : t -> int = "sl2_hash_stub"
 
   let unit = __unit ()
+
+  let name = "SL2"
 end
 
 module MCRC32C : MonoidHash = struct
@@ -37,6 +40,8 @@ module MCRC32C : MonoidHash = struct
   let valid _ = true
   let eq x y = Int64.equal x y
   let cmp x y = Int64.compare x y
+
+  let name = "MCRC32C"
 end
 
 module DebugHash : MonoidHash = struct
@@ -54,4 +59,6 @@ module DebugHash : MonoidHash = struct
   let hash x = Hashtbl.hash (to_list x)
   let eq x y = to_list x = to_list y
   let cmp x y = compare (to_list x) (to_list y)
+
+  let name = "DebugHash"
 end
