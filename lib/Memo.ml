@@ -10,7 +10,10 @@
 open BatFingerTree
 open Word
 open Common
-module Hasher = Hash.SL2
+
+(*module Hasher = Hash.MCRC32C*)
+(*module Hasher = Hash.SL2*)
+module Hasher = Hash.DebugHash
 module Hashtbl = Core.Hashtbl
 
 type env = value Dynarray.t
@@ -504,7 +507,9 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
               assert (rs.r == Building);
               rs.r <- Evaluating bh;
               n.progress.enter rs
-          | Some m -> enter_new_memo_aux rs m true)
+          | Some m ->
+              print_endline "hit!";
+              enter_new_memo_aux rs m true)
       | None ->
           if matched then (
             assert (rs.r == Building);
