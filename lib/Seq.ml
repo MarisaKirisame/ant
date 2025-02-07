@@ -33,7 +33,7 @@ let monoid : measure monoid =
 let constructor_degree_table : int Dynarray.t = Dynarray.create ()
 
 let set_constructor_degree (ctag : int) (degree : int) : unit =
-  assert (Dynarray.length constructor_degree_table == ctag);
+  assert (Dynarray.length constructor_degree_table = ctag);
   Dynarray.add_last constructor_degree_table degree
 
 let measure (w : Word.t) : measure =
@@ -51,7 +51,7 @@ let from_constructor (ctag : int) : seq = Generic.singleton (Word.make Word.cons
 let from_int (i : int) : seq = Generic.singleton (Word.make Word.int_tag i)
 
 let to_int (s : seq) : int =
-  assert (Generic.size s == 1);
+  assert (Generic.size s = 1);
   Generic.head_exn s
 
 let summary (s : seq) : measure = Generic.measure ~monoid ~measure s
