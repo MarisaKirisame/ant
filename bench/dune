@@ -2,4 +2,4 @@
  (name bench_ant)
  (public_name bench_ant)
  (link_flags -linkall)
- (libraries ant core_bench core_bench.inline_benchmarks))
+ (libraries ant core_bench core_bench.inline_benchmarks cmdliner))
