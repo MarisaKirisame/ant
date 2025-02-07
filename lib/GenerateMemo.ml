@@ -61,7 +61,7 @@ let ant_pp_ocaml_adt adt_name ctors =
     ^ String.concat " | "
         (List.map
            (fun (con_name, types) ->
-             if List.length types == 0 then con_name
+             if List.length types = 0 then con_name
              else
                con_name ^ " of "
                ^ String.concat " * "
@@ -105,7 +105,7 @@ let ant_pp_adt_ffi e adt_name ctors =
         (List.map
            (fun (con_name, types) ->
              let args = List.mapi (fun i _ -> "x" ^ string_of_int i) types in
-             (if List.length types == 0 then con_name else con_name ^ "(" ^ String.concat ", " args ^ ")")
+             (if List.length types = 0 then con_name else con_name ^ "(" ^ String.concat ", " args ^ ")")
              ^ " -> " ^ adt_name ^ "_" ^ con_name ^ " " ^ String.concat " " args)
            ctors))
   ^^ break 1
@@ -118,7 +118,7 @@ let ant_pp_adt_ffi e adt_name ctors =
                 string_of_int (Hashtbl.find_exn e.ctag con_name)
                 ^ " -> "
                 ^
-                if List.length types == 0 then con_name
+                if List.length types = 0 then con_name
                 else
                   "let ["
                   ^ String.concat ";" (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
