@@ -8,7 +8,7 @@ module type MonoidHash = sig
   val eq : t -> t -> bool
   val cmp : t -> t -> int
   val from_int : int -> t
-  val name: string
+  val name : string
 end
 
 module SL2 : MonoidHash = struct
@@ -23,7 +23,6 @@ module SL2 : MonoidHash = struct
   external hash : t -> int = "sl2_hash_stub"
 
   let unit = __unit ()
-
   let name = "SL2"
 end
 
@@ -39,7 +38,6 @@ module SL2Slow : MonoidHash = struct
   external hash : t -> int = "sl2_slow_hash_stub"
 
   let unit = __unit ()
-
   let name = "SL2Slow"
 end
 
@@ -56,7 +54,6 @@ module MCRC32C : MonoidHash = struct
   let valid _ = true
   let eq x y = Int64.equal x y
   let cmp x y = Int64.compare x y
-
   let name = "MCRC32C"
 end
 
@@ -67,14 +64,17 @@ module DebugHash : MonoidHash = struct
     match t with Empty -> acc | Single i -> i :: acc | Mult (x, y) -> to_list_aux x (to_list_aux y acc)
 
   let to_list t = to_list_aux t []
-  
   let unit = Empty
   let from_int i = Single i
   let mul x y = Mult (x, y)
   let valid _ = true
-  let hash x = Hashtbl.hash (to_list x)
+
+  let hash x =
+    let s = Core.Hash.alloc () in
+    let s = List.fold_left (fun acc i -> Core.Hash.fold_int acc i) s (to_list x) in
+    Core.Hash.get_hash_value s
+
   let eq x y = to_list x = to_list y
   let cmp x y = compare (to_list x) (to_list y)
-
   let name = "DebugHash"
 end
