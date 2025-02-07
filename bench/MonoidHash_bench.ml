@@ -19,19 +19,22 @@ let bench_monoid_hash () =
              Core.Staged.stage (fun () ->
                  for i = 0 to len - 1 do
                    acc.contents <- mul acc.contents (from_int i)
-                 done));
+                 done;
+                 ignore @@ hash acc.contents));
          Bench.Test.create_indexed ~name:"MCRC32C" ~args (fun len ->
              let open Hash.MCRC32C in
              let acc = ref unit in
              Core.Staged.stage (fun () ->
                  for i = 0 to len - 1 do
                    acc.contents <- mul acc.contents (from_int i)
-                 done));
+                 done;
+                 ignore @@ hash acc.contents));
          Bench.Test.create_indexed ~name:"DebugHash" ~args (fun len ->
              let open Hash.DebugHash in
              let acc = ref unit in
              Core.Staged.stage (fun () ->
                  for i = 0 to len - 1 do
                    acc.contents <- mul acc.contents (from_int i)
-                 done));
+                 done;
+                 ignore @@ hash acc.contents));
        ])
