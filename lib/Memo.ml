@@ -10,10 +10,10 @@
 open BatFingerTree
 open Word
 open Common
+module Hasher = Hash.MCRC32C
 
-(*module Hasher = Hash.MCRC32C*)
 (*module Hasher = Hash.SL2*)
-module Hasher = Hash.DebugHash
+(*module Hasher = Hash.DebugHash*)
 module Hashtbl = Core.Hashtbl
 
 type env = value Dynarray.t
@@ -294,9 +294,12 @@ and path_compress_reference (rs : record_state) (r : reference) : seq =
     let v = path_compress_value rs v in
     set_value_rs rs r.src v;
     slice v.seq r.offset r.values_count)
-  else Generic.Single (Reference r)
+  else (
+    failwith "here";
+    Generic.Single (Reference r))
 
 let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq =
+  print_endline "add_to_store";
   let v = { depth = rs.m.d; seq; compressed_since = 0; fetch_length } in
   let r =
     { src = S (Dynarray.length rs.s); offset = 0; values_count = (Generic.measure ~monoid ~measure seq).degree }
@@ -306,10 +309,9 @@ let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq 
 
 (*move a value from depth x to depth x+1*)
 let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq) option =
-  (match req.src with S _ -> failwith "fetching from store!" | _ -> ());
   print_endline
-    ("fetching " ^ string_of_int req.word_count ^ " words from " ^ source_to_string req.src ^ " at depth "
-   ^ string_of_int rs.m.d);
+    ("fetching " ^ string_of_int req.word_count ^ " words from " ^ source_to_string req.src ^ " offset "
+   ^ string_of_int req.offset ^ " at depth " ^ string_of_int rs.m.d);
   (* Only value at the right depth can be fetched. 
    * If higher depth, it is already fetched so pointless to fetch again.
    * If lower depth, it is not fetched by the last level so we cannot trepass.
@@ -319,14 +321,17 @@ let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq)
   let x, y = pop_n v.seq req.offset in
   let words, rest =
     Generic.split ~monoid ~measure
-      (fun m -> not (match m.full with None -> false | Some m -> req.word_count <= m.length))
+      (fun m -> not (match m.full with None -> false | Some m -> m.length <= req.word_count))
       y
   in
   let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
-  if (not (Generic.is_empty rest)) && length <> req.word_count then
+    if (not (Generic.is_empty rest)) && length <> req.word_count then (
+      assert (length <= req.word_count);
+    print_endline "fetch fail";
     (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
-    None
-  else
+    None)
+  else (
+    print_endline "fetch ok!";
     let transformed_x = if Generic.is_empty x then Generic.empty else add_to_store rs x v.fetch_length in
     let transformed_rest =
       if Generic.is_empty rest then Generic.empty (*todo: match in the reverse direction*)
@@ -337,7 +342,7 @@ let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq)
     let seq = Generic.append ~monoid ~measure transformed_x (Generic.append ~monoid ~measure words transformed_rest) in
     assert ((Generic.measure ~monoid ~measure seq).degree = (Generic.measure ~monoid ~measure v.seq).degree);
     set_value_rs rs req.src { depth = v.depth + 1; fetch_length = v.fetch_length; seq; compressed_since = rs.f };
-    Some ({ fetched = words; have_prefix = Generic.is_empty x; have_suffix = Generic.is_empty rest }, seq)
+    Some ({ fetched = words; have_prefix = Generic.is_empty x; have_suffix = Generic.is_empty rest }, seq))
 
 let init_fetch_length () : int ref = ref 1
 
@@ -545,7 +550,9 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
           register_memo_need_unfetched s { src = ref.src; offset = ref.offset; word_count = !(r_v.fetch_length) }
         with
         | Some (fr, seq) -> (
-            if fr.have_suffix then r_v.fetch_length := !(r_v.fetch_length) * 2;
+            if fr.have_suffix then (
+              print_endline ("have_suffix, fetchlength " ^ string_of_int !(r_v.fetch_length));
+              r_v.fetch_length := !(r_v.fetch_length) * 2);
             let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
             let rest = Generic.append ~monoid ~measure seq_tl tl in
             match seq_hd with Word w -> Some (w, rest) | Reference _ -> failwith "impossible: reference")
@@ -673,9 +680,9 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let cek = { c; e = Dynarray.map init_value e; k = init_value k; d = 0; r = None } in
   let rec exec cek =
     (*print_state cek "debug_state";*)
-    exec (memo_step cek m)
+    exec (raw_step cek m)
   in
-  try exec cek
+  try exec (memo_step cek m)
   with DoneExc ->
     assert (Dynarray.length cek.e = 1);
     (Dynarray.get_last cek.e).seq
