@@ -33,15 +33,15 @@ value m_crc32c_mul_stub(value a, value b) {
 
 value m_crc32c_from_int_stub(value a) {
   CAMLparam1(a);
-  int i = Int_val(a);
-  m_crc32c_t res = m_crc32c_fold_bytes((const void *)&i, 4);
+  int64_t i = Long_val(a);
+  m_crc32c_t res = m_crc32c_fold_bytes((const void *)&i, sizeof(i));
   CAMLreturn(m_crc32c_encode_i64(res));
 }
 
 value m_crc32c_from_char_stub(value a) {
   CAMLparam1(a);
   char c = Int_val(a);
-  m_crc32c_t res = m_crc32c_fold_bytes(&c, 1);
+  m_crc32c_t res = m_crc32c_fold_bytes(&c, sizeof(c));
   CAMLreturn(m_crc32c_encode_i64(res));
 }
 
