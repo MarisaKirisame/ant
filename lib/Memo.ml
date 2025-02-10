@@ -56,7 +56,15 @@ and kont = value
  * Values also have their own individual depth, which denote when they are created/last fetched.
  *)
 and depth_t = int
-and state = { mutable c : exp; mutable e : env; mutable k : kont; d : depth_t; mutable r : record_state option }
+
+and state = {
+  mutable c : exp;
+  mutable e : env;
+  mutable k : kont;
+  d : depth_t;
+  mutable sc : int;
+  mutable r : record_state option;
+}
 
 (* The Reference
  * To track whether a fragment is fetched or unfetched,
@@ -405,17 +413,24 @@ and get_enter (s : state) : record_state -> state =
   let c = strip_c s.c in
   let e = Dynarray.map (fun v -> v.seq) s.e in
   let k = s.k.seq in
+  let r = Option.get s.r in
+  assert (s.sc >= r.m.sc);
+  let scd = s.sc - r.m.sc in
+  assert (scd >= 0);
   fun rs ->
     let depth = rs.m.d + 1 in
     let seq_to_value s = { seq = s; depth; fetch_length = init_fetch_length (); compressed_since = 0 } in
-    { c; e = Dynarray.map seq_to_value e; k = seq_to_value k; d = depth; r = Some rs }
+    { c; e = Dynarray.map seq_to_value e; k = seq_to_value k; d = depth; sc = rs.m.sc + scd; r = Some rs }
 
 and record_memo_exit (s : state) : state =
   let r = Option.get s.r in
   (match r.r with
   | Evaluating ev -> ( match !ev with BlackHole -> ev := Unknown | _ -> ())
   | Reentrance _ | Building -> ());
-  unshift_all s
+  let unshifted = unshift_all s in
+  assert (s.sc >= unshifted.sc);
+  unshifted.sc <- s.sc;
+  unshifted
 
 and get_done (s : state) : done_t =
   let p = get_progress s in
@@ -424,7 +439,7 @@ and get_done (s : state) : done_t =
 (* Stepping require an unfetched fragment. register the current state.
  * Note that the reference in request does not refer to value in s, but value one level down.
  *)
-let register_memo_need_unfetched (s : state) (req : fetch_request) : (fetch_result * seq) option =
+let register_memo_need_unfetched (s : state) (req : fetch_request) : seq option =
   let r = Option.get s.r in
   let lookup =
     match r.r with
@@ -451,7 +466,7 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : (fetch_resu
       (*print_endline ("new entry when " ^ source_to_string req.src ^ " word length " ^ string_of_int req.word_count);*)
       Hashtbl.add_exn lookup ~key:(fr_to_fh fr) ~data:bh;
       r.r <- Evaluating bh;
-      Some (fr, seq)
+      Some seq
   | None -> None
 
 let lift_c (c : exp) : exp = c
@@ -472,13 +487,14 @@ let rec print_stacktrace (s : state) : unit =
   match s.r with Some s -> print_stacktrace s.m | _ -> ()
 
 let rec enter_new_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) true 0
+  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) true None 0
 
 (*only enter if there is an existing entries. this is cheaper then enter_new_memo.*)
 and try_match_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) false 0
+  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = Building } (Array.get m s.c.pc) false None 0
 
-and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool) (depth : int) : state =
+and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool) (p : progress_t option) (depth : int)
+    : state =
   match !m with
   | BlackHole ->
       print_stacktrace rs.m;
@@ -490,35 +506,42 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
       d.skip rs
   | Unknown ->
       if matched then (
-        m := BlackHole;
-        assert (rs.r = Building);
-        rs.r <- Evaluating m;
-        {
-          c = lift_c rs.m.c;
-          e = Dynarray.init (Dynarray.length rs.m.e) (fun i -> lift_value (E i) rs.m.d);
-          k = lift_value K rs.m.d;
-          d = rs.m.d + 1;
-          r = Some rs;
-        })
+        match p with
+        | None ->
+            m := BlackHole;
+            assert (rs.r = Building);
+            rs.r <- Evaluating m;
+            {
+              c = lift_c rs.m.c;
+              e = Dynarray.init (Dynarray.length rs.m.e) (fun i -> lift_value (E i) rs.m.d);
+              k = lift_value K rs.m.d;
+              d = rs.m.d + 1;
+              sc = rs.m.sc;
+              r = Some rs;
+            }
+        | Some p ->
+            failwith "here";
+            rs.r <- Reentrance !m;
+            p.enter rs)
       else rs.m
   | Need n -> (
       match fetch_value rs n.request with
       | Some (fr, _) -> (
           match Hashtbl.find n.lookup (fr_to_fh fr) with
           | None ->
-              (*print_endline ("new entry at memo depth " ^ string_of_int depth);*)
+              print_endline ("new entry " ^ request_to_string n.request ^ " at memo depth " ^ string_of_int depth);
               let bh = ref BlackHole in
               Hashtbl.add_exn n.lookup ~key:(fr_to_fh fr) ~data:bh;
               assert (rs.r = Building);
               rs.r <- Evaluating bh;
               n.progress.enter rs
-          | Some m -> enter_new_memo_aux rs m true (depth + 1))
+          | Some m -> enter_new_memo_aux rs m true (Some n.progress) (depth + 1))
       | None ->
           if matched then (
             assert (rs.r = Building);
             rs.r <- Reentrance !m;
-            (*print_endline
-              ("request " ^ request_to_string n.request ^ " failed, entering memo depth " ^ string_of_int depth);*)
+            print_endline
+              ("request " ^ request_to_string n.request ^ " failed, entering memo depth " ^ string_of_int depth);
             n.progress.enter rs)
           else rs.m)
 
@@ -549,7 +572,7 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
         match
           register_memo_need_unfetched s { src = ref.src; offset = ref.offset; word_count = !(r_v.fetch_length) }
         with
-        | Some (fr, seq) -> (
+        | Some seq -> (
             let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
             let rest = Generic.append ~monoid ~measure seq_tl tl in
             match seq_hd with Word w -> Some (w, rest) | Reference _ -> failwith "impossible: reference")
@@ -580,7 +603,7 @@ let rec exec_done (s : state) : 'a =
       | Evaluating ev -> ( match !ev with BlackHole -> ev := Done (get_done s) | _ -> failwith "exec_done impossible")
       | Reentrance _ -> ()
       | _ -> failwith "exec_done impossible");
-      exec_done (unshift_all s)
+      exec_done (record_memo_exit s)
   | None -> raise DoneExc
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
@@ -652,11 +675,15 @@ let get_next_cont (seqs : seq) : seq =
   let splitted = splits seqs in
   List.hd (List.rev splitted)
 
+let stepped (x : state) =
+  x.sc <- x.sc + 1;
+  x
+
 let return_n (s : state) (n : int) (return_exp : exp) : state =
   assert (Dynarray.length s.e = n);
   s.e <- Dynarray.of_list [ Dynarray.get_last s.e ];
   s.c <- return_exp;
-  s
+  stepped s
 
 let drop_n (s : state) (e : int) (n : int) (return_exp : exp) : state =
   assert (Dynarray.length s.e = e);
@@ -670,7 +697,7 @@ let drop_n (s : state) (e : int) (n : int) (return_exp : exp) : state =
   loop 0;
   Dynarray.add_last s.e last;
   s.c <- return_exp;
-  s
+  stepped s
 
 let assert_env_length (s : state) (e : int) : unit =
   let l = Dynarray.length s.e in
@@ -678,20 +705,30 @@ let assert_env_length (s : state) (e : int) : unit =
   assert (l = e)
 
 let raw_step (cek : state) (_ : memo_t) : state = cek.c.step cek
-let memo_step (cek : state) (m : memo_t) : state = raw_step (enter_new_memo cek m) m
+
+let memo_step (cek : state) (m : memo_t) : state =
+  let before_step = cek.sc in
+  let cek = enter_new_memo cek m in
+  if cek.sc > before_step then cek else raw_step cek m
+
 let lookup_step (cek : state) (m : memo_t) : state = raw_step (try_match_memo cek m) m
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let init_value (w : words) : value = value_at_depth w 0 in
-  let cek = { c; e = Dynarray.map init_value e; k = init_value k; d = 0; r = None } in
+  let cek = { c; e = Dynarray.map init_value e; k = init_value k; d = 0; sc = 0; r = None } in
   let i = ref 0 in
   let rec exec cek =
     (*print_state cek "debug_state";*)
     i := !i + 1;
     exec (memo_step cek m)
   in
-  try exec (memo_step cek m)
+  try exec cek
   with DoneExc ->
     assert (Dynarray.length cek.e = 1);
-    print_endline ("took " ^ string_of_int !i ^ " step");
+    print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int cek.sc ^ " step.");
     (Dynarray.get_last cek.e).seq
+
+let resolve_failed (cek : state) (m : memo_t) : state =
+  let before_step = (Option.get cek.r).m.sc in
+  let cek = record_memo_exit cek in
+  if cek.sc > before_step then cek else raw_step cek m
