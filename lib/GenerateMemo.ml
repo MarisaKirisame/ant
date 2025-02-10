@@ -263,7 +263,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
               ("(fun x -> assert_env_length x " ^ string_of_int s.env_length ^ "; " ^ "push_env x ("
              ^ "Dynarray.get x.e " ^ string_of_int loc ^ ");" ^ "x.c <- pc_to_exp "
               ^ string_of_int (k.k (push_s s))
-              ^ ";" ^ " x)"),
+              ^ ";" ^ " stepped x)"),
             pc ))
   | Match (value, cases) ->
       ant_pp_expr ctx s value { k = (fun s -> ant_pp_cases ctx (dup_s s) cases k); fv = fv_cases cases (dup_fv k.fv) }
@@ -275,7 +275,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
               ^ string_of_int (Hashtbl.find_exn ctx.ctag cname)
               ^ ") x.d)); x.c <- pc_to_exp "
               ^ string_of_int (k.k (push_s s))
-              ^ "; x)"),
+              ^ "; stepped x)"),
             pc ))
   | App (App (Ctor cname, [ x0 ]), [ x1 ]) ->
       ant_pp_expr ctx s x0
@@ -298,7 +298,8 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
 
                           ( string ("(fun x -> assert_env_length x " ^ string_of_int s.env_length ^ "; ")
                             ^^ let_x1 ^^ let_x0 ^^ add_last
-                            ^^ string ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s (pop_s (pop_s s)))) ^ "; x)"),
+                            ^^ string
+                                 ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s (pop_s (pop_s s)))) ^ "; stepped x)"),
                             pc )));
                   fv = k.fv;
                 });
@@ -315,7 +316,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
         ^^ string (string_of_int keep_length)
         ^^ string " tl; x.k <- value_at_depth (get_next_cont tl) x.d; x.c <- pc_to_exp "
         ^^ string (string_of_int (k.k (push_s keep_s)))
-        ^^ string "; x)");
+        ^^ string "; stepped x)");
       ant_pp_expr ctx s x
         {
           k =
@@ -328,7 +329,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                       ^ string_of_int (Hashtbl.find_exn ctx.ctag cont_name)
                       ^ "; keep; x.k.seq]) x.d; x.c <- pc_to_exp "
                       ^ string_of_int (Hashtbl.find_exn ctx.func_pc "list_incr")
-                      ^ "; x)"),
+                      ^ "; stepped x)"),
                     pc )));
           fv = k.fv;
         }
@@ -351,13 +352,14 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                       add_code_k (fun pc ->
                           ( string ("(fun x -> assert_env_length x " ^ string_of_int s.env_length ^ "; match ")
                             ^^ x0
-                            ^^ string " with  | None -> raw_step (record_memo_exit x) memo | Some (x0, _) -> match "
+                            ^^ string " with  | None -> resolve_failed x memo | Some (x0, _) -> match "
                             ^^ x1
                             ^^ string
-                                 " with None -> raw_step (record_memo_exit x) memo | Some (x1, _) -> \
-                                  (Dynarray.remove_last x.e;Dynarray.remove_last x.e;"
+                                 " with None -> resolve_failed x memo | Some (x1, _) -> (Dynarray.remove_last \
+                                  x.e;Dynarray.remove_last x.e;"
                             ^^ add_last
-                            ^^ string ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s (pop_s (pop_s s)))) ^ "; x))"),
+                            ^^ string
+                                 ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s (pop_s (pop_s s)))) ^ "; stepped x))"),
                             pc )));
                   fv = fv_expr x1 (dup_fv k.fv);
                 });
@@ -368,7 +370,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
       add_code_k (fun pc ->
           ( string ("(fun x -> assert_env_length x " ^ string_of_int s.env_length ^ "; ")
             ^^ add_last
-            ^^ string ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s s)) ^ "; x)"),
+            ^^ string ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s s)) ^ "; stepped x)"),
             pc ))
   | _ -> failwith ("ant_pp_expr: " ^ show_expr c)
 
@@ -379,8 +381,8 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : p
          ^ "let last = (Dynarray.get_last x.e).seq in ")
         ^^ break 1
         ^^ string
-             "match (resolve_seq x last) with | None -> raw_step (record_memo_exit x) memo | Some (hd, tl) -> \
-              Dynarray.remove_last x.e;"
+             "match (resolve_seq x last) with | None -> resolve_failed x memo | Some (hd, tl) -> Dynarray.remove_last \
+              x.e;"
         ^^ break 1
         ^^ string " (match Word.get_value hd with "
         ^^ (let s = pop_s s in
@@ -408,7 +410,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : p
                                 expr
                                 { k = (fun s -> drop s [ x1; x0 ] k); fv = k.fv })
                          ^ ";")
-                    ^^ string " x)"
+                    ^^ string "stepped x)"
                 | _ -> failwith (show_pattern pat))
               c)
         ^^ string "))",
@@ -445,8 +447,8 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
 let generate_apply_cont ctx =
   set_code apply_cont
     (string
-       "(fun x -> assert_env_length x 1; match resolve_seq x x.k.seq with | None -> raw_step (record_memo_exit x) memo \
-        | Some (hd, tl) -> match Word.get_value hd with "
+       "(fun x -> assert_env_length x 1; match resolve_seq x x.k.seq with | None -> resolve_failed x memo | Some (hd, \
+        tl) -> match Word.get_value hd with "
     ^^ separate_map (break 1)
          (fun (name, action) ->
            string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ") ^^ action ^^ string " x tl")
