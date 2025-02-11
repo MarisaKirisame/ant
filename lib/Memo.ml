@@ -499,7 +499,7 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : seq option 
     | Evaluating ev -> (
         match !ev with
         | BlackHole | Unknown ->
-            print_endline ("fill, pc " ^ string_of_int s.c.pc);
+            (*print_endline ("fill, pc " ^ string_of_int s.c.pc);*)
             let lookup = Hashtbl.create (module Core.Int) in
             ev := Need { request = req; lookup; progress = get_progress s };
             lookup
@@ -518,7 +518,7 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : seq option 
   match fetch_value r req with
   | Some (fr, seq) ->
       let bh = ref BlackHole in
-      print_endline ("new entry when " ^ source_to_string req.src ^ " word length " ^ string_of_int req.word_count);
+      (*print_endline ("new entry when " ^ source_to_string req.src ^ " word length " ^ string_of_int req.word_count);*)
       Hashtbl.add_exn lookup ~key:(fr_to_fh fr) ~data:bh;
       r.r <- Evaluating bh;
       Some seq
@@ -584,7 +584,6 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
         | Some p ->
             assert (rs.r = Building);
             rs.r <- Evaluating m;
-            print_endline "enter!";
             p.enter rs)
       else rs.m
   | Need n -> (
@@ -592,7 +591,7 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
       | Some (fr, _) -> (
           match Hashtbl.find n.lookup (fr_to_fh fr) with
           | None ->
-              print_endline ("new entry " ^ request_to_string n.request ^ " at memo depth " ^ string_of_int depth);
+              (*print_endline ("new entry " ^ request_to_string n.request ^ " at memo depth " ^ string_of_int depth);*)
               let bh = ref BlackHole in
               Hashtbl.add_exn n.lookup ~key:(fr_to_fh fr) ~data:bh;
               assert (rs.r = Building);
@@ -604,8 +603,8 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
           if matched then (
             assert (rs.r = Building);
             rs.r <- Reentrance !m;
-            print_endline
-              ("request " ^ request_to_string n.request ^ " failed, entering memo depth " ^ string_of_int depth);
+            (*print_endline
+              ("request " ^ request_to_string n.request ^ " failed, entering memo depth " ^ string_of_int depth);*)
             n.progress.enter rs)
           else (
             print_endline "sad";
@@ -793,7 +792,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let rec exec cek =
     (*print_state cek "debug_state";*)
     i := !i + 1;
-    exec (memo_over cek m)
+    if !i mod 100 = 0 then exec (memo_step cek m) else exec (memo_over cek m)
   in
   try exec (enter_new_memo cek m)
   with DoneExc ->
