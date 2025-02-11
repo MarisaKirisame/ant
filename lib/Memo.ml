@@ -139,6 +139,8 @@ and memo_node_t =
   | Need of { request : fetch_request; lookup : lookup_t; progress : progress_t }
   (* We know there is no more fetch to be done, as the machine evaluate to a value state. *)
   | Done of done_t
+  (* We know a bit, but the evaluation is ended prematurely. Still it is better to skip to there. *)
+  | Halfway of progress_t
   (* We know nothing about what's gonna happen. Will switch to Need or Done.
    * Another design is to always force it to be a Need/Done before hand.
    *)
@@ -388,13 +390,14 @@ let unshift_c (s : state) : exp = s.c
 
 let unshift_all (s : state) : state =
   let r = Option.get s.r in
-  (* since c is an int theres no shifting needed. todo: make this resilient to change in type *)
   let c = unshift_c s in
   let e = Dynarray.map (fun v -> unshift_value r v) s.e in
   let k = unshift_value r s.k in
   r.m.c <- c;
   r.m.e <- e;
   r.m.k <- k;
+  assert (r.m.sc <= s.sc);
+  r.m.sc <- s.sc;
   r.m
 
 let strip_c (c : exp) : exp = c
@@ -427,14 +430,27 @@ and record_memo_exit (s : state) : state =
   (match r.r with
   | Evaluating ev -> ( match !ev with BlackHole -> ev := Unknown | _ -> ())
   | Reentrance _ | Building -> ());
-  let unshifted = unshift_all s in
-  assert (s.sc >= unshifted.sc);
-  unshifted.sc <- s.sc;
-  unshifted
+  unshift_all s
 
 and get_done (s : state) : done_t =
   let p = get_progress s in
   { skip = (fun rs -> p.exit (p.enter rs)) }
+
+let rebase_value (rs : record_state) (v : value) : value = todo "rebase_value"
+
+let rebase (rs : record_state) : record_state =
+  assert (rs.r = Building);
+  let rsmr = Option.get rs.m.r in
+  (match rsmr.r with
+  | Evaluating ev -> (
+      match !ev with
+      | BlackHole | Unknown | Halfway _ ->
+          ev := Halfway (get_progress rs.m);
+          ev := Unknown)
+  | Reentrance _ -> failwith "reentrance"
+  | Building _ -> failwith "building");
+  let rsm = unshift_all rs.m in
+  { m = rsm; f = rs.f; s = Dynarray.map (rebase_value rs) rs.s; r = Building }
 
 (* Stepping require an unfetched fragment. register the current state.
  * Note that the reference in request does not refer to value in s, but value one level down.
@@ -446,24 +462,26 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : seq option 
     | Evaluating ev -> (
         match !ev with
         | BlackHole | Unknown ->
+            print_endline ("fill, pc " ^ string_of_int s.c.pc);
             let lookup = Hashtbl.create (module Core.Int) in
             ev := Need { request = req; lookup; progress = get_progress s };
             lookup
         | Need _ -> failwith "impossible case: Need"
-        | Done _ -> failwith "impossible case: Done")
+        | Done _ -> failwith "impossible case: Done"
+        | Halfway _ -> failwith "impossible case: Done")
     | Reentrance re -> (
         match re with
         | Need n ->
-            if req <> n.request then print_endline (request_to_string req ^ " " ^ request_to_string n.request) else ();
+            (*if req <> n.request then print_endline (request_to_string req ^ " " ^ request_to_string n.request) else ();*)
             assert (req = n.request);
             n.lookup
-        | BlackHole | Unknown | Done _ -> failwith "register_memo_need_unfetched impossible")
+        | BlackHole | Unknown | Done _ | Halfway _ -> failwith "register_memo_need_unfetched impossible")
     | Building -> failwith "register_memo_need_unfetched impossible"
   in
   match fetch_value r req with
   | Some (fr, seq) ->
       let bh = ref BlackHole in
-      (*print_endline ("new entry when " ^ source_to_string req.src ^ " word length " ^ string_of_int req.word_count);*)
+      print_endline ("new entry when " ^ source_to_string req.src ^ " word length " ^ string_of_int req.word_count);
       Hashtbl.add_exn lookup ~key:(fr_to_fh fr) ~data:bh;
       r.r <- Evaluating bh;
       Some seq
@@ -496,18 +514,25 @@ and try_match_memo (s : state) (m : memo_t) : state =
 and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool) (p : progress_t option) (depth : int)
     : state =
   match !m with
-  | BlackHole ->
+  | Halfway p ->
+      assert (rs.r = Building);
+      rs.r <- Evaluating m;
+      failwith "halfway";
+      p.enter rs
+  (*| BlackHole ->
       print_stacktrace rs.m;
-      failwith "Blackhole detected"
+      failwith "Blackhole detected"*)
   | Done d ->
       (*todo: d.skip should allow rs.r to be in whatever state as it is done.*)
       assert (rs.r = Building);
       rs.r <- Reentrance !m;
       d.skip rs
-  | Unknown ->
+  | Unknown | BlackHole ->
       if matched then (
         match p with
         | None ->
+            (*print_endline ("no entry! pc: " ^ string_of_int rs.m.c.pc);*)
+            (*print_endline "new"; Werid - this is the most frequent state by an extreme amount*)
             m := BlackHole;
             assert (rs.r = Building);
             rs.r <- Evaluating m;
@@ -520,8 +545,9 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
               r = Some rs;
             }
         | Some p ->
-            failwith "here";
-            rs.r <- Reentrance !m;
+            assert (rs.r = Building);
+            rs.r <- Evaluating m;
+            print_endline "enter!";
             p.enter rs)
       else rs.m
   | Need n -> (
@@ -537,13 +563,16 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool
               n.progress.enter rs
           | Some m -> enter_new_memo_aux rs m true (Some n.progress) (depth + 1))
       | None ->
+          (*enter_new_memo_aux (rebase rs) m matched p depth*)
           if matched then (
             assert (rs.r = Building);
             rs.r <- Reentrance !m;
             print_endline
               ("request " ^ request_to_string n.request ^ " failed, entering memo depth " ^ string_of_int depth);
             n.progress.enter rs)
-          else rs.m)
+          else (
+            print_endline "sad";
+            rs.m))
 
 (* A single transition step should:
  *   0   - Start with a sequence of resolve
@@ -711,6 +740,13 @@ let memo_step (cek : state) (m : memo_t) : state =
   let cek = enter_new_memo cek m in
   if cek.sc > before_step then cek else raw_step cek m
 
+let memo_over (cek : state) (m : memo_t) : state =
+  let before_step = cek.sc in
+  let before_depth = cek.d in
+  let cek = enter_new_memo cek m in
+  let cek = if cek.d > before_depth then record_memo_exit cek else cek in
+  if cek.sc > before_step then cek else raw_step cek m
+
 let lookup_step (cek : state) (m : memo_t) : state = raw_step (try_match_memo cek m) m
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
@@ -720,9 +756,9 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let rec exec cek =
     (*print_state cek "debug_state";*)
     i := !i + 1;
-    exec (memo_step cek m)
+    exec (memo_over cek m)
   in
-  try exec cek
+  try exec (enter_new_memo cek m)
   with DoneExc ->
     assert (Dynarray.length cek.e = 1);
     print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int cek.sc ^ " step.");
