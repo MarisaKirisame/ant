@@ -222,6 +222,14 @@ let fr_to_fh (fr : fetch_result) : fetch_hash =
   (*print_endline ("hash: " ^ string_of_int ret);*)
   ret
 
+(* 
+   Pop a specific number of elements from the seq represented by a finger tree
+   The count is determined by the `n`. All the elements with a `max_degree` less than `n` are popped.
+   Return a 2-tuple of
+    - a seq consisting of the popped elements *and an element from the head of the rest seq*
+      as the last element to check some invariants
+    - the remained part of the original seq
+*)
 let pop_n (s : seq) (n : int) : seq * seq =
   assert (n >= 0);
   if n = 0 then (Generic.empty, s)
@@ -250,6 +258,7 @@ let pop_n (s : seq) (n : int) : seq * seq =
           in
           (l, r))
 
+(* Slice a seq with a given `offset` and `values_count` with `pop_n` *)
 let slice (seq : seq) (offset : int) (values_count : int) : seq =
   let m = Generic.measure ~monoid ~measure seq in
   assert (m.degree = m.max_degree);
@@ -260,6 +269,15 @@ let slice (seq : seq) (offset : int) (values_count : int) : seq =
   let y, _ = pop_n x values_count in
   y
 
+(*
+  Get a value in `rs` with given `src`.
+  Depending on the `src`, the value is fetched:
+    - E i: from the env of the state inside the record_state.
+           (not the env of the state which contains the record_state,
+           because it is in a deeper depth and not corresponding to the current record_state)
+    - S i: from the store of the record_state
+    - K: the kont of the state inside the record_state, same as E i
+*)
 let get_value_rs (rs : record_state) (src : source) : value =
   match src with E i -> Dynarray.get rs.m.e i | S i -> Dynarray.get rs.s i | K -> rs.m.k
 
@@ -272,6 +290,12 @@ let set_value_rs (rs : record_state) (src : source) (v : value) : unit =
 let set_value (s : state) (src : source) (v : value) : unit =
   match src with E i -> Dynarray.set s.e i v | S _ -> failwith "set_value impossible" | K -> s.k <- v
 
+(*
+  Get a value in `rs` with given `src` and path-compress it.
+  a value at depth 0 is trivially compressed.
+  If the value is at depth + 1, directly do that with current record_state,
+  otherwise, it's at depth, then we get the record_state of the previous depth and compress it.
+*)
 let rec path_compress (rs : record_state) (src : source) : value =
   let v = get_value_rs rs src in
   let new_v =
@@ -283,13 +307,20 @@ let rec path_compress (rs : record_state) (src : source) : value =
   set_value_rs rs src new_v;
   new_v
 
-(*given a last of depth x, value with depth x+1. path compress*)
+(*given a last of depth x, value with depth x+1. path compress
+  first we check if the value has been compressed;
+  if not, we call path_compress_seq on the seq of the value
+    and update the value with a more recent compressed_since value.
+*)
 and path_compress_value (rs : record_state) (v : value) : value =
   assert (v.depth = rs.m.d + 1);
-  if v.compressed_since = rs.f then v
-  else { seq = path_compress_seq rs v.seq; compressed_since = rs.f; depth = v.depth; fetch_length = v.fetch_length }
+  if v.compressed_since = rs.f then v else { v with seq = path_compress_seq rs v.seq; compressed_since = rs.f }
 
-(*path compressing a seq with depth x+1*)
+(*path compressing a seq with depth x+1
+  path compress a seq means find the first element without a full measure_t
+  and the element must be a reference, then compress the reference,
+  then recursively path compress the rest of the seq
+*)
 and path_compress_seq (rs : record_state) (x : seq) : seq =
   let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
   assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
@@ -300,7 +331,13 @@ and path_compress_seq (rs : record_state) (x : seq) : seq =
         (Generic.append ~monoid ~measure (path_compress_reference rs y) (path_compress_seq rs rest))
   | _ -> failwith "path_compress_seq impossible"
 
-(*path compressing reference of depth x+1*)
+(*path compressing reference of depth x+1
+  first obtain the value denoted by the reference,
+  then check the depth of the value:
+    if the depth is the same as the current depth, then the value is already compressed, return the slice of the value
+    otherwise, path compress it by getting the compressed value, update the reference to point to the compressed value,
+    and return the content in the value represented by the reference
+*)
 and path_compress_reference (rs : record_state) (r : reference) : seq =
   let v = get_value_rs rs r.src in
   if v.depth = rs.m.d + 1 then (
