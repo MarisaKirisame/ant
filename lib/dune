@@ -6,6 +6,7 @@
   Lexer
   Tokens
   Parser
+  Pat
   Syntax
   Tyck
   Seq
