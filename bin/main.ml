@@ -20,11 +20,12 @@ let parse content =
       Printf.eprintf "Lexing error at line %d, character %d: %s\n" line cnum @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input print_ast print_ant print_cek_ant tyck print_cps_transformed print_de print_cps_de =
+let driver input print_ast compile_pat print_ant print_cek_ant tyck print_cps_transformed print_de print_cps_de =
   let src = read_all input in
   let ast = parse src in
   let _ =
     if print_ast then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog ast);
+    if compile_pat then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog @@ Pat.compile pat);
     if print_ant then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_ant ast);
     if print_cek_ant then PPrint.ToChannel.pretty 0.8 80 stdout (GenerateMemo.pp_cek_ant ast);
     if tyck then PPrint.ToChannel.pretty 0.8 80 stdout (Tyck.pp_inferred (Tyck.infer_prog ast));
@@ -47,6 +48,10 @@ let print_ast =
 let print_ant =
   let doc = "Print the AST in ant" in
   Arg.(value & flag & info [ "a"; "print-ant" ] ~doc)
+
+let compile_pat =
+  let doc = "Compile the pattern" in
+  Arg.(value & flag & info [ "pat"; "compile-pat" ] ~doc)
 
 let print_cek_ant =
   let doc = "Print the AST in ant (CEK)" in
@@ -74,8 +79,8 @@ let cmd =
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
   Cmd.v info
     Term.(
-      const driver $ input $ print_ast $ print_ant $ print_cek_ant $ tyck $ print_cps_transformed $ print_de
-      $ print_cps_de)
+      const driver $ input $ print_ast $ compile_pat $ print_ant $ print_cek_ant $ tyck $ print_cps_transformed
+      $ print_de $ print_cps_de)
 
 let i = Cmd.eval cmd
 

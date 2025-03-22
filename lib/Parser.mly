@@ -88,14 +88,17 @@ rev_preceded_or_sep_llist1(D, X):
 // Grammar of the ant language
 
 pattern:
+  | "<ctor>" delimited_pattern { PApp ($1, Some $2) }
+  | delimited_pattern { $1 }
+  | pattern_comma_list %prec below_COMMA { PTup $1 }
+
+delimited_pattern:
+  | "<ctor>" { PApp ($1, None) }
   | "<int>" { PInt $1 }
   | "<bool>" { PBool $1 }
   | "<id>" { if $1 = "_" then PAny else PVar $1 }
-  | "<ctor>" { PApp ($1, None) }
-  | "<ctor>" pattern { PApp ($1, Some $2) }
   | "(" ")" { PUnit }
   | "(" pattern ")" { $2 }
-  | pattern_comma_list %prec below_COMMA { PTup $1 }
 
 simple_pattern:
   | "_" { PAny }
