@@ -11,11 +11,17 @@ module OccurrenceMap = Map.Make (struct
   let compare = compare
 end)
 
+module StringMap = Map.Make (struct
+  type t = string
+
+  let compare = String.compare
+end)
+
 type pattern_matrix = {
   arity : int;
   occs : occurrence list;
   bnds : string OccurrenceMap.t list;
-  pats : pattern list;
+  pats : pattern list list;
   acts : int list;
 }
 
@@ -76,4 +82,43 @@ let spec_row ctor n col occs row bnd =
       (List.flatten @@ List.mapi (fun i cell -> if i = n then cells else [ cell ]) row, OccurrenceMap.merge bnd new_bnd))
     kept
 
-let arity_of desc = match desc with PDInt _ -> 0 | PDBool _ -> 0 | PDUnit -> 0 | PDCtor (_, n) -> n | PDTuple n -> n
+let arity_of arity_map desc =
+  match desc with
+  | PDInt _ -> 0
+  | PDBool _ -> 0
+  | PDUnit -> 0
+  | PDCtor (s, _) -> (
+      match StringMap.find_opt s arity_map with
+      | Some n -> n
+      | None -> failwith ("Constructor " ^ s ^ " not found in arity map"))
+  | PDTuple n -> n
+
+let check_arity arity_map pat =
+  let compare_old_and_new s nu =
+    match StringMap.find_opt s arity_map with
+    | Some old when old = nu -> arity_map
+    | Some old -> failwith ("Arity mismatch for " ^ s ^ ": " ^ string_of_int old ^ " vs " ^ string_of_int nu)
+    | None -> StringMap.add s nu arity_map
+  in
+  match pat with
+  | PApp (ctor, None) -> compare_old_and_new ctor 0
+  | PApp (ctor, Some (PTup args)) -> compare_old_and_new ctor (List.length args)
+  | PApp (ctor, Some _) -> compare_old_and_new ctor 1
+  | _ -> arity_map
+
+let split_at l =
+  let rec aux acc n l =
+    match (n, l) with 0, _ -> (List.rev acc, l) | _, [] -> ([], []) | n, x :: xs -> aux (x :: acc) (n - 1) xs
+  in
+  aux [] l
+
+let unpack_nth occs n m =
+  List.mapi (fun i occ -> if i = n then List.init m (fun j -> j :: occ) else [ occ ]) occs |> List.flatten
+
+let spec_mat ctor col mat =
+  let { arity; occs; bnds; pats; acts } = mat in
+  let arity_map = List.fold_left (fun map pats -> check_arity map @@ List.nth pats col) StringMap.empty pats in
+  let n = arity_of arity_map ctor in
+  let new_arity = arity + n - 1 in
+  let new_occs = unpack_nth occs col n in
+  ()
