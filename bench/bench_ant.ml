@@ -1,7 +1,7 @@
-let driver intmap hash list =
+let driver intmap hash _list =
   if intmap then Intmap_bench.bench_intmap ();
-  if hash then MonoidHash_bench.bench_monoid_hash ();
-  if list then List_bench.bench_list ()
+  if hash then MonoidHash_bench.bench_monoid_hash ()
+  (* if list then List_bench.bench_list () *)
 
 let _ =
   driver
