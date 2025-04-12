@@ -11,11 +11,11 @@ type pattern =
 [@@deriving show]
 
 type binding =
-  | BSeq of expr
-  | BOne of pattern * expr
-  | BRec of (pattern * expr) list
-  | BCont of pattern * expr
-  | BRecC of (pattern * expr) list
+  | BSeq of expr (* e1; e2 *)
+  | BOne of pattern * expr (* let _ = e1 in e2 *)
+  | BRec of (pattern * expr) list (* let rec f x = e1 and g y = e2 in e3 *)
+  | BCont of pattern * expr (* for internal use *)
+  | BRecC of (pattern * expr) list (* for internal use *)
 [@@deriving show]
 
 and expr =

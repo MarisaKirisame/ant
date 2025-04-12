@@ -3,19 +3,25 @@ open Map
 
 let compile ast = ast
 
-type occurrence = int list
+type occurrence = int list [@@deriving show]
+
+let rec pp_occ = function
+  | [] -> PPrint.string "\\"
+  | x :: xs -> PPrint.(pp_occ xs ^^ string "." ^^ string (string_of_int x))
 
 module OccurrenceMap = Map.Make (struct
   type t = occurrence
 
   let compare = compare
 end)
+[@@deriving show]
 
 module StringMap = Map.Make (struct
   type t = string
 
   let compare = String.compare
 end)
+[@@deriving show]
 
 type pattern_matrix = {
   arity : int;
@@ -25,7 +31,67 @@ type pattern_matrix = {
   acts : int list;
 }
 
-type patdesc = PDInt of int | PDBool of bool | PDUnit | PDCtor of string * int | PDTuple of int
+let[@tail_mod_cons] rec map3 f l1 l2 l3 =
+  match (l1, l2, l3) with
+  | [], [], [] -> []
+  | [ a1 ], [ b1 ], [ c1 ] ->
+      let r1 = f a1 b1 c1 in
+      [ r1 ]
+  | a1 :: a2 :: l1, b1 :: b2 :: l2, c1 :: c2 :: l3 ->
+      let r1 = f a1 b1 c1 in
+      let r2 = f a2 b2 c2 in
+      let rl = map3 f l1 l2 l3 in
+      r1 :: r2 :: rl
+  | _, _, _ -> invalid_arg "map3"
+
+let[@tail_mod_cons] rec unzip_map3 f l1 l2 l3 =
+  match (l1, l2, l3) with
+  | [], [], [] -> ([], [], [])
+  | [ a1 ], [ b1 ], [ c1 ] ->
+      let ra1, rb1, rc1 = f a1 b1 c1 in
+      ([ ra1 ], [ rb1 ], [ rc1 ])
+  | a1 :: a2 :: l1, b1 :: b2 :: l2, c1 :: c2 :: l3 ->
+      let ra1, rb1, rc1 = f a1 b1 c1 in
+      let ra2, rb2, rc2 = f a2 b2 c2 in
+      let rl1, rl2, rl3 = unzip_map3 f l1 l2 l3 in
+      (ra1 :: ra2 :: rl1, rb1 :: rb2 :: rl2, rc1 :: rc2 :: rl3)
+  | _, _, _ -> invalid_arg "unzip_map3"
+
+(*
+  output format:
+
+  arity = 4
+  occurrence = [\.0, \.1, \.2, \.3]
+  
+  (PAny, PAny, PAny, PAny)   -> 1 with { \.0 -> x, \.1 -> y, \.2 -> z, \.3 -> w }
+  (PInt 1, PAny, PAny, PAny) -> 2 with { }
+  (PInt 2, PAny, PAny, PAny) -> 3 with { \.0 -> z }
+  (PInt 3, PAny, PAny, PAny) -> 4 
+  (PInt 4, PAny, PAny, PAny) -> 5
+*)
+
+let pp_pattern_matrix { arity; occs; bnds; pats; acts } =
+  PPrint.(
+    group @@ string "arity = "
+    ^^ (string @@ string_of_int arity)
+    ^^ hardline ^^ string "occurrence = "
+    ^^ pp_occ (List.hd occs)
+    ^^ hardline ^^ separate hardline
+    @@ map3
+         (fun pat bnd act ->
+           parens (separate_map (string ",") pp_pattern pat)
+           ^^ space ^^ string "->" ^^ space
+           ^^ string (string_of_int act)
+           ^^
+           if OccurrenceMap.is_empty bnd then empty
+           else
+             string "with" ^^ space
+             ^^ separate2 (string "(") (string ")")
+                  ( OccurrenceMap.to_list bnd |> fun bnd ->
+                    List.map (fun (k, v) -> pp_occ k ^^ string "->" ^^ string v) bnd ))
+         pats bnds acts)
+
+type patdesc = PDInt of int | PDBool of bool | PDUnit | PDCtor of string * int | PDTuple of int [@@deriving show]
 
 let pat_desc pattern =
   match pattern with
@@ -125,19 +191,6 @@ let remove_at n =
 let unpack_nth occs n m =
   List.mapi (fun i occ -> if i = n then List.init m (fun j -> j :: occ) else [ occ ]) occs |> List.flatten
 
-let[@tail_mod_cons] rec unzip_map3 f l1 l2 l3 =
-  match (l1, l2, l3) with
-  | [], [], [] -> ([], [], [])
-  | [ a1 ], [ b1 ], [ c1 ] ->
-      let ra1, rb1, rc1 = f a1 b1 c1 in
-      ([ ra1 ], [ rb1 ], [ rc1 ])
-  | a1 :: a2 :: l1, b1 :: b2 :: l2, c1 :: c2 :: l3 ->
-      let ra1, rb1, rc1 = f a1 b1 c1 in
-      let ra2, rb2, rc2 = f a2 b2 c2 in
-      let rl1, rl2, rl3 = unzip_map3 f l1 l2 l3 in
-      (ra1 :: ra2 :: rl1, rb1 :: rb2 :: rl2, rc1 :: rc2 :: rl3)
-  | _, _, _ -> invalid_arg "map3"
-
 let assert_valid mat =
   let { arity; occs; bnds; pats; acts } = mat in
   let n = List.length pats in
@@ -205,3 +258,82 @@ let default_mat col mat =
   let acts = List.flatten new_acts in
   assert_valid { arity; occs; bnds; pats; acts }
 
+(*
+  e.g.
+  match x with
+  | P1 -> a1
+  | P2 -> a2
+  | P3 -> a3
+  -->
+  pats = [P1; P2; P3]
+  acts = [a1; a2; a3]
+*)
+let make_mat pats acts =
+  let arity = 1 in
+  let occs = [ [] ] in
+  let bnds = List.map (fun _ -> OccurrenceMap.empty) pats in
+  let pats = List.map (fun pat -> [ pat ]) pats in
+  { arity; occs; bnds; pats; acts }
+
+let collect_pat_mat expr =
+  let rec aux acc = function
+    | Unit | Bool _ | Int _ | Float _ | Str _ | Builtin _ | Var _ | Ctor _ -> List.rev acc
+    | App (f, args) ->
+        let acc = aux acc f in
+        List.fold_left aux acc args
+    | Op (_, e1, e2) ->
+        let acc = aux acc e1 in
+        aux acc e2
+    | Tup args -> List.fold_left aux acc args
+    | Arr args -> List.fold_left aux acc args
+    | Lam (_, e) -> aux acc e
+    | Let (BSeq e1, e2) ->
+        let acc = aux acc e1 in
+        aux acc e2
+    | Let (BOne (pat, e1), e2) ->
+        let acc = aux acc e1 in
+        let mat = make_mat [ pat ] [ 0 ] in
+        let acc = mat :: acc in
+        aux acc e2
+    | Let (BRec bindings, e2) ->
+        let acc =
+          List.fold_left
+            (fun acc (pat, e1) ->
+              let mat = make_mat [ pat ] [ 0 ] in
+              let acc = mat :: acc in
+              aux acc e1)
+            acc bindings
+        in
+        aux acc e2
+    | Let (_, e2) -> aux acc e2
+    | Sel (e, _) -> aux acc e
+    | If (c, e1, e2) ->
+        let acc = aux acc c in
+        let acc = aux acc e1 in
+        aux acc e2
+    | Match (e, MatchPattern cases) ->
+        let acc = aux acc e in
+        let pats = List.map (fun (pat, _) -> pat) cases in
+        let acts = List.mapi (fun i (_, _) -> i) cases in
+        let arms = List.map (fun (_, arm) -> arm) cases in
+        let mat = make_mat pats acts in
+        List.fold_left aux (mat :: acc) arms
+  in
+  aux [] expr
+
+let show_all_pattern_matrixes prog =
+  let matrixes =
+    List.fold_left
+      (fun acc stmt ->
+        match stmt with
+        | Type _ -> acc
+        | Fun (_, _, e) -> collect_pat_mat e @ acc
+        | Term (None, e) -> collect_pat_mat e @ acc
+        | Term (Some pat, e) ->
+            let mat = make_mat [ pat ] [ 0 ] in
+            collect_pat_mat e @ (mat :: acc))
+      [] prog
+  in
+  PPrint.(
+    separate (break 1)
+    @@ List.map (fun mat -> string "pattern matrix:" ^^ break 1 ^^ nest 2 (pp_pattern_matrix mat)) matrixes)

@@ -15,7 +15,7 @@ type any =
 let _ = let rec f = fun x ->
   match x with
   | (A (a, b)) -> a + b
-  | A a, b -> a + b
+  | A (a, b) -> a + b
   | C B -> 0
   | D (B, _, _, _, _, _) -> 1
   | D (_, B, _, _, _, _) -> 2
