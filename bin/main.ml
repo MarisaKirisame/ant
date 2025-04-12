@@ -23,16 +23,16 @@ let parse content =
 let driver input print_ast compile_pat print_ant print_cek_ant tyck print_cps_transformed print_de print_cps_de =
   let src = read_all input in
   let ast = parse src in
+  let output_pp = PPrint.ToChannel.pretty 0.8 80 stdout in
   let _ =
-    if print_ast then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog ast);
-    if compile_pat then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog @@ Pat.compile pat);
-    if print_ant then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_ant ast);
-    if print_cek_ant then PPrint.ToChannel.pretty 0.8 80 stdout (GenerateMemo.pp_cek_ant ast);
-    if tyck then PPrint.ToChannel.pretty 0.8 80 stdout (Tyck.pp_inferred (Tyck.infer_prog ast));
-    if print_cps_transformed then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog (Transform.cps_prog ast))
-    else if print_de then PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog (Transform.defunc_prog ast))
-    else if print_cps_de then
-      PPrint.ToChannel.pretty 0.8 80 stdout (Syntax.pp_prog (Transform.defunc_prog (Transform.cps_prog ast)))
+    if print_ast then output_pp (Syntax.pp_prog ast);
+    if compile_pat then output_pp (Pat.show_all_pattern_matrixes ast);
+    if print_ant then output_pp (Syntax.pp_ant ast);
+    if print_cek_ant then output_pp (GenerateMemo.pp_cek_ant ast);
+    if tyck then output_pp (Tyck.pp_inferred (Tyck.infer_prog ast));
+    if print_cps_transformed then output_pp (Syntax.pp_prog (Transform.cps_prog ast))
+    else if print_de then output_pp (Syntax.pp_prog (Transform.defunc_prog ast))
+    else if print_cps_de then output_pp (Syntax.pp_prog (Transform.defunc_prog (Transform.cps_prog ast)))
   in
   ()
 
