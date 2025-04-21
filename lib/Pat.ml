@@ -1,5 +1,4 @@
 open Syntax
-open Map
 
 let compile ast = ast
 
@@ -40,11 +39,10 @@ let[@tail_mod_cons] rec map3 f l1 l2 l3 =
   | a1 :: a2 :: l1, b1 :: b2 :: l2, c1 :: c2 :: l3 ->
       let r1 = f a1 b1 c1 in
       let r2 = f a2 b2 c2 in
-      let rl = map3 f l1 l2 l3 in
-      r1 :: r2 :: rl
+      r1 :: r2 :: map3 f l1 l2 l3
   | _, _, _ -> invalid_arg "map3"
 
-let[@tail_mod_cons] rec unzip_map3 f l1 l2 l3 =
+let rec unzip_map3 f l1 l2 l3 =
   match (l1, l2, l3) with
   | [], [], [] -> ([], [], [])
   | [ a1 ], [ b1 ], [ c1 ] ->
@@ -258,6 +256,53 @@ let default_mat col mat =
   let acts = List.flatten new_acts in
   assert_valid { arity; occs; bnds; pats; acts }
 
+let column_ctor_prefix_score { pats; _ } col =
+  let score = ref 0 in
+  List.iter
+    (fun row ->
+      let cell = List.nth row col in
+      match cell with PApp (_, _) -> score := !score + 1 | _ -> ())
+    pats;
+  !score
+
+module Hashtbl = Stdlib.Hashtbl
+
+let column_small_branching_factor_score { pats; _ } col =
+  let ctors = Hashtbl.create 8 in
+  List.iter
+    (fun row ->
+      let cell = List.nth row col in
+      let pat_desc = pat_desc cell in
+      match pat_desc with PDCtor (c, _) -> Hashtbl.add ctors c () | _ -> ())
+    pats;
+  -Hashtbl.length ctors
+
+let column_small_arity_score { pats; _ } col =
+  let arity = ref 0 in
+  List.iter
+    (fun row ->
+      let cell = List.nth row col in
+      let pat_desc = pat_desc cell in
+      match pat_desc with PDCtor (_, n) | PDTuple n -> arity := !arity + n | _ -> ())
+    pats;
+  - !arity
+
+let choose_column m =
+  let { arity; _ } = m in
+  let heuristics = [ column_ctor_prefix_score; column_small_branching_factor_score; column_small_arity_score ] in
+  let chosen = ref 0 in
+  List.iter
+    (fun h ->
+      let max_score = ref 0 in
+      for i = 0 to arity - 1 do
+        let score = h m i in
+        if score > !max_score then (
+          max_score := score;
+          chosen := i)
+      done)
+    heuristics;
+  !chosen
+
 (*
   e.g.
   match x with
@@ -327,7 +372,9 @@ let show_all_pattern_matrixes prog =
       (fun acc stmt ->
         match stmt with
         | Type _ -> acc
-        | Fun (_, _, e) -> collect_pat_mat e @ acc
+        | Fun (_, args_pats, e) ->
+            let pats = List.map (fun pat -> make_mat [ pat ] [ 0 ]) args_pats in
+            pats @ collect_pat_mat e @ acc
         | Term (None, e) -> collect_pat_mat e @ acc
         | Term (Some pat, e) ->
             let mat = make_mat [ pat ] [ 0 ] in
