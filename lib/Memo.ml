@@ -151,39 +151,6 @@ let source_to_string (src : source) =
 let request_to_string (req : fetch_request) =
   "at " ^ source_to_string req.src ^ "+" ^ string_of_int req.offset ^ ", " ^ string_of_int req.word_count ^ " words"
 
-let constructor_degree_table : int Dynarray.t = Dynarray.create ()
-
-let set_constructor_degree (ctag : int) (degree : int) : unit =
-  assert (Dynarray.length constructor_degree_table = ctag);
-  Dynarray.add_last constructor_degree_table degree
-
-let monoid : measure_t monoid =
-  {
-    zero = { degree = 0; max_degree = 0; full = Some { length = 0; hash = Hasher.unit } };
-    combine =
-      (fun x y ->
-        {
-          degree = x.degree + y.degree;
-          max_degree = max x.max_degree (x.degree + y.max_degree);
-          full =
-            (match (x.full, y.full) with
-            | Some xf, Some yf -> Some { length = xf.length + yf.length; hash = Hasher.mul xf.hash yf.hash }
-            | _ -> None);
-        });
-  }
-
-let measure (et : fg_et) : measure_t =
-  match et with
-  | Word w ->
-      let degree =
-        match Word.get_tag w with
-        | 0 -> 1
-        | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
-        | _ -> failwith "unknown tag"
-      in
-      { degree; max_degree = degree; full = Some { length = 1; hash = Hasher.from_int w } }
-  | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
-
 let fr_to_fh (fr : fetch_result) : fetch_hash =
   let ret = Hasher.hash (Option.get (Generic.measure ~measure ~monoid fr.fetched).full).hash in
   (*print_endline ("hash: " ^ string_of_int ret);*)

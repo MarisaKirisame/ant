@@ -146,7 +146,7 @@ let 13 =
       x.c <- pc_to_exp 1;
       stepped x)
 
-let () = Memo.set_constructor_degree 0 1
-let () = Memo.set_constructor_degree 1 1
-let () = Memo.set_constructor_degree 2 (-1)
-let () = Memo.set_constructor_degree 3 (-1)
+let () = Value.set_constructor_degree 0 1
+let () = Value.set_constructor_degree 1 1
+let () = Value.set_constructor_degree 2 (-1)
+let () = Value.set_constructor_degree 3 (-1)
