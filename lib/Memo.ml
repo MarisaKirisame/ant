@@ -16,6 +16,7 @@ module Hasher = Hash.MCRC32C
 (*module Hasher = Hash.SL2*)
 (*module Hasher = Hash.DebugHash*)
 module Hashtbl = Core.Hashtbl
+open Value
 
 type env = value Dynarray.t
 
@@ -55,7 +56,6 @@ and kont = value
  *   have a depth of 0, and an extension increase the depth by 1.
  * Values also have their own individual depth, which denote when they are created/last fetched.
  *)
-and depth_t = int
 
 and state = {
   mutable c : exp;
@@ -66,20 +66,6 @@ and state = {
   mutable r : record_state option;
 }
 
-(* The Reference
- * To track whether a fragment is fetched or unfetched,
- *   ant extend the seq finger tree to include a Reference Type.
- * For a value with depth x+1, the Reference is an index into the C/E/S/K of the machine at depth x.
- * A key invariant is that a machine at depth x only contain value with depth x or with depth x+1,
- *   and a key collary is that machine at depth x is only able to fetch value at depth x-1:
- *   The machine only contain reference with depth x or x+1, and the latter is already fetched, so cannot be fetched again.
- *
- * If a value at depth x have a reference which refer to a value at depth x,
- *   It should path-compress lazily, as it had already been fetched, and the reference is pointless.
- *)
-and reference = { src : source; offset : int; values_count : int }
-and source = E of int | S of int | K
-
 (* Needed in Record Mode *)
 and record_state = {
   (*s f r die earlier then m so they are separated.*)
@@ -89,14 +75,6 @@ and record_state = {
   mutable r : record_context;
 }
 
-and fetch_count = int
-and fg_et = Word of Word.t | Reference of reference
-and seq = (fg_et, measure_t) Generic.fg
-and measure_t = { degree : int; max_degree : int; full : full_measure option }
-
-(* measure have this iff fully fetched (only Word.t, no reference). *)
-and full_measure = { length : int; hash : Hasher.t }
-
 (* The Store
  * A fetch can be partial, so the remaining fragment need to be fetched again.
  *   they are appended into the Store.
@@ -104,17 +82,6 @@ and full_measure = { length : int; hash : Hasher.t }
  *   done by pairing each value a ref of length, aliased on all fetch of the same origin, growing exponentially.
  *)
 and store = value Dynarray.t
-
-(* Note: Value should not alias. Doing so will mess with the fetch_length, which is bad. *)
-and value = {
-  seq : seq;
-  depth : depth_t;
-  fetch_length : int ref;
-  (* A value with depth x is path-compressed iff all the reference refer to value with depth < x.
-   * If a value with depth x have it's compressed_since = fetch_count on depth x-1, it is path_compressed.
-   *)
-  compressed_since : fetch_count;
-}
 
 (* The memo
  * The memo is the key data structure that handle all memoization logic.
@@ -137,6 +104,7 @@ and memo_t = memo_node_t ref Array.t
 and memo_node_t =
   (* We know transiting need to resolve a fetch_request to continue. *)
   | Need of { request : fetch_request; lookup : lookup_t; progress : progress_t }
+  | Continue of { request : fetch_request; lookup : lookup_t; }
   (* We know there is no more fetch to be done, as the machine evaluate to a value state. *)
   | Done of done_t
   (* We know a bit, but the evaluation is ended prematurely. Still it is better to skip to there. *)
