@@ -67,7 +67,7 @@ let ant_pp_ocaml_adt adt_name ctors =
                ^ String.concat " * "
                    (List.map
                       (fun ty ->
-                        match ty with TNamed "int" -> "int" | TNamed _ -> "Memo.seq" | _ -> failwith (show_ty ty))
+                        match ty with TNamed "int" -> "int" | TNamed _ -> "Value.seq" | _ -> failwith (show_ty ty))
                       types))
            ctors))
 
@@ -81,7 +81,7 @@ let ant_pp_adt_constructors (e : ctx) adt_name ctors =
         string
           ("let " ^ adt_name ^ "_" ^ con_name ^ " "
           ^ String.concat " " (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-          ^ ": Memo.seq = Memo.appends ["
+          ^ ": Value.seq = Memo.appends ["
           ^ String.concat ";"
               (("Memo.from_constructor " ^ string_of_int (Hashtbl.find_exn e.ctag con_name))
               :: List.mapi
@@ -433,8 +433,8 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
           let term_code = ant_pp_expr ctx s term { k = return; fv = empty_fv () } in
           ( string ("(fun x -> x.c <- pc_to_exp " ^ string_of_int term_code ^ "; x)"),
             string "let rec" ^^ space ^^ string name ^^ space
-            ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : seq)")))
-            ^^ string ": seq " ^^ string "=" ^^ space ^^ group @@ string "exec_cek "
+            ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
+            ^^ string ": Value.seq " ^^ string "=" ^^ space ^^ group @@ string "exec_cek "
             ^^ string ("(pc_to_exp " ^ string_of_int term_code ^ ")")
             ^^ string "(Dynarray.of_list" ^^ string "["
             ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
