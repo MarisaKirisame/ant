@@ -55,6 +55,8 @@ and kont = value
  * The stack can then be assigned a depth, where the root CEK machine (which does not do recording whatsowever)
  *   have a depth of 0, and an extension increase the depth by 1.
  * Values also have their own individual depth, which denote when they are created/last fetched.
+ *
+ * Todo: the stack is a bad name. Rename to history.
  *)
 and state = {
   mutable c : exp;
