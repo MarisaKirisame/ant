@@ -56,7 +56,6 @@ and kont = value
  *   have a depth of 0, and an extension increase the depth by 1.
  * Values also have their own individual depth, which denote when they are created/last fetched.
  *)
-
 and state = {
   mutable c : exp;
   mutable e : env;
@@ -104,7 +103,7 @@ and memo_t = memo_node_t ref Array.t
 and memo_node_t =
   (* We know transiting need to resolve a fetch_request to continue. *)
   | Need of { request : fetch_request; lookup : lookup_t; progress : progress_t }
-  | Continue of { request : fetch_request; lookup : lookup_t; }
+  | Continue of { request : fetch_request; lookup : lookup_t }
   (* We know there is no more fetch to be done, as the machine evaluate to a value state. *)
   | Done of done_t
   (* We know a bit, but the evaluation is ended prematurely. Still it is better to skip to there. *)
