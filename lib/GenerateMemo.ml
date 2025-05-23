@@ -470,6 +470,6 @@ let pp_cek_ant x =
   ^^ separate (break 1)
        (List.init (Dynarray.length ctx.constructor_degree) (fun i ->
             string
-              ("let () = Memo.set_constructor_degree " ^ string_of_int i ^ " " ^ "("
+              ("let () = Value.set_constructor_degree " ^ string_of_int i ^ " " ^ "("
               ^ string_of_int (Dynarray.get ctx.constructor_degree i)
               ^ ")")))
