@@ -5,7 +5,7 @@ open Word
 open Memo
 open Common
 
-let memo = Array.init 14 (fun _ -> ref Memo.Unknown)
+let memo = Array.init 14 (fun _ -> ref State.Unknown)
 
 type ocaml_int_list = Nil | Cons of int * Value.seq
 

@@ -15,6 +15,7 @@
   Memo
   Word
   Value
+  State
   Hash
   Intmap
   Common
