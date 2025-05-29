@@ -29,7 +29,7 @@ SAC only handle the last repetition, while memoization based approach have no tr
 
 Note: while the last two seems similar, the key difference is externality. SAC split the program into two part: a functional core, and an imperative driver. Incrementalization only occur between the boundary, thus internal invocations are not incremental.
 
-## Key Idea
+## Solution
 The key observation is that both `map f xs` and `map f (xs ++ [x])` share a long and common prefix. 
 On this prefix the computation is the same, thus we should not be memoizing values, but prefixes of values.
 As prefixes are incomplete, we cannot return the corresponding values, but must instead jump to the intermediate state, where the next small-step evaluation will require reading outside of the memoized prefixes.
