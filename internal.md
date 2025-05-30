@@ -85,7 +85,10 @@ Note that it is possible to enter recording mode inside recording mode, so the h
 Ant select the memoized fragment in a demand driven manner - that is, it select values which will/have a high chance to be used.
 More specifically whenever a read violation occur (that is, attempting to read a reference), ant is given a location which must be read for progression.
 
-Ant can then extend the fragment with n words starting at that location, where n exponentially increase upon reading the same value (reading a match log count as reading the original value where the log is derived from)
+Instead of exiting recording, ant can then extend the fragment with n words starting at that location, where n exponentially increase upon reading the same value (reading a match log count as reading the original value where the log is derived from).
 
 Note that extension mean a reference can now be readable, as the values it point to might be newly extended. 
 Ant resolve them on demand via a method similar to path-compression in union find.
+
+Extension may not always succeed - remember that history is a stack, where the readbale fragments form a decreasing subset of all values. 
+If extending will break this violation, ant cannot extend and the recording must finish.
