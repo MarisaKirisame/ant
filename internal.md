@@ -1,4 +1,4 @@
-# Prefix Memoization
+# Partial Memoization
 
 ## Background
 Incremental Computing aim to speed up computation by reusing previous results. 
@@ -35,7 +35,7 @@ On this prefix the computation is the same, thus we should not be memoizing valu
 As chunks are incomplete, we cannot return the corresponding values, but must instead jump to the intermediate state, where the next small-step evaluation will require reading outside of the memoized chunks.
 
 ### Sketch
-Prefix memoization operate on a CEK machine, modified to provide:
+Partial memoization operate on a CEK machine, modified to provide:
 
 - Selection of fragment
 - Hashing of chunks
