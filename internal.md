@@ -31,14 +31,14 @@ Note: while the last two seems similar, the key difference is externality. SAC s
 
 ## Solution
 The key observation is that both `map f xs` and `map f (xs ++ [x])` share a long and common prefix. 
-On this prefix the computation is the same, thus we should not be memoizing values, but prefixes of values, which we call fragment.
-As prefixes are incomplete, we cannot return the corresponding values, but must instead jump to the intermediate state, where the next small-step evaluation will require reading outside of the memoized prefixes.
+On this prefix the computation is the same, thus we should not be memoizing values, but chunks of values, which we call fragment.
+As chunks are incomplete, we cannot return the corresponding values, but must instead jump to the intermediate state, where the next small-step evaluation will require reading outside of the memoized chunks.
 
 ### Sketch
 Prefix memoization operate on a CEK machine, modified to provide:
 
 - Selection of fragment
-- Hashing of prefixes
+- Hashing of chunks
 - Recording jump into memo structure
 - Applying jump from memo structure
 
@@ -46,7 +46,7 @@ With these features, ant select a fragment and calculate its hash, then start re
 and record the fragment. Whenever applicable (hash match), ant will jump ahead to reuse old computation.
 
 ### Value Representation
-To provide quick hashing of prefixes, and to define prefix for algebaric data type (trees), ant use a finger tree of word (fixed size int) to represent a value. 
+To provide quick hashing of chunks, and to define chunk for algebaric data type (trees), ant use a finger tree of word (fixed size int) to represent a value. 
 An integer is represented as a singleton sequence, storing a single word denoting that int, 
 and an algebraic data type is represented by a sequence where the head value is a unique constructor tag, and all fields representation are joined without any separators.
 Both values in the environment and the value representing continuation is denoted this way. 
