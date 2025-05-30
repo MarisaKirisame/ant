@@ -49,6 +49,7 @@ and record the fragment. Whenever applicable (hash match), ant will jump ahead t
 To provide quick hashing of prefixes, and to define prefix for algebaric data type (trees), ant use a finger tree of word (fixed size int) to represent a value. 
 An integer is represented as a singleton sequence, storing a single word denoting that int, 
 and an algebraic data type is represented by a sequence where the head value is a unique constructor tag, and all fields representation are joined without any separators.
+Both values in the environment and the value representing continuation is denoted this way. 
 
 The finger tree is annotated with word lengths, degree/max degree (from monoid parsing), and monoid hashing. This allow the finger tree to be used as a sequence of words or as an ADT, selecting arbitary fragment/child, and maintaining a hash along the way.
 
