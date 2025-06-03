@@ -462,7 +462,7 @@ let pp_cek_ant x =
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Common"
   ^^ break 1 ^^ string "let memo = Array.init "
   ^^ string (string_of_int (Dynarray.length codes))
-  ^^ string "(fun _ -> ref State.Unknown)" ^^ break 1 ^^ generated_stmt ^^ break 1
+  ^^ string "(fun _ -> ref State.BlackHole)" ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string ("let " ^ string_of_int i ^ " = add_exp ") ^^ Option.get (Dynarray.get codes i)))

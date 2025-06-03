@@ -46,6 +46,7 @@ and state = {
   mutable e : env;
   mutable k : kont;
   d : depth_t;
+  (*step_count*)
   mutable sc : int;
   mutable r : record_state option;
 }
@@ -56,7 +57,7 @@ and record_state = {
   m : state;
   s : store;
   mutable f : fetch_count;
-  mutable r : record_context;
+  mutable r : memo_node_t ref option;
 }
 
 (* The Store
@@ -66,11 +67,6 @@ and record_state = {
  *   done by pairing each value a ref of length, aliased on all fetch of the same origin, growing exponentially.
  *)
 and store = value Dynarray.t
-
-and record_context =
-  | Evaluating of memo_node_t ref
-  | Reentrance of memo_node_t
-  | Building (* Urgh I hate this. It's so easy though. *)
 
 (* The memo
  * The memo is the key data structure that handle all memoization logic.
@@ -92,19 +88,17 @@ and memo_t = memo_node_t ref Array.t
 
 and memo_node_t =
   (* We know transiting need to resolve a fetch_request to continue. *)
-  | Need of { request : fetch_request; lookup : lookup_t; progress : progress_t }
-  | Continue of { request : fetch_request; lookup : lookup_t }
-  (* We know there is no more fetch to be done, as the machine evaluate to a value state. *)
+  | Need of { next : memo_next_t; progress : progress_t }
+  (* We have not made progress. Need more fetching. *)
+  | Continue of memo_next_t
+  (* The machine evaluate to a value. *)
   | Done of done_t
   (* We know a bit, but the evaluation is ended prematurely. Still it is better to skip to there. *)
   | Halfway of progress_t
-  (* We know nothing about what's gonna happen. Will switch to Need or Done.
-   * Another design is to always force it to be a Need/Done before hand.
-   *)
-  | Unknown
   (* We are figuring out this entry. *)
   | BlackHole
 
+and memo_next_t = { request : fetch_request; lookup : lookup_t }
 and done_t = { skip : record_state -> state }
 and fetch_request = { src : source; offset : int; word_count : int }
 
@@ -112,7 +106,6 @@ and fetch_request = { src : source; offset : int; word_count : int }
 and lookup_t = (fetch_hash, memo_node_t ref) Hashtbl.t
 
 and progress_t = {
-  (* potential optimization: make enter and exit optional to denote no progress. *)
   (* ++depth. *)
   enter : record_state -> state;
   (* --depth.

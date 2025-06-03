@@ -17,6 +17,7 @@ open Word
  *)
 type value = {
   seq : seq;
+  (* Look like we only need a bit dictating fetchness? *)
   depth : depth_t;
   fetch_length : int ref;
   (* A value with depth x is path-compressed iff all the reference refer to value with depth < x.
@@ -38,7 +39,7 @@ and measure_t = { degree : int; max_degree : int; full : full_measure option }
  * To track whether a fragment is fetched or unfetched,
  *   ant extend the seq finger tree to include a Reference Type.
  * For a value with depth x+1, the Reference is an index into the C/E/S/K of the machine at depth x.
- * A key invariant is that a machine at depth x only contain value with depth x or with depth x+1,
+ * A key invariant is that a machine at depth x only contain values with depth x or with depth x+1,
  *   and a key collary is that machine at depth x is only able to fetch value at depth x-1:
  *   The machine only contain reference with depth x or x+1, and the latter is already fetched, so cannot be fetched again.
  *
