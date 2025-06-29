@@ -427,9 +427,9 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
           (new_scope ()) ps
       in
       let arg_num = s.env_length in
-      let name = match x with Some (PVar x) -> x in
+      let name = match x with Some (PVar x) -> x | _ -> failwith "bad match" in
       add_code_k (fun entry_code ->
-          Hashtbl.add_exn ctx.func_pc name entry_code;
+          Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
           let term_code = ant_pp_expr ctx s term { k = return; fv = empty_fv () } in
           ( string ("(fun x -> x.c <- pc_to_exp " ^ string_of_int term_code ^ "; x)"),
             string "let rec" ^^ space ^^ string name ^^ space
