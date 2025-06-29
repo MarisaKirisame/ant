@@ -312,6 +312,10 @@ let rec print_stacktrace (s : state) : unit =
 let rec enter_new_memo (s : state) (m : memo_t) : state =
   enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = None } (Array.get m s.c.pc) None 0
 
+and rs_insert_memo_node (rs : record_state) (m : memo_node_t ref) : unit =
+  assert (rs.r = None);
+  rs.r <- Some m
+
 and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (p : progress_t option) (depth : int) : state =
   let try_enter_next next progress =
     match fetch_value rs next.request with
@@ -320,35 +324,30 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (p : progress_t
         | None -> (
             let bh = ref BlackHole in
             Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
-            assert (rs.r = None);
-            rs.r <- Some bh;
+            rs_insert_memo_node rs bh;
             match progress with
             | Some p -> p.enter rs
             | None -> failwith "todo: should make a new record_state. we are not skipping ahead but that's fine")
         | Some m -> enter_new_memo_aux rs m progress (depth + 1))
     | None -> (
-        assert (rs.r = None);
-        rs.r <- Some m;
+        rs_insert_memo_node rs m;
         match progress with
         | Some p -> p.enter rs
         | None -> failwith "todo: should exit record_state, becaue not enough fetch value")
   in
   match !m with
   | Halfway p ->
-      assert (rs.r = None);
-      rs.r <- Some m;
+      rs_insert_memo_node rs m;
       failwith "halfway" (*p.enter rs*)
   | Done d ->
       (*todo: d.skip should allow rs.r to be in whatever state as it is done.*)
-      assert (rs.r = None);
-      rs.r <- Some m;
+      rs_insert_memo_node rs m;
       d.skip rs
   | BlackHole -> (
       match p with
       | None ->
           m := BlackHole;
-          assert (rs.r = None);
-          rs.r <- Some m;
+          rs_insert_memo_node rs m;
           {
             c = lift_c rs.m.c;
             e = Dynarray.init (Dynarray.length rs.m.e) (fun i -> lift_value (E i) rs.m.d);
@@ -358,8 +357,7 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (p : progress_t
             r = Some rs;
           }
       | Some p ->
-          assert (rs.r = None);
-          rs.r <- Some m;
+          rs_insert_memo_node rs m;
           p.enter rs)
   | Need { next; progress } -> try_enter_next next (Some progress)
   | Continue next -> try_enter_next next p
