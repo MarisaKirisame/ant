@@ -205,14 +205,22 @@ let unshift_all (s : state) : state =
 
 let strip_c (c : exp) : exp = c
 
-let rec get_progress (s : state) : progress_t =
-  {
-    enter = get_enter s;
-    (* We might want hint of new values to speedup the exit process, so have it general for now. 
-     * Also good to make explicit the symmetry.
-     *)
-    exit = record_memo_exit;
-  }
+(* There might be no progress made compare to the last history. 
+ * In such case, we should not conjure up a zero-distance progress_t.
+ *)
+let rec get_progress (s : state) : progress_t option =
+  let r = Option.get s.r in
+  assert (s.sc >= r.m.sc);
+  if s.sc == r.m.sc then None
+  else
+    Some
+      {
+        enter = get_enter s;
+        (* We might want hint of new values to speedup the exit process, so have it general for now. 
+         * Also good to make explicit the symmetry.
+         *)
+        exit = record_memo_exit;
+      }
 
 (* Carefully written to make sure that unneeded values can be freed asap. *)
 and get_enter (s : state) : record_state -> state =
@@ -231,12 +239,13 @@ and get_enter (s : state) : record_state -> state =
 and record_memo_exit (s : state) : state = unshift_all s
 
 and get_done (s : state) : done_t =
-  let p = get_progress s in
+  let p = Option.get (get_progress s) in
   { skip = (fun rs -> p.exit (p.enter rs)) }
 
 (*
 let rebase_value (rs : record_state) (v : value) : value = todo "rebase_value"
 
+(*todo: this seems to be the abortion function. we should not call get_progress here, but to determine whether we actually improve*)
 let rebase (rs : record_state) : record_state =
   assert (rs.r = Building);
   let rsmr = Option.get rs.m.r in
@@ -263,7 +272,9 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : seq option 
     | BlackHole ->
         (*print_endline ("fill, pc " ^ string_of_int s.c.pc);*)
         let lookup = Hashtbl.create (module Core.Int) in
-        ev := Need { next = { request = req; lookup }; progress = get_progress s };
+        (match get_progress s with
+        | Some p -> ev := Need { next = { request = req; lookup }; progress = p }
+        | None -> ev := Continue { request = req; lookup });
         lookup
     | Continue _ -> failwith "impossible case: Continue"
     | Need n ->
@@ -299,73 +310,59 @@ let rec print_stacktrace (s : state) : unit =
   match s.r with Some s -> print_stacktrace s.m | _ -> ()
 
 let rec enter_new_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = None } (Array.get m s.c.pc) true None 0
+  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = None } (Array.get m s.c.pc) None 0
 
-(*only enter if there is an existing entries. this is cheaper then enter_new_memo.*)
-and try_match_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = None } (Array.get m s.c.pc) false None 0
-
-and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (matched : bool) (p : progress_t option) (depth : int)
-    : state =
+and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (p : progress_t option) (depth : int) : state =
+  let try_enter_next next progress =
+    match fetch_value rs next.request with
+    | Some (fr, _) -> (
+        match Hashtbl.find next.lookup (fr_to_fh fr) with
+        | None -> (
+            let bh = ref BlackHole in
+            Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
+            assert (rs.r = None);
+            rs.r <- Some bh;
+            match progress with
+            | Some p -> p.enter rs
+            | None -> failwith "todo: should make a new record_state. we are not skipping ahead but that's fine")
+        | Some m -> enter_new_memo_aux rs m progress (depth + 1))
+    | None -> (
+        assert (rs.r = None);
+        rs.r <- Some m;
+        match progress with
+        | Some p -> p.enter rs
+        | None -> failwith "todo: should exit record_state, becaue not enough fetch value")
+  in
   match !m with
   | Halfway p ->
       assert (rs.r = None);
       rs.r <- Some m;
-      failwith "halfway";
-      p.enter rs
-  (*| BlackHole ->
-      print_stacktrace rs.m;
-      failwith "Blackhole detected"*)
+      failwith "halfway" (*p.enter rs*)
   | Done d ->
       (*todo: d.skip should allow rs.r to be in whatever state as it is done.*)
       assert (rs.r = None);
       rs.r <- Some m;
       d.skip rs
-  | BlackHole ->
-      if matched then (
-        match p with
-        | None ->
-            (*print_endline ("no entry! pc: " ^ string_of_int rs.m.c.pc);*)
-            (*print_endline "new"; Werid - this is the most frequent state by an extreme amount*)
-            m := BlackHole;
-            assert (rs.r = None);
-            rs.r <- Some m;
-            {
-              c = lift_c rs.m.c;
-              e = Dynarray.init (Dynarray.length rs.m.e) (fun i -> lift_value (E i) rs.m.d);
-              k = lift_value K rs.m.d;
-              d = rs.m.d + 1;
-              sc = rs.m.sc;
-              r = Some rs;
-            }
-        | Some p ->
-            assert (rs.r = None);
-            rs.r <- Some m;
-            p.enter rs)
-      else rs.m
-  | Need n -> (
-      match fetch_value rs n.next.request with
-      | Some (fr, _) -> (
-          match Hashtbl.find n.next.lookup (fr_to_fh fr) with
-          | None ->
-              (*print_endline ("new entry " ^ request_to_string n.request ^ " at memo depth " ^ string_of_int depth);*)
-              let bh = ref BlackHole in
-              Hashtbl.add_exn n.next.lookup ~key:(fr_to_fh fr) ~data:bh;
-              assert (rs.r = None);
-              rs.r <- Some bh;
-              n.progress.enter rs
-          | Some m -> enter_new_memo_aux rs m true (Some n.progress) (depth + 1))
+  | BlackHole -> (
+      match p with
       | None ->
-          (*enter_new_memo_aux (rebase rs) m matched p depth*)
-          if matched then (
-            assert (rs.r = None);
-            rs.r <- Some m;
-            (*print_endline
-              ("request " ^ request_to_string n.request ^ " failed, entering memo depth " ^ string_of_int depth);*)
-            n.progress.enter rs)
-          else (
-            print_endline "sad";
-            rs.m))
+          m := BlackHole;
+          assert (rs.r = None);
+          rs.r <- Some m;
+          {
+            c = lift_c rs.m.c;
+            e = Dynarray.init (Dynarray.length rs.m.e) (fun i -> lift_value (E i) rs.m.d);
+            k = lift_value K rs.m.d;
+            d = rs.m.d + 1;
+            sc = rs.m.sc;
+            r = Some rs;
+          }
+      | Some p ->
+          assert (rs.r = None);
+          rs.r <- Some m;
+          p.enter rs)
+  | Need { next; progress } -> try_enter_next next (Some progress)
+  | Continue next -> try_enter_next next p
 
 (* A single transition step should:
  *   0   - Start with a sequence of resolve
@@ -537,8 +534,6 @@ let memo_over (cek : state) (m : memo_t) : state =
   let cek = enter_new_memo cek m in
   let cek = if cek.d > before_depth then record_memo_exit cek else cek in
   if cek.sc > before_step then cek else raw_step cek m
-
-let lookup_step (cek : state) (m : memo_t) : state = raw_step (try_match_memo cek m) m
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let init_value (w : words) : value = value_at_depth w 0 in

@@ -83,6 +83,8 @@ and store = value Dynarray.t
  *     This would be handled naturally as the execution should only depend on the prefixes.
  *   The caller should traverse down this memo tree until it can not find a fetch,
  *     then execute the function.
+ *   We are doing some work here to ensure every progress_t advance the execution: 
+ *     there is no zero-distance jump.
  *)
 and memo_t = memo_node_t ref Array.t
 
