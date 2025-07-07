@@ -3,6 +3,7 @@
  (public_name ant)
  (libraries pprint batteries core)
  (modules
+  AppList
   Lexer
   Tokens
   Parser
