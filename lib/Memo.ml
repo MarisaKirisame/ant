@@ -92,7 +92,7 @@ and path_compress_seq (rs : record_state) (x : seq) : seq =
   assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
   match Generic.front rhs ~monoid ~measure with
   | None -> lhs
-  | Some (rest, Reference y) ->
+  | Some (rest, Indirect (_, y)) ->
       Generic.append ~monoid ~measure lhs
         (Generic.append ~monoid ~measure (path_compress_reference rs y) (path_compress_seq rs rest))
   | _ -> failwith "path_compress_seq impossible"
@@ -110,7 +110,7 @@ and path_compress_reference (rs : record_state) (r : reference) : seq =
     let v = path_compress_value rs v in
     set_value_rs rs r.src v;
     slice v.seq r.offset r.values_count)
-  else Generic.Single (Reference r)
+  else Generic.Single (Indirect (v.seq, r))
 
 let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq =
   let v = { depth = rs.m.d; seq; compressed_since = 0; fetch_length } in
@@ -118,7 +118,7 @@ let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq 
     { src = S (Dynarray.length rs.s); offset = 0; values_count = (Generic.measure ~monoid ~measure seq).degree }
   in
   Dynarray.add_last rs.s v;
-  Generic.singleton (Reference r)
+  Generic.singleton (Indirect (seq,  r))
 
 let init_fetch_length () : int ref = ref 1
 
@@ -164,7 +164,7 @@ let rec unshift_seq (rs : record_state) (x : seq) : seq =
   assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
   match Generic.front rhs ~monoid ~measure with
   | None -> lhs
-  | Some (rest, Reference y) ->
+  | Some (rest, Indirect (_, y)) ->
       Generic.append ~monoid ~measure lhs
         (Generic.append ~monoid ~measure (unshift_reference rs y) (unshift_seq rs rest))
   | _ -> failwith "unshift_seq impossible"
@@ -294,9 +294,10 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : seq option 
 
 let lift_c (c : exp) : exp = c
 
-let lift_value (src : source) (d : depth_t) : value =
+let lift_value (s: state) (src : source) (d : depth_t) : value =
+  let v = get_value s src in
   {
-    seq = Generic.singleton (Reference { src; offset = 0; values_count = 1 });
+    seq = Generic.singleton (Indirect (v.seq,  { src; offset = 0; values_count = 1 }));
     depth = d + 1;
     fetch_length = init_fetch_length ();
     compressed_since = 0;
@@ -350,8 +351,8 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (p : progress_t
           rs_insert_memo_node rs m;
           {
             c = lift_c rs.m.c;
-            e = Dynarray.init (Dynarray.length rs.m.e) (fun i -> lift_value (E i) rs.m.d);
-            k = lift_value K rs.m.d;
+            e = Dynarray.init (Dynarray.length rs.m.e) (fun i -> lift_value rs.m (E i) rs.m.d);
+            k = lift_value rs.m K rs.m.d;
             d = rs.m.d + 1;
             sc = rs.m.sc;
             r = Some rs;
@@ -378,8 +379,8 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
   assert (m.max_degree = 1);
   let tl, hd = Generic.front_exn ~monoid ~measure x in
   match hd with
-  | Word w -> Some (w, tl)
-  | Reference ref ->
+  | Direct w -> Some (w, tl)
+  | Indirect (_, ref) ->
       let rs = Option.get s.r in
       let r_v = get_value_rs rs ref.src in
       if r_v.depth = s.d then
@@ -392,7 +393,7 @@ let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
         | Some seq -> (
             let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
             let rest = Generic.append ~monoid ~measure seq_tl tl in
-            match seq_hd with Word w -> Some (w, rest) | Reference _ -> failwith "impossible: reference")
+            match seq_hd with Direct w -> Some (w, rest) | Indirect _ -> failwith "impossible: indirect")
         | None -> None)
 
 (* Todo: I think we should path-compress lazily all places in the code, just like what we are doing here. *)
@@ -405,7 +406,7 @@ let rec resolve (s : state) (src : source) : (Word.t * seq) option =
   | Some ret ->
       set_value s src
         {
-          seq = Generic.cons ~monoid ~measure (snd ret) (Word (fst ret));
+          seq = Generic.cons ~monoid ~measure (snd ret) (Direct (fst ret));
           depth = v.depth;
           compressed_since = v.compressed_since;
           fetch_length = v.fetch_length;
@@ -437,14 +438,14 @@ let value_at_depth (seq : seq) (depth : int) : value =
   assert (m.max_degree = 1);
   { seq; depth; fetch_length = init_fetch_length (); compressed_since = 0 }
 
-let from_constructor (ctag : int) : seq = Generic.singleton (Word (Word.make Word.constructor_tag ctag))
-let from_int (i : int) : seq = Generic.singleton (Word (Word.make Word.int_tag i))
+let from_constructor (ctag : int) : seq = Generic.singleton (Direct (Word.make Word.constructor_tag ctag))
+let from_int (i : int) : seq = Generic.singleton (Direct (Word.make Word.int_tag i))
 
 let to_int (s : seq) : int =
   assert ((Generic.measure ~monoid ~measure s).degree = 1);
   assert ((Generic.measure ~monoid ~measure s).max_degree = 1);
   assert (Generic.size s = 1);
-  match Generic.head_exn s with Word w -> w | Reference _ -> failwith "conveting reference to_int"
+  match Generic.head_exn s with Direct w -> w | Indirect _ -> failwith "conveting indirect to_int"
 
 let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
 let appends (x : seq list) : seq = List.fold_right append x empty
@@ -457,7 +458,7 @@ let rec splits (x : seq) : seq list =
     h :: splits t
 
 let list_match (x : seq) : (Word.t * seq) option =
-  Option.map (fun (x, Word y) -> (y, x)) (Generic.front ~monoid ~measure x)
+  Option.map (fun (x, Direct y) -> (y, x)) (Generic.front ~monoid ~measure x)
 
 let push_env (s : state) (v : value) : unit =
   assert ((Generic.measure ~monoid ~measure v.seq).degree = 1);

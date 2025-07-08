@@ -27,7 +27,7 @@ type value = {
 }
 
 and seq = (fg_et, measure_t) Generic.fg
-and fg_et = Word of Word.t | Reference of reference
+and fg_et = Direct of Word.t | Indirect of (seq * reference)
 and depth_t = int
 and fetch_count = int
 
@@ -72,7 +72,7 @@ let monoid : measure_t monoid =
 
 let measure (et : fg_et) : measure_t =
   match et with
-  | Word w ->
+  | Direct w ->
       let degree =
         match Word.get_tag w with
         | 0 -> 1
@@ -80,7 +80,7 @@ let measure (et : fg_et) : measure_t =
         | _ -> failwith "unknown tag"
       in
       { degree; max_degree = degree; full = Some { length = 1; hash = Hasher.from_int w } }
-  | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
+  | Indirect (_, r) -> { degree = r.values_count; max_degree = r.values_count; full = None }
 
 (* 
    Pop a specific number of elements from the seq represented by a finger tree
@@ -90,7 +90,7 @@ let measure (et : fg_et) : measure_t =
       as the last element to check some invariants
     - the remained part of the original seq
 *)
-let pop_n (s : seq) (n : int) : seq * seq =
+let rec pop_n (s : seq) (n : int) : seq * seq =
   assert (n >= 0);
   if n = 0 then (Generic.empty, s)
   else (
@@ -101,20 +101,21 @@ let pop_n (s : seq) (n : int) : seq * seq =
     let m = Generic.measure ~monoid ~measure x in
     assert (m.degree < n);
     match v with
-    | Word v ->
+    | Direct v ->
         assert (m.degree + 1 = n);
-        let l = Generic.snoc ~monoid ~measure x (Word v) in
+        let l = Generic.snoc ~monoid ~measure x (Direct v) in
         (l, w)
-    | Reference v ->
+    | Indirect (s', v) ->
         assert (m.degree < n);
         assert (m.degree + v.values_count >= n);
         let need = n - m.degree in
-        let l = Generic.snoc ~monoid ~measure x (Reference { src = v.src; offset = v.offset; values_count = need }) in
+        let ls, rs = (pop_n s' need) in
+        let l = Generic.snoc ~monoid ~measure x (Indirect (ls, { src = v.src; offset = v.offset; values_count = need })) in
         if v.values_count = need then (l, w)
         else
           let r =
             Generic.cons ~monoid ~measure w
-              (Reference { src = v.src; offset = v.offset + need; values_count = v.values_count - need })
+              (Indirect (rs, { src = v.src; offset = v.offset + need; values_count = v.values_count - need }))
           in
           (l, r))
 
