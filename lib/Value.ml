@@ -30,8 +30,7 @@ and seq = (fg_et, measure_t) Generic.fg
 and fg_et = Direct of Word.t | Indirect of (seq * reference)
 and depth_t = int
 and fetch_count = int
-
-and measure_t = { degree : int; max_degree : int; length : int; hash : Hasher.t; all_indirect : bool }
+and measure_t = { degree : int; max_degree : int; length : int; hash : Hasher.t; all_direct : bool }
 
 (* The Reference
  * To track whether a fragment is fetched or unfetched,
@@ -55,16 +54,15 @@ let set_constructor_degree (ctag : int) (degree : int) : unit =
 
 let monoid : measure_t monoid =
   {
-    zero = { degree = 0; max_degree = 0; full = Some { length = 0; hash = Hasher.unit } };
+    zero = { degree = 0; max_degree = 0; length = 0; hash = Hasher.unit; all_direct = true };
     combine =
       (fun x y ->
         {
           degree = x.degree + y.degree;
           max_degree = max x.max_degree (x.degree + y.max_degree);
-          full =
-            (match (x.full, y.full) with
-            | Some xf, Some yf -> Some { length = xf.length + yf.length; hash = Hasher.mul xf.hash yf.hash }
-            | _ -> None);
+          length = x.length + y.length;
+          hash = Hasher.mul x.hash y.hash;
+          all_direct = x.all_direct && y.all_direct;
         });
   }
 
@@ -77,8 +75,9 @@ let measure (et : fg_et) : measure_t =
         | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
         | _ -> failwith "unknown tag"
       in
-      { degree; max_degree = degree; full = Some { length = 1; hash = Hasher.from_int w } }
-  | Indirect (_, r) -> { degree = r.values_count; max_degree = r.values_count; full = None }
+      { degree; max_degree = degree; length = 1; hash = Hasher.from_int w; all_direct = true }
+  | Indirect (_, r) ->
+      { degree = r.values_count; max_degree = r.values_count; length = 0; hash = Hasher.unit; all_direct = false }
 
 (* 
    Pop a specific number of elements from the seq represented by a finger tree
@@ -107,8 +106,10 @@ let rec pop_n (s : seq) (n : int) : seq * seq =
         assert (m.degree < n);
         assert (m.degree + v.values_count >= n);
         let need = n - m.degree in
-        let ls, rs = (pop_n s' need) in
-        let l = Generic.snoc ~monoid ~measure x (Indirect (ls, { src = v.src; offset = v.offset; values_count = need })) in
+        let ls, rs = pop_n s' need in
+        let l =
+          Generic.snoc ~monoid ~measure x (Indirect (ls, { src = v.src; offset = v.offset; values_count = need }))
+        in
         if v.values_count = need then (l, w)
         else
           let r =

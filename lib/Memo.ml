@@ -31,7 +31,7 @@ let request_to_string (req : fetch_request) =
   "at " ^ source_to_string req.src ^ "+" ^ string_of_int req.offset ^ ", " ^ string_of_int req.word_count ^ " words"
 
 let fr_to_fh (fr : fetch_result) : fetch_hash =
-  let ret = Hasher.hash (Option.get (Generic.measure ~measure ~monoid fr.fetched).full).hash in
+  let ret = Hasher.hash (Generic.measure ~measure ~monoid fr.fetched).hash in
   (*print_endline ("hash: " ^ string_of_int ret);*)
   ret
 
@@ -88,8 +88,8 @@ and path_compress_value (rs : record_state) (v : value) : value =
   then recursively path compress the rest of the seq
 *)
 and path_compress_seq (rs : record_state) (x : seq) : seq =
-  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
-  assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
+  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> not m.all_direct) x in
+  assert (Generic.measure ~monoid ~measure lhs).all_direct;
   match Generic.front rhs ~monoid ~measure with
   | None -> lhs
   | Some (rest, Indirect (_, y)) ->
@@ -118,7 +118,7 @@ let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq 
     { src = S (Dynarray.length rs.s); offset = 0; values_count = (Generic.measure ~monoid ~measure seq).degree }
   in
   Dynarray.add_last rs.s v;
-  Generic.singleton (Indirect (seq,  r))
+  Generic.singleton (Indirect (seq, r))
 
 let init_fetch_length () : int ref = ref 1
 
@@ -134,12 +134,8 @@ let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq)
   assert ((get_value_rs rs req.src).depth = rs.m.d);
   let v = path_compress rs req.src in
   let x, y = pop_n v.seq req.offset in
-  let words, rest =
-    Generic.split ~monoid ~measure
-      (fun m -> not (match m.full with None -> false | Some m -> m.length <= req.word_count))
-      y
-  in
-  let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
+  let words, rest = Generic.split ~monoid ~measure (fun m -> not (m.all_direct && m.length <= req.word_count)) y in
+  let length = (Generic.measure ~monoid ~measure words).length in
   assert (length <= req.word_count);
   if (not (Generic.is_empty rest)) && length != req.word_count then
     (*we could try to return the shorten fragment and continue. however i doubt it is reusable so we are just cluttering the hashtable*)
@@ -160,8 +156,8 @@ let fetch_value (rs : record_state) (req : fetch_request) : (fetch_result * seq)
 
 (*assuming this seq is at depth l.m.d+1, convert it to depth l.m.d*)
 let rec unshift_seq (rs : record_state) (x : seq) : seq =
-  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
-  assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
+  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> not m.all_direct) x in
+  assert (Generic.measure ~monoid ~measure lhs).all_direct;
   match Generic.front rhs ~monoid ~measure with
   | None -> lhs
   | Some (rest, Indirect (_, y)) ->
@@ -294,10 +290,10 @@ let register_memo_need_unfetched (s : state) (req : fetch_request) : seq option 
 
 let lift_c (c : exp) : exp = c
 
-let lift_value (s: state) (src : source) (d : depth_t) : value =
+let lift_value (s : state) (src : source) (d : depth_t) : value =
   let v = get_value s src in
   {
-    seq = Generic.singleton (Indirect (v.seq,  { src; offset = 0; values_count = 1 }));
+    seq = Generic.singleton (Indirect (v.seq, { src; offset = 0; values_count = 1 }));
     depth = d + 1;
     fetch_length = init_fetch_length ();
     compressed_since = 0;
