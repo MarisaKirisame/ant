@@ -31,9 +31,7 @@ and fg_et = Direct of Word.t | Indirect of (seq * reference)
 and depth_t = int
 and fetch_count = int
 
-(* measure have this iff fully fetched (only Word.t, no reference). *)
-and full_measure = { length : int; hash : Hasher.t }
-and measure_t = { degree : int; max_degree : int; full : full_measure option }
+and measure_t = { degree : int; max_degree : int; length : int; hash : Hasher.t; all_indirect : bool }
 
 (* The Reference
  * To track whether a fragment is fetched or unfetched,
