@@ -1,6 +1,7 @@
 open BatFingerTree
 module Hasher = Hash.MCRC32C
 open Word
+open AppList
 
 (*todo: have barrier alongside value side by side, to allow force reading with violation*)
 (* The Value type.
@@ -30,7 +31,20 @@ and seq = (fg_et, measure_t) Generic.fg
 and fg_et = Direct of Word.t | Indirect of (seq * reference)
 and depth_t = int
 and fetch_count = int
-and measure_t = { degree : int; max_degree : int; length : int; hash : Hasher.t; all_direct : bool }
+
+and measure_t = {
+  degree : int;
+  max_degree : int;
+  length : int;
+  hash : Hasher.t;
+  (* We are storing a summary of all potential references for privilege checking.
+   * It is in a app_list instead of e.g. a trie/functional set to speed up monoid operations.
+   * But - maybe some other datastructure will work better, should try later.
+   *)
+  indirects : reference app_list;
+  (* Why all_direct instead of just querying indirects? A single unboxed bit is fast. *)
+  all_direct : bool;
+}
 
 (* The Reference
  * To track whether a fragment is fetched or unfetched,
@@ -54,7 +68,7 @@ let set_constructor_degree (ctag : int) (degree : int) : unit =
 
 let monoid : measure_t monoid =
   {
-    zero = { degree = 0; max_degree = 0; length = 0; hash = Hasher.unit; all_direct = true };
+    zero = { degree = 0; max_degree = 0; length = 0; hash = Hasher.unit; indirects = app_list_empty; all_direct = true };
     combine =
       (fun x y ->
         {
@@ -62,6 +76,7 @@ let monoid : measure_t monoid =
           max_degree = max x.max_degree (x.degree + y.max_degree);
           length = x.length + y.length;
           hash = Hasher.mul x.hash y.hash;
+          indirects = app_list_append x.indirects y.indirects;
           all_direct = x.all_direct && y.all_direct;
         });
   }
@@ -75,9 +90,23 @@ let measure (et : fg_et) : measure_t =
         | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
         | _ -> failwith "unknown tag"
       in
-      { degree; max_degree = degree; length = 1; hash = Hasher.from_int w; all_direct = true }
+      {
+        degree;
+        max_degree = degree;
+        length = 1;
+        hash = Hasher.from_int w;
+        indirects = app_list_empty;
+        all_direct = true;
+      }
   | Indirect (_, r) ->
-      { degree = r.values_count; max_degree = r.values_count; length = 0; hash = Hasher.unit; all_direct = false }
+      {
+        degree = r.values_count;
+        max_degree = r.values_count;
+        length = 0;
+        hash = Hasher.unit;
+        indirects = app_list_singleton r;
+        all_direct = false;
+      }
 
 (* 
    Pop a specific number of elements from the seq represented by a finger tree

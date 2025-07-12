@@ -1,6 +1,8 @@
 type 'a app_list_full = LeafAlist of 'a | AppAlist of 'a app_list_full * 'a app_list_full
 type 'a app_list = 'a app_list_full option
 
+let app_list_singleton x = Some (LeafAlist x)
+
 let rec app_list_full_to_list_aux x aux =
   match x with
   | LeafAlist x -> x :: aux
