@@ -157,7 +157,7 @@ let push_s s = { meta_env = s.meta_env; env_length = s.env_length + 1 }
 
 let extend_s s name =
   let meta_env = write_linear s.meta_env in
-  Hashtbl.add_exn meta_env name (Some s.env_length);
+  Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length);
   { meta_env = make_linear meta_env; env_length = s.env_length + 1 }
 
 let drop_s s name =
