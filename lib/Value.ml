@@ -2,7 +2,6 @@ open BatFingerTree
 module Hasher = Hash.MCRC32C
 open Word
 open AppList
-
 include Reference
 
 (* The Value type.
