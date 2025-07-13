@@ -3,7 +3,8 @@ module Hasher = Hash.MCRC32C
 open Word
 open AppList
 
-(*todo: have barrier alongside value side by side, to allow force reading with violation*)
+include Reference
+
 (* The Value type.
  * This is the basic value type which will be manipulated by Ant under the hoold.
  * The Value type provide capabilities of that of Seq.ml, as well as *Reference*.
@@ -45,20 +46,6 @@ and measure_t = {
   (* Why all_direct instead of just querying indirects? A single unboxed bit is fast. *)
   all_direct : bool;
 }
-
-(* The Reference
- * To track whether a fragment is fetched or unfetched,
- *   ant extend the seq finger tree to include a Reference Type.
- * For a value with depth x+1, the Reference is an index into the C/E/S/K of the machine at depth x.
- * A key invariant is that a machine at depth x only contain values with depth x or with depth x+1,
- *   and a key collary is that machine at depth x is only able to fetch value at depth x-1:
- *   The machine only contain reference with depth x or x+1, and the latter is already fetched, so cannot be fetched again.
- *
- * If a value at depth x have a reference which refer to a value at depth x,
- *   It should path-compress lazily, as it had already been fetched, and the reference is pointless.
- *)
-and reference = { src : source; offset : int; values_count : int }
-and source = E of int | S of int | K
 
 let constructor_degree_table : int Dynarray.t = Dynarray.create ()
 
