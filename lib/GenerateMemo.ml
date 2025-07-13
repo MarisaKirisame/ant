@@ -204,7 +204,7 @@ let return (s : scope) : pc =
 
 let add_fv (v : string) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
   let fv = write_linear fv in
-  ignore (Hashtbl.add fv v ());
+  ignore (Hashtbl.add fv ~key:v ~data:());
   make_linear fv
 
 let remove_fv (v : string) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
@@ -246,12 +246,14 @@ let keep_only (s : scope) (fv : (string, unit) Hashtbl.t linear) : int Dynarray.
   Dynarray.iteri
     (fun i k ->
       if k.keep then (
-        (match k.source with None -> () | Some v -> Hashtbl.add_exn meta_env v (Some (Dynarray.length keep_idx)));
+        (match k.source with
+        | None -> ()
+        | Some v -> Hashtbl.add_exn meta_env ~key:v ~data:(Some (Dynarray.length keep_idx)));
         Dynarray.add_last keep_idx i)
       else ())
     keep;
   Hashtbl.iteri (read_linear s.meta_env) ~f:(fun ~key ~data ->
-      if Option.is_some data then ignore (Hashtbl.add meta_env key None));
+      if Option.is_some data then ignore (Hashtbl.add meta_env ~key ~data:None));
   (keep_idx, { meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
 
 let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
