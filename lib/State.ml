@@ -53,9 +53,11 @@ and state = {
 
 (* Needed in Record Mode *)
 and record_state = {
-  (*s f r die earlier then m so they are separated.*)
+  (* s f r die earlier then m so they are separated. *)
   m : state;
   s : store;
+  (* instead of mutating the next level, which cannot be undone eaily, path compression work on this lifted value *)
+  l : lifted;
   mutable f : fetch_count;
   mutable r : memo_node_t ref option;
 }
@@ -67,6 +69,7 @@ and record_state = {
  *   done by pairing each value a ref of length, aliased on all fetch of the same origin, growing exponentially.
  *)
 and store = value Dynarray.t
+and lifted = (source, value) Hashtbl.t
 
 (* The memo
  * The memo is the key data structure that handle all memoization logic.
