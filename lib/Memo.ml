@@ -307,7 +307,9 @@ let rec print_stacktrace (s : state) : unit =
   match s.r with Some s -> print_stacktrace s.m | _ -> ()
 
 let rec enter_new_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux { m = s; s = Dynarray.create (); f = 0; r = None } (Array.get m s.c.pc) None 0
+  enter_new_memo_aux
+    { m = s; s = Dynarray.create (); l = Hashtbl.create (module Source); f = 0; r = None }
+    (Array.get m s.c.pc) None 0
 
 and rs_insert_memo_node (rs : record_state) (m : memo_node_t ref) : unit =
   assert (rs.r = None);
