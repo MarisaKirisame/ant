@@ -461,13 +461,16 @@ let pp_cek_ant x =
   let ctx = new_ctx () in
   let generated_stmt = separate_map (break 1) (ant_pp_stmt ctx) x in
   generate_apply_cont ctx;
-  string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Common"
-  ^^ break 1 ^^ string "let memo = Array.init "
+  string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1
+  ^^ string "let memo = Array.init "
   ^^ string (string_of_int (Dynarray.length codes))
   ^^ string "(fun _ -> ref State.BlackHole)" ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
-            string ("let " ^ string_of_int i ^ " = add_exp ") ^^ Option.get (Dynarray.get codes i)))
+            string ("let ()" ^ " = add_exp ")
+            ^^ Option.get (Dynarray.get codes i)
+            ^^ string " "
+            ^^ string (string_of_int i)))
   ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length ctx.constructor_degree) (fun i ->
