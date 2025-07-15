@@ -44,17 +44,16 @@ let fr_to_fh (fr : fetch_result) : fetch_hash =
     - S i: from the store of the record_state
     - K: the kont of the state inside the record_state, same as E i
 *)
+
 let get_value_rs (rs : record_state) (src : source) : value =
-  match src with E i -> Dynarray.get rs.m.e i | S i -> Dynarray.get rs.s i | K -> rs.m.k
+  match Hashtbl.find rs.l src with
+  | Some v -> v
+  | None -> ( match src with E i -> Dynarray.get rs.m.e i | S i -> Dynarray.get rs.s i | K -> rs.m.k)
+
+let set_value_rs (rs : record_state) (src : source) (v : value) : unit = Hashtbl.set rs.l ~key:src ~data:v
 
 let get_value (s : state) (src : source) : value =
   match src with E i -> Dynarray.get s.e i | S _ -> failwith "get_value impossible" | K -> s.k
-
-let set_value_rs (rs : record_state) (src : source) (v : value) : unit =
-  match src with E i -> Dynarray.set rs.m.e i v | S i -> Dynarray.set rs.s i v | K -> rs.m.k <- v
-
-let set_value (s : state) (src : source) (v : value) : unit =
-  match src with E i -> Dynarray.set s.e i v | S _ -> failwith "set_value impossible" | K -> s.k <- v
 
 (*
   Get a value in `rs` with given `src` and path-compress it.
@@ -401,15 +400,18 @@ let rec resolve (s : state) (src : source) : (Word.t * seq) option =
   assert ((Generic.measure ~monoid ~measure v.seq).degree = 1);
   assert ((Generic.measure ~monoid ~measure v.seq).max_degree = 1);
   match resolve_seq s v.seq with
-  | Some ret ->
-      set_value s src
-        {
-          seq = Generic.cons ~monoid ~measure (snd ret) (Direct (fst ret));
-          depth = v.depth;
-          compressed_since = v.compressed_since;
-          fetch_length = v.fetch_length;
-        };
-      Some ret
+  | Some ret -> (
+      match s.r with
+      | Some r ->
+          set_value_rs r src
+            {
+              seq = Generic.cons ~monoid ~measure (snd ret) (Direct (fst ret));
+              depth = v.depth;
+              compressed_since = v.compressed_since;
+              fetch_length = v.fetch_length;
+            };
+          Some ret
+      | None -> Some ret)
   | None -> None
 
 let rec exec_done (s : state) : 'a =
