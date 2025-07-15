@@ -424,10 +424,10 @@ let rec exec_done (s : state) : 'a =
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
 
-let add_exp (f : state -> state) : int =
+let add_exp (f : state -> state) (pc_ : int) : unit =
   let pc = Dynarray.length pc_map in
-  Dynarray.add_last pc_map { step = f; pc };
-  pc
+  assert (pc == pc_);
+  Dynarray.add_last pc_map { step = f; pc }
 
 let pc_to_exp (pc : int) : exp = Dynarray.get pc_map pc
 

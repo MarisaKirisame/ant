@@ -3,7 +3,6 @@
 open Ant
 open Word
 open Memo
-open Common
 
 let memo = Array.init 14 (fun _ -> ref State.BlackHole)
 
@@ -24,8 +23,9 @@ let to_ocaml_int_list x =
 let rec list_incr (x0 : Value.seq) : Value.seq =
   exec_cek (pc_to_exp 2) (Dynarray.of_list [ x0 ]) (Memo.from_constructor 0) memo
 
-let 0 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 1;
       match resolve_seq x x.k.seq with
       | None -> resolve_failed x memo
@@ -39,21 +39,27 @@ let 0 =
                 x.c <- pc_to_exp 9;
                 stepped x)
                 x tl))
+    0
 
-let 1 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       x.c <- pc_to_exp 2;
       x)
+    1
 
-let 2 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 1;
       push_env x (Dynarray.get x.e 0);
       x.c <- pc_to_exp 3;
       stepped x)
+    2
 
-let 3 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 2;
       let last = (Dynarray.get_last x.e).seq in
       match resolve_seq x last with
@@ -70,35 +76,45 @@ let 3 =
               push_env x (value_at_depth x1 x.d);
               x.c <- pc_to_exp 6;
               stepped x))
+    3
 
-let 4 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 1;
       push_env x (value_at_depth (Memo.from_constructor 1) x.d);
       x.c <- pc_to_exp 5;
       stepped x)
+    4
 
-let 5 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 2;
       return_n x 2 (pc_to_exp 0))
+    5
 
-let 6 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 3;
       push_env x (Dynarray.get x.e 1);
       x.c <- pc_to_exp 7;
       stepped x)
+    6
 
-let 7 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 4;
       push_env x (value_at_depth (Memo.from_int 1) x.d);
       x.c <- pc_to_exp 8;
       stepped x)
+    7
 
-let 8 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 5;
       match resolve_seq x (Dynarray.get x.e 3).seq with
       | None -> resolve_failed x memo
@@ -111,40 +127,51 @@ let 8 =
               push_env x (value_at_depth (Memo.from_int (x0 + x1)) x.d);
               x.c <- pc_to_exp 12;
               stepped x))
+    8
 
-let 9 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 2;
       let x1 = (pop_env x).seq in
       let x0 = (pop_env x).seq in
       push_env x (value_at_depth (Memo.appends [ Memo.from_constructor 2; x0; x1 ]) x.d);
       x.c <- pc_to_exp 10;
       stepped x)
+    9
 
-let 10 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 1;
       drop_n x 1 0 (pc_to_exp 11))
+    10
 
-let 11 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 1;
       return_n x 1 (pc_to_exp 0))
+    11
 
-let 12 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 4;
       push_env x (Dynarray.get x.e 2);
       x.c <- pc_to_exp 13;
       stepped x)
+    12
 
-let 13 =
-  add_exp (fun x ->
+let () =
+  add_exp
+    (fun x ->
       assert_env_length x 5;
       let keep = env_call x [ 3 ] 1 in
       x.k <- value_at_depth (Memo.appends [ Memo.from_constructor 3; keep; x.k.seq ]) x.d;
       x.c <- pc_to_exp 1;
       stepped x)
+    13
 
 let () = Value.set_constructor_degree 0 1
 let () = Value.set_constructor_degree 1 1
