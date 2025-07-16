@@ -329,9 +329,7 @@ and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (p : progress_t
         | Some m -> enter_new_memo_aux rs m progress (depth + 1))
     | None -> (
         rs_insert_memo_node rs m;
-        match progress with
-        | Some p -> p.enter rs
-        | None -> failwith "todo: should exit record_state, becaue not enough fetch value")
+        match progress with Some p -> p.enter rs | None -> rs.m)
   in
   match !m with
   | Halfway p ->
@@ -520,6 +518,11 @@ let assert_env_length (s : state) (e : int) : unit =
   if l <> e then print_endline ("env_length should be " ^ string_of_int e ^ " but is " ^ string_of_int l);
   assert (l = e)
 
+(* There are multiple ways to step forward:
+ * A raw step, which try to execute one small step.
+ * A memo step, which allow mmoization to move as far as possible.
+ * A abort step, which is like the memo step, but will also pop off the memo context if needed.
+ *)
 let raw_step (cek : state) (_ : memo_t) : state = cek.c.step cek
 
 let memo_step (cek : state) (m : memo_t) : state =
