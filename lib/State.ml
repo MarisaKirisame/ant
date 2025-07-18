@@ -91,20 +91,22 @@ and lifted = (source, value) Hashtbl.t
  *)
 and memo_t = memo_node_t ref Array.t
 
+(* The node always start from BlackHole, and may become Halfway, and finally be Need, Continue, or Done. *)
 and memo_node_t =
-  (* We know transiting need to resolve a fetch_request to continue. *)
+  (* We know transiting need to resolve a fetch_request to continue. It's one of the possible final state. *)
   | Need of { next : memo_next_t; progress : progress_t }
-  (* We have not made progress. Need more fetching. *)
+  (* We have not made progress. Need more fetching. Continue is like Need, but without progress. *)
   | Continue of memo_next_t
-  (* The machine evaluate to a value. *)
+  (* The machine evaluate to a value. It's one of the possible final state. *)
   | Done of done_t
   (* We know a bit, but the evaluation is ended prematurely. Still it is better to skip to there. *)
   | Halfway of progress_t
   (* We are figuring out this entry. *)
+  (* Ref: the concept of Haskell's black hole *)
   | BlackHole
 
 and memo_next_t = { request : fetch_request; lookup : lookup_t }
-and done_t = { skip : record_state -> state }
+and done_t = { skip : record_state -> state } (* exception-like continuation *)
 and fetch_request = { src : source; offset : int; word_count : int }
 
 (*todo: maybe try janestreet's hashtable. we want lookup to be as fast as possible so it might be worth to ffi some SOTA*)
