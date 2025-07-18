@@ -94,6 +94,7 @@ let measure (et : fg_et) : measure_t =
         all_direct = false;
       }
 
+(* split at the values level, not the finger tree node level *)
 (* 
    Pop a specific number of elements from the seq represented by a finger tree
    The count is determined by the `n`. All the elements with a `max_degree` less than `n` are popped.
