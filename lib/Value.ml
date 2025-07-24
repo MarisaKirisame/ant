@@ -1,7 +1,6 @@
 open BatFingerTree
 module Hasher = Hash.MCRC32C
 open Word
-open AppList
 include Reference
 
 (* The Value type.
@@ -14,26 +13,13 @@ include Reference
  *
  * Note: Value should not alias. Doing so will mess with the fetch_length, which is bad. 
  *)
-type value = {
-  seq : seq;
-  fetch_length : int ref;
-}
-
+type value = { seq : seq; fetch_length : int ref }
 and seq = (fg_et, measure_t) Generic.fg
-and fg_et = Word of Word.t | Reference of (reference)
+and fg_et = Word of Word.t | Reference of reference
 and depth_t = int
 and fetch_count = int
-
-and measure_t = {
-  degree : int;
-  max_degree : int;
-  full : full_measure_t option;
-}
-
-and full_measure_t = {
-  length : int;
-  hash : Hasher.t;
-}
+and measure_t = { degree : int; max_degree : int; full : full_measure_t option }
+and full_measure_t = { length : int; hash : Hasher.t }
 
 let constructor_degree_table : int Dynarray.t = Dynarray.create ()
 
@@ -43,45 +29,30 @@ let set_constructor_degree (ctag : int) (degree : int) : unit =
 
 let monoid : measure_t monoid =
   {
-    zero = { degree = 0; max_degree = 0; length = 0; hash = Hasher.unit; indirects = app_list_empty; all_direct = true };
+    zero = { degree = 0; max_degree = 0; full = Some { length = 0; hash = Hasher.unit } };
     combine =
       (fun x y ->
         {
           degree = x.degree + y.degree;
           max_degree = max x.max_degree (x.degree + y.max_degree);
-          length = x.length + y.length;
-          hash = Hasher.mul x.hash y.hash;
-          indirects = app_list_append x.indirects y.indirects;
-          all_direct = x.all_direct && y.all_direct;
+          full =
+            (match (x.full, y.full) with
+            | Some fx, Some fy -> Some { length = fx.length + fy.length; hash = Hasher.mul fx.hash fy.hash }
+            | _ -> None);
         });
   }
 
 let measure (et : fg_et) : measure_t =
   match et with
-  | Direct w ->
+  | Word w ->
       let degree =
         match Word.get_tag w with
         | 0 -> 1
         | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
         | _ -> failwith "unknown tag"
       in
-      {
-        degree;
-        max_degree = degree;
-        length = 1;
-        hash = Hasher.from_int w;
-        indirects = app_list_empty;
-        all_direct = true;
-      }
-  | Indirect (_, r) ->
-      {
-        degree = r.values_count;
-        max_degree = r.values_count;
-        length = 0;
-        hash = Hasher.unit;
-        indirects = app_list_singleton r;
-        all_direct = false;
-      }
+      { degree; max_degree = degree; full = Some { length = 1; hash = Hasher.from_int w } }
+  | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
 
 (* split at the values level, not the finger tree node level *)
 (* 
@@ -103,23 +74,20 @@ let rec pop_n (s : seq) (n : int) : seq * seq =
     let m = Generic.measure ~monoid ~measure x in
     assert (m.degree < n);
     match v with
-    | Direct v ->
+    | Word v ->
         assert (m.degree + 1 = n);
-        let l = Generic.snoc ~monoid ~measure x (Direct v) in
+        let l = Generic.snoc ~monoid ~measure x (Word v) in
         (l, w)
-    | Indirect (s', v) ->
+    | Reference v ->
         assert (m.degree < n);
         assert (m.degree + v.values_count >= n);
         let need = n - m.degree in
-        let ls, rs = pop_n s' need in
-        let l =
-          Generic.snoc ~monoid ~measure x (Indirect (ls, { src = v.src; offset = v.offset; values_count = need }))
-        in
+        let l = Generic.snoc ~monoid ~measure x (Reference { src = v.src; offset = v.offset; values_count = need }) in
         if v.values_count = need then (l, w)
         else
           let r =
             Generic.cons ~monoid ~measure w
-              (Indirect (rs, { src = v.src; offset = v.offset + need; values_count = v.values_count - need }))
+              (Reference { src = v.src; offset = v.offset + need; values_count = v.values_count - need })
           in
           (l, r))
 

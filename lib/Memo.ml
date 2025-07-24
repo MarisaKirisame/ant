@@ -31,8 +31,7 @@ let request_to_string (req : fetch_request) =
   "at " ^ source_to_string req.src ^ "+" ^ string_of_int req.offset ^ ", " ^ string_of_int req.word_count ^ " words"
 
 let fr_to_fh (fr : fetch_result) : fetch_hash =
-  let ret = Hasher.hash (Generic.measure ~measure ~monoid fr.fetched).hash in
-  (*print_endline ("hash: " ^ string_of_int ret);*)
+  let ret = Hasher.hash (Option.get (Generic.measure ~measure ~monoid fr.fetched).full).hash in
   ret
 
 (*
@@ -45,71 +44,11 @@ let fr_to_fh (fr : fetch_result) : fetch_hash =
     - K: the kont of the state inside the record_state, same as E i
 *)
 
-let get_value_rs (rs : record_state) (src : source) : value =
-  match Hashtbl.find rs.l src with
-  | Some v -> v
-  | None -> ( match src with E i -> Dynarray.get rs.m.e i | S i -> Dynarray.get rs.s i | K -> rs.m.k)
-
-let set_value_rs (rs : record_state) (src : source) (v : value) : unit = Hashtbl.set rs.l ~key:src ~data:v
+let get_value_with_store (state : state) (store : store) (src : source) : value =
+   ( match src with E i -> Dynarray.get state.e i | S i -> Dynarray.get store i | K -> state.k)
 
 let get_value (s : state) (src : source) : value =
   match src with E i -> Dynarray.get s.e i | S _ -> failwith "get_value impossible" | K -> s.k
-
-(*
-  Get a value in `rs` with given `src` and path-compress it.
-  a value at depth 0 is trivially compressed.
-  If the value is at depth + 1, directly do that with current record_state,
-  otherwise, it's at depth, then we get the record_state of the previous depth and compress it.
-*)
-let rec path_compress (rs : record_state) (src : source) : value =
-  let v = get_value_rs rs src in
-  let new_v =
-    if v.depth = 0 then v (*anything at depth 0 is trivially path-compressed*)
-    else if v.depth = rs.m.d + 1 then path_compress_value rs v
-    else if v.depth = rs.m.d then path_compress_value (Option.get rs.m.r) v
-    else failwith "bad depth"
-  in
-  set_value_rs rs src new_v;
-  new_v
-
-(*given a last of depth x, value with depth x+1. path compress
-  first we check if the value has been compressed;
-  if not, we call path_compress_seq on the seq of the value
-    and update the value with a more recent compressed_since value.
-*)
-and path_compress_value (rs : record_state) (v : value) : value =
-  assert (v.depth = rs.m.d + 1);
-  if v.compressed_since = rs.f then v else { v with seq = path_compress_seq rs v.seq; compressed_since = rs.f }
-
-(*path compressing a seq with depth x+1
-  path compress a seq means find the first element without a full measure_t
-  and the element must be a reference, then compress the reference,
-  then recursively path compress the rest of the seq
-*)
-and path_compress_seq (rs : record_state) (x : seq) : seq =
-  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> not m.all_direct) x in
-  assert (Generic.measure ~monoid ~measure lhs).all_direct;
-  match Generic.front rhs ~monoid ~measure with
-  | None -> lhs
-  | Some (rest, Indirect (_, y)) ->
-      Generic.append ~monoid ~measure lhs
-        (Generic.append ~monoid ~measure (path_compress_reference rs y) (path_compress_seq rs rest))
-  | _ -> failwith "path_compress_seq impossible"
-
-(*path compressing reference of depth x+1
-  first obtain the value denoted by the reference,
-  then check the depth of the value:
-    if the depth is the same as the current depth, then the value is already compressed, return the slice of the value
-    otherwise, path compress it by getting the compressed value, update the reference to point to the compressed value,
-    and return the content in the value represented by the reference
-*)
-and path_compress_reference (rs : record_state) (r : reference) : seq =
-  let v = get_value_rs rs r.src in
-  if v.depth = rs.m.d + 1 then (
-    let v = path_compress_value rs v in
-    set_value_rs rs r.src v;
-    slice v.seq r.offset r.values_count)
-  else Generic.Single (Indirect (v.seq, r))
 
 let add_to_store (rs : record_state) (seq : seq) (fetch_length : int ref) : seq =
   let v = { depth = rs.m.d; seq; compressed_since = 0; fetch_length } in
@@ -236,25 +175,6 @@ and record_memo_exit (s : state) : state = unshift_all s
 and get_done (s : state) : done_t =
   let p = Option.get (get_progress s) in
   { skip = (fun rs -> p.exit (p.enter rs)) }
-
-(*
-let rebase_value (rs : record_state) (v : value) : value = todo "rebase_value"
-
-(*todo: this seems to be the abortion function. we should not call get_progress here, but to determine whether we actually improve*)
-let rebase (rs : record_state) : record_state =
-  assert (rs.r = Building);
-  let rsmr = Option.get rs.m.r in
-  (match rsmr.r with
-  | Evaluating ev -> (
-      match !ev with
-      | BlackHole | Unknown | Halfway _ ->
-          ev := Halfway (get_progress rs.m);
-          ev := Unknown)
-  | Reentrance _ -> failwith "reentrance"
-  | Building _ -> failwith "building");
-  let rsm = unshift_all rs.m in
-  { m = rsm; f = rs.f; s = Dynarray.map (rebase_value rs) rs.s; r = Building }
-*)
 
 (* Stepping require an unfetched fragment. register the current state.
  * Note that the reference in request does not refer to value in s, but value one level down.
