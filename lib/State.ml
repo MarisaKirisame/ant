@@ -29,10 +29,7 @@ and state = {
   sc : int;
 }
 
-and recording = {
-  s : store;
-  u : update;
-}
+and recording = { s : store; u : update }
 
 (* The Store
  * A fetch can be partial, so the remaining fragment need to be fetched again.
@@ -42,6 +39,7 @@ and recording = {
  *)
 and store = value Dynarray.t
 and update = memo_node_t ref
+
 (* The memo tree is the key data structure that handle all memoization logic.
  *   It contain a fetch request, which try to fetch a reference of a length.
  *   The segment then is hashed and compared to value in a hashtable.
@@ -68,5 +66,4 @@ and fetch_request = { src : source; offset : int; word_count : int }
 
 (*todo: maybe try janestreet's hashtable. we want lookup to be as fast as possible so it might be worth to ffi some SOTA*)
 and lookup_t = (fetch_hash, memo_node_t ref) Hashtbl.t
-
 and fetch_hash = int
