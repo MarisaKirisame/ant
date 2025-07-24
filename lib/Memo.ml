@@ -518,12 +518,60 @@ let assert_env_length (s : state) (e : int) : unit =
   if l <> e then print_endline ("env_length should be " ^ string_of_int e ^ " but is " ^ string_of_int l);
   assert (l = e)
 
-(* There are multiple ways to step forward:
- * A raw step, which try to execute one small step.
- * A memo step, which allow mmoization to move as far as possible.
- * A abort step, which is like the memo step, but will also pop off the memo context if needed.
+(* Contribution and CEK context:
+ * Each record context is required to made contribution to the memo tree eventually,
+ *   by for example, inserting a new entry, or updating a new entry from a `black hole` to `need`.
+ * To enforce this, the machine behave differently depending on
+ *   whether the current record context have made contribution or not.
+ * In particular, only when the current record context have made contribution,
+ *   can the machine exit the record context or enter another one.
  *)
-let raw_step (cek : state) (_ : memo_t) : state = cek.c.step cek
+
+type step_status = NoContribution | Contributed | NoProgress
+(*
+ * A step might result in 1 of 3 status:
+ * - NoContribution: where the enter made a new record context which no contribution had been made yet.
+ *     We then have to stay in the current record context until contribution is made.
+ * - Contributed: where the machine made a contribution. This can be due to:
+ *   - Creating a new entry in the memo tree, and moving down into a corresponding memo context.
+ *   - Making progress in the current record context, as those progress is guranteed to be uploaded to the memo tree.
+ *   - Exiting the current record context, moving up out of it (as previos record context made contribution).
+ *     In this case, everything is good.
+ * - NoProgress: where the machine did not make any progress
+ *     In this case a raw machine step must be executed, to enforce progress.
+ *
+ * The function ant_step is the default function to progress the machine, 
+ *   and can be called repeatedly to evaluate the program into a value. 
+ * Ant step assume the input is in a contributed status (the root of the context stack also count for uniformity),
+ *   and will return a state in a contributed status.
+ *)
+
+let rec ant_step (cek : state) (m : memo_t) : state =
+  match memo_step_contributed cek m with
+  | NoContribution, cek -> (
+      match memo_step_no_contribution cek m with Contributed, cek -> cek | NoProgress, cek -> raw_step cek m)
+  | Contributed, cek -> cek
+  | NoProgress, cek -> raw_step cek m
+
+and memo_step_no_contribution (cek : state) (_ : memo_t) : step_status * state =
+  (* Search the memo table to go forward.
+   *   But - will not create/move to a new context.
+   *   Thus - if resolve_seq failed, or if there is no more values in tree,
+   *     will just use the last progress
+   *)
+  1
+
+and memo_step_contributed (cek : state) (_ : memo_t) : step_status * state =
+  (* Search the memo table to go forward.
+   *   If resolve_seq failed, will abort upward to a progress that can pass.
+   *   If the tree does not contain the correct hash, will insert a entry, 
+   *     enter the record_context and return a contributed status.
+   *   If all reolving succeed and entered a non-needed leave state (such as halfway),
+   *     enter the record_context and return a non_contributed status.
+   *)
+  1
+
+and raw_step (cek : state) (_ : memo_t) : state = cek.c.step cek
 
 let memo_step (cek : state) (m : memo_t) : state =
   let before_step = cek.sc in

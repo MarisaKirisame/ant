@@ -12,38 +12,27 @@ include Reference
  * so read of those values will be interrupted, and corresponding memo table operation
  * will be carried out.
  *
- * Such capability is provided by a some what Union-Find like design.
- *
  * Note: Value should not alias. Doing so will mess with the fetch_length, which is bad. 
  *)
 type value = {
   seq : seq;
-  (* Look like we only need a bit dictating fetchness? *)
-  depth : depth_t;
   fetch_length : int ref;
-  (* A value with depth x is path-compressed iff all the reference refer to value with depth < x.
-   * If a value with depth x have it's compressed_since = fetch_count on depth x-1, it is path_compressed.
-   *)
-  compressed_since : fetch_count;
 }
 
 and seq = (fg_et, measure_t) Generic.fg
-and fg_et = Direct of Word.t | Indirect of (seq * reference)
+and fg_et = Word of Word.t | Reference of (reference)
 and depth_t = int
 and fetch_count = int
 
 and measure_t = {
   degree : int;
   max_degree : int;
+  full : full_measure_t option;
+}
+
+and full_measure_t = {
   length : int;
   hash : Hasher.t;
-  (* We are storing a summary of all potential references for privilege checking.
-   * It is in a app_list instead of e.g. a trie/functional set to speed up monoid operations.
-   * But - maybe some other datastructure will work better, should try later.
-   *)
-  indirects : reference app_list;
-  (* Why all_direct instead of just querying indirects? A single unboxed bit is fast. *)
-  all_direct : bool;
 }
 
 let constructor_degree_table : int Dynarray.t = Dynarray.create ()
