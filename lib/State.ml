@@ -44,7 +44,7 @@ and update = memo_node_t ref
  *   It contain a fetch request, which try to fetch a reference of a length.
  *   The segment then is hashed and compared to value in a hashtable.
  *   The value inside a hashtable is another cek machine.
- *   We are doing some work here to ensure every progress_t advance the execution: 
+ *   We are doing some work here to ensure every progress advance the execution: 
  *     there is no zero-distance jump.
  *)
 and memo_t = memo_node_t ref Array.t
