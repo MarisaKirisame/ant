@@ -34,37 +34,51 @@ let fr_to_fh (fr : fetch_result) : fetch_hash =
   let ret = Hasher.hash (Option.get (Generic.measure ~measure ~monoid fr.fetched).full).hash in
   ret
 
-(*
-  Get a value in `rs` with given `src`.
-  Depending on the `src`, the value is fetched:
-    - E i: from the env of the state inside the record_state.
-           (not the env of the state which contains the record_state,
-           because it is in a deeper depth and not corresponding to the current record_state)
-    - S i: from the store of the record_state
-    - K: the kont of the state inside the record_state, same as E i
-*)
+let get_value (state : state) (store : store option) (src : source) : value =
+  match src with E i -> Dynarray.get state.e i | S i -> Dynarray.get (Option.get store) i | K -> state.k
 
-let get_value_with_store (state : state) (store : store) (src : source) : value =
-  match src with E i -> Dynarray.get state.e i | S i -> Dynarray.get store i | K -> state.k
-
-let get_value (s : state) (src : source) : value =
-  match src with E i -> Dynarray.get s.e i | S _ -> failwith "get_value impossible" | K -> s.k
-
-let add_to_store (store : store) (seq : seq) (fetch_length : int ref) : unit =
-  let v = { seq; fetch_length } in
-  Dynarray.add_last store v
-
+let get_value_ (state : state) (store : store option) (src : source) : seq = (get_value state store src).seq
 let init_fetch_length () : int ref = ref 1
 
-let fetch_value (state : state) (store : store) (req : fetch_request) : fetch_result option =
-  let v = get_value_with_store state store req.src in
+(* Where does the references in tstate point to? 
+ * Note that references in Here can only point to S.
+ *)
+type tvalue = Here of seq | Lower of seq
+type tstore = tvalue Dynarray.t
+
+type tstate = {
+  mutable tc : exp;
+  mutable te : tvalue Dynarray.t;
+  mutable tk : tvalue;
+  mutable ts : tstore;
+  mutable tsc : int;
+}
+
+let set_tvalue (ts : tstate) (src : source) (tv : tvalue) : unit =
+  match src with E i -> Dynarray.set ts.te i tv | S i -> Dynarray.set ts.ts i tv | K -> ts.tk <- tv
+
+let init_store () : store = Dynarray.create ()
+
+let add_to_store (store : store) (tstore : tstore) (seq : seq) (fetch_length : int ref) : seq =
+  let v = { seq; fetch_length } in
+  Dynarray.add_last store v;
+  let d = (Generic.measure ~monoid ~measure seq).degree in
+  (* if it is 0 it must be empty and we should not be adding *)
+  assert (d > 0);
+  let r = { src = S (Dynarray.length store); offset = 0; values_count = d } in
+  Dynarray.add_last tstore (Lower (Generic.singleton (Reference r)));
+  Generic.singleton (Reference r)
+
+let fetch_value (state : state) (store : store) (tstate : tstate) (req : fetch_request) : fetch_result option =
+  let v = get_value state (Some store) req.src in
   let x, y = pop_n v.seq req.offset in
   let words, rest =
     Generic.split ~monoid ~measure
       (fun m -> not (match m.full with Some f -> f.length <= req.word_count | None -> false))
       y
   in
-  let length = (Option.get (Generic.measure ~monoid ~measure words).full).length in
+  let m = Generic.measure ~monoid ~measure words in
+  let length = (Option.get m.full).length in
   assert (length <= req.word_count);
   if (not (Generic.is_empty rest)) && length != req.word_count then
     (* We could try to return the shorten fragment and continue.
@@ -73,159 +87,133 @@ let fetch_value (state : state) (store : store) (req : fetch_request) : fetch_re
   else
     let have_prefix = not (Generic.is_empty x) in
     let have_suffix = not (Generic.is_empty rest) in
-    if have_prefix then add_to_store store x v.fetch_length;
-    if have_suffix then add_to_store store rest v.fetch_length;
+    let transformed_x = if have_prefix then add_to_store store tstate.ts x v.fetch_length else Generic.empty in
+    let transformed_rest = if have_suffix then add_to_store store tstate.ts rest v.fetch_length else Generic.empty in
     if not have_suffix then v.fetch_length := !(v.fetch_length) * 2;
+    let seq = Generic.append ~monoid ~measure transformed_x (Generic.append ~monoid ~measure words transformed_rest) in
+    set_tvalue tstate req.src (Here seq);
     Some { fetched = words; have_prefix; have_suffix = not (Generic.is_empty rest) }
 
-let rec subst (state : state) (store : store) (x : seq) : seq =
+let rec subst (resolve : source -> seq) (x : seq) : seq =
   let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
   assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
   match Generic.front rhs ~monoid ~measure with
   | None -> lhs
   | Some (rest, Reference r) ->
       Generic.append ~monoid ~measure lhs
-        (Generic.append ~monoid ~measure (subst_reference state store r) (subst state store rest))
-  | _ -> failwith "unshift_seq impossible"
+        (Generic.append ~monoid ~measure (subst_reference resolve r) (subst resolve rest))
 
-and subst_reference (state : state) (store : store) (r : reference) : seq =
-  let v = get_value_with_store state store r.src in
-  slice v.seq r.offset r.values_count
+and subst_reference (resolve : source -> seq) (r : reference) : seq =
+  let seq = resolve r.src in
+  slice seq r.offset r.values_count
 
-(* reference in y get resolved to values in x and store *)
-let subst_state (x : state) (store : store) (y : state) : state =
-  let e = Dynarray.map (fun v -> { v with seq = subst x store v.seq }) y.e in
-  let k = { y.k with seq = subst x store y.k.seq } in
-  { y with e; k }
+(* fast forward state x to state y via store *)
+let fast_forward_to (x : state) (store : store) (y : state) : state =
+  let c = y.c in
+  let e = Dynarray.map (fun v -> { v with seq = subst (get_value_ x (Some store)) v.seq }) y.e in
+  let k = { y.k with seq = subst (get_value_ x (Some store)) y.k.seq } in
+  let sc = x.sc + y.sc in
+  { c; e; k; sc }
 
-(* Stepping require an unfetched fragment. register the current state.
- * Note that the reference in request does not refer to value in s, but value one level down.
+(* Stepping require an unfetched fragment. register the current state. *)
+let register_memo_need_unfetched (state : state) (store : store option) (request : fetch_request) (update : update) :
+    unit =
+  match !update with
+  | BlackHole | Halfway _ ->
+      let lookup = Hashtbl.create (module Core.Int) in
+      update := Need { next = { request; lookup }; current = Shared state }
+  | Need n -> ()
+  | Done _ -> failwith "impossible case: Done"
+
+let make_value (seq : seq) : value = { seq; fetch_length = init_fetch_length () }
+let single_reference (src : source) : seq = Generic.singleton (Reference { src; offset = 0; values_count = 1 })
+let print_state (cek : state) msg : unit = print_endline (msg ^ ": pc=" ^ string_of_int cek.c.pc)
+
+(* Each execution cycle in ant consist of 3 steps:
+ * - Locating a node from the memo tree, which consist of an updatable intermediate state.
+ * - Updating that state in the memo tree by moving forward.
+ * - Forwarding to that state.
+ * These 3 steps use and improve the memo tree at the same time.
  *)
-let register_memo_need_unfetched (s : state) (req : fetch_request) : seq option =
-  let r = Option.get s.r in
-  let ev = Option.get r.r in
-  let lookup =
-    match !ev with
-    | BlackHole ->
-        (*print_endline ("fill, pc " ^ string_of_int s.c.pc);*)
-        let lookup = Hashtbl.create (module Core.Int) in
-        (match get_progress s with
-        | Some p -> ev := Need { next = { request = req; lookup }; progress = p }
-        | None -> ev := Continue { request = req; lookup });
-        lookup
-    | Continue _ -> failwith "impossible case: Continue"
-    | Need n ->
-        assert (req = n.next.request);
-        n.next.lookup
-    | Done _ -> failwith "impossible case: Done"
-    | Halfway _ -> failwith "impossible case: Halfway"
+
+let tstate_from_state (s : state) : tstate =
+  {
+    tc = s.c;
+    te = Dynarray.mapi (fun i _ -> Lower (single_reference (E i))) s.e;
+    tk = Lower (single_reference K);
+    ts = Dynarray.create ();
+    tsc = 0;
+  }
+
+let dyn_array_update (f : 'a -> 'a) (arr : 'a Dynarray.t) : unit =
+  let len = Dynarray.length arr in
+  for i = 0 to len - 1 do
+    Dynarray.set arr i (f (Dynarray.get arr i))
+  done
+
+let dyn_array_rev_update (f : 'a -> 'a) (arr : 'a Dynarray.t) : unit =
+  let len = Dynarray.length arr in
+  for i = len - 1 downto 0 do
+    Dynarray.set arr i (f (Dynarray.get arr i))
+  done
+
+let unHere (Here seq) = seq
+let unLower (Lower seq) = seq
+
+let state_from_tstate (s : state) (t : tstate) : state =
+  dyn_array_rev_update
+    (fun v ->
+      match v with Here v -> Lower (subst (fun (S i) -> unLower (Dynarray.get t.ts i)) v) | Lower v -> Lower v)
+    t.ts;
+  let transform (tv : tvalue) (src : source) : value =
+    match tv with Here v -> make_value (subst (fun (S i) -> unLower (Dynarray.get t.ts i)) v) | Lower v -> make_value v
   in
-  match fetch_value r req with
-  | Some (fr, seq) ->
-      let bh = ref BlackHole in
-      (*print_endline ("new entry when " ^ source_to_string req.src ^ " word length " ^ string_of_int req.word_count);*)
-      Hashtbl.add_exn lookup ~key:(fr_to_fh fr) ~data:bh;
-      r.r <- Some bh;
-      Some seq
-  | None -> None
+  { c = t.tc; e = Dynarray.mapi (fun i v -> transform v (E i)) t.te; k = transform t.tk K; sc = t.tsc }
 
-let lift_c (c : exp) : exp = c
+exception DoneExc of state
 
-let lift_value (s : state) (src : source) (d : depth_t) : value =
-  { seq = Generic.singleton (Reference { src; offset = 0; values_count = 1 }); fetch_length = init_fetch_length () }
+let locate (state : state) (memo : memo_t) : state * store * update =
+  let store = init_store () in
+  let tstate = tstate_from_state state in
+  let rec climb (update : update) : state * update =
+    match !update with
+    | Halfway s -> (copy_state s, update)
+    | Done d -> raise (DoneExc (fast_forward_to state store (copy_state d)))
+    | BlackHole -> (state_from_tstate state tstate, update)
+    | Need { current; next } -> (
+        let fr = Option.get (fetch_value state store tstate next.request) in
+        match Hashtbl.find next.lookup (fr_to_fh fr) with
+        | None ->
+            let bh = ref BlackHole in
+            Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
+            (copy_state current, bh)
+        | Some m -> climb m)
+  in
+  let state, update = climb (Array.get memo state.c.pc) in
+  (state, store, update)
 
-let print_state (cek : state) msg : unit =
-  print_endline (msg ^ ": pc=" ^ string_of_int cek.c.pc ^ ", d=" ^ string_of_int cek.d)
+let update (state : state) (store : store) (update : update) : state = 1
 
-let rec print_stacktrace (s : state) : unit =
-  print_state s "stacktrace";
-  match s.r with Some s -> print_stacktrace s.m | _ -> ()
+let ant_step (x : state) (m : memo_t) : state =
+  let y, store, update = locate x m in
+  let y = update y store update in
+  fast_forward_to x store y
 
+(* Record state is used to record the current state of the machine.
+ * It is used to record the current state of the machine, and to enter a new memo context.
+ * It is also used to record the current state of the machine, and to enter a new memo context.
+ *)
 let rec enter_new_memo (s : state) (m : memo_t) : state =
   enter_new_memo_aux
     { m = s; s = Dynarray.create (); l = Hashtbl.create (module Source); f = 0; r = None }
     (Array.get m s.c.pc) None 0
-
-and rs_insert_memo_node (rs : record_state) (m : memo_node_t ref) : unit =
-  assert (rs.r = None);
-  rs.r <- Some m
-
-and enter_new_memo_aux (rs : record_state) (m : memo_node_t ref) (p : progress_t option) (depth : int) : state =
-  let try_enter_next next progress =
-    match fetch_value rs next.request with
-    | Some (fr, _) -> (
-        match Hashtbl.find next.lookup (fr_to_fh fr) with
-        | None -> (
-            let bh = ref BlackHole in
-            Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
-            rs_insert_memo_node rs bh;
-            match progress with
-            | Some p -> p.enter rs
-            | None -> failwith "todo: should make a new record_state. we are not skipping ahead but that's fine")
-        | Some m -> enter_new_memo_aux rs m progress (depth + 1))
-    | None -> (
-        rs_insert_memo_node rs m;
-        match progress with Some p -> p.enter rs | None -> rs.m)
-  in
-  match !m with
-  | Halfway p ->
-      rs_insert_memo_node rs m;
-      failwith "halfway" (*p.enter rs*)
-  | Done d ->
-      (*todo: d.skip should allow rs.r to be in whatever state as it is done.*)
-      rs_insert_memo_node rs m;
-      d.skip rs
-  | BlackHole -> (
-      match p with
-      | None ->
-          m := BlackHole;
-          rs_insert_memo_node rs m;
-          {
-            c = lift_c rs.m.c;
-            e = Dynarray.init (Dynarray.length rs.m.e) (fun i -> lift_value rs.m (E i) rs.m.d);
-            k = lift_value rs.m K rs.m.d;
-            d = rs.m.d + 1;
-            sc = rs.m.sc;
-            r = Some rs;
-          }
-      | Some p ->
-          rs_insert_memo_node rs m;
-          p.enter rs)
-  | Need { next; progress } -> try_enter_next next (Some progress)
-  | Continue next -> try_enter_next next p
-
-(* A single transition step should:
- *   0   - Start with a sequence of resolve
- *   1.0 - If any resolve return None, call record_memo_exit
- *   1.1 - Otherwise, issue a sequence of writes to state
- *   1.2 - Or call exec_done if everything had been evaluated
- * A key invariant is that all resolve must appear before any action in state 1.
- *   In particular, this mean you should not resolve once you write to state.
- *)
-exception DoneExc
 
 let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
   let m = Generic.measure ~monoid ~measure x in
   assert (m.degree = 1);
   assert (m.max_degree = 1);
   let tl, hd = Generic.front_exn ~monoid ~measure x in
-  match hd with
-  | Direct w -> Some (w, tl)
-  | Indirect (_, ref) ->
-      let rs = Option.get s.r in
-      let r_v = get_value_rs rs ref.src in
-      if r_v.depth = s.d then
-        resolve_seq s (Generic.append ~monoid ~measure (slice r_v.seq ref.offset ref.values_count) tl)
-      else (
-        assert (r_v.depth + 1 = s.d);
-        match
-          register_memo_need_unfetched s { src = ref.src; offset = ref.offset; word_count = !(r_v.fetch_length) }
-        with
-        | Some seq -> (
-            let seq_tl, seq_hd = Generic.front_exn ~monoid ~measure (slice seq ref.offset ref.values_count) in
-            let rest = Generic.append ~monoid ~measure seq_tl tl in
-            match seq_hd with Direct w -> Some (w, rest) | Indirect _ -> failwith "impossible: indirect")
-        | None -> None)
+  match hd with Direct w -> Some (w, tl) | Reference ref -> None
 
 (* Todo: I think we should path-compress lazily all places in the code, just like what we are doing here. *)
 (* Src cannot be a Store, as we are resolving location at the top level, while only non-top-level have store. *)
@@ -264,14 +252,6 @@ let add_exp (f : state -> state) (pc_ : int) : unit =
   Dynarray.add_last pc_map { step = f; pc }
 
 let pc_to_exp (pc : int) : exp = Dynarray.get pc_map pc
-
-let value_at_depth (seq : seq) (depth : int) : value =
-  let m = Generic.measure ~monoid ~measure seq in
-  if m.degree <> 1 then print_endline (string_of_int m.degree);
-  assert (m.degree = 1);
-  assert (m.max_degree = 1);
-  { seq; depth; fetch_length = init_fetch_length (); compressed_since = 0 }
-
 let from_constructor (ctag : int) : seq = Generic.singleton (Direct (Word.make Word.constructor_tag ctag))
 let from_int (i : int) : seq = Generic.singleton (Direct (Word.make Word.int_tag i))
 
