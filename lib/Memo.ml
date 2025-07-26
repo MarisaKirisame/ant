@@ -116,8 +116,7 @@ let fast_forward_to (x : state) (store : store) (y : state) : state =
   { c; e; k; sc }
 
 (* Stepping require an unfetched fragment. register the current state. *)
-let register_memo_need_unfetched (state : state) (store : store option) (request : fetch_request) (update : update) :
-    unit =
+let register_memo_need_unfetched (state : state) (request : fetch_request) (update : update) : unit =
   match !update with
   | BlackHole | Halfway _ ->
       let lookup = Hashtbl.create (module Core.Int) in
@@ -166,100 +165,109 @@ let state_from_tstate (s : state) (t : tstate) : state =
       match v with Here v -> Lower (subst (fun (S i) -> unLower (Dynarray.get t.ts i)) v) | Lower v -> Lower v)
     t.ts;
   let transform (tv : tvalue) (src : source) : value =
-    match tv with Here v -> make_value (subst (fun (S i) -> unLower (Dynarray.get t.ts i)) v) | Lower v -> make_value v
+    match tv with
+    | Here v -> make_value (subst (fun (S i) -> unLower (Dynarray.get t.ts i)) v)
+    | Lower v -> make_value v
   in
   { c = t.tc; e = Dynarray.mapi (fun i v -> transform v (E i)) t.te; k = transform t.tk K; sc = t.tsc }
 
 exception DoneExc of state
 
+(* note how fetch_value_can_fail enable exit not only via fetch_fallthrough, but also from climb_halfway *)
+let rec climb (state : state) (store : store) (tstate : tstate) (fetch_value_can_fail : bool) (climb_done : state -> 'a)
+    (climb_halfway : state -> update -> 'a) (update : update) (fetch_fallthrough : unit -> 'a) : 'a =
+  match !update with
+  | Halfway s -> climb_halfway (copy_state s) update
+  | Done d -> climb_done (copy_state d)
+  | BlackHole -> climb_halfway (state_from_tstate state tstate) update
+  | Need { current; next } -> (
+      match fetch_value state store tstate next.request with
+      | None ->
+          assert fetch_value_can_fail;
+          fetch_fallthrough ()
+      | Some fr -> (
+          match Hashtbl.find next.lookup (fr_to_fh fr) with
+          | None ->
+              let bh = ref BlackHole in
+              Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
+              climb_halfway (copy_state current) bh
+          | Some m ->
+              climb state store tstate fetch_value_can_fail climb_done climb_halfway m (fun _ ->
+                  climb_halfway (copy_state current) update)))
+
 let locate (state : state) (memo : memo_t) : state * store * update =
   let store = init_store () in
   let tstate = tstate_from_state state in
-  let rec climb (update : update) : state * update =
-    match !update with
-    | Halfway s -> (copy_state s, update)
-    | Done d -> raise (DoneExc (fast_forward_to state store (copy_state d)))
-    | BlackHole -> (state_from_tstate state tstate, update)
-    | Need { current; next } -> (
-        let fr = Option.get (fetch_value state store tstate next.request) in
-        match Hashtbl.find next.lookup (fr_to_fh fr) with
-        | None ->
-            let bh = ref BlackHole in
-            Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
-            (copy_state current, bh)
-        | Some m -> climb m)
-  in
-  let state, update = climb (Array.get memo state.c.pc) in
-  (state, store, update)
+  climb state store tstate false
+    (fun d -> raise (DoneExc (fast_forward_to state store d)))
+    (fun state update -> (state, store, update))
+    (Array.get memo state.c.pc)
+    (fun _ -> failwith "impossible: fetch_fallthrough should not be called in locate")
 
-let update (state : state) (store : store) (update : update) : state = 1
+let improve update s =
+  match !update with
+  | Halfway _ | BlackHole -> update := Done s
+  | Need _ | Done _ -> failwith "impossible case in improve"
+
+let update (state : state) (update : update) : state =
+  let store = init_store () in
+  let tstate = tstate_from_state state in
+  let state_ =
+    climb state store tstate true
+      (fun d ->
+        let d = fast_forward_to state store d in
+        improve update (Shared d);
+        raise (DoneExc d))
+      (fun y _ ->
+        let state = fast_forward_to state store y in
+        improve update (Shared state);
+        state)
+      update
+      (fun _ -> state)
+  in
+  assert (state_.sc > state.sc);
+  state_
 
 let ant_step (x : state) (m : memo_t) : state =
-  let y, store, update = locate x m in
-  let y = update y store update in
+  let y, store, update_ = locate x m in
+  let y = update y update_ in
   fast_forward_to x store y
 
-(* Record state is used to record the current state of the machine.
- * It is used to record the current state of the machine, and to enter a new memo context.
- * It is also used to record the current state of the machine, and to enter a new memo context.
- *)
-let rec enter_new_memo (s : state) (m : memo_t) : state =
-  enter_new_memo_aux
-    { m = s; s = Dynarray.create (); l = Hashtbl.create (module Source); f = 0; r = None }
-    (Array.get m s.c.pc) None 0
-
-let rec resolve_seq (s : state) (x : seq) : (Word.t * seq) option =
+let rec resolve_seq (s : state) (x : seq) (update : update) : (Word.t * seq) option =
   let m = Generic.measure ~monoid ~measure x in
   assert (m.degree = 1);
   assert (m.max_degree = 1);
   let tl, hd = Generic.front_exn ~monoid ~measure x in
-  match hd with Direct w -> Some (w, tl) | Reference ref -> None
+  match hd with
+  | Word w -> Some (w, tl)
+  | Reference ref ->
+      let r_v = get_value s None ref.src in
+      register_memo_need_unfetched s { src = ref.src; offset = ref.offset; word_count = !(r_v.fetch_length) } update;
+      None
 
-(* Todo: I think we should path-compress lazily all places in the code, just like what we are doing here. *)
 (* Src cannot be a Store, as we are resolving location at the top level, while only non-top-level have store. *)
-let rec resolve (s : state) (src : source) : (Word.t * seq) option =
-  let v = get_value s src in
+let rec resolve (s : state) (src : source) (update : update) : (Word.t * seq) option =
+  let v = get_value s None src in
   assert ((Generic.measure ~monoid ~measure v.seq).degree = 1);
   assert ((Generic.measure ~monoid ~measure v.seq).max_degree = 1);
-  match resolve_seq s v.seq with
-  | Some ret -> (
-      match s.r with
-      | Some r ->
-          set_value_rs r src
-            {
-              seq = Generic.cons ~monoid ~measure (snd ret) (Direct (fst ret));
-              depth = v.depth;
-              compressed_since = v.compressed_since;
-              fetch_length = v.fetch_length;
-            };
-          Some ret
-      | None -> Some ret)
-  | None -> None
-
-let rec exec_done (s : state) : 'a =
-  match s.r with
-  | Some r ->
-      let ev = Option.get r.r in
-      (match !ev with BlackHole -> ev := Done (get_done s) | _ -> failwith "exec_done impossible");
-      exec_done (record_memo_exit s)
-  | None -> raise DoneExc
+  resolve_seq s v.seq update
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
 
-let add_exp (f : state -> state) (pc_ : int) : unit =
+let add_exp (f : state -> update -> state) (pc_ : int) : unit =
   let pc = Dynarray.length pc_map in
   assert (pc == pc_);
   Dynarray.add_last pc_map { step = f; pc }
 
 let pc_to_exp (pc : int) : exp = Dynarray.get pc_map pc
-let from_constructor (ctag : int) : seq = Generic.singleton (Direct (Word.make Word.constructor_tag ctag))
-let from_int (i : int) : seq = Generic.singleton (Direct (Word.make Word.int_tag i))
+let from_constructor (ctag : int) : seq = Generic.singleton (Word (Word.make Word.constructor_tag ctag))
+let from_int (i : int) : seq = Generic.singleton (Word (Word.make Word.int_tag i))
 
 let to_int (s : seq) : int =
   assert ((Generic.measure ~monoid ~measure s).degree = 1);
   assert ((Generic.measure ~monoid ~measure s).max_degree = 1);
   assert (Generic.size s = 1);
-  match Generic.head_exn s with Direct w -> w | Indirect _ -> failwith "conveting indirect to_int"
+  match Generic.head_exn s with Word w -> w | Reference _ -> failwith "conveting reference to_int"
 
 let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
 let appends (x : seq list) : seq = List.fold_right append x empty
@@ -272,7 +280,7 @@ let rec splits (x : seq) : seq list =
     h :: splits t
 
 let list_match (x : seq) : (Word.t * seq) option =
-  Option.map (fun (x, Direct y) -> (y, x)) (Generic.front ~monoid ~measure x)
+  Option.map (fun (x, Word y) -> (y, x)) (Generic.front ~monoid ~measure x)
 
 let push_env (s : state) (v : value) : unit =
   assert ((Generic.measure ~monoid ~measure v.seq).degree = 1);
@@ -298,7 +306,7 @@ let restore_env (s : state) (n : int) (seqs : seq) : unit =
   assert (List.length splitted = n);
   assert (Dynarray.length s.e = 1);
   let last = Dynarray.get_last s.e in
-  s.e <- Dynarray.of_list (List.map (fun x -> value_at_depth x s.d) splitted);
+  s.e <- Dynarray.of_list (List.map (fun x -> make_value x) splitted);
   Dynarray.add_last s.e last
 
 let get_next_cont (seqs : seq) : seq =
@@ -334,89 +342,19 @@ let assert_env_length (s : state) (e : int) : unit =
   if l <> e then print_endline ("env_length should be " ^ string_of_int e ^ " but is " ^ string_of_int l);
   assert (l = e)
 
-(* Contribution and CEK context:
- * Each record context is required to made contribution to the memo tree eventually,
- *   by for example, inserting a new entry, or updating a new entry from a `black hole` to `need`.
- * To enforce this, the machine behave differently depending on
- *   whether the current record context have made contribution or not.
- * In particular, only when the current record context have made contribution,
- *   can the machine exit the record context or enter another one.
- *)
-
-type step_status = NoContribution | Contributed | NoProgress
-(*
- * A step might result in 1 of 3 status:
- * - NoContribution: where the enter made a new record context which no contribution had been made yet.
- *     We then have to stay in the current record context until contribution is made.
- * - Contributed: where the machine made a contribution. This can be due to:
- *   - Creating a new entry in the memo tree, and moving down into a corresponding memo context.
- *   - Making progress in the current record context, as those progress is guranteed to be uploaded to the memo tree.
- *   - Exiting the current record context, moving up out of it (as previos record context made contribution).
- *     In this case, everything is good.
- * - NoProgress: where the machine did not make any progress
- *     In this case a raw machine step must be executed, to enforce progress.
- *
- * The function ant_step is the default function to progress the machine, 
- *   and can be called repeatedly to evaluate the program into a value. 
- * Ant step assume the input is in a contributed status (the root of the context stack also count for uniformity),
- *   and will return a state in a contributed status.
- *)
-
-let rec ant_step (cek : state) (m : memo_t) : state =
-  match memo_step_contributed cek m with
-  | NoContribution, cek -> (
-      match memo_step_no_contribution cek m with Contributed, cek -> cek | NoProgress, cek -> raw_step cek m)
-  | Contributed, cek -> cek
-  | NoProgress, cek -> raw_step cek m
-
-and memo_step_no_contribution (cek : state) (_ : memo_t) : step_status * state =
-  (* Search the memo table to go forward.
-   *   But - will not create/move to a new context.
-   *   Thus - if resolve_seq failed, or if there is no more values in tree,
-   *     will just use the last progress
-   *)
-  1
-
-and memo_step_contributed (cek : state) (_ : memo_t) : step_status * state =
-  (* Search the memo table to go forward.
-   *   If resolve_seq failed, will abort upward to a progress that can pass.
-   *   If the tree does not contain the correct hash, will insert a entry, 
-   *     enter the record_context and return a contributed status.
-   *   If all reolving succeed and entered a non-needed leave state (such as halfway),
-   *     enter the record_context and return a non_contributed status.
-   *)
-  1
-
-and raw_step (cek : state) (_ : memo_t) : state = cek.c.step cek
-
-let memo_step (cek : state) (m : memo_t) : state =
-  let before_step = cek.sc in
-  let cek = enter_new_memo cek m in
-  if cek.sc > before_step then cek else raw_step cek m
-
-let memo_over (cek : state) (m : memo_t) : state =
-  let before_step = cek.sc in
-  let before_depth = cek.d in
-  let cek = enter_new_memo cek m in
-  let cek = if cek.d > before_depth then record_memo_exit cek else cek in
-  if cek.sc > before_step then cek else raw_step cek m
+let exec_done (s : state) (u : update) : state =
+  improve u (Shared s);
+  raise (DoneExc s)
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
-  let init_value (w : words) : value = value_at_depth w 0 in
-  let cek = { c; e = Dynarray.map init_value e; k = init_value k; d = 0; sc = 0; r = None } in
+  let state = { c; e = Dynarray.map make_value e; k = make_value k; sc = 0 } in
   let i = ref 0 in
-  let rec exec cek =
-    (*print_state cek "debug_state";*)
+  let rec exec state =
     i := !i + 1;
-    if !i mod 100 = 0 then exec (memo_step cek m) else exec (memo_over cek m)
+    exec (ant_step state m)
   in
-  try exec (enter_new_memo cek m)
-  with DoneExc ->
-    assert (Dynarray.length cek.e = 1);
-    print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int cek.sc ^ " step.");
-    (Dynarray.get_last cek.e).seq
-
-let resolve_failed (cek : state) (m : memo_t) : state =
-  let before_step = (Option.get cek.r).m.sc in
-  let cek = record_memo_exit cek in
-  if cek.sc > before_step then cek else raw_step cek m
+  try exec state
+  with DoneExc state ->
+    assert (Dynarray.length state.e = 1);
+    print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int state.sc ^ " step.");
+    (Dynarray.get_last state.e).seq

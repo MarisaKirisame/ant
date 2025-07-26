@@ -3,6 +3,7 @@
 open Ant
 open Word
 open Memo
+open Value
 
 let memo = Array.init 14 (fun _ -> ref State.BlackHole)
 
@@ -25,32 +26,32 @@ let rec list_incr (x0 : Value.seq) : Value.seq =
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 1;
-      match resolve_seq x x.k.seq with
-      | None -> resolve_failed x memo
+      match resolve x K update with
+      | None -> x
       | Some (hd, tl) -> (
           match Word.get_value hd with
-          | 0 -> (fun x tl -> exec_done x) x tl
+          | 0 -> (fun x tl upate -> exec_done x update) x tl update
           | 3 ->
-              (fun x tl ->
+              (fun x tl update ->
                 restore_env x 1 tl;
-                x.k <- value_at_depth (get_next_cont tl) x.d;
+                x.k <- make_value (get_next_cont tl);
                 x.c <- pc_to_exp 9;
                 stepped x)
-                x tl))
+                x tl update))
     0
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       x.c <- pc_to_exp 2;
       x)
     1
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 1;
       push_env x (Dynarray.get x.e 0);
       x.c <- pc_to_exp 3;
@@ -59,11 +60,11 @@ let () =
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 2;
-      let last = (Dynarray.get_last x.e).seq in
-      match resolve_seq x last with
-      | None -> resolve_failed x memo
+      let last = E (Dynarray.length x.e - 1) in
+      match resolve x last update with
+      | None -> x
       | Some (hd, tl) -> (
           Dynarray.remove_last x.e;
           match Word.get_value hd with
@@ -72,17 +73,17 @@ let () =
               x
           | 2 ->
               let [ x0; x1 ] = Memo.splits tl in
-              push_env x (value_at_depth x0 x.d);
-              push_env x (value_at_depth x1 x.d);
+              push_env x (make_value x0);
+              push_env x (make_value x1);
               x.c <- pc_to_exp 6;
               stepped x))
     3
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 1;
-      push_env x (value_at_depth (Memo.from_constructor 1) x.d);
+      push_env x (make_value (Memo.from_constructor 1));
       x.c <- pc_to_exp 5;
       stepped x)
     4
@@ -96,7 +97,7 @@ let () =
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 3;
       push_env x (Dynarray.get x.e 1);
       x.c <- pc_to_exp 7;
@@ -105,44 +106,44 @@ let () =
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 4;
-      push_env x (value_at_depth (Memo.from_int 1) x.d);
+      push_env x (make_value (Memo.from_int 1));
       x.c <- pc_to_exp 8;
       stepped x)
     7
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 5;
-      match resolve_seq x (Dynarray.get x.e 3).seq with
-      | None -> resolve_failed x memo
+      match resolve x (Dynarray.get x.e 3) update with
+      | None -> x
       | Some (x0, _) -> (
-          match resolve_seq x (Dynarray.get x.e 4).seq with
-          | None -> resolve_failed x memo
+          match resolve x (Dynarray.get x.e 4) update with
+          | None -> x
           | Some (x1, _) ->
               Dynarray.remove_last x.e;
               Dynarray.remove_last x.e;
-              push_env x (value_at_depth (Memo.from_int (x0 + x1)) x.d);
+              push_env x (make_value (Memo.from_int (x0 + x1)));
               x.c <- pc_to_exp 12;
               stepped x))
     8
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 2;
       let x1 = (pop_env x).seq in
       let x0 = (pop_env x).seq in
-      push_env x (value_at_depth (Memo.appends [ Memo.from_constructor 2; x0; x1 ]) x.d);
+      push_env x (make_value (Memo.appends [ Memo.from_constructor 2; x0; x1 ]));
       x.c <- pc_to_exp 10;
       stepped x)
     9
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 1;
       drop_n x 1 0 (pc_to_exp 11))
     10
@@ -156,7 +157,7 @@ let () =
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 4;
       push_env x (Dynarray.get x.e 2);
       x.c <- pc_to_exp 13;
@@ -165,10 +166,10 @@ let () =
 
 let () =
   add_exp
-    (fun x ->
+    (fun x update ->
       assert_env_length x 5;
       let keep = env_call x [ 3 ] 1 in
-      x.k <- value_at_depth (Memo.appends [ Memo.from_constructor 3; keep; x.k.seq ]) x.d;
+      x.k <- make_value (Memo.appends [ Memo.from_constructor 3; keep; x.k.seq ]);
       x.c <- pc_to_exp 1;
       stepped x)
     13
