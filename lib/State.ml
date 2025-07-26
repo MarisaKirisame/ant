@@ -14,7 +14,7 @@ type env = value Dynarray.t
  *)
 and exp = {
   (* One step transition. Throw an exception when done. *)
-  step : state -> state;
+  step : state -> update -> state;
   (*pc is an isomorphism to func, and pc -> func is a table lookup.*)
   pc : int;
 }
@@ -22,11 +22,11 @@ and exp = {
 and kont = value
 
 and state = {
-  c : exp;
-  e : env;
-  k : kont;
+  mutable c : exp;
+  mutable e : env;
+  mutable k : kont;
   (* step_count *)
-  sc : int;
+  mutable sc : int;
 }
 
 and recording = { s : store; u : update }
