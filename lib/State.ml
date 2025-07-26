@@ -52,11 +52,11 @@ and memo_t = memo_node_t ref Array.t
 (* The node always start from BlackHole, and may become Halfway, and finally be Need, Continue, or Done. *)
 and memo_node_t =
   (* We know transiting need to resolve a fetch_request to continue. *)
-  | Need of { next : memo_next_t; progress : state }
+  | Need of { current : shared; next : memo_next_t }
   (* The machine evaluate to a value. *)
-  | Done of state
+  | Done of shared
   (* We know a bit, but the evaluation is ended prematurely. Still it is better to skip to there. *)
-  | Halfway of state
+  | Halfway of shared
   (* We are figuring out this entry. *)
   (* Ref: the concept of Haskell's black hole *)
   | BlackHole
@@ -67,3 +67,11 @@ and fetch_request = { src : source; offset : int; word_count : int }
 (*todo: maybe try janestreet's hashtable. we want lookup to be as fast as possible so it might be worth to ffi some SOTA*)
 and lookup_t = (fetch_hash, memo_node_t ref) Hashtbl.t
 and fetch_hash = int
+and shared = Shared of state
+
+let copy_state (Shared s) : state =
+  let c = s.c in
+  let e = Dynarray.map (fun v -> v) s.e in
+  let k = s.k in
+  let sc = s.sc in
+  { c; e; k; sc }
