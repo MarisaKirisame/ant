@@ -1,5 +1,3 @@
-1
-
 open Ant
 open Word
 open Memo
@@ -62,7 +60,7 @@ let () =
   add_exp
     (fun x update ->
       assert_env_length x 2;
-      let last = E (Dynarray.length x.e - 1) in
+      let last = Source.E (Dynarray.length x.e - 1) in
       match resolve x last update with
       | None -> x
       | Some (hd, tl) -> (
@@ -117,10 +115,10 @@ let () =
   add_exp
     (fun x update ->
       assert_env_length x 5;
-      match resolve x (Dynarray.get x.e 3) update with
+      match resolve x (Source.E 3) update with
       | None -> x
       | Some (x0, _) -> (
-          match resolve x (Dynarray.get x.e 4) update with
+          match resolve x (Source.E 4) update with
           | None -> x
           | Some (x1, _) ->
               Dynarray.remove_last x.e;
