@@ -269,7 +269,7 @@ let update (state : state) (update : update) : state =
   if state.sc == state_.sc then (
     let state_ = state_.c.step state_ update in
     if state.sc < state_.sc then improve update (Halfway (Shared state_));
-    state)
+    state_)
   else (
     assert (state.sc < state_.sc);
     state_)
