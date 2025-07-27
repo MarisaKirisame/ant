@@ -3,12 +3,12 @@ open PPrint
 open Syntax
 open Memo
 open State
+
 (* As K come with interpretative overhead,
  *   we want to use K as little as possible,
  *   instead storing the computed temporary variables onto the env as a stack,
  *   only using K whenever we do a non-tail function call.
  *)
-
 type 'a code = document
 
 type ctx = {
@@ -310,7 +310,6 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
   | App (Var "list_incr", [ x ]) ->
       let cont_name = "cont_" ^ string_of_int (Dynarray.length ctx.conts) in
       let keep, keep_s = keep_only s k.fv in
-      print_endline (string_of_int keep_s.env_length);
       (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
       let keep_length = keep_s.env_length in
       add_cont ctx cont_name (keep_length + 1)
@@ -345,12 +344,8 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                 {
                   k =
                     (fun s ->
-                      let x0 =
-                        string ("(resolve x (Dynarray.get x.e " ^ string_of_int (s.env_length - 2) ^ ") update)")
-                      in
-                      let x1 =
-                        string ("(resolve x (Dynarray.get x.e " ^ string_of_int (s.env_length - 1) ^ ") update)")
-                      in
+                      let x0 = string ("(resolve x (Source.E " ^ string_of_int (s.env_length - 2) ^ ") update)") in
+                      let x1 = string ("(resolve x (Source.E " ^ string_of_int (s.env_length - 1) ^ ") update)") in
                       let add_last = string "push_env x (make_value (Memo.from_int (x0 + x1)) );" in
                       add_code_k (fun pc ->
                           ( string ("(fun x update -> assert_env_length x " ^ string_of_int s.env_length ^ "; match ")
@@ -380,7 +375,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : p
   add_code_k (fun pc ->
       ( string
           ("(fun x update -> assert_env_length x " ^ string_of_int s.env_length ^ "; "
-         ^ "let last = E (Dynarray.length x.e - 1) in ")
+         ^ "let last = Source.E (Dynarray.length x.e - 1) in ")
         ^^ break 1
         ^^ string "match resolve x last update with | None -> x | Some (hd, tl) -> Dynarray.remove_last x.e;"
         ^^ break 1
@@ -417,7 +412,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : p
 
 let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
-  | Type (TBOne (name, Enum { params = _; ctors })) -> (* TODO *) ant_pp_adt ctx name ctors
+  | Type (TBOne (name, Enum { params = _; ctors })) -> ant_pp_adt ctx name ctors
   | Type (TBRec _) -> failwith "Not implemented (TODO)"
   | Term (x, Lam (ps, term)) ->
       let s =
@@ -454,4 +449,24 @@ let generate_apply_cont ctx =
          (Dynarray.to_list ctx.conts)
     ^^ string ")")
 
-let pp_cek_ant x = ()
+let pp_cek_ant x =
+  let ctx = new_ctx () in
+  let generated_stmt = separate_map (break 1) (ant_pp_stmt ctx) x in
+  generate_apply_cont ctx;
+  string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
+  ^^ break 1 ^^ string "let memo = Array.init "
+  ^^ string (string_of_int (Dynarray.length codes))
+  ^^ string "(fun _ -> ref State.BlackHole)" ^^ break 1 ^^ generated_stmt ^^ break 1
+  ^^ separate (break 1)
+       (List.init (Dynarray.length codes) (fun i ->
+            string ("let ()" ^ " = add_exp ")
+            ^^ Option.get (Dynarray.get codes i)
+            ^^ string " "
+            ^^ string (string_of_int i)))
+  ^^ break 1
+  ^^ separate (break 1)
+       (List.init (Dynarray.length ctx.constructor_degree) (fun i ->
+            string
+              ("let () = Value.set_constructor_degree " ^ string_of_int i ^ " " ^ "("
+              ^ string_of_int (Dynarray.get ctx.constructor_degree i)
+              ^ ")")))

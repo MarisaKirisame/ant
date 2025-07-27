@@ -35,7 +35,15 @@ let fr_to_fh (fr : fetch_result) : fetch_hash =
   ret
 
 let get_value (state : state) (store : store option) (src : source) : value =
-  match src with E i -> Dynarray.get state.e i | S i -> Dynarray.get (Option.get store) i | K -> state.k
+  match src with
+  | E i ->
+      assert (i < Dynarray.length state.e);
+      Dynarray.get state.e i
+  | S i ->
+      print_endline ("get_value: " ^ string_of_int i ^ " " ^ string_of_int (Dynarray.length (Option.get store)));
+      assert (i < Dynarray.length (Option.get store));
+      Dynarray.get (Option.get store) i
+  | K -> state.k
 
 let get_value_ (state : state) (store : store option) (src : source) : seq = (get_value state store src).seq
 let init_fetch_length () : int ref = ref 1
@@ -61,11 +69,11 @@ let init_store () : store = Dynarray.create ()
 
 let add_to_store (store : store) (tstore : tstore) (seq : seq) (fetch_length : int ref) : seq =
   let v = { seq; fetch_length } in
-  Dynarray.add_last store v;
   let d = (Generic.measure ~monoid ~measure seq).degree in
   (* if it is 0 it must be empty and we should not be adding *)
   assert (d > 0);
   let r = { src = S (Dynarray.length store); offset = 0; values_count = d } in
+  Dynarray.add_last store v;
   Dynarray.add_last tstore (Lower (Generic.singleton (Reference r)));
   Generic.singleton (Reference r)
 
@@ -122,7 +130,7 @@ let register_memo_need_unfetched (state : state) (request : fetch_request) (upda
       let lookup = Hashtbl.create (module Core.Int) in
       update := Need { next = { request; lookup }; current = Shared state }
   | Need n -> ()
-  | Done _ -> failwith "impossible case: Done"
+  | Done _ -> failwith "Done canot be fetching"
 
 let make_value (seq : seq) : value = { seq; fetch_length = init_fetch_length () }
 let single_reference (src : source) : seq = Generic.singleton (Reference { src; offset = 0; values_count = 1 })
@@ -164,22 +172,45 @@ let state_from_tstate (s : state) (t : tstate) : state =
     (fun v ->
       match v with Here v -> Lower (subst (fun (S i) -> unLower (Dynarray.get t.ts i)) v) | Lower v -> Lower v)
     t.ts;
-  let transform (tv : tvalue) (src : source) : value =
+  let transform (tv : tvalue) : value =
     match tv with
     | Here v -> make_value (subst (fun (S i) -> unLower (Dynarray.get t.ts i)) v)
     | Lower v -> make_value v
   in
-  { c = t.tc; e = Dynarray.mapi (fun i v -> transform v (E i)) t.te; k = transform t.tk K; sc = t.tsc }
+  { c = t.tc; e = Dynarray.map transform t.te; k = transform t.tk; sc = t.tsc }
 
-exception DoneExc of state
+let rec seq_refs_aux (x : seq) (rs : reference list) : reference list =
+  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
+  assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
+  match Generic.front rhs ~monoid ~measure with
+  | None -> rs
+  | Some (rest, Reference r) -> seq_refs_aux rest (r :: seq_refs_aux lhs rs)
+
+let state_refs (state : state) : reference list =
+  let e = Dynarray.fold_left (fun rs x -> seq_refs_aux x.seq rs) [] state.e in
+  let k = seq_refs_aux state.k.seq e in
+  k
+
+let valid_state (fetched : state) (tstate : tstate) (forward_to : state) : bool =
+  List.for_all
+    (fun r ->
+      assert false;
+      true)
+    (state_refs forward_to)
+
+exception DoneExec of state
 
 (* note how fetch_value_can_fail enable exit not only via fetch_fallthrough, but also from climb_halfway *)
 let rec climb (state : state) (store : store) (tstate : tstate) (fetch_value_can_fail : bool) (climb_done : state -> 'a)
     (climb_halfway : state -> update -> 'a) (update : update) (fetch_fallthrough : unit -> 'a) : 'a =
   match !update with
-  | Halfway s -> climb_halfway (copy_state s) update
+  | Halfway s ->
+      print_endline "halfway halfway";
+      climb_halfway (copy_state s) update
   | Done d -> climb_done (copy_state d)
-  | BlackHole -> climb_halfway (state_from_tstate state tstate) update
+  | BlackHole ->
+      print_endline "halfway blackhole";
+      climb_halfway (state_from_tstate state tstate) update
   | Need { current; next } -> (
       match fetch_value state store tstate next.request with
       | None ->
@@ -188,49 +219,64 @@ let rec climb (state : state) (store : store) (tstate : tstate) (fetch_value_can
       | Some fr -> (
           match Hashtbl.find next.lookup (fr_to_fh fr) with
           | None ->
+              print_endline ("adding to " ^ (Hashtbl.length next.lookup |> string_of_int));
+              print_endline "halfway need";
               let bh = ref BlackHole in
               Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
-              climb_halfway (copy_state current) bh
+              climb_halfway (state_from_tstate state tstate) bh
           | Some m ->
+              print_endline "climbing deeper";
               climb state store tstate fetch_value_can_fail climb_done climb_halfway m (fun _ ->
-                  climb_halfway (copy_state current) update)))
+                  climb_halfway (state_from_tstate state tstate) update)))
 
 let locate (state : state) (memo : memo_t) : state * store * update =
   let store = init_store () in
   let tstate = tstate_from_state state in
+  print_endline "start climbing in locate";
+
   climb state store tstate false
-    (fun d -> raise (DoneExc (fast_forward_to state store d)))
+    (fun d -> raise (DoneExec (fast_forward_to state store d)))
     (fun state update -> (state, store, update))
     (Array.get memo state.c.pc)
     (fun _ -> failwith "impossible: fetch_fallthrough should not be called in locate")
 
-let improve update s =
-  match !update with
-  | Halfway _ | BlackHole -> update := Done s
-  | Need _ | Done _ -> failwith "impossible case in improve"
+let improve update u =
+  (match (!update, u) with
+  | Need _, _ -> failwith "impossible to improve Need"
+  | Done _, _ -> failwith "impossible to improve Done"
+  | _, BlackHole -> failwith "blakchole does not improve"
+  | BlackHole, _ | _, Need _ | _, Done _ -> ()
+  | Halfway (Shared l), Halfway (Shared r) -> assert (l.sc < r.sc));
+  update := u
 
 let update (state : state) (update : update) : state =
   let store = init_store () in
   let tstate = tstate_from_state state in
+  print_endline "start climbing in update";
   let state_ =
     climb state store tstate true
       (fun d ->
         let d = fast_forward_to state store d in
-        improve update (Shared d);
-        raise (DoneExc d))
+        improve update (Done (Shared d));
+        raise (DoneExec d))
       (fun y _ ->
-        let state = fast_forward_to state store y in
-        improve update (Shared state);
+        let state_ = fast_forward_to state store y in
+        if state.sc < state_.sc then improve update (Halfway (Shared state_));
         state)
       update
       (fun _ -> state)
   in
-  assert (state_.sc > state.sc);
-  state_
+  if state.sc == state_.sc then (
+    let state_ = state_.c.step state_ update in
+    if state.sc < state_.sc then improve update (Halfway (Shared state_));
+    state)
+  else (
+    assert (state.sc < state_.sc);
+    state_)
 
 let ant_step (x : state) (m : memo_t) : state =
   let y, store, update_ = locate x m in
-  let y = update y update_ in
+  let y = try update y update_ with DoneExec d -> raise (DoneExec (fast_forward_to x store d)) in
   fast_forward_to x store y
 
 let rec resolve_seq (s : state) (x : seq) (update : update) : (Word.t * seq) option =
@@ -317,7 +363,7 @@ let stepped (x : state) =
   x.sc <- x.sc + 1;
   x
 
-let return_n (s : state) (n : int) (return_exp : exp) : state =
+let return_n (s : state) (n : int) (return_exp : exp) (_ : update) : state =
   assert (Dynarray.length s.e = n);
   s.e <- Dynarray.of_list [ Dynarray.get_last s.e ];
   s.c <- return_exp;
@@ -342,9 +388,9 @@ let assert_env_length (s : state) (e : int) : unit =
   if l <> e then print_endline ("env_length should be " ^ string_of_int e ^ " but is " ^ string_of_int l);
   assert (l = e)
 
-let exec_done (s : state) (u : update) : state =
-  improve u (Shared s);
-  raise (DoneExc s)
+let exec_done (d : state) (u : update) : state =
+  improve u (Done (Shared d));
+  raise (DoneExec d)
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let state = { c; e = Dynarray.map make_value e; k = make_value k; sc = 0 } in
@@ -354,7 +400,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
     exec (ant_step state m)
   in
   try exec state
-  with DoneExc state ->
+  with DoneExec state ->
     assert (Dynarray.length state.e = 1);
     print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int state.sc ^ " step.");
     (Dynarray.get_last state.e).seq
