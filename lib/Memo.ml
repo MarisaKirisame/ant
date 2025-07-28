@@ -189,6 +189,8 @@ let valid_state (fetched : state) (tstate : tstate) (forward_to : state) : bool 
 
 exception DoneExec of state
 
+let log x = print_endline x
+
 (* note how fetch_value_can_fail enable exit not only via fetch_fallthrough, but also from climb_halfway *)
 let rec climb (state : state) (store : store) (tstate : tstate) (fetch_value_can_fail : bool) (climb_done : state -> 'a)
     (climb_halfway : state -> update -> 'a) (update : update) (fetch_fallthrough : unit -> 'a) : 'a =
@@ -202,14 +204,17 @@ let rec climb (state : state) (store : store) (tstate : tstate) (fetch_value_can
           assert fetch_value_can_fail;
           fetch_fallthrough ()
       | Some fr -> (
+          (*note how we cant directly return current here. this is because current havent introduce this value we just fetched yet!*)
+          (*todo: use current*)
+          (*fast_forward_to (state_from_tstate state tstate) store (copy_state current)*)
           match Hashtbl.find next.lookup (fr_to_fh fr) with
           | None ->
               let bh = ref BlackHole in
               Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
-              climb_halfway (state_from_tstate state tstate) bh
+              climb_halfway ( (state_from_tstate state tstate) ) bh
           | Some m ->
               climb state store tstate fetch_value_can_fail climb_done climb_halfway m (fun _ ->
-                  climb_halfway (state_from_tstate state tstate) update)))
+                  climb_halfway ((state_from_tstate state tstate))))
 
 let locate (state : state) (memo : memo_t) : state * store * update =
   let store = init_store () in
@@ -227,8 +232,10 @@ let improve update u =
   | _, BlackHole -> failwith "blakchole does not improve"
   | BlackHole, _ | _, Need _ | _, Done _ -> ()
   | Halfway (Shared l), Halfway (Shared r) -> assert (l.sc < r.sc));
-  (match u with BlackHole -> () | Need { current = Shared x; _ } | Done (Shared x) | Halfway (Shared x) -> ());
-  (*print_endline ("improving with sc: " ^ string_of_int x.sc));*)
+  (match u with
+  | BlackHole -> ()
+  | Need { current = Shared x; _ } | Done (Shared x) | Halfway (Shared x) ->
+      log ("improving with sc: " ^ string_of_int x.sc));
   update := u
 
 let update (state : state) (memo : memo_t) (update : update) : state =
@@ -241,15 +248,17 @@ let update (state : state) (memo : memo_t) (update : update) : state =
         let d = fast_forward_to state store d in
         improve update (Done (Shared d));
         raise (DoneExec d))
-      (fun y _ -> fast_forward_to state store y)
+      (fun y _ ->
+        log ("update of sc=" ^ string_of_int y.sc);
+        fast_forward_to state store y)
       (Array.get memo state.c.pc)
       (fun _ -> state)
   in
   assert (sc_before <= state.sc);
-  if sc_before == state.sc then
-    (*print_endline ("before step taken:sc=" ^ string_of_int state.sc ^ ", pc=" ^ string_of_int state.c.pc);*)
-    ignore (state.c.step state update)
-    (*print_endline ("after step taken:sc=" ^ string_of_int state.sc ^ ", pc=" ^ string_of_int state.c.pc);*);
+  if sc_before == state.sc then (
+    log ("before step taken:sc=" ^ string_of_int state.sc ^ ", pc=" ^ string_of_int state.c.pc);
+    ignore (state.c.step state update);
+    log ("after step taken:sc=" ^ string_of_int state.sc ^ ", pc=" ^ string_of_int state.c.pc));
   if sc_before < state.sc then improve update (Halfway (Shared state));
   state
 
@@ -374,7 +383,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let state = { c; e; k; sc = 0 } in
   let i = ref 0 in
   let rec exec state =
-    (*print_endline ("step " ^ string_of_int !i ^ ": " ^ string_of_int state.sc);*)
+    print_endline ("step " ^ string_of_int !i ^ ": " ^ string_of_int state.sc);
     i := !i + 1;
     exec (ant_step state m)
   in
