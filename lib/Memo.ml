@@ -211,10 +211,10 @@ let rec climb (state : state) (store : store) (tstate : tstate) (fetch_value_can
           | None ->
               let bh = ref BlackHole in
               Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
-              climb_halfway ( (state_from_tstate state tstate) ) bh
+              climb_halfway (state_from_tstate state tstate) bh
           | Some m ->
               climb state store tstate fetch_value_can_fail climb_done climb_halfway m (fun _ ->
-                  climb_halfway ((state_from_tstate state tstate))))
+                  climb_halfway (state_from_tstate state tstate) update)))
 
 let locate (state : state) (memo : memo_t) : state * store * update =
   let store = init_store () in
