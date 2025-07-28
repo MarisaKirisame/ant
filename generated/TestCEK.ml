@@ -34,7 +34,7 @@ let () =
           | 3 ->
               (fun x tl update ->
                 restore_env x 1 tl;
-                x.k <- make_value (get_next_cont tl);
+                x.k <- get_next_cont tl;
                 x.c <- pc_to_exp 9;
                 stepped x)
                 x tl update))
@@ -44,7 +44,7 @@ let () =
   add_exp
     (fun x update ->
       x.c <- pc_to_exp 2;
-      x)
+      stepped x)
     1
 
 let () =
@@ -68,11 +68,11 @@ let () =
           match Word.get_value hd with
           | 1 ->
               x.c <- pc_to_exp 4;
-              x
+              stepped x
           | 2 ->
               let [ x0; x1 ] = Memo.splits tl in
-              push_env x (make_value x0);
-              push_env x (make_value x1);
+              push_env x x0;
+              push_env x x1;
               x.c <- pc_to_exp 6;
               stepped x))
     3
@@ -81,7 +81,7 @@ let () =
   add_exp
     (fun x update ->
       assert_env_length x 1;
-      push_env x (make_value (Memo.from_constructor 1));
+      push_env x (Memo.from_constructor 1);
       x.c <- pc_to_exp 5;
       stepped x)
     4
@@ -106,7 +106,7 @@ let () =
   add_exp
     (fun x update ->
       assert_env_length x 4;
-      push_env x (make_value (Memo.from_int 1));
+      push_env x (Memo.from_int 1);
       x.c <- pc_to_exp 8;
       stepped x)
     7
@@ -123,7 +123,7 @@ let () =
           | Some (x1, _) ->
               Dynarray.remove_last x.e;
               Dynarray.remove_last x.e;
-              push_env x (make_value (Memo.from_int (x0 + x1)));
+              push_env x (Memo.from_int (x0 + x1));
               x.c <- pc_to_exp 12;
               stepped x))
     8
@@ -132,9 +132,9 @@ let () =
   add_exp
     (fun x update ->
       assert_env_length x 2;
-      let x1 = (pop_env x).seq in
-      let x0 = (pop_env x).seq in
-      push_env x (make_value (Memo.appends [ Memo.from_constructor 2; x0; x1 ]));
+      let x1 = pop_env x in
+      let x0 = pop_env x in
+      push_env x (Memo.appends [ Memo.from_constructor 2; x0; x1 ]);
       x.c <- pc_to_exp 10;
       stepped x)
     9
@@ -167,7 +167,7 @@ let () =
     (fun x update ->
       assert_env_length x 5;
       let keep = env_call x [ 3 ] 1 in
-      x.k <- make_value (Memo.appends [ Memo.from_constructor 3; keep; x.k.seq ]);
+      x.k <- Memo.appends [ Memo.from_constructor 3; keep; x.k ];
       x.c <- pc_to_exp 1;
       stepped x)
     13
