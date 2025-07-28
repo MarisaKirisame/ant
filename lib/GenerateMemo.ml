@@ -273,9 +273,9 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
       add_code_k (fun pc ->
           ( string
               ("(fun x update -> assert_env_length x " ^ string_of_int s.env_length
-             ^ "; (push_env x (make_value (Memo.from_constructor "
+             ^ "; push_env x (Memo.from_constructor "
               ^ string_of_int (Hashtbl.find_exn ctx.ctag cname)
-              ^ ") )); x.c <- pc_to_exp "
+              ^ "); x.c <- pc_to_exp "
               ^ string_of_int (k.k (push_s s))
               ^ "; stepped x)"),
             pc ))
@@ -289,13 +289,13 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                   k =
                     (fun s ->
                       add_code_k (fun pc ->
-                          let let_x1 = string "let x1 = (pop_env x).seq in " in
-                          let let_x0 = string "let x0 = (pop_env x).seq in " in
+                          let let_x1 = string "let x1 = (pop_env x) in " in
+                          let let_x0 = string "let x0 = (pop_env x) in " in
                           let add_last =
                             string
-                              ("push_env x " ^ "(make_value (Memo.appends [Memo.from_constructor "
+                              ("push_env x " ^ "(Memo.appends [Memo.from_constructor "
                               ^ string_of_int (Hashtbl.find_exn ctx.ctag cname)
-                              ^ ";x0;x1]) )" ^ "; ")
+                              ^ ";x0;x1])" ^ "; ")
                           in
 
                           ( string ("(fun x update -> assert_env_length x " ^ string_of_int s.env_length ^ "; ")
@@ -315,7 +315,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
       add_cont ctx cont_name (keep_length + 1)
         (string "(fun x tl update -> restore_env x "
         ^^ string (string_of_int keep_length)
-        ^^ string " tl; x.k <- make_value (get_next_cont tl) ; x.c <- pc_to_exp "
+        ^^ string " tl; x.k <- get_next_cont tl; x.c <- pc_to_exp "
         ^^ string (string_of_int (k.k (push_s keep_s)))
         ^^ string "; stepped x)");
       ant_pp_expr ctx s x
@@ -327,9 +327,9 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                       ("(fun x update -> assert_env_length x " ^ string_of_int s.env_length
                      ^ "; let keep = env_call x ["
                       ^ String.concat ";" (List.map string_of_int (Dynarray.to_list keep))
-                      ^ "] 1 in x.k <- make_value (Memo.appends [Memo.from_constructor "
+                      ^ "] 1 in x.k <- (Memo.appends [Memo.from_constructor "
                       ^ string_of_int (Hashtbl.find_exn ctx.ctag cont_name)
-                      ^ "; keep; x.k.seq]) ; x.c <- pc_to_exp "
+                      ^ "; keep; x.k]) ; x.c <- pc_to_exp "
                       ^ string_of_int (Hashtbl.find_exn ctx.func_pc "list_incr")
                       ^ "; stepped x)"),
                     pc )));
@@ -346,7 +346,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                     (fun s ->
                       let x0 = string ("(resolve x (Source.E " ^ string_of_int (s.env_length - 2) ^ ") update)") in
                       let x1 = string ("(resolve x (Source.E " ^ string_of_int (s.env_length - 1) ^ ") update)") in
-                      let add_last = string "push_env x (make_value (Memo.from_int (x0 + x1)) );" in
+                      let add_last = string "push_env x (Memo.from_int (x0 + x1));" in
                       add_code_k (fun pc ->
                           ( string ("(fun x update -> assert_env_length x " ^ string_of_int s.env_length ^ "; match ")
                             ^^ x0
@@ -363,7 +363,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
           fv = k.fv;
         }
   | Int i ->
-      let add_last = string ("push_env x (make_value (Memo.from_int (" ^ string_of_int i ^ ")) );") in
+      let add_last = string ("push_env x (Memo.from_int (" ^ string_of_int i ^ "));") in
       add_code_k (fun pc ->
           ( string ("(fun x update -> assert_env_length x " ^ string_of_int s.env_length ^ "; ")
             ^^ add_last
@@ -389,13 +389,12 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : p
                     string "| "
                     ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
                     ^^ string " -> "
-                    ^^ string ("(x.c <- pc_to_exp " ^ string_of_int (ant_pp_expr ctx s expr k) ^ "; x)")
+                    ^^ string ("(x.c <- pc_to_exp " ^ string_of_int (ant_pp_expr ctx s expr k) ^ "; stepped x)")
                 | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
                     string "| "
                     ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
                     ^^ string " -> "
-                    ^^ string
-                         "(let [x0; x1] = Memo.splits tl in push_env x (make_value x0 ); push_env x (make_value x1 );"
+                    ^^ string "(let [x0; x1] = Memo.splits tl in push_env x x0; push_env x x1;"
                     ^^ string
                          ("x.c <- pc_to_exp "
                          ^ string_of_int
@@ -425,7 +424,7 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
           let term_code = ant_pp_expr ctx s term { k = return; fv = empty_fv () } in
-          ( string ("(fun x update -> x.c <- pc_to_exp " ^ string_of_int term_code ^ "; x)"),
+          ( string ("(fun x update -> x.c <- pc_to_exp " ^ string_of_int term_code ^ "; stepped x)"),
             string "let rec" ^^ space ^^ string name ^^ space
             ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
             ^^ string ": Value.seq " ^^ string "=" ^^ space ^^ group @@ string "exec_cek "

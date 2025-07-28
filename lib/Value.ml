@@ -13,11 +13,9 @@ include Reference
  *
  * Note: Value should not alias. Doing so will mess with the fetch_length, which is bad. 
  *)
-type value = { seq : seq; fetch_length : int ref }
-and seq = (fg_et, measure_t) Generic.fg
+type value = (fg_et, measure_t) Generic.fg
+and seq = value
 and fg_et = Word of Word.t | Reference of reference
-and depth_t = int
-and fetch_count = int
 and measure_t = { degree : int; max_degree : int; full : full_measure_t option }
 and full_measure_t = { length : int; hash : Hasher.t }
 
