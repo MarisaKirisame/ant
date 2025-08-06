@@ -4,7 +4,7 @@ module Source = struct
   module T = struct
     (* In the state of our abstract machine, we may have a number of environments and stores.
      * Therefore, we need to index the nth environment or the nth store with the extra field. *)
-    type t = E of int | S of int | K [@@deriving hash, compare, sexp]
+    type t = E of int | S of int | K [@@deriving eq, hash, compare, sexp]
   end
 
   include T

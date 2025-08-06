@@ -8,8 +8,8 @@ let run x = List.map string_of_int (to_ocaml (list_incr (from_ocaml x)))
 
 (* Run the test with a large input to ensure it works correctly *)
 let rec loop i =
-  if i < 25 then
-    let _ = run (List.init 100 (fun i -> i)) in
+  if i < 100 then
+    let _ = run (List.init 50 (fun i -> i)) in
     loop (i + 1)
 
 let _ = loop 0

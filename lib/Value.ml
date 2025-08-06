@@ -99,3 +99,22 @@ let slice (seq : seq) (offset : int) (values_count : int) : seq =
   let _, x = pop_n seq offset in
   let y, _ = pop_n x values_count in
   y
+
+let string_of_src (src : source) : string =
+  match src with
+  | Source.E i -> "E(" ^ string_of_int i ^ ")"
+  | Source.S i -> "S(" ^ string_of_int i ^ ")"
+  | Source.K -> "K"
+
+let string_of_reference (r : reference) : string =
+  "Reference(src: " ^ string_of_src r.src ^ ", offset: " ^ string_of_int r.offset ^ ", values_count: "
+  ^ string_of_int r.values_count ^ ")"
+
+let string_of_fg_et (et : fg_et) : string =
+  match et with Word w -> "Word(" ^ string_of_int w ^ ")" | Reference r -> string_of_reference r
+
+let rec string_of_value (v : value) : string =
+  if Generic.is_empty v then ""
+  else
+    let v, w = Generic.front_exn ~monoid ~measure v in
+    string_of_fg_et w ^ string_of_value v
