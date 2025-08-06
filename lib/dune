@@ -23,7 +23,7 @@
   batFingerTree
   GenerateMemo)
  (preprocess
-  (pps ppx_jane ppx_deriving.show))
+  (pps ppx_jane ppx_deriving.show ppx_deriving.eq))
  (foreign_stubs
   (language c)
   (names sl2_stubs sl2_slow_stubs crc32c_stubs hashtbl_stubs)
