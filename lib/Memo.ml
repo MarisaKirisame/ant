@@ -205,8 +205,7 @@ exception DoneExec of state
 
 (* note how fetch_value_can_fail enable exit not only via fetch_fallthrough, but also from climb_halfway *)
 let rec climb_aux (state : state) (store : store) (tstate : tstate) (fetch_value_can_fail : bool)
-    (climb_done : state -> 'a) (climb_halfway : state -> update -> 'a) (update : update)
-    (fetch_fallthrough : unit -> 'a) (depth : int) : 'a =
+    (climb_done : state -> 'a) (climb_halfway : state -> update -> 'a) (update : update) (depth : int) : 'a =
   match !update with
   | Halfway s ->
       log ("climb_halfway depth: " ^ string_of_int depth);
@@ -216,11 +215,7 @@ let rec climb_aux (state : state) (store : store) (tstate : tstate) (fetch_value
   | Need { current; next } -> (
       log ("request: " ^ request_to_string next.request);
       match fetch_value state store tstate next.request with
-      | None ->
-          log "fallthrough:";
-          assert fetch_value_can_fail;
-          (*shouldnt we just return current in this case? there doesnt seems to be a need for fallthrough*)
-          fetch_fallthrough ()
+      | None -> climb_halfway (copy_state current) update
       | Some fr -> (
           (*note how we cant directly return current here. this is because current havent introduce this value we just fetched yet!*)
           (*todo: use current*)
@@ -239,25 +234,20 @@ let rec climb_aux (state : state) (store : store) (tstate : tstate) (fetch_value
                     if Source.( = ) s next.request.src then Option.some $ seq_of_fetch_result fr else None)
               in
               climb_halfway state bh
-          | Some m ->
-              climb_aux state store tstate fetch_value_can_fail climb_done climb_halfway m
-                (*todo: fetch result return a substitution, in this case we subst current with it*)
-                (fun _ -> climb_halfway (state_from_tstate state tstate) update)
-                (depth + 1)))
+          | Some m -> climb_aux state store tstate fetch_value_can_fail climb_done climb_halfway m (depth + 1)))
 
 let rec climb (state : state) (store : store) (fetch_value_can_fail : bool) (climb_done : state -> 'a)
-    (climb_halfway : state -> update -> 'a) (update : update) (fetch_fallthrough : unit -> 'a) : 'a =
+    (climb_halfway : state -> update -> 'a) (memo : memo_t) : 'a =
   let tstate = tstate_from_state state in
 
-  climb_aux state store tstate fetch_value_can_fail climb_done climb_halfway update fetch_fallthrough 0
+  climb_aux state store tstate fetch_value_can_fail climb_done climb_halfway (Array.get memo state.c.pc) 0
 
 let locate (state : state) (memo : memo_t) : state * store * update =
   let store = init_store () in
   climb state store false
     (fun d -> raise (DoneExec (fast_forward_to state store d)))
     (fun state update -> (state, store, update))
-    (Array.get memo state.c.pc)
-    (fun _ -> failwith "impossible: fetch_fallthrough should not be called in locate")
+    memo
 
 let improve update u =
   (match (!update, u) with
@@ -283,8 +273,7 @@ let update (state : state) (memo : memo_t) (update : update) : state =
       (fun y _ ->
         log ("update of state:" ^ string_of_cek state);
         fast_forward_to state store y)
-      (Array.get memo state.c.pc)
-      (fun _ -> state)
+      memo
   in
   assert (sc_before <= state.sc);
   if sc_before == state.sc then (

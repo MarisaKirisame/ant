@@ -13,3 +13,4 @@ let rec loop i =
     loop (i + 1)
 
 let _ = loop 0
+let _ = run (List.init 50 (fun i -> i + 10))
