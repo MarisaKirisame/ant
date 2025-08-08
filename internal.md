@@ -3,48 +3,63 @@
 ## Background
 Incremental Computing aim to speed up computation by reusing previous results. 
 Due to its prevalency in computing, Incremental Computation had been applied to various domain, such as Build System, Database, Compiler, Web Browsers.
-An incremental framework/programming language aim to transform non-incremental program into incremental ones.
 
-### Memoization
-The most basic method to incrementalize a program is memoization. To memoize a function, one extend the function with an auxilary data structure (typically a hashmap), which pair inputs of the function with its output. On repeated invoation, this memo-table can skip the actual execution and return the recorde output directly.
+## Memoization
+The most classic method to incrementalize a program is memoization. To memoize a function, one extend the function with an auxilary data structure (typically a hashmap), which pair inputs of the function with its output. On repeated invoation, this memo-table can skip the actual execution and return the recorded output directly.
 
-Memoization requires fast hash/comparison, which can be supplied by hash-consing, or by storing the hash and ignoring hash collision.
+The key issue with memoization is that it is too coarse grained. The key problem with memoization is spine-traversal. For example, supposed `map f xs`, including all recursive call is memoized. `map f (xs ++ [x])`, however, cannot reuse any previous result, and must recompute from scratch. 
 
-A program can be transformed into an incremental one by converting all functions to memoized functions.
+## Insight
+To fix this, memoization should not be applied on the whole value. Instead, memoization split the input `A`, which is an CEK machine, into two part: the memoized fragment, `F[]` an CEK machine with open term `FVS`, and the carry-on fragment `XS`, a enviroment binding the open terms. The memoized fragment is lookuped and matched in a data structure. The resulting value in the memoization table is thus a term `B' = G[FVS]` reachable from `A' = F[FVS]` (`A' ->* B'`). Memoization then allow skipping in the form of `A = F[XS] ->* G[XS] -> B` for arbitary `XS`.
 
-The key problem with memoization is spine-traversal. For example, supposed `map f xs`, including all recursive call is memoized. `map f (xs ++ [x])`, however, cannot reuse any previous result, and must recompute from scratch. But, stepping back, the actual solution is clear: `map f (xs ++ [x]) = map f xs ++ [f x]`, thus we should be able to reuse the previous result. (Yes, we still need to traverse the spine in this case, but this is irrelevant: the issue is expensiveness of reuse (which can be fixed in other ways), while previously the issue is not reusing)
+As an example, from a bird eye view, we should be memoizing `map f (xs ++ [_0])` to `map f xs ++ map f _0` - in other word, memoizing a prefix of the input list, so the result is usable on a right-extended list. (A left-extended list is already handled by classic memoization).
 
-### Change Based Approach
-To circumvent the spine-traversal problem, change-based approach such as self adjusting computation (SAC) instead maintain a computation graph, updating it whenever the input changed. By doing this, SAC decoupled itself from the shape (spine) of the data, and coupled itself to the computation.
+To sum up, to use a `F[XS] ->* G[XS]` entry to skip computation, we have to:
+- split the current program `X` into `A[BS]`, according to some `skeleton`
+- check equality between `F` and `A`
+- subst `BS` into `G[XS]` to create the final term `Y = G[BS]` such that `X = A[BS] ->* G[BS] = Y`
 
-This does solve the spine-traversal problem, but the coupling to compute intoduce other problems.
+Note that there are two class of concepts, the term/enviroment/substitution that operate in object level, and one that operate in the meta level, operating over the whole CEK machine. The former is in lower case while the latter is in upper case.
 
-In particular, there are three kinds of repetition a program may encounter:
+# TODO: should be readable now, but refine into paragraphs
+## Splitting
+- CEK: a meta-value
+- Store: a meta-environment
+- Reference: meta-variable
+- Values in CEK might hold References
 
-- repetition in data: a single value might have repeated subterms. for example, a loop-unrolled function will contain the same instruction repeated multiple times.
-- repetition across invocations: multiple invocations to a function share repeated subterms. for example, an analyze pass will be call in a compiler multiple times, each time on similar programs.
-- repetition across program invocation: the program (e.g. the compiler) may be called on similar input.
+## Checking
+- Problem: cannot traverse structure, otherwise too expensive
+- e.g. need to get prefix of length X in sublinear term
+- Solution: Monoid Hashing over a tree that represent the list
 
-SAC only handle the last repetition, while memoization based approach have no trouble handling all kinds of reptition.
+- Problem: language should support tree
+- Solution: Monoid Parsing
 
-Note: while the last two seems similar, the key difference is externality. SAC split the program into two part: a functional core, and an imperative driver. Incrementalization only occur between the boundary, thus internal invocations are not incremental.
+- Problem: Cons now O(log X) instead of constant
+- Solution: Represent values with Finger Trees
 
-## Solution
-The key observation is that both `map f xs` and `map f (xs ++ [x])` share a long and common prefix. 
-On this prefix the computation is the same, thus we should not be memoizing values, but chunks of values, which we call fragment.
-As chunks are incomplete, we cannot return the corresponding values, but must instead jump to the intermediate state, where the next small-step evaluation will require reading outside of the memoized chunks.
+## Substitution
+- Subst a single value: loop over all references resolving them
+- Subst a CEK: note dependency between values, need to resolve backward in store order
 
-### Sketch
-Partial memoization operate on a CEK machine, modified to provide:
+## Memo Structure
+- Interactive process, a tree of hashmap
+- Each node: require a splitting, result in hashmap, include a 'current' CEK in case of no match
+- Nodes might also be incomplete - then no hashmap/splitting, only 'current' is available
 
-- Selection of fragment
-- Hashing of chunks
-- Recording jump into memo structure
-- Applying jump from memo structure
+## Skeleton Synthesis
+- Whenever evaluation stuck (due to encountering references):
+- We know what is needed, extend the memo tree with that splitting
+- Should request fragment length exponential to tree depth, so tree climbing is polylog
 
-With these features, ant select a fragment and calculate its hash, then start recording the execution under the fragment, until pending out-of-fragment reads,
-and record the fragment. Whenever applicable (hash match), ant will jump ahead to reuse old computation.
+## Updating Memo
+- Execute 3 steps in cycle to ensure progress in CEK and improvement in memo tree
+- Lookup the corresponding CEK/splitting/node by climbing the tree
+- Improve the lookuped CEK by skipping/stepping(if skipping failed)
+- Use the commuting square to jump forward the main CEK
 
+# Old, do not read. TODO: reuse what's good here
 ### Value Representation
 To provide quick hashing of chunks, and to define chunk for algebaric data type (trees), ant use a finger tree of word (fixed size int) to represent a value. 
 An integer is represented as a singleton sequence, storing a single word denoting that int, 
