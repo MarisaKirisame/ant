@@ -52,8 +52,7 @@ let measure (et : fg_et) : measure_t =
       { degree; max_degree = degree; full = Some { length = 1; hash = Hasher.from_int w } }
   | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
 
-(* split at the values level, not the finger tree node level *)
-(* 
+(* Split at the values level, not the finger tree node level
    Pop a specific number of elements from the seq represented by a finger tree
    The count is determined by the `n`. All the elements with a `max_degree` less than `n` are popped.
    Return a 2-tuple of
