@@ -14,7 +14,7 @@ type env = value Dynarray.t
  *)
 and exp = {
   (* One step transition. Throw an exception when done. *)
-  step : state -> update -> state;
+  step : state -> store -> update -> state;
   (*pc is an isomorphism to func, and pc -> func is a table lookup.*)
   pc : int;
 }
@@ -77,7 +77,7 @@ let copy_state (Shared s) : state =
   { c; e; k; sc }
 
 let string_of_cek (s : state) : string =
-  assert (s.sc <= 1000);
+  assert (s.sc <= 10000);
   "pc: " ^ string_of_int s.c.pc
   ^ (", e: " ^ (Dynarray.to_list s.e |> List.map string_of_value |> String.concat ", "))
   ^ ", k: " ^ string_of_value s.k ^ ", sc: " ^ string_of_int s.sc

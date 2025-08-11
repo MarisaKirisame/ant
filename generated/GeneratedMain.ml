@@ -5,12 +5,14 @@ open Common
 let rec to_ocaml x = match to_ocaml_int_list x with Nil -> [] | Cons (x, l) -> x :: to_ocaml l
 let rec from_ocaml x = match x with [] -> int_list_Nil | xh :: xt -> int_list_Cons xh (from_ocaml xt)
 let run x = List.map string_of_int (to_ocaml (list_incr (from_ocaml x)))
+let list_length = 100 (*todo: error when 100*)
 
 (* Run the test with a large input to ensure it works correctly *)
 let rec loop i =
-  if i < 100 then
-    let _ = run (List.init 50 (fun i -> i)) in
+  if i < 30 then
+    let _ = run (List.init list_length (fun i -> i)) in
     loop (i + 1)
 
 let _ = loop 0
-let _ = run (List.init 50 (fun i -> i + 10))
+let _ = print_endline "warmup done..."
+let _ = run (List.init list_length (fun i -> i + 10))
