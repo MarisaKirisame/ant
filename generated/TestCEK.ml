@@ -88,9 +88,9 @@ let () =
 
 let () =
   add_exp
-    (fun x ->
-      assert_env_length x 2;
-      return_n x 2 (pc_to_exp 0))
+    (fun x_0 store_0 update_0 ->
+      assert_env_length x_0 2;
+      return_n x_0 2 (pc_to_exp 0) store_0 update_0)
     5
 
 let () =
@@ -148,9 +148,9 @@ let () =
 
 let () =
   add_exp
-    (fun x ->
-      assert_env_length x 1;
-      return_n x 1 (pc_to_exp 0))
+    (fun x_1 store_1 update_1 ->
+      assert_env_length x_1 1;
+      return_n x_1 1 (pc_to_exp 0) store_1 update_1)
     11
 
 let () =
