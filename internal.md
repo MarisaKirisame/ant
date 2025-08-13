@@ -19,6 +19,12 @@ To sum up, to use a `F[XS] ->* G[XS]` entry to skip computation, we have to:
 - check equality between `F` and `A`
 - subst `BS` into `G[XS]` to create the final term `Y = G[BS]` such that `X = A[BS] ->* G[BS] = Y`
 
+- X    -split>   F[XS]
+- |                |
+- |                |
+- v                v
+- Y    <subst-   G[XS]
+
 Note that there are two class of concepts, the term/enviroment/substitution that operate in object level, and one that operate in the meta level, operating over the whole CEK machine. The former is in lower case while the latter is in upper case.
 
 # TODO: should be readable now, but refine into paragraphs
@@ -58,7 +64,11 @@ Note that there are two class of concepts, the term/enviroment/substitution that
 - Lookup the corresponding CEK/splitting/node by climbing the tree
 - Improve the lookuped CEK by skipping/stepping(if skipping failed)
 - Use the commuting square to jump forward the main CEK
-
+- `X -> F[XS] -> G[XS] -> H[XS]`
+- "split    "
+-       "lookup      "
+-                "lookup       "
+-       "improve               " 
 # Old, do not read. TODO: reuse what's good here
 ### Value Representation
 To provide quick hashing of chunks, and to define chunk for algebaric data type (trees), ant use a finger tree of word (fixed size int) to represent a value. 
