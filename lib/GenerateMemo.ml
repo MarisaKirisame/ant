@@ -25,6 +25,50 @@ let add_cont (ctx : ctx) (name : string) (arity : int) (app : (state -> words ->
   Dynarray.add_last ctx.constructor_degree (1 - arity);
   Dynarray.add_last ctx.conts (name, app)
 
+let fresh_name : (string, int) Hashtbl.t = Hashtbl.create (module Core.String)
+
+let gensym (base : string) : string =
+  let n = Option.value (Hashtbl.find fresh_name base) ~default:0 in
+  Hashtbl.set fresh_name ~key:base ~data:(n + 1);
+  base ^ "_" ^ string_of_int n
+
+let int (i : int) : int code = string (string_of_int i)
+
+let lam (a : string) (f : 'a code -> 'b code) : ('a -> 'b) code =
+  let a = gensym a |> string in
+  string "(fun " ^^ a ^^ string " -> " ^^ f a ^^ string ")"
+
+let lam2 (a : string) (b : string) (f : 'a code -> 'b code -> 'c code) : ('a -> 'b -> 'c) code =
+  let a = gensym a |> string in
+  let b = gensym b |> string in
+  string "(fun " ^^ a ^^ string " " ^^ b ^^ string " -> " ^^ f a b ^^ string ")"
+
+let lam3 (a : string) (b : string) (c : string) (f : 'a code -> 'b code -> 'c code -> 'd code) :
+    ('a -> 'b -> 'c -> 'd) code =
+  let a = gensym a |> string in
+  let b = gensym b |> string in
+  let c = gensym c |> string in
+  string "(fun " ^^ a ^^ string " " ^^ b ^^ string " " ^^ c ^^ string " -> " ^^ f a b c ^^ string ")"
+
+let app (f : ('a -> 'b) code) (a : 'a code) : 'b code = group (f ^^ space ^^ a)
+let app2 (f : ('a -> 'b -> 'c) code) (a : 'a code) (b : 'b code) : 'c code = app (app f a) b
+let app3 (f : ('a -> 'b -> 'c -> 'd) code) (a : 'a code) (b : 'b code) (c : 'c code) : 'd code = app (app2 f a b) c
+
+let app4 (f : ('a -> 'b -> 'c -> 'd -> 'e) code) (a : 'a code) (b : 'b code) (c : 'c code) (d : 'd code) : 'e code =
+  app (app3 f a b c) d
+
+let app5 (f : ('a -> 'b -> 'c -> 'd -> 'e -> 'f) code) (a : 'a code) (b : 'b code) (c : 'c code) (d : 'd code)
+    (e : 'e code) : 'f code =
+  app (app4 f a b c d) e
+
+let assert_env_length (s : state code) (e : int code) : unit code = app2 (string "assert_env_length") s e
+
+let return_n (s : state code) (n : int code) (return_exp : exp code) (store : store code) (update : update code) :
+    state code =
+  app5 (string "return_n") s n return_exp store update
+
+let seq (x : unit code) (y : unit -> unit code) : unit code = group (x ^^ string "; " ^^ y ())
+
 let new_ctx () : ctx =
   let ctx =
     {
@@ -198,9 +242,11 @@ let drop (s : scope) (vars : string list) (k : kont) : pc =
 let return (s : scope) : pc =
   add_code
     (Some
-       (string
-          ("(fun x -> assert_env_length x " ^ string_of_int s.env_length ^ "; return_n x " ^ string_of_int s.env_length
-         ^ " (pc_to_exp " ^ string_of_int apply_cont ^ "))")))
+       (lam3 "x" "store" "update" (fun x store update ->
+            seq
+              (assert_env_length x (int s.env_length))
+              (fun _ ->
+                return_n x (int s.env_length) (string " (pc_to_exp " ^^ int apply_cont ^^ string ")") store update))))
 
 let add_fv (v : string) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
   let fv = write_linear fv in

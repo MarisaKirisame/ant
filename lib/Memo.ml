@@ -141,7 +141,7 @@ let register_memo_need_unfetched (state : state) (request : fetch_request) (upda
       let lookup = Hashtbl.create (module Core.Int) in
       log ("updating need with: " ^ string_of_cek state);
       update := Need { next = { request; lookup }; current = Shared state }
-  | Need n -> ()
+  | Need _ -> ()
   | Done _ -> failwith "Done canot be fetching"
 
 let single_reference (src : source) : seq = Generic.singleton (Reference { src; offset = 0; values_count = 1 })

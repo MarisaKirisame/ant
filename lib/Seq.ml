@@ -2,6 +2,12 @@ open BatFingerTree
 open Word
 open Common
 
+(*[0; 1; 2; 3]
+ * Cons 0 (Cons 1 (Cons 2 (Cons 3 Empty)))
+ * Cons 0 Cons 1 Cons 2 Cons 3 Empty
+ * 256  0 256  1 256  2 256  3 257
+ * Cons 0 Cons 1 Cons 2 (Cons 3 Empty) []:value have degree = 1 (and max_degree = 1)
+ *)
 type measure = {
   length : int;
   (*A degree is the number of value a string generate. 

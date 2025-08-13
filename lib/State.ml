@@ -49,6 +49,10 @@ and update = memo_node_t ref
  *)
 and memo_t = memo_node_t ref Array.t
 
+(*   A
+ *  | |
+ *  B C
+ *)
 (* The node always start from BlackHole, and may become Halfway, and finally be Need, Continue, or Done. *)
 and memo_node_t =
   (* We know transiting need to resolve a fetch_request to continue. *)
