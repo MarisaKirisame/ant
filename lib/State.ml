@@ -40,7 +40,7 @@ and recording = { s : store; u : update }
 and store = value Dynarray.t
 and update = memo_node_t ref
 
-(* The memo tree is the key data structure that handle all memoization logic.
+(* The memo trie is the key data structure that handle all memoization logic.
  *   It contain a fetch request, which try to fetch a reference of a length.
  *   The segment then is hashed and compared to value in a hashtable.
  *   The value inside a hashtable is another cek machine.
