@@ -3,6 +3,7 @@ open PPrint
 open Syntax
 open Memo
 open State
+open Word
 
 (* As K come with interpretative overhead,
  *   we want to use K as little as possible,
@@ -50,6 +51,15 @@ let lam3 (a : string) (b : string) (c : string) (f : 'a code -> 'b code -> 'c co
   let c = gensym c |> string in
   string "(fun " ^^ a ^^ string " " ^^ b ^^ string " " ^^ c ^^ string " -> " ^^ f a b c ^^ string ")"
 
+let lam4 (a : string) (b : string) (c : string) (d : string) (f : 'a code -> 'b code -> 'c code -> 'd code -> 'e code) :
+    ('a -> 'b -> 'c -> 'd -> 'e) code =
+  let a = gensym a |> string in
+  let b = gensym b |> string in
+  let c = gensym c |> string in
+  let d = gensym d |> string in
+  string "(fun " ^^ a ^^ string " " ^^ b ^^ string " " ^^ c ^^ string " " ^^ d ^^ string " -> " ^^ f a b c d
+  ^^ string ")"
+
 let app (f : ('a -> 'b) code) (a : 'a code) : 'b code = group (f ^^ space ^^ a)
 let app2 (f : ('a -> 'b -> 'c) code) (a : 'a code) (b : 'b code) : 'c code = app (app f a) b
 let app3 (f : ('a -> 'b -> 'c -> 'd) code) (a : 'a code) (b : 'b code) (c : 'c code) : 'd code = app (app2 f a b) c
@@ -67,7 +77,60 @@ let return_n (s : state code) (n : int code) (return_exp : exp code) (store : st
     state code =
   app5 (string "return_n") s n return_exp store update
 
+let drop_n (s : state code) (e : int code) (n : int code) (return_exp : exp code) : state code =
+  app4 (string "drop_n") s e n return_exp
+
+let push_env (s : state code) (v : int code) : unit code = app2 (string "push_env") s v
+let pc_to_exp (pc : int code) : exp code = app (string "pc_to_exp") pc
 let seq (x : unit code) (y : unit -> unit code) : unit code = group (x ^^ string "; " ^^ y ())
+let seq_b1 (x : unit code) (y : unit -> unit code) : unit code = group (x ^^ string ";" ^^ break 1 ^^ y ())
+let paren (x : 'a code) : 'a code = string "(" ^^ x ^^ string ")"
+let dyn_array_get (arr : 'a Dynarray.t code) (i : int code) : 'a code = app2 (string "Dynarray.get") arr i
+let dyn_array_remove_last (arr : 'a Dynarray.t code) : unit code = app (string "Dynarray.remove_last") arr
+
+let state_env (s : state code) : env code =
+  (* paren (app (string "state.e") s) *)
+  paren s ^^ string ".e"
+
+let state_kont (s : state code) : kont code =
+  (* paren (app (string "state.k") s) *)
+  paren s ^^ string ".k"
+
+let stepped (s : state code) : state code = app (string "stepped") s
+let set_c (s : state code) (c : exp code) : unit code = paren s ^^ string ".c <- " ^^ c
+let set_k (s : state code) (k : kont code) : unit code = paren s ^^ string ".k <- " ^^ k
+let from_constructor (ctag : int code) : Value.seq code = app (string "Memo.from_constructor") ctag
+let pop_env (s : state code) : Value.value code = app (string "pop_env") s
+
+let env_call (s : state code) (keep : int list code) (nargs : int code) : Value.seq code =
+  app3 (string "env_call") s keep nargs
+
+let restore_env (s : state code) (n : int code) (seqs : Value.seq code) : unit code =
+  app3 (string "restore_env") s n seqs
+
+let get_next_cont (seqs : Value.seq code) : Value.seq code = app (string "get_next_cont") seqs
+
+let resolve (s : state code) (store : store code) (src : Reference.source code) (update : update code) :
+    (Word.t code * Value.seq code) option code =
+  app4 (string "resolve") s store src update
+
+let memo_appends (xs : Value.seq code list) : Value.seq code =
+  app (string "Memo.appends") (string "[" ^^ separate (string ";") xs ^^ string "]")
+
+let memo_from_int (i : int code) : Value.seq code = app (string "Memo.from_int") i
+let memo_splits (seq : Value.seq code) : Value.seq list code = app (string "Memo.splits") seq
+
+let let_in (a : string) (value : 'a code) (body : 'a code -> 'b code) : 'b code =
+  let a = gensym a |> string in
+  string "let " ^^ a ^^ string " = " ^^ value ^^ string " in " ^^ body a
+
+let list_literal (xs : 'a code list) : 'a list code = string "[" ^^ separate (string ";") xs ^^ string "]"
+let list_literal_of (f : 'a -> 'b code) (xs : 'a list) : 'b list code = list_literal (List.map f xs)
+
+let match_option (x : 'a option code) (none : unit -> 'b code) (pat : 'a code) (some : unit -> 'b code) : 'b code =
+  string "match " ^^ x ^^ string " with | None -> " ^^ none () ^^ string " | Some " ^^ pat ^^ string " -> " ^^ some ()
+
+let src_E (i : int) : Reference.source code = string "Source.E " ^^ string (string_of_int i)
 
 let new_ctx () : ctx =
   let ctx =
@@ -232,11 +295,10 @@ let drop (s : scope) (vars : string list) (k : kont) : pc =
       (s, 0) vars
   in
   add_code_k (fun pc ->
-      ( string
-          ("(fun x store update -> assert_env_length x " ^ string_of_int s.env_length ^ "; drop_n x "
-         ^ string_of_int s.env_length ^ " " ^ string_of_int n ^ " (pc_to_exp "
-          ^ string_of_int (k.k new_s)
-          ^ "))"),
+      ( lam3 "x" "store" "update" (fun x store update ->
+            seq
+              (assert_env_length x (int s.env_length))
+              (fun _ -> drop_n x (int s.env_length) (int n) (paren (pc_to_exp (int (k.k new_s)))))),
         pc ))
 
 let return (s : scope) : pc =
@@ -245,8 +307,7 @@ let return (s : scope) : pc =
        (lam3 "x" "store" "update" (fun x store update ->
             seq
               (assert_env_length x (int s.env_length))
-              (fun _ ->
-                return_n x (int s.env_length) (string " (pc_to_exp " ^^ int apply_cont ^^ string ")") store update))))
+              (fun _ -> return_n x (int s.env_length) (paren (pc_to_exp (int apply_cont))) store update))))
 
 let add_fv (v : string) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
   let fv = write_linear fv in
@@ -307,23 +368,25 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
   | Var name ->
       add_code_k (fun pc ->
           let loc = Option.get (Hashtbl.find_exn (read_linear s.meta_env) name) in
-          ( string
-              ("(fun x store update -> assert_env_length x " ^ string_of_int s.env_length ^ "; " ^ "push_env x ("
-             ^ "Dynarray.get x.e " ^ string_of_int loc ^ ");" ^ "x.c <- pc_to_exp "
-              ^ string_of_int (k.k (push_s s))
-              ^ ";" ^ " stepped x)"),
+          ( lam3 "x" "store" "update" (fun x store update ->
+                seq
+                  (assert_env_length x (int s.env_length))
+                  (fun _ ->
+                    seq
+                      (push_env x (paren (dyn_array_get (state_env x) (int loc))))
+                      (fun _ -> seq (set_c x (pc_to_exp (int (k.k (push_s s))))) (fun _ -> stepped x)))),
             pc ))
   | Match (value, cases) ->
       ant_pp_expr ctx s value { k = (fun s -> ant_pp_cases ctx (dup_s s) cases k); fv = fv_cases cases (dup_fv k.fv) }
   | Ctor cname ->
       add_code_k (fun pc ->
-          ( string
-              ("(fun x store update -> assert_env_length x " ^ string_of_int s.env_length
-             ^ "; push_env x (Memo.from_constructor "
-              ^ string_of_int (Hashtbl.find_exn ctx.ctag cname)
-              ^ "); x.c <- pc_to_exp "
-              ^ string_of_int (k.k (push_s s))
-              ^ "; stepped x)"),
+          ( lam3 "x" "store" "update" (fun x store update ->
+                seq
+                  (assert_env_length x (int s.env_length))
+                  (fun _ ->
+                    seq
+                      (push_env x (paren (from_constructor (int (Hashtbl.find_exn ctx.ctag cname)))))
+                      (fun _ -> seq (set_c x (pc_to_exp (int (k.k (push_s s))))) (fun _ -> stepped x)))),
             pc ))
   | App (App (Ctor cname, [ x0 ]), [ x1 ]) ->
       ant_pp_expr ctx s x0
@@ -335,19 +398,25 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                   k =
                     (fun s ->
                       add_code_k (fun pc ->
-                          let let_x1 = string "let x1 = (pop_env x) in " in
-                          let let_x0 = string "let x0 = (pop_env x) in " in
-                          let add_last =
-                            string
-                              ("push_env x " ^ "(Memo.appends [Memo.from_constructor "
-                              ^ string_of_int (Hashtbl.find_exn ctx.ctag cname)
-                              ^ ";x0;x1])" ^ "; ")
-                          in
-
-                          ( string ("(fun x store update -> assert_env_length x " ^ string_of_int s.env_length ^ "; ")
-                            ^^ let_x1 ^^ let_x0 ^^ add_last
-                            ^^ string
-                                 ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s (pop_s (pop_s s)))) ^ "; stepped x)"),
+                          ( lam3 "x" "store" "update" (fun x store update ->
+                                seq
+                                  (assert_env_length x (int s.env_length))
+                                  (fun _ ->
+                                    let_in "x1" (pop_env x) (fun x1 ->
+                                        let_in "x0" (pop_env x) (fun x0 ->
+                                            seq
+                                              (push_env x
+                                                 (paren
+                                                    (memo_appends
+                                                       [
+                                                         from_constructor (int (Hashtbl.find_exn ctx.ctag cname));
+                                                         x0;
+                                                         x1;
+                                                       ])))
+                                              (fun _ ->
+                                                seq
+                                                  (set_c x (pc_to_exp (int (k.k (push_s (pop_s (pop_s s)))))))
+                                                  (fun _ -> stepped x)))))),
                             pc )));
                   fv = k.fv;
                 });
@@ -359,25 +428,40 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
       (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
       let keep_length = keep_s.env_length in
       add_cont ctx cont_name (keep_length + 1)
-        (string "(fun x tl store update -> restore_env x "
-        ^^ string (string_of_int keep_length)
-        ^^ string " tl; x.k <- get_next_cont tl; x.c <- pc_to_exp "
-        ^^ string (string_of_int (k.k (push_s keep_s)))
-        ^^ string "; stepped x)");
+        (lam4 "x" "tl" "store" "update" (fun x tl store update ->
+             seq
+               (assert_env_length x (int keep_length))
+               (fun _ ->
+                 seq
+                   (restore_env x (int keep_length) tl)
+                   (fun _ ->
+                     seq
+                       (set_k x (get_next_cont tl))
+                       (fun _ -> seq (set_c x (pc_to_exp (int (k.k (push_s keep_s))))) (fun _ -> stepped x))))));
       ant_pp_expr ctx s x
         {
           k =
             (fun s ->
               add_code_k (fun pc ->
-                  ( string
-                      ("(fun x store update -> assert_env_length x " ^ string_of_int s.env_length
-                     ^ "; let keep = env_call x ["
-                      ^ String.concat ";" (List.map string_of_int (Dynarray.to_list keep))
-                      ^ "] 1 in x.k <- (Memo.appends [Memo.from_constructor "
-                      ^ string_of_int (Hashtbl.find_exn ctx.ctag cont_name)
-                      ^ "; keep; x.k]) ; x.c <- pc_to_exp "
-                      ^ string_of_int (Hashtbl.find_exn ctx.func_pc "list_incr")
-                      ^ "; stepped x)"),
+                  ( lam3 "x" "store" "update" (fun x store update ->
+                        seq
+                          (assert_env_length x (int s.env_length))
+                          (fun _ ->
+                            let_in "keep"
+                              (env_call x (paren (list_literal_of int (Dynarray.to_list keep))) (int 1))
+                              (fun keep ->
+                                seq
+                                  (set_k x
+                                     (memo_appends
+                                        [
+                                          from_constructor (int (Hashtbl.find_exn ctx.ctag cont_name));
+                                          keep;
+                                          state_kont x;
+                                        ]))
+                                  (fun _ ->
+                                    seq
+                                      (set_c x (pc_to_exp (int (Hashtbl.find_exn ctx.func_pc "list_incr"))))
+                                      (fun _ -> stepped x))))),
                     pc )));
           fv = k.fv;
         }
@@ -390,74 +474,112 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                 {
                   k =
                     (fun s ->
-                      let x0 =
-                        string ("(resolve x store (Source.E " ^ string_of_int (s.env_length - 2) ^ ") update)")
-                      in
-                      let x1 =
-                        string ("(resolve x store (Source.E " ^ string_of_int (s.env_length - 1) ^ ") update)")
-                      in
-                      let add_last = string "push_env x (Memo.from_int (x0 + x1));" in
                       add_code_k (fun pc ->
-                          ( string
-                              ("(fun x store update -> assert_env_length x " ^ string_of_int s.env_length ^ "; match ")
-                            ^^ x0
-                            ^^ string " with  | None -> x | Some (x0, _) -> match "
-                            ^^ x1
-                            ^^ string
-                                 " with None -> x | Some (x1, _) -> (Dynarray.remove_last x.e;Dynarray.remove_last x.e;"
-                            ^^ add_last
-                            ^^ string
-                                 ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s (pop_s (pop_s s)))) ^ "; stepped x))"),
+                          ( lam3 "x" "store" "update" (fun x store update ->
+                                seq
+                                  (assert_env_length x (int s.env_length))
+                                  (fun _ ->
+                                    let x0 = resolve x store (paren (src_E (s.env_length - 2))) update in
+                                    let x1 = resolve x store (paren (src_E (s.env_length - 1))) update in
+                                    let x0_s = gensym "x0" |> string in
+                                    let x1_s = gensym "x1" |> string in
+                                    match_option x0
+                                      (fun _ -> x)
+                                      (paren (x0_s ^^ string ", _"))
+                                      (fun _ ->
+                                        match_option x1
+                                          (fun _ -> x)
+                                          (paren (x1_s ^^ string ", _"))
+                                          (fun _ ->
+                                            seq
+                                              (dyn_array_remove_last (state_env x))
+                                              (fun _ ->
+                                                seq
+                                                  (dyn_array_remove_last (state_env x))
+                                                  (fun _ ->
+                                                    seq
+                                                      (push_env x
+                                                         (paren (memo_from_int (paren (x0_s ^^ string " + " ^^ x1_s)))))
+                                                      (fun _ ->
+                                                        seq
+                                                          (set_c x (pc_to_exp (int (k.k (push_s (pop_s (pop_s s)))))))
+                                                          (fun _ -> stepped x)))))))),
                             pc )));
                   fv = fv_expr x1 (dup_fv k.fv);
                 });
           fv = k.fv;
         }
   | Int i ->
-      let add_last = string ("push_env x (Memo.from_int (" ^ string_of_int i ^ "));") in
       add_code_k (fun pc ->
-          ( string ("(fun x store update -> assert_env_length x " ^ string_of_int s.env_length ^ "; ")
-            ^^ add_last
-            ^^ string ("x.c <- pc_to_exp " ^ string_of_int (k.k (push_s s)) ^ "; stepped x)"),
+          ( lam3 "x" "store" "update" (fun x store update ->
+                seq
+                  (assert_env_length x (int s.env_length))
+                  (fun _ ->
+                    seq
+                      (push_env x (paren (memo_from_int (int i))))
+                      (fun _ -> seq (set_c x (pc_to_exp (int (k.k (push_s s))))) (fun _ -> stepped x)))),
             pc ))
   | _ -> failwith ("ant_pp_expr: " ^ show_expr c)
 
 and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : pc =
   add_code_k (fun pc ->
-      ( string
-          ("(fun x store update -> assert_env_length x " ^ string_of_int s.env_length ^ "; "
-         ^ "let last = Source.E (Dynarray.length x.e - 1) in ")
-        ^^ break 1
-        ^^ string "match resolve x store last update with | None -> x | Some (hd, tl) -> Dynarray.remove_last x.e;"
-        ^^ break 1
-        ^^ string " (match Word.get_value hd with "
-        ^^ (let s = pop_s s in
-            separate_map (break 1)
-              (fun (pat, expr) ->
-                (* special casing for now, as pat design need changes. *)
-                match pat with
-                | PApp (cname, None) ->
-                    string "| "
-                    ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
-                    ^^ string " -> "
-                    ^^ string ("(x.c <- pc_to_exp " ^ string_of_int (ant_pp_expr ctx s expr k) ^ "; stepped x)")
-                | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
-                    string "| "
-                    ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
-                    ^^ string " -> "
-                    ^^ string "(let [x0; x1] = Memo.splits tl in push_env x x0; push_env x x1;"
-                    ^^ string
-                         ("x.c <- pc_to_exp "
-                         ^ string_of_int
-                             (ant_pp_expr ctx
-                                (extend_s (extend_s s x0) x1)
-                                expr
-                                { k = (fun s -> drop s [ x1; x0 ] k); fv = k.fv })
-                         ^ ";")
-                    ^^ string "stepped x)"
-                | _ -> failwith (show_pattern pat))
-              c)
-        ^^ string "))",
+      ( lam3 "x" "store" "update" (fun x store update ->
+            seq
+              (assert_env_length x (int s.env_length))
+              (fun _ ->
+                let_in "last"
+                  (src_E (s.env_length - 1))
+                  (fun last ->
+                    let m = resolve x store last update in
+                    let hd = gensym "hd" |> string in
+                    let tl = gensym "tl" |> string in
+                    match_option m
+                      (fun _ -> x)
+                      (paren (hd ^^ string ", " ^^ tl))
+                      (fun _ ->
+                        seq_b1
+                          (dyn_array_remove_last (state_env x))
+                          (fun _ ->
+                            let s = pop_s s in
+                            let t =
+                              separate_map (break 1)
+                                (fun (pat, expr) ->
+                                  (* special casing for now, as pat design need changes. *)
+                                  match pat with
+                                  | PApp (cname, None) ->
+                                      string "| "
+                                      ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
+                                      ^^ string " -> "
+                                      ^^ paren
+                                           (seq
+                                              (set_c x (pc_to_exp (int (ant_pp_expr ctx s expr k))))
+                                              (fun _ -> stepped x))
+                                  | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
+                                      string "| "
+                                      ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
+                                      ^^ string " -> "
+                                      ^^ paren
+                                           (let x0_s = gensym "x0" |> string in
+                                            let x1_s = gensym "x1" |> string in
+                                            seq
+                                              (string "let [" ^^ x0_s ^^ string "; " ^^ x1_s ^^ string "] ="
+                                             ^^ memo_splits tl ^^ string " in " ^^ push_env x x0_s)
+                                              (fun _ ->
+                                                seq (push_env x x1_s) (fun _ ->
+                                                    seq
+                                                      (set_c x
+                                                         (paren
+                                                            (pc_to_exp
+                                                               (int
+                                                                  (ant_pp_expr ctx
+                                                                     (extend_s (extend_s s x0) x1)
+                                                                     expr
+                                                                     { k = (fun s -> drop s [ x1; x0 ] k); fv = k.fv })))))
+                                                      (fun _ -> stepped x))))
+                                  | _ -> failwith (show_pattern pat))
+                                c
+                            in
+                            string " (match Word.get_value " ^^ hd ^^ string " with " ^^ t ^^ string ")"))))),
         pc ))
 
 let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
