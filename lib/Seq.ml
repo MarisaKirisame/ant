@@ -2,12 +2,41 @@ open BatFingerTree
 open Word
 open Common
 
-(*[0; 1; 2; 3]
- * Cons 0 (Cons 1 (Cons 2 (Cons 3 Empty)))
- * Cons 0 Cons 1 Cons 2 Cons 3 Empty
- * 256  0 256  1 256  2 256  3 257
- * Cons 0 Cons 1 Cons 2 (Cons 3 Empty) []:value have degree = 1 (and max_degree = 1)
+(* This file implement monoid parsing, a key technique in Ant. 
+ * The key problem is:
+ *   We need to treat values (ADTs) as strings of atomic size,
+ *   and we need to be able to reason about partial strings - a substring of a string which represent a value.
+ *
+ * To this end, we define the string repesentation of a value to be the prefix traversal of that value.
+ * For example, the list (Cons 0 (Cons 1 (Cons 2 Empty))) will be represented as 'Cons 0 Cons 1 Cons 2 Empty'.
+ * Like wise, the tree (Node (Node (Leaf 0) (Leaf 1)) (Node (Leaf 2) (Leaf 3))) is represented as 
+ *   'Node Node Leaf 0 Leaf 1 Node Leaf 2 Leaf 3'
+ *
+ * Essentially, we are stripping off all parenthesis from the value, and this is fine because
+ *   Each constructor have a fixed arity, so the parenthesis can always be recovered, although we never explicitly do so.
+ *
+ * With this representation, now we can talk about substrings of values, such as 'Node Node Leaf'.
+ * Such strings can be of 3 kinds:
+ * - A string representing exactly a single value, such as 'Node Leaf 0 Leaf 1'.
+ * - A string representing multiple values, such as 'Leaf 0 Leaf 1', which represent two values.
+ * - A string representing an incomplete value, such as 'Node', which need two more values to complete and produce a value.
+ *     In some sense, this string contain '-1' value: after adding 2 more values, it will have a value of 1.
+ *
+ * Because negative values dont really make sense, we will be calling them 'degree'.
+ * A atomic value have a degree of 1, and a constructor have a degree of 1 minus the number of arguments it take.
+ * For example, 'Node' have a degree of -1, and 'Leaf' have a degree of 0.
+ * The degree of a string is the sum of the degrees of its components.
+ * For example, 'Node Leaf 0 Leaf 1' have a degree of 0, as it have 1 constructor and 2 atomic values.
+ * This allow us to pop a value from a string of degree >= 1: 
+ *   we just need to find the earliest place where the prefix have a degree of 1.
+ *
+ * A key insight is that pattern matching can be carried out using only a partial value.
+ * That is, given only the first word of the string, we can obtain the constructor tag,
+ *   and thus can decide which branch to take.
+ * Note that we had not obtained the value of the constructor arguments yet, but that is fine.
+ * We can represent them as 'references', which point to some location in some string, to resolve them later.
  *)
+
 type measure = {
   length : int;
   (*A degree is the number of value a string generate. 
