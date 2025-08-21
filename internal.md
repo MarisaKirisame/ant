@@ -1,3 +1,4 @@
+# TODO: break into multiple documents, figure out how code should link to docs
 # Partial Memoization
 
 ## Background
@@ -27,9 +28,19 @@ To sum up, to use a `F[XS] ->* G[XS]` entry to skip computation, we have to:
 
 Note that there are two class of concepts, the term/enviroment/substitution that operate in object level, and one that operate in the meta level, operating over the whole CEK machine. The former is in lower case while the latter is in upper case.
 
-# TODO: should be readable now, but refine into paragraphs
-## Splitting
+## CEK Machine
 - CEK: a meta-value
+- C: represented by a program counter
+- E: a list of value
+- K: reified to be a value
+
+## Monoid Parsing
+- Finger Tree
+- Monoid
+- Degree
+- Max Degree
+
+## Splitting
 - Store: a meta-environment
 - Reference: meta-variable
 - Values in CEK might hold References
@@ -38,12 +49,6 @@ Note that there are two class of concepts, the term/enviroment/substitution that
 - Problem: cannot traverse structure, otherwise too expensive
 - e.g. need to get prefix of length X in sublinear term
 - Solution: Monoid Hashing over a tree that represent the list
-
-- Problem: language should support tree
-- Solution: Monoid Parsing
-
-- Problem: Cons now O(log X) instead of constant
-- Solution: Represent values with Finger Trees
 
 ## Substitution
 - Subst a single value: loop over all references resolving them

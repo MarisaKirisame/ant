@@ -118,6 +118,7 @@ let memo_appends (xs : Value.seq code list) : Value.seq code =
   app (string "Memo.appends") (string "[" ^^ separate (string ";") xs ^^ string "]")
 
 let memo_from_int (i : int code) : Value.seq code = app (string "Memo.from_int") i
+let int_from_word (w : Word.t code) : int code = app (string "Word.to_int") w
 let memo_splits (seq : Value.seq code) : Value.seq list code = app (string "Memo.splits") seq
 
 let let_in (a : string) (value : 'a code) (body : 'a code -> 'b code) : 'b code =
@@ -499,7 +500,11 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                                                   (fun _ ->
                                                     seq
                                                       (push_env x
-                                                         (paren (memo_from_int (paren (x0_s ^^ string " + " ^^ x1_s)))))
+                                                         (paren
+                                                            (memo_from_int
+                                                               (paren
+                                                                  (int_from_word x0_s ^^ string " + "
+                                                                 ^^ int_from_word x1_s)))))
                                                       (fun _ ->
                                                         seq
                                                           (set_c x (pc_to_exp (int (k.k (push_s (pop_s (pop_s s)))))))
