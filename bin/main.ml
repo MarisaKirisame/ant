@@ -20,10 +20,11 @@ let parse content =
       Printf.eprintf "Lexing error at line %d, character %d: %s\n" line cnum @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input print_ast compile_pat print_ant print_cek_ant tyck print_cps_transformed print_de print_cps_de =
+let driver input output print_ast compile_pat print_ant print_cek_ant tyck print_cps_transformed print_de print_cps_de =
   let src = read_all input in
   let ast = parse src in
-  let output_pp = PPrint.ToChannel.pretty 0.8 80 stdout in
+  let debug_pp = PPrint.ToChannel.pretty 0.8 80 stdout in
+  let output_pp = PPrint.ToChannel.pretty 0.8 80 (Out_channel.open_text output) in
   let _ =
     if print_ast then output_pp (Syntax.pp_prog ast);
     if compile_pat then output_pp (Pat.show_all_pattern_matrixes ast);
@@ -40,6 +41,11 @@ let input =
   let doc = "The name of the input file" in
   let docv = "INPUT" in
   Arg.(required & pos 0 (some string) None & info [] ~doc ~docv)
+
+let output =
+  let doc = "The name of the output file" in
+  let docv = "OUTPUT" in
+  Arg.(required & pos 1 (some string) None & info [] ~doc ~docv)
 
 let print_ast =
   let doc = "Print the AST" in
@@ -79,7 +85,7 @@ let cmd =
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
   Cmd.v info
     Term.(
-      const driver $ input $ print_ast $ compile_pat $ print_ant $ print_cek_ant $ tyck $ print_cps_transformed
+      const driver $ input $ output $ print_ast $ compile_pat $ print_ant $ print_cek_ant $ tyck $ print_cps_transformed
       $ print_de $ print_cps_de)
 
 let i = Cmd.eval cmd
