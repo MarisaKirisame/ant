@@ -98,28 +98,3 @@ The branch node also contain a hashtable where the key is the fetch result, and 
 Note that the memo tree might request to fetch different parts of a value. 
 To support this, each time a fetch occur, the leftover part is inserted into a match log (which is a sequence of value). 
 A location can then additionally be an index into the match log with the offset.
-
-### Recording new entries
-Once ant had selected and hashed a fragment, ant will enter recording mode, saving the old cek machine into history, and creating a new one. 
-The cek machine also store a pointer to a memo structure node, so the recording result can be inserted back into it cheaply.
-
-To track whether words are inside/outside of the fragment, the finger tree may additionally contain reference, a location into the history, alongside the monoidal parsing representation (so a value with reference can still be used). 
-
-When ant will execute past the fragment (so attempting to read references as words), the recording is done. 
-The reference can then be unlifted back to values, by replacing them with corresponding values, and this unlifting process is entered into the memo node, 
-which will be executed under different history.
-In other words, the memo result is a CEK with reference, and jumping forward is implemnted by resolving the references.
-
-Note that it is possible to enter recording mode inside recording mode, so the history form a stack, pushing/popping upon entering/exiting.
-
-### Extension
-Ant select the memoized fragment in a demand driven manner - that is, it select values which will/have a high chance to be used.
-More specifically whenever a read violation occur (that is, attempting to read a reference), ant is given a location which must be read for progression.
-
-Instead of exiting recording, ant can then extend the fragment with n words starting at that location, where n exponentially increase upon reading the same value (reading a match log count as reading the original value where the log is derived from).
-
-Note that extension mean a reference can now be readable, as the values it point to might be newly extended. 
-Ant resolve them on demand via a method similar to path-compression in union find.
-
-Extension may not always succeed - remember that history is a stack, where the readbale fragments form a decreasing subset of all values. 
-If extending will break this violation, ant cannot extend and the recording must finish.

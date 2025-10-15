@@ -235,6 +235,7 @@ let rec climb (state : state) (store : store) (fetch_value_can_fail : bool) (cli
   let tstate = tstate_from_state state in
   climb_aux state store tstate fetch_value_can_fail climb_done climb_halfway (Array.get memo state.c.pc) 0
 
+(* find a node on the tree as far as possible. *)
 let locate (state : state) (memo : memo_t) : state * store * update =
   let store = init_store () in
   climb state store false
@@ -276,6 +277,9 @@ let update (state : state) (store : store) (memo : memo_t) (update : update) : s
   if sc_before < state.sc then improve update (Halfway (Shared state));
   state
 
+(* The point of the ant_step function is to both improve the memo tree, creating larger and larger skip,
+ * as well as actually moving forward along the tree as well.
+ *)
 let ant_step (x : state) (m : memo_t) : state =
   let y, store, update_ = locate x m in
   log ("located a state: " ^ string_of_cek y);
