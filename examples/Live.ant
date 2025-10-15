@@ -1,0 +1,34 @@
+type nat = 
+  | Z 
+  | S of nat
+;;
+
+type 'a list =
+  | Nil
+  | Cons of 'a * 'a list
+;;
+
+type expr =
+  | EInt of int
+  | EPlus of expr * expr
+  | EVar of nat
+  | EAbs of expr
+  | EApp of expr * expr
+  | ETrue
+  | EFalse
+  | EIf of expr * expr * expr
+  | ENil
+  | ECons of expr * expr
+  | EMatchList of expr * expr * expr
+  | EFix of expr
+;;
+
+type value = 
+  | VInt of int
+  | VAbs of expr * value list
+  | VTrue
+  | VFalse
+  | VNil
+  | VCons of value
+  | VFix of expr * value list
+;;
