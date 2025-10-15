@@ -32,5 +32,7 @@ type source = Source.t
  *
  * If a value at depth x have a reference which refer to a value at depth x,
  *   It should path-compress lazily, as it had already been fetched, and the reference is pointless.
+ *
+ * take values_count (drop offset (read src))
  *)
 type reference = { src : source; offset : int; values_count : int }
