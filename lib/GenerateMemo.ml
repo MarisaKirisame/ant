@@ -5,6 +5,11 @@ open Memo
 open State
 open Word
 
+(*todo: implement tail call*)
+(*todo: use CPS*)
+(*todo: do not do a stack machine*)
+(*todo: no transit step*)
+
 (* As K come with interpretative overhead,
  *   we want to use K as little as possible,
  *   instead storing the computed temporary variables onto the env as a stack,
@@ -170,13 +175,7 @@ let ant_pp_ocaml_adt adt_name ctors =
         (List.map
            (fun (con_name, types) ->
              if List.length types = 0 then con_name
-             else
-               con_name ^ " of "
-               ^ String.concat " * "
-                   (List.map
-                      (fun ty ->
-                        match ty with TNamed "int" -> "int" | TNamed _ -> "Value.seq" | _ -> failwith (show_ty ty))
-                      types))
+             else con_name ^ " of " ^ String.concat " * " (List.map (fun _ -> "Value.seq") types))
            ctors))
 
 let ant_pp_adt_constructors (e : ctx) adt_name ctors =
@@ -192,14 +191,7 @@ let ant_pp_adt_constructors (e : ctx) adt_name ctors =
           ^ ": Value.seq = Memo.appends ["
           ^ String.concat ";"
               (("Memo.from_constructor " ^ string_of_int (Hashtbl.find_exn e.ctag con_name))
-              :: List.mapi
-                   (fun i ty ->
-                     let argname = "x" ^ string_of_int i in
-                     match ty with
-                     | TNamed "int" -> "Memo.from_int " ^ argname
-                     | TNamed _ -> argname
-                     | _ -> failwith (show_ty ty))
-                   types)
+              :: List.mapi (fun i _ -> "x" ^ string_of_int i) types)
           ^ "]")
       in
       register_constructor)
@@ -231,14 +223,7 @@ let ant_pp_adt_ffi e adt_name ctors =
                   "let ["
                   ^ String.concat ";" (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
                   ^ "] = Memo.splits t in " ^ con_name ^ "("
-                  ^ String.concat ","
-                      (List.mapi
-                         (fun i ty ->
-                           match ty with
-                           | TNamed "int" -> "Memo.to_int(" ^ "x" ^ string_of_int i ^ ")"
-                           | TNamed _ -> "x" ^ string_of_int i
-                           | _ -> failwith (show_ty ty))
-                         types)
+                  ^ String.concat "," (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
                   ^ ")")
               ctors))
 
@@ -258,28 +243,31 @@ type scope = {
   meta_env : (string, int option) Hashtbl.t linear;
   (*Note: env_length is not the amount of entries in meta_env above! It is the length of the environment when executing the cek machine.*)
   env_length : int;
+  resolved : bool;
 }
 
-let new_scope () = { meta_env = make_linear (Hashtbl.create (module Core.String)); env_length = 0 }
-let push_s s = { meta_env = s.meta_env; env_length = s.env_length + 1 }
+let new_scope () = { meta_env = make_linear (Hashtbl.create (module Core.String)); env_length = 0; resolved = false }
+let push_s s = { s with env_length = s.env_length + 1 }
 
 let extend_s s name =
   let meta_env = write_linear s.meta_env in
   Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length);
-  { meta_env = make_linear meta_env; env_length = s.env_length + 1 }
+  { s with meta_env = make_linear meta_env; env_length = s.env_length + 1 }
 
 let drop_s s name =
   assert (Option.is_some (Hashtbl.find_exn (read_linear s.meta_env) name));
   let meta_env = write_linear s.meta_env in
   Hashtbl.remove meta_env name;
-  { meta_env = make_linear meta_env; env_length = s.env_length - 1 }
+  { s with meta_env = make_linear meta_env; env_length = s.env_length - 1 }
 
 let pop_n s n =
   assert (s.env_length >= n);
-  { meta_env = s.meta_env; env_length = s.env_length - n }
+  { s with meta_env = s.meta_env; env_length = s.env_length - n }
 
 let pop_s s = pop_n s 1
-let dup_s s = { meta_env = make_linear (Hashtbl.copy (read_linear s.meta_env)); env_length = s.env_length }
+
+(*todo: we actually need to dup a bunch. lets switch to a functional data structure. *)
+let dup_s s = { s with meta_env = make_linear (Hashtbl.copy (read_linear s.meta_env)); env_length = s.env_length }
 
 type kont = { k : scope -> pc; fv : (string, unit) Hashtbl.t linear }
 
@@ -323,13 +311,17 @@ let remove_fv (v : string) (fv : (string, unit) Hashtbl.t linear) : (string, uni
 let rec fv_expr (e : expr) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
   match e with
   | Ctor _ -> fv
-  | App (f, xs) -> List.fold_left (fun fv e -> fv_expr e fv) (fv_expr f fv) xs
+  | App (f, xs) -> fv_exprs xs (fv_expr f fv)
   | Op (_, x, y) -> fv_expr y (fv_expr x fv)
   | Var name -> add_fv name fv
   | Int _ -> fv
+  | Match (value, cases) -> fv_expr value (fv_cases cases fv)
   | _ -> failwith ("fv_expr: " ^ show_expr e)
 
-let rec fv_pat (pat : pattern) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
+and fv_exprs (es : expr list) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
+  List.fold_left (fun fv e -> fv_expr e fv) fv es
+
+and fv_pat (pat : pattern) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
   match pat with
   | PApp (_, None) -> fv
   | PApp (_, Some x) -> fv_pat x fv
@@ -337,7 +329,7 @@ let rec fv_pat (pat : pattern) (fv : (string, unit) Hashtbl.t linear) : (string,
   | PVar name -> remove_fv name fv
   | _ -> failwith (show_pattern pat)
 
-let fv_cases (MatchPattern c : cases) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
+and fv_cases (MatchPattern c : cases) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
   List.fold_left (fun fv (pat, e) -> fv_pat pat (fv_expr e fv)) fv c
 
 type keep_t = { mutable keep : bool; mutable source : string option }
@@ -362,7 +354,7 @@ let keep_only (s : scope) (fv : (string, unit) Hashtbl.t linear) : int Dynarray.
     keep;
   Hashtbl.iteri (read_linear s.meta_env) ~f:(fun ~key ~data ->
       if Option.is_some data then ignore (Hashtbl.add meta_env ~key ~data:None));
-  (keep_idx, { meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
+  (keep_idx, { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
 
 let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
   match c with
@@ -389,7 +381,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                       (push_env x (paren (from_constructor (int (Hashtbl.find_exn ctx.ctag cname)))))
                       (fun _ -> seq (set_c x (pc_to_exp (int (k.k (push_s s))))) (fun _ -> stepped x)))),
             pc ))
-  | App (App (Ctor cname, [ x0 ]), [ x1 ]) ->
+  | App (Ctor cname, [ x0; x1 ]) ->
       ant_pp_expr ctx s x0
         {
           k =
@@ -423,7 +415,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                 });
           fv = fv_expr x1 (dup_fv k.fv);
         }
-  | App (Var "list_incr", [ x ]) ->
+  | App (Var f, xs) ->
       let cont_name = "cont_" ^ string_of_int (Dynarray.length ctx.conts) in
       let keep, keep_s = keep_only s k.fv in
       (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
@@ -439,7 +431,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                      seq
                        (set_k x (get_next_cont tl))
                        (fun _ -> seq (set_c x (pc_to_exp (int (k.k (push_s keep_s))))) (fun _ -> stepped x))))));
-      ant_pp_expr ctx s x
+      ant_pp_exprs ctx s xs
         {
           k =
             (fun s ->
@@ -449,7 +441,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                           (assert_env_length x (int s.env_length))
                           (fun _ ->
                             let_in "keep"
-                              (env_call x (paren (list_literal_of int (Dynarray.to_list keep))) (int 1))
+                              (env_call x (paren (list_literal_of int (Dynarray.to_list keep))) (int (List.length xs)))
                               (fun keep ->
                                 seq
                                   (set_k x
@@ -461,7 +453,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
                                         ]))
                                   (fun _ ->
                                     seq
-                                      (set_c x (pc_to_exp (int (Hashtbl.find_exn ctx.func_pc "list_incr"))))
+                                      (set_c x (pc_to_exp (int (Hashtbl.find_exn ctx.func_pc f))))
                                       (fun _ -> stepped x))))),
                     pc )));
           fv = k.fv;
@@ -526,6 +518,11 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : pc =
             pc ))
   | _ -> failwith ("ant_pp_expr: " ^ show_expr c)
 
+and ant_pp_exprs (ctx : ctx) (s : scope) (cs : expr list) (k : kont) : pc =
+  match cs with
+  | [] -> k.k s
+  | c :: cs -> ant_pp_expr ctx s c { k = (fun s -> ant_pp_exprs ctx s cs k); fv = fv_exprs cs (dup_fv k.fv) }
+
 and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : pc =
   add_code_k (fun pc ->
       ( lam3 "x" "store" "update" (fun x store update ->
@@ -549,7 +546,8 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : p
                             let t =
                               separate_map (break 1)
                                 (fun (pat, expr) ->
-                                  (* special casing for now, as pat design need changes. *)
+                                  let s = dup_s s in
+                                  (*todo: special casing for now, as pat design need changes. *)
                                   match pat with
                                   | PApp (cname, None) ->
                                       string "| "
@@ -559,6 +557,24 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : p
                                            (seq
                                               (set_c x (pc_to_exp (int (ant_pp_expr ctx s expr k))))
                                               (fun _ -> stepped x))
+                                  | PApp (cname, Some (PVar x0)) ->
+                                      string "| "
+                                      ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
+                                      ^^ string " -> "
+                                      ^^ paren
+                                           (let x0_s = gensym "x0" |> string in
+                                            seq
+                                              (string "let [" ^^ x0_s ^^ string "] =" ^^ memo_splits tl ^^ string " in "
+                                             ^^ push_env x x0_s)
+                                              (fun _ ->
+                                                seq
+                                                  (set_c x
+                                                     (paren
+                                                        (pc_to_exp
+                                                           (int
+                                                              (ant_pp_expr ctx (extend_s s x0) expr
+                                                                 { k = (fun s -> drop s [ x0 ] k); fv = k.fv })))))
+                                                  (fun _ -> stepped x)))
                                   | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
                                       string "| "
                                       ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
