@@ -24,8 +24,10 @@ let driver input output print_ast compile_pat print_ant print_cek_ant tyck print
   let src = read_all input in
   let ast = parse src in
   let debug_pp = PPrint.ToChannel.pretty 0.8 80 stdout in
+  let debug = false in
   let output_pp = PPrint.ToChannel.pretty 0.8 80 (Out_channel.open_text output) in
   let _ =
+    if debug then debug_pp (Syntax.pp_prog ast);
     if print_ast then output_pp (Syntax.pp_prog ast);
     if compile_pat then output_pp (Pat.show_all_pattern_matrixes ast);
     if print_ant then output_pp (Syntax.pp_ant ast);

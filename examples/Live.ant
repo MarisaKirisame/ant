@@ -3,10 +3,17 @@ type nat =
   | S of nat
 ;;
 
-type 'a list =
+type list 'a =
   | Nil
-  | Cons of 'a * 'a list
+  | Cons of 'a * list 'a
 ;;
+
+let index = fun x n ->
+  match x with
+  | Cons (xh, xt) -> 
+    (match n with
+    | Z -> xh
+    | S m -> index xt m);;
 
 type expr =
   | EInt of int
@@ -25,10 +32,10 @@ type expr =
 
 type value = 
   | VInt of int
-  | VAbs of expr * value list
+  | VAbs of expr * list value
   | VTrue
   | VFalse
   | VNil
   | VCons of value
-  | VFix of expr * value list
+  | VFix of expr * list value
 ;;
