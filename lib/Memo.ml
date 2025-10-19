@@ -272,7 +272,7 @@ let update (state : state) (store : store) (memo : memo_t) (update : update) : s
   assert (sc_before <= state.sc);
   if sc_before == state.sc then (
     log ("before step taken:sc=" ^ string_of_int state.sc ^ ", pc=" ^ string_of_int state.c.pc);
-    ignore (state.c.step state store update);
+    ignore (state.c.step (make_world state store update));
     log ("after step taken:sc=" ^ string_of_int state.sc ^ ", pc=" ^ string_of_int state.c.pc));
   if sc_before < state.sc then improve update (Halfway (Shared state));
   state
@@ -289,7 +289,7 @@ let ant_step (x : state) (m : memo_t) : state =
 let pow2_int x = 1 lsl x
 let get_word_count (store : store) : int = pow2_int $ Dynarray.length store
 
-let rec resolve_seq (state : state) (store : store) (x : seq) (update : update) : (Word.t * seq) option =
+let rec resolve_seq (w : world) (x : seq) : (Word.t * seq) option =
   let m = Generic.measure ~monoid ~measure x in
   assert (m.degree = 1);
   assert (m.max_degree = 1);
@@ -297,24 +297,24 @@ let rec resolve_seq (state : state) (store : store) (x : seq) (update : update) 
   match hd with
   | Word w -> Some (w, tl)
   | Reference ref ->
-      register_memo_need_unfetched state
-        { src = ref.src; offset = ref.offset; word_count = get_word_count store }
-        update;
+      register_memo_need_unfetched w.state
+        { src = ref.src; offset = ref.offset; word_count = get_word_count w.store }
+        w.update;
       None
 
 (* Src cannot be a Store, as we are resolving location at the top level, while only non-top-level have store. *)
-let rec resolve (state : state) (store : store) (src : source) (update : update) : (Word.t * seq) option =
+let rec resolve (w : world) (src : source) : (Word.t * seq) option =
   (* Note that we deliberately not pass store into get_value. 
    * The store is only used for fetch length calculation, and the actual content is discarded.
    *)
-  let v = get_value state None src in
+  let v = get_value w.state None src in
   assert ((Generic.measure ~monoid ~measure v).degree = 1);
   assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
-  resolve_seq state store v update
+  resolve_seq w v
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
 
-let add_exp (f : state -> store -> update -> state) (pc_ : int) : unit =
+let add_exp (f : world -> unit) (pc_ : int) : unit =
   let pc = Dynarray.length pc_map in
   assert (pc == pc_);
   Dynarray.add_last pc_map { step = f; pc }
@@ -342,69 +342,65 @@ let rec splits (x : seq) : seq list =
 let list_match (x : seq) : (Word.t * seq) option =
   Option.map (Generic.front ~monoid ~measure x) (fun (x, Word y) -> (y, x))
 
-let push_env (s : state) (v : value) : unit =
+let push_env (w : world) (v : value) : unit =
   assert ((Generic.measure ~monoid ~measure v).degree = 1);
   assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
-  Dynarray.add_last s.e v
+  Dynarray.add_last w.state.e v
 
-let pop_env (s : state) : value =
-  let v = Dynarray.pop_last s.e in
+let pop_env (w : world) : value =
+  let v = Dynarray.pop_last w.state.e in
   assert ((Generic.measure ~monoid ~measure v).degree = 1);
   assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
   v
 
-let env_call (s : state) (keep : int list) (nargs : int) : seq =
-  let l = Dynarray.length s.e in
-  let ret = appends (List.map keep (fun i -> Dynarray.get s.e i)) in
-  s.e <- Dynarray.init nargs (fun i -> Dynarray.get s.e (l - nargs + i));
+let env_call (w : world) (keep : int list) (nargs : int) : seq =
+  let l = Dynarray.length w.state.e in
+  let ret = appends (List.map keep (fun i -> Dynarray.get w.state.e i)) in
+  w.state.e <- Dynarray.init nargs (fun i -> Dynarray.get w.state.e (l - nargs + i));
   assert ((Generic.measure ~monoid ~measure ret).degree = List.length keep);
   assert ((Generic.measure ~monoid ~measure ret).max_degree = List.length keep);
   ret
 
-let restore_env (s : state) (n : int) (seqs : seq) : unit =
+let restore_env (w : world) (n : int) (seqs : seq) : unit =
   let splitted = List.rev (List.tl_exn (List.rev (splits seqs))) in
   assert (List.length splitted = n);
-  assert (Dynarray.length s.e = 1);
-  let last = Dynarray.get_last s.e in
-  s.e <- Dynarray.of_list splitted;
-  Dynarray.add_last s.e last
+  assert (Dynarray.length w.state.e = 1);
+  let last = Dynarray.get_last w.state.e in
+  w.state.e <- Dynarray.of_list splitted;
+  Dynarray.add_last w.state.e last
 
 let get_next_cont (seqs : seq) : seq =
   let splitted = splits seqs in
   List.hd_exn (List.rev splitted)
 
-let stepped (x : state) =
-  x.sc <- x.sc + 1;
-  x
+let stepped (w : world) : unit = w.state.sc <- w.state.sc + 1
 
-let return_n (s : state) (n : int) (return_exp : exp) (_ : store) (_ : update) : state =
-  assert (Dynarray.length s.e = n);
-  s.e <- Dynarray.of_list [ Dynarray.get_last s.e ];
-  s.c <- return_exp;
-  stepped s
+let return_n (w : world) (n : int) (return_exp : exp) : unit =
+  assert (Dynarray.length w.state.e = n);
+  w.state.e <- Dynarray.of_list [ Dynarray.get_last w.state.e ];
+  w.state.c <- return_exp;
+  stepped w
 
-let drop_n (s : state) (e : int) (n : int) (return_exp : exp) : state =
-  assert (Dynarray.length s.e = e);
-  let last = Dynarray.pop_last s.e in
+let drop_n (w : world) (e : int) (n : int) : unit =
+  assert (Dynarray.length w.state.e = e);
+  let last = Dynarray.pop_last w.state.e in
   let rec loop x =
     if x = n then ()
     else (
-      Dynarray.remove_last s.e;
+      Dynarray.remove_last w.state.e;
       loop (x + 1))
   in
   loop 0;
-  Dynarray.add_last s.e last;
-  s.c <- return_exp;
-  stepped s
+  Dynarray.add_last w.state.e last
 
-let assert_env_length (s : state) (e : int) : unit =
-  let l = Dynarray.length s.e in
+let assert_env_length (w : world) (e : int) : unit =
+  let l = Dynarray.length w.state.e in
   if l <> e then print_endline ("env_length should be " ^ string_of_int e ^ " but is " ^ string_of_int l);
   assert (l = e)
 
-let exec_done (d : state) (u : update) : state =
-  improve u (Done (Shared d));
-  raise (DoneExec d)
+let exec_done (w : world) : unit =
+  improve w.update (Done (Shared w.state));
+  raise (DoneExec w.state)
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   let state = { c; e; k; sc = 0 } in

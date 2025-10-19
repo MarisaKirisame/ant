@@ -14,7 +14,7 @@ type env = value Dynarray.t
  *)
 and exp = {
   (* One step transition. Throw an exception when done. *)
-  step : state -> store -> update -> state;
+  step : world -> unit;
   (*pc is an isomorphism to func, and pc -> func is a table lookup.*)
   pc : int;
 }
@@ -39,6 +39,7 @@ and recording = { s : store; u : update }
  *)
 and store = value Dynarray.t
 and update = memo_node_t ref
+and world = { state : state; store : store; update : update }
 
 (* The memo trie is the key data structure that handle all memoization logic.
  *   It contain a fetch request, which try to fetch a reference of a length.
@@ -72,6 +73,8 @@ and fetch_request = { src : source; offset : int; word_count : int }
 and lookup_t = (fetch_hash, memo_node_t ref) Hashtbl.t
 and fetch_hash = int
 and shared = Shared of state
+
+let make_world state store update : world = { state; store; update }
 
 let copy_state (Shared s) : state =
   let c = s.c in
