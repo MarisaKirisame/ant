@@ -3,7 +3,7 @@ open Word
 open Memo
 open Value
 
-let memo = Array.init 14 (fun _ -> ref State.BlackHole)
+let memo = Array.init 4 (fun _ -> ref State.BlackHole)
 
 type ocaml_int_list = Nil | Cons of Value.seq * Value.seq
 
@@ -20,158 +20,99 @@ let to_ocaml_int_list x =
       Cons (x0, x1)
 
 let rec list_incr (x0 : Value.seq) : Value.seq =
-  exec_cek (pc_to_exp 2) (Dynarray.of_list [ x0 ]) (Memo.from_constructor 0) memo
+  exec_cek (pc_to_exp 1) (Dynarray.of_list [ x0 ]) (Memo.from_constructor 0) memo
 
 let () =
   add_exp
-    (fun x store update ->
-      assert_env_length x 1;
-      match resolve x store K update with
-      | None -> x
+    (fun w ->
+      assert_env_length w 1;
+      match resolve w K with
+      | None -> ()
       | Some (hd, tl) -> (
           match Word.get_value hd with
-          | 0 -> (fun x tl store upate -> exec_done x update) x tl store update
+          | 0 -> exec_done w
           | 3 ->
-              (fun x_7 tl_1 store_7 update_7 ->
-                assert_env_length x_7 1;
-                restore_env x_7 1 tl_1;
-                x_7.k <- get_next_cont tl_1;
-                x_7.c <- pc_to_exp 9;
-                stepped x_7)
-                x tl store update))
+              ();
+              (assert_env_length w) 1;
+              w.state.k <- get_next_cont tl;
+              ((restore_env w) 1) tl;
+              (();
+               (assert_env_length w) 2;
+               let x1_2 = pop_env w in
+               let x0_2 = pop_env w in
+               (push_env w) (Memo.appends [ Memo.from_constructor 2; x0_2; x1_2 ]));
+              ();
+              (assert_env_length w) 1;
+              ((drop_n w) 1) 0;
+              (assert_env_length w) 1;
+              ((return_n w) 1) (pc_to_exp 0)))
     0
 
 let () =
   add_exp
-    (fun x store update ->
-      x.c <- pc_to_exp 2;
-      stepped x)
+    (fun w_0 ->
+      ();
+      (assert_env_length w_0) 1;
+      (push_env w_0) ((Dynarray.get w_0.state.e) 0);
+      w_0.state.c <- pc_to_exp 3;
+      stepped w_0)
     1
 
 let () =
   add_exp
-    (fun x_0 store_0 update_0 ->
-      assert_env_length x_0 1;
-      push_env x_0 (Dynarray.get x_0.e 0);
-      x_0.c <- pc_to_exp 3;
-      stepped x_0)
+    (fun w_2 ->
+      ();
+      (assert_env_length w_2) 5;
+      match (resolve w_2) (Source.E 3) with
+      | None -> ()
+      | Some x0_1 -> (
+          match (resolve w_2) (Source.E 4) with
+          | None -> ()
+          | Some x1_1 ->
+              ();
+              ignore (pop_env w_2);
+              ignore (pop_env w_2);
+              (push_env w_2) (Memo.from_int (Word.to_int (fst x0_1) + Word.to_int (fst x1_1)));
+              ();
+              (assert_env_length w_2) 4;
+              (push_env w_2) ((Dynarray.get w_2.state.e) 2);
+              (();
+               (assert_env_length w_2) 5;
+               let keep_0 = ((env_call w_2) [ 3 ]) 1 in
+               w_2.state.k <- Memo.appends [ Memo.from_constructor 3; keep_0; w_2.state.k ]);
+              w_2.state.c <- pc_to_exp 1;
+              stepped w_2))
     2
 
 let () =
   add_exp
-    (fun x_1 store_1 update_1 ->
-      assert_env_length x_1 2;
+    (fun w_1 ->
+      (assert_env_length w_1) 2;
       let last_0 = Source.E 1 in
-      match resolve x_1 store_1 last_0 update_1 with
-      | None -> x_1
-      | Some (hd_0, tl_0) -> (
-          Dynarray.remove_last x_1.e;
-          match Word.get_value hd_0 with
+      match (resolve w_1) last_0 with
+      | None -> ()
+      | Some x_0 -> (
+          ignore (pop_env w_1);
+          match Word.get_value (fst x_0) with
           | 1 ->
-              x_1.c <- pc_to_exp 4;
-              stepped x_1
+              ();
+              (assert_env_length w_1) 1;
+              (push_env w_1) (Memo.from_constructor 1);
+              (assert_env_length w_1) 2;
+              ((return_n w_1) 2) (pc_to_exp 0)
           | 2 ->
-              let [ x0_0; x1_0 ] = Memo.splits tl_0 in
-              push_env x_1 x0_0;
-              push_env x_1 x1_0;
-              x_1.c <- pc_to_exp 6;
-              stepped x_1))
+              let [ x0_0; x1_0 ] = Memo.splits (snd x_0) in
+              (push_env w_1) x0_0;
+              (push_env w_1) x1_0;
+              ();
+              (assert_env_length w_1) 3;
+              (push_env w_1) ((Dynarray.get w_1.state.e) 1);
+              ();
+              (assert_env_length w_1) 4;
+              (push_env w_1) (Memo.from_int 1);
+              w_1.state.c <- pc_to_exp 2;
+              stepped w_1))
     3
-
-let () =
-  add_exp
-    (fun x_2 store_2 update_2 ->
-      assert_env_length x_2 1;
-      push_env x_2 (Memo.from_constructor 1);
-      x_2.c <- pc_to_exp 5;
-      stepped x_2)
-    4
-
-let () =
-  add_exp
-    (fun x_3 store_3 update_3 ->
-      assert_env_length x_3 2;
-      return_n x_3 2 (pc_to_exp 0) store_3 update_3)
-    5
-
-let () =
-  add_exp
-    (fun x_4 store_4 update_4 ->
-      assert_env_length x_4 3;
-      push_env x_4 (Dynarray.get x_4.e 1);
-      x_4.c <- pc_to_exp 7;
-      stepped x_4)
-    6
-
-let () =
-  add_exp
-    (fun x_5 store_5 update_5 ->
-      assert_env_length x_5 4;
-      push_env x_5 (Memo.from_int 1);
-      x_5.c <- pc_to_exp 8;
-      stepped x_5)
-    7
-
-let () =
-  add_exp
-    (fun x_6 store_6 update_6 ->
-      assert_env_length x_6 5;
-      match resolve x_6 store_6 (Source.E 3) update_6 with
-      | None -> x_6
-      | Some (x0_1, _) -> (
-          match resolve x_6 store_6 (Source.E 4) update_6 with
-          | None -> x_6
-          | Some (x1_1, _) ->
-              Dynarray.remove_last x_6.e;
-              Dynarray.remove_last x_6.e;
-              push_env x_6 (Memo.from_int (Word.to_int x0_1 + Word.to_int x1_1));
-              x_6.c <- pc_to_exp 12;
-              stepped x_6))
-    8
-
-let () =
-  add_exp
-    (fun x_8 store_8 update_8 ->
-      assert_env_length x_8 2;
-      let x1_2 = pop_env x_8 in
-      let x0_2 = pop_env x_8 in
-      push_env x_8 (Memo.appends [ Memo.from_constructor 2; x0_2; x1_2 ]);
-      x_8.c <- pc_to_exp 10;
-      stepped x_8)
-    9
-
-let () =
-  add_exp
-    (fun x_9 store_9 update_9 ->
-      assert_env_length x_9 1;
-      drop_n x_9 1 0 (pc_to_exp 11))
-    10
-
-let () =
-  add_exp
-    (fun x_10 store_10 update_10 ->
-      assert_env_length x_10 1;
-      return_n x_10 1 (pc_to_exp 0) store_10 update_10)
-    11
-
-let () =
-  add_exp
-    (fun x_11 store_11 update_11 ->
-      assert_env_length x_11 4;
-      push_env x_11 (Dynarray.get x_11.e 2);
-      x_11.c <- pc_to_exp 13;
-      stepped x_11)
-    12
-
-let () =
-  add_exp
-    (fun x_12 store_12 update_12 ->
-      assert_env_length x_12 5;
-      let keep_0 = env_call x_12 [ 3 ] 1 in
-      x_12.k <- Memo.appends [ Memo.from_constructor 3; keep_0; x_12.k ];
-      x_12.c <- pc_to_exp 1;
-      stepped x_12)
-    13
 
 let () = Value.set_constructor_degree 0 1
 let () = Value.set_constructor_degree 1 1
