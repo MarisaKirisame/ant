@@ -13,14 +13,12 @@ module OccurrenceMap = Map.Make (struct
 
   let compare = compare
 end)
-[@@deriving show]
 
 module StringMap = Map.Make (struct
   type t = string
 
   let compare = String.compare
 end)
-[@@deriving show]
 
 type pattern_matrix = {
   arity : int;
