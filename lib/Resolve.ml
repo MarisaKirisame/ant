@@ -12,7 +12,7 @@ let rec resolve_expr ctx x =
   | Match (x, cases) -> Match (recurse x, resolve_cases ctx cases)
   | If (i, t, e) -> If (recurse i, recurse t, recurse e)
   | Let (BOne (p, l), r) -> Let (BOne (p, recurse l), recurse r)
-  | Ctor _ -> x
+  | Ctor _ | Int _ -> x
   | _ -> failwith ("resolve_expr: " ^ show_expr x)
 
 and resolve_cases ctx (MatchPattern cases) = MatchPattern (List.map (fun (pat, x) -> (pat, resolve_expr ctx x)) cases)
