@@ -15,10 +15,41 @@ open Word
  *   instead storing the computed temporary variables onto the env as a stack,
  *   only using K whenever we do a non-tail function call.
  *)
-type 'a code = Code of document
+type ir = Raw of document | Seqs of ir list | Unit | Function of string
 
-let code doc = Code doc
-let uncode (Code doc) = doc
+let rec ir_to_doc ir =
+  match ir with
+  | Raw doc -> doc
+  | Seqs [] -> string "()"
+  | Seqs [ x ] -> ir_to_doc x
+  | Seqs (x :: xs) -> parens (List.fold_left (fun acc x -> acc ^^ string ";" ^^ ir_to_doc x) (ir_to_doc x) xs)
+  | Unit -> string "()"
+  | Function str -> string str
+
+type 'a code = Code of ir
+
+let show_ir ir =
+  let doc = ir_to_doc ir in
+  let buf = Buffer.create 128 in
+  PPrint.ToBuffer.pretty 0.8 80 buf doc;
+  Buffer.contents buf
+
+let rec optimize_ir ir =
+  match ir with
+  | Raw d -> Raw d
+  | Seqs xs ->
+      let xs = List.map optimize_ir xs in
+      Seqs (List.flatten (List.map (fun ir -> match ir with Unit -> [] | Seqs xs -> xs | x -> [ x ]) xs))
+  | Unit -> Unit
+
+let code (doc : document) = Code (Raw doc)
+
+let uncode (Code ir) : document =
+  print_endline (show_ir ir);
+  ir_to_doc ir
+
+let from_ir (Code ir) = ir
+let to_ir ir = Code ir
 
 type ctx = {
   arity : (string, int) Hashtbl.t;
@@ -88,11 +119,8 @@ let app5 (f : ('a -> 'b -> 'c -> 'd -> 'e -> 'f) code) (a : 'a code) (b : 'b cod
 let assert_env_length (w : world code) (e : int code) : unit code = app2 (code $ string "assert_env_length") w e
 let return_n (w : world code) (n : int code) (exp : exp code) : unit code = app3 (code $ string "return_n") w n exp
 let drop_n (w : world code) (e : int code) (n : int code) : unit code = app3 (code $ string "drop_n") w e n
-let pc_to_exp (pc : int code) : exp code = app (code $ string "pc_to_exp") pc
-
-let seq (x : unit code) (y : unit -> 'a code) : 'a code =
-  code $ parens (group (uncode x ^^ string "; " ^^ uncode (y ())))
-
+let pc_to_exp (pc : int code) : exp code = app (to_ir $ Function "pc_to_exp") pc
+let seq (x : unit code) (y : unit -> 'a code) : 'a code = to_ir (Seqs [ from_ir x; from_ir (y ()) ])
 let seqs (xs : (unit -> unit code) list) : unit code = List.fold_left seq unit xs
 
 let seq_b1 (x : unit code) (y : unit -> unit code) : unit code =
@@ -174,18 +202,18 @@ let new_ctx () : ctx =
   add_cont ctx "cont_done" 0 (fun w _ -> exec_done w);
   ctx
 
-let codes : document option Dynarray.t = Dynarray.create ()
+let codes : (world -> unit) code option Dynarray.t = Dynarray.create ()
 
 type pc = int
 
-let add_code (c : document option) : pc =
+let add_code (c : (world -> unit) code option) : pc =
   let pc = Dynarray.length codes in
   Dynarray.add_last codes c;
   pc
 
-let set_code (i : int) (c : document) : unit = Dynarray.set codes i (Some c)
+let set_code (i : int) (c : (world -> unit) code) : unit = Dynarray.set codes i (Some c)
 
-let add_code_k (k : pc -> document * 'a) : 'a =
+let add_code_k (k : pc -> (world -> unit) code * 'a) : 'a =
   let pc = add_code None in
   let code, ret = k pc in
   set_code pc code;
@@ -375,7 +403,7 @@ let keep_only (s : scope) (fv : (string, unit) Hashtbl.t linear) : int Dynarray.
 
 let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) : unit code =
   let make_code w = f { s with progressed = false } w in
-  if s.progressed then goto w (add_code $ Some (uncode $ lam "w" make_code)) else make_code w
+  if s.progressed then goto w (add_code $ Some (lam "w" make_code)) else make_code w
 
 let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -> unit code =
   match c with
@@ -600,7 +628,7 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
       let name = match x with Some (PVar x) -> x | _ -> failwith "bad match" in
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
-          ( uncode $ lam "w" (fun w -> ant_pp_expr ctx s term { k = (fun s w -> return s w); fv = empty_fv () } w),
+          ( lam "w" (fun w -> ant_pp_expr ctx s term { k = (fun s w -> return s w); fv = empty_fv () } w),
             string "let rec" ^^ space ^^ string name ^^ space
             ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
             ^^ string ": Value.seq " ^^ string "=" ^^ space ^^ group @@ string "exec_cek "
@@ -615,15 +643,18 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
 
 let generate_apply_cont ctx =
   set_code apply_cont
-    (string
-       "(fun w -> assert_env_length w 1; match resolve w K with | None -> () | Some (hd, tl) -> match Word.get_value \
-        hd with "
-    ^^ separate_map (break 1)
-         (fun (name, action) ->
-           string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ")
-           ^^ uncode (action (code $ string "w") (code $ string "tl")))
-         (Dynarray.to_list ctx.conts)
-    ^^ string ")")
+    (lam "w" (fun w ->
+         seq
+           (assert_env_length w (int 1))
+           (fun _ ->
+             code
+             $ string "match resolve " ^^ uncode w
+               ^^ string " K with | None -> () | Some (hd, tl) -> match Word.get_value hd with "
+               ^^ separate_map (break 1)
+                    (fun (name, action) ->
+                      string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ")
+                      ^^ uncode (action w (code $ string "tl")))
+                    (Dynarray.to_list ctx.conts))))
 
 let pp_cek_ant x =
   let ctx = new_ctx () in
@@ -636,7 +667,7 @@ let pp_cek_ant x =
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string ("let ()" ^ " = add_exp ")
-            ^^ Option.get (Dynarray.get codes i)
+            ^^ ir_to_doc (optimize_ir (from_ir (Option.get (Dynarray.get codes i))))
             ^^ string " "
             ^^ string (string_of_int i)))
   ^^ break 1

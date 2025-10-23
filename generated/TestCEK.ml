@@ -24,28 +24,28 @@ let rec list_incr (x0 : Value.seq) : Value.seq =
 
 let () =
   add_exp
-    (fun w ->
-      assert_env_length w 1;
-      match resolve w K with
+    (fun w_3 ->
+      (assert_env_length w_3) 1;
+      match resolve w_3 K with
       | None -> ()
       | Some (hd, tl) -> (
           match Word.get_value hd with
-          | 0 -> exec_done w
+          | 0 -> exec_done w_3
           | 3 ->
               ();
-              (assert_env_length w) 1;
-              w.state.k <- get_next_cont tl;
-              ((restore_env w) 1) tl;
+              (assert_env_length w_3) 1;
+              w_3.state.k <- get_next_cont tl;
+              ((restore_env w_3) 1) tl;
               (();
-               (assert_env_length w) 2;
-               let x1_2 = pop_env w in
-               let x0_2 = pop_env w in
-               (push_env w) (Memo.appends [ Memo.from_constructor 2; x0_2; x1_2 ]));
+               (assert_env_length w_3) 2;
+               let x1_2 = pop_env w_3 in
+               let x0_2 = pop_env w_3 in
+               (push_env w_3) (Memo.appends [ Memo.from_constructor 2; x0_2; x1_2 ]));
               ();
-              (assert_env_length w) 1;
-              ((drop_n w) 1) 0;
-              (assert_env_length w) 1;
-              ((return_n w) 1) (pc_to_exp 0)))
+              (assert_env_length w_3) 1;
+              ((drop_n w_3) 1) 0;
+              (assert_env_length w_3) 1;
+              ((return_n w_3) 1) (pc_to_exp 0)))
     0
 
 let () =
