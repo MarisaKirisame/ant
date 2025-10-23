@@ -40,13 +40,15 @@ let rec optimize_ir ir =
   | Seqs xs ->
       let xs = List.map optimize_ir xs in
       Seqs (List.flatten (List.map (fun ir -> match ir with Unit -> [] | Seqs xs -> xs | x -> [ x ]) xs))
+  | Function f -> Function f
   | Unit -> Unit
 
 let code (doc : document) = Code (Raw doc)
 
 let uncode (Code ir) : document =
   print_endline (show_ir ir);
-  ir_to_doc ir
+  (* ir_to_doc ir *)
+  ir_to_doc (optimize_ir ir)
 
 let from_ir (Code ir) = ir
 let to_ir ir = Code ir
@@ -73,7 +75,7 @@ let gensym (base : string) : string =
   base ^ "_" ^ string_of_int n
 
 let int (i : int) : int code = code $ string (string_of_int i)
-let unit : unit code = code $ string "()"
+let unit : unit code = Code Unit
 
 let lam (a : string) (f : 'a code -> 'b code) : ('a -> 'b) code =
   let a = gensym a |> string in
@@ -667,7 +669,7 @@ let pp_cek_ant x =
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string ("let ()" ^ " = add_exp ")
-            ^^ ir_to_doc (optimize_ir (from_ir (Option.get (Dynarray.get codes i))))
+            ^^ uncode (Option.get (Dynarray.get codes i))
             ^^ string " "
             ^^ string (string_of_int i)))
   ^^ break 1
