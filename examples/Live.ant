@@ -36,6 +36,40 @@ type value =
   | VTrue
   | VFalse
   | VNil
-  | VCons of value
+  | VCons of value * value
   | VFix of expr * list value
+;;
+
+let vadd = fun l r ->
+  match l with
+  | VInt li ->
+    (match r with 
+    | VInt ri -> VInt (li + ri))
+;;
+
+let eval = fun expr env ->
+  match expr with
+  | EInt i -> VInt i
+  | EPlus (x, y) -> vadd (eval x env) (eval y env)
+  | EVar idx -> index env idx
+  | EAbs e -> VAbs e env
+  | EFix e -> VFix e env
+  | EApp (f, x) ->
+    let fv = eval f env in
+    let xv = eval x env in
+    (match fv with 
+    | VAbs (e, env_) -> eval e (Cons xv env_)
+    | VFix (e, env_) -> eval e (Cons xv (Cons fv env_)))
+  | ETrue -> VTrue
+  | EFalse -> VFalse
+  | EIf (i, t, e) -> 
+    (match eval i env with
+    | VTrue -> eval t env
+    | VFalse -> eval e env)
+  | ENil -> VNil
+  | ECons (x, xs) -> VCons (eval x env) (eval xs env)
+  | EMatchList (v, n, c) ->
+    (match eval v env with
+    | VNil -> eval n env
+    | VCons (x, xs) -> eval c (Cons xs (Cons x env)))
 ;;

@@ -26,6 +26,7 @@ and expr =
   | Str of string
   | Builtin of builtin
   | Var of string
+  | GVar of string
   | Ctor of string
   | App of expr * expr list
   | Op of string * expr * expr

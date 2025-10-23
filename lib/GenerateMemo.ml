@@ -357,12 +357,13 @@ let remove_fv (v : string) (fv : (string, unit) Hashtbl.t linear) : (string, uni
 
 let rec fv_expr (e : expr) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
   match e with
-  | Ctor _ -> fv
+  | Ctor _ | Int _ | GVar _ -> fv
   | App (f, xs) -> fv_exprs xs (fv_expr f fv)
   | Op (_, x, y) -> fv_expr y (fv_expr x fv)
   | Var name -> add_fv name fv
-  | Int _ -> fv
   | Match (value, cases) -> fv_expr value (fv_cases cases fv)
+  | If (i, t, e) -> fv_expr i (fv_expr t (fv_expr e fv))
+  | Let (BOne (l, v), r) -> fv_expr v (fv_pat l (fv_expr r fv))
   | _ -> failwith ("fv_expr: " ^ show_expr e)
 
 and fv_exprs (es : expr list) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
@@ -432,6 +433,21 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
             (fun _ -> push_env w (from_constructor (int (Hashtbl.find_exn ctx.ctag cname))));
             (fun _ -> k.k (push_s s) w);
           ]
+  | App (Ctor cname, [ x0 ]) ->
+      ant_pp_expr ctx s x0
+        {
+          k =
+            (fun s w ->
+              seqs
+                [
+                  (fun _ -> assert_env_length w (int s.env_length));
+                  (fun _ ->
+                    let_in "x0" (pop_env w) (fun x0 ->
+                        push_env w (memo_appends [ from_constructor (int (Hashtbl.find_exn ctx.ctag cname)); x0 ])));
+                  (fun _ -> k.k (push_s (pop_s s)) w);
+                ]);
+          fv = k.fv;
+        }
   | App (Ctor cname, [ x0; x1 ]) ->
       ant_pp_expr ctx s x0
         {
@@ -457,7 +473,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
                 w);
           fv = fv_expr x1 (dup_fv k.fv);
         }
-  | App (Var f, xs) ->
+  | App (GVar f, xs) ->
       let cont_name = "cont_" ^ string_of_int (Dynarray.length ctx.conts) in
       let keep, keep_s = keep_only s k.fv in
       (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
@@ -536,6 +552,12 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
             (fun _ -> push_env w (memo_from_int (int i)));
             (fun _ -> k.k (push_s s) w);
           ]
+  | Let (BOne (PVar l, v), r) ->
+      ant_pp_expr ctx s v
+        {
+          k = (fun s w -> ant_pp_expr ctx (extend_s s l) r { k = (fun s w -> drop s [ l ] w k); fv = k.fv } w);
+          fv = fv_pat (PVar l) (fv_expr r (dup_fv k.fv));
+        }
   | _ -> failwith ("ant_pp_expr: " ^ show_expr c)
 
 and ant_pp_exprs (ctx : ctx) (s : scope) (cs : expr list) (k : kont) : world code -> unit code =
@@ -611,6 +633,34 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                                          expr
                                          { k = (fun s w -> drop s [ x1; x0 ] w k); fv = k.fv }
                                          w)))
+                        | PApp (cname, Some (PTup [ PVar x0; PVar x1; PVar x2 ])) ->
+                            string "| "
+                            ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
+                            ^^ string " -> "
+                            ^^
+                            let x0_s = gensym "x0" |> string in
+                            let x1_s = gensym "x1" |> string in
+                            let x2_s = gensym "x2" |> string in
+                            uncode
+                              (seq
+                                 (code
+                                    (string "let [" ^^ x0_s ^^ string "; " ^^ x1_s ^^ string "; " ^^ x2_s
+                                   ^^ string "] ="
+                                    ^^ uncode (memo_splits (fst x))
+                                    ^^ string " in "
+                                    ^^ uncode (push_env w (code x0_s))))
+                                 (fun _ ->
+                                   seqs
+                                     [
+                                       (fun _ -> push_env w (code x1_s));
+                                       (fun _ -> push_env w (code x2_s));
+                                       (fun _ ->
+                                         ant_pp_expr ctx
+                                           (extend_s (extend_s (extend_s s x0) x1) x2)
+                                           expr
+                                           { k = (fun s w -> drop s [ x2; x1; x0 ] w k); fv = k.fv }
+                                           w);
+                                     ]))
                         | _ -> failwith (show_pattern pat))
                       c
                   in

@@ -22,7 +22,7 @@ let parse content =
 
 let driver input output print_ast compile_pat print_ant print_cek_ant tyck print_cps_transformed print_de print_cps_de =
   let src = read_all input in
-  let ast = parse src in
+  let ast = Resolve.resolve (parse src) in
   let debug_pp = PPrint.ToChannel.pretty 0.8 80 stdout in
   let debug = false in
   let output_pp = PPrint.ToChannel.pretty 0.8 80 (Out_channel.open_text output) in
