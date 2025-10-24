@@ -3,7 +3,7 @@ open Word
 open Memo
 open Value
 
-let memo = Array.init 12 (fun _ -> ref State.BlackHole)
+let memo = Array.init 13 (fun _ -> ref State.BlackHole)
 
 type ocaml_nat = Z | S of Value.seq
 
@@ -49,6 +49,7 @@ type ocaml_expr =
   | ECons of Value.seq * Value.seq
   | EMatchList of Value.seq * Value.seq * Value.seq
   | EFix of Value.seq
+  | EHole
 
 let expr_EInt x0 : Value.seq = Memo.appends [ Memo.from_constructor 6; x0 ]
 let expr_EPlus x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 7; x0; x1 ]
@@ -62,6 +63,7 @@ let expr_ENil : Value.seq = Memo.appends [ Memo.from_constructor 14 ]
 let expr_ECons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 15; x0; x1 ]
 let expr_EMatchList x0 x1 x2 : Value.seq = Memo.appends [ Memo.from_constructor 16; x0; x1; x2 ]
 let expr_EFix x0 : Value.seq = Memo.appends [ Memo.from_constructor 17; x0 ]
+let expr_EHole : Value.seq = Memo.appends [ Memo.from_constructor 18 ]
 
 let from_ocaml_expr x =
   match x with
@@ -77,6 +79,7 @@ let from_ocaml_expr x =
   | ECons (x0, x1) -> expr_ECons x0 x1
   | EMatchList (x0, x1, x2) -> expr_EMatchList x0 x1 x2
   | EFix x0 -> expr_EFix x0
+  | EHole -> expr_EHole
 
 let to_ocaml_expr x =
   let h, t = Option.get (Memo.list_match x) in
@@ -111,6 +114,7 @@ let to_ocaml_expr x =
   | 17 ->
       let [ x0 ] = Memo.splits t in
       EFix x0
+  | 18 -> EHole
 
 type ocaml_value =
   | VInt of Value.seq
@@ -121,13 +125,13 @@ type ocaml_value =
   | VCons of Value.seq * Value.seq
   | VFix of Value.seq * Value.seq
 
-let value_VInt x0 : Value.seq = Memo.appends [ Memo.from_constructor 18; x0 ]
-let value_VAbs x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 19; x0; x1 ]
-let value_VTrue : Value.seq = Memo.appends [ Memo.from_constructor 20 ]
-let value_VFalse : Value.seq = Memo.appends [ Memo.from_constructor 21 ]
-let value_VNil : Value.seq = Memo.appends [ Memo.from_constructor 22 ]
-let value_VCons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 23; x0; x1 ]
-let value_VFix x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 24; x0; x1 ]
+let value_VInt x0 : Value.seq = Memo.appends [ Memo.from_constructor 19; x0 ]
+let value_VAbs x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 20; x0; x1 ]
+let value_VTrue : Value.seq = Memo.appends [ Memo.from_constructor 21 ]
+let value_VFalse : Value.seq = Memo.appends [ Memo.from_constructor 22 ]
+let value_VNil : Value.seq = Memo.appends [ Memo.from_constructor 23 ]
+let value_VCons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 24; x0; x1 ]
+let value_VFix x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 25; x0; x1 ]
 
 let from_ocaml_value x =
   match x with
@@ -142,19 +146,19 @@ let from_ocaml_value x =
 let to_ocaml_value x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | 18 ->
+  | 19 ->
       let [ x0 ] = Memo.splits t in
       VInt x0
-  | 19 ->
+  | 20 ->
       let [ x0; x1 ] = Memo.splits t in
       VAbs (x0, x1)
-  | 20 -> VTrue
-  | 21 -> VFalse
-  | 22 -> VNil
-  | 23 ->
+  | 21 -> VTrue
+  | 22 -> VFalse
+  | 23 -> VNil
+  | 24 ->
       let [ x0; x1 ] = Memo.splits t in
       VCons (x0, x1)
-  | 24 ->
+  | 25 ->
       let [ x0; x1 ] = Memo.splits t in
       VFix (x0, x1)
 
@@ -174,25 +178,22 @@ let () =
           match Word.get_value hd with
           | 0 -> exec_done w_9
           | 5 ->
-              (assert_env_length w_9) 0;
               w_9.state.k <- get_next_cont tl;
               ((restore_env w_9) 0) tl;
               (assert_env_length w_9) 1;
               ((drop_n w_9) 1) 0;
-              (assert_env_length w_9) 1;
-              ((drop_n w_9) 1) 0;
-              (assert_env_length w_9) 1;
-              ((return_n w_9) 1) (pc_to_exp 0)
-          | 25 ->
-              (assert_env_length w_9) 0;
-              w_9.state.k <- get_next_cont tl;
-              ((restore_env w_9) 0) tl;
               (assert_env_length w_9) 1;
               ((drop_n w_9) 1) 0;
               (assert_env_length w_9) 1;
               ((return_n w_9) 1) (pc_to_exp 0)
           | 26 ->
-              (assert_env_length w_9) 2;
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 0) tl;
+              (assert_env_length w_9) 1;
+              ((drop_n w_9) 1) 0;
+              (assert_env_length w_9) 1;
+              ((return_n w_9) 1) (pc_to_exp 0)
+          | 27 ->
               w_9.state.k <- get_next_cont tl;
               ((restore_env w_9) 2) tl;
               (assert_env_length w_9) 3;
@@ -201,38 +202,34 @@ let () =
               (push_env w_9) ((Dynarray.get w_9.state.e) 0);
               (assert_env_length w_9) 5;
               let keep_7 = ((env_call w_9) [ 2 ]) 2 in
-              w_9.state.k <- Memo.appends [ Memo.from_constructor 32; keep_7; w_9.state.k ];
+              w_9.state.k <- Memo.appends [ Memo.from_constructor 33; keep_7; w_9.state.k ];
               w_9.state.c <- pc_to_exp 8;
               stepped w_9
-          | 27 ->
-              (assert_env_length w_9) 0;
+          | 28 ->
               w_9.state.k <- get_next_cont tl;
               ((restore_env w_9) 0) tl;
               (assert_env_length w_9) 1;
               ((drop_n w_9) 1) 0;
               (assert_env_length w_9) 1;
               ((return_n w_9) 1) (pc_to_exp 0)
-          | 28 ->
-              (assert_env_length w_9) 2;
+          | 29 ->
               w_9.state.k <- get_next_cont tl;
               ((restore_env w_9) 2) tl;
-              (assert_env_length w_9) 4;
+              (assert_env_length w_9) 3;
               (push_env w_9) ((Dynarray.get w_9.state.e) 1);
-              (assert_env_length w_9) 5;
+              (assert_env_length w_9) 4;
               (push_env w_9) ((Dynarray.get w_9.state.e) 0);
-              (assert_env_length w_9) 6;
-              let keep_8 = ((env_call w_9) [ 2; 3 ]) 2 in
-              w_9.state.k <- Memo.appends [ Memo.from_constructor 33; keep_8; w_9.state.k ];
+              (assert_env_length w_9) 5;
+              let keep_8 = ((env_call w_9) [ 2 ]) 2 in
+              w_9.state.k <- Memo.appends [ Memo.from_constructor 34; keep_8; w_9.state.k ];
               w_9.state.c <- pc_to_exp 8;
               stepped w_9
-          | 29 ->
-              (assert_env_length w_9) 3;
+          | 30 ->
               w_9.state.k <- get_next_cont tl;
               ((restore_env w_9) 3) tl;
               w_9.state.c <- pc_to_exp 10;
               stepped w_9
-          | 30 ->
-              (assert_env_length w_9) 2;
+          | 31 ->
               w_9.state.k <- get_next_cont tl;
               ((restore_env w_9) 2) tl;
               (assert_env_length w_9) 3;
@@ -241,15 +238,96 @@ let () =
               (push_env w_9) ((Dynarray.get w_9.state.e) 0);
               (assert_env_length w_9) 5;
               let keep_11 = ((env_call w_9) [ 2 ]) 2 in
-              w_9.state.k <- Memo.appends [ Memo.from_constructor 36; keep_11; w_9.state.k ];
+              w_9.state.k <- Memo.appends [ Memo.from_constructor 37; keep_11; w_9.state.k ];
               w_9.state.c <- pc_to_exp 8;
               stepped w_9
-          | 31 ->
-              (assert_env_length w_9) 3;
+          | 32 ->
               w_9.state.k <- get_next_cont tl;
               ((restore_env w_9) 3) tl;
               w_9.state.c <- pc_to_exp 11;
-              stepped w_9))
+              stepped w_9
+          | 33 ->
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 1) tl;
+              (assert_env_length w_9) 2;
+              let keep_14 = ((env_call w_9) []) 2 in
+              w_9.state.k <- Memo.appends [ Memo.from_constructor 26; keep_14; w_9.state.k ];
+              w_9.state.c <- pc_to_exp 4;
+              stepped w_9
+          | 34 ->
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 1) tl;
+              (assert_env_length w_9) 2;
+              (push_env w_9) ((Dynarray.get w_9.state.e) 0);
+              w_9.state.c <- pc_to_exp 12;
+              stepped w_9
+          | 35 ->
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 0) tl;
+              (assert_env_length w_9) 1;
+              ((drop_n w_9) 1) 0;
+              (assert_env_length w_9) 1;
+              ((return_n w_9) 1) (pc_to_exp 0)
+          | 36 ->
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 0) tl;
+              (assert_env_length w_9) 1;
+              ((drop_n w_9) 1) 0;
+              (assert_env_length w_9) 1;
+              ((return_n w_9) 1) (pc_to_exp 0)
+          | 37 ->
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 1) tl;
+              (assert_env_length w_9) 2;
+              let x1_17 = pop_env w_9 in
+              let x0_26 = pop_env w_9 in
+              (push_env w_9) (Memo.appends [ Memo.from_constructor 24; x0_26; x1_17 ]);
+              (assert_env_length w_9) 1;
+              ((drop_n w_9) 1) 0;
+              (assert_env_length w_9) 1;
+              ((return_n w_9) 1) (pc_to_exp 0)
+          | 38 ->
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 0) tl;
+              (assert_env_length w_9) 1;
+              ((drop_n w_9) 1) 0;
+              (assert_env_length w_9) 1;
+              ((return_n w_9) 1) (pc_to_exp 0)
+          | 39 ->
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 0) tl;
+              (assert_env_length w_9) 1;
+              ((drop_n w_9) 1) 0;
+              (assert_env_length w_9) 1;
+              ((drop_n w_9) 1) 0;
+              (assert_env_length w_9) 1;
+              ((return_n w_9) 1) (pc_to_exp 0)
+          | 40 ->
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 2) tl;
+              (assert_env_length w_9) 3;
+              ((drop_n w_9) 3) 0;
+              (assert_env_length w_9) 3;
+              ((drop_n w_9) 3) 1;
+              (assert_env_length w_9) 2;
+              ((drop_n w_9) 2) 1;
+              (assert_env_length w_9) 1;
+              ((drop_n w_9) 1) 0;
+              (assert_env_length w_9) 1;
+              ((return_n w_9) 1) (pc_to_exp 0)
+          | 41 ->
+              w_9.state.k <- get_next_cont tl;
+              ((restore_env w_9) 2) tl;
+              (assert_env_length w_9) 3;
+              ((drop_n w_9) 3) 0;
+              (assert_env_length w_9) 3;
+              ((drop_n w_9) 3) 1;
+              (assert_env_length w_9) 2;
+              ((drop_n w_9) 2) 1;
+              (assert_env_length w_9) 1;
+              ((drop_n w_9) 1) 0;
+              (assert_env_length w_9) 1;
+              ((return_n w_9) 1) (pc_to_exp 0)))
     0
 
 let () =
@@ -336,7 +414,7 @@ let () =
               (push_env w_6) (Memo.from_int (Word.to_int (fst x0_4) + Word.to_int (fst x1_1)));
               (assert_env_length w_6) 5;
               let x0_5 = pop_env w_6 in
-              (push_env w_6) (Memo.appends [ Memo.from_constructor 18; x0_5 ]);
+              (push_env w_6) (Memo.appends [ Memo.from_constructor 19; x0_5 ]);
               (assert_env_length w_6) 5;
               ((drop_n w_6) 5) 1;
               (assert_env_length w_6) 4;
@@ -355,7 +433,7 @@ let () =
       | Some x_3 -> (
           ignore (pop_env w_5);
           match Word.get_value (fst x_3) with
-          | 18 ->
+          | 19 ->
               let [ x0_3 ] = Memo.splits (snd x_3) in
               (push_env w_5) x0_3;
               (assert_env_length w_5) 4;
@@ -376,7 +454,7 @@ let () =
       | Some x_2 -> (
           ignore (pop_env w_4);
           match Word.get_value (fst x_2) with
-          | 18 ->
+          | 19 ->
               let [ x0_2 ] = Memo.splits (snd x_2) in
               (push_env w_4) x0_2;
               (assert_env_length w_4) 3;
@@ -411,7 +489,7 @@ let () =
               (push_env w_8) ((Dynarray.get w_8.state.e) 2);
               (assert_env_length w_8) 4;
               let x0_7 = pop_env w_8 in
-              (push_env w_8) (Memo.appends [ Memo.from_constructor 18; x0_7 ]);
+              (push_env w_8) (Memo.appends [ Memo.from_constructor 19; x0_7 ]);
               (assert_env_length w_8) 4;
               ((drop_n w_8) 4) 1;
               (assert_env_length w_8) 3;
@@ -426,7 +504,7 @@ let () =
               (push_env w_8) ((Dynarray.get w_8.state.e) 1);
               (assert_env_length w_8) 6;
               let keep_1 = ((env_call w_8) [ 1; 3 ]) 2 in
-              w_8.state.k <- Memo.appends [ Memo.from_constructor 26; keep_1; w_8.state.k ];
+              w_8.state.k <- Memo.appends [ Memo.from_constructor 27; keep_1; w_8.state.k ];
               w_8.state.c <- pc_to_exp 8;
               stepped w_8
           | 8 ->
@@ -438,7 +516,7 @@ let () =
               (push_env w_8) ((Dynarray.get w_8.state.e) 2);
               (assert_env_length w_8) 5;
               let keep_2 = ((env_call w_8) []) 2 in
-              w_8.state.k <- Memo.appends [ Memo.from_constructor 27; keep_2; w_8.state.k ];
+              w_8.state.k <- Memo.appends [ Memo.from_constructor 28; keep_2; w_8.state.k ];
               w_8.state.c <- pc_to_exp 1;
               stepped w_8
           | 9 ->
@@ -451,7 +529,7 @@ let () =
               (assert_env_length w_8) 5;
               let x1_3 = pop_env w_8 in
               let x0_11 = pop_env w_8 in
-              (push_env w_8) (Memo.appends [ Memo.from_constructor 19; x0_11; x1_3 ]);
+              (push_env w_8) (Memo.appends [ Memo.from_constructor 20; x0_11; x1_3 ]);
               (assert_env_length w_8) 4;
               ((drop_n w_8) 4) 1;
               (assert_env_length w_8) 3;
@@ -466,7 +544,7 @@ let () =
               (assert_env_length w_8) 5;
               let x1_4 = pop_env w_8 in
               let x0_13 = pop_env w_8 in
-              (push_env w_8) (Memo.appends [ Memo.from_constructor 24; x0_13; x1_4 ]);
+              (push_env w_8) (Memo.appends [ Memo.from_constructor 25; x0_13; x1_4 ]);
               (assert_env_length w_8) 4;
               ((drop_n w_8) 4) 1;
               (assert_env_length w_8) 3;
@@ -481,17 +559,17 @@ let () =
               (push_env w_8) ((Dynarray.get w_8.state.e) 1);
               (assert_env_length w_8) 6;
               let keep_3 = ((env_call w_8) [ 1; 3 ]) 2 in
-              w_8.state.k <- Memo.appends [ Memo.from_constructor 28; keep_3; w_8.state.k ];
+              w_8.state.k <- Memo.appends [ Memo.from_constructor 29; keep_3; w_8.state.k ];
               w_8.state.c <- pc_to_exp 8;
               stepped w_8
           | 11 ->
               (assert_env_length w_8) 2;
-              (push_env w_8) (Memo.from_constructor 20);
+              (push_env w_8) (Memo.from_constructor 21);
               (assert_env_length w_8) 3;
               ((return_n w_8) 3) (pc_to_exp 0)
           | 12 ->
               (assert_env_length w_8) 2;
-              (push_env w_8) (Memo.from_constructor 21);
+              (push_env w_8) (Memo.from_constructor 22);
               (assert_env_length w_8) 3;
               ((return_n w_8) 3) (pc_to_exp 0)
           | 13 ->
@@ -505,12 +583,12 @@ let () =
               (push_env w_8) ((Dynarray.get w_8.state.e) 1);
               (assert_env_length w_8) 7;
               let keep_4 = ((env_call w_8) [ 1; 3; 4 ]) 2 in
-              w_8.state.k <- Memo.appends [ Memo.from_constructor 29; keep_4; w_8.state.k ];
+              w_8.state.k <- Memo.appends [ Memo.from_constructor 30; keep_4; w_8.state.k ];
               w_8.state.c <- pc_to_exp 8;
               stepped w_8
           | 14 ->
               (assert_env_length w_8) 2;
-              (push_env w_8) (Memo.from_constructor 22);
+              (push_env w_8) (Memo.from_constructor 23);
               (assert_env_length w_8) 3;
               ((return_n w_8) 3) (pc_to_exp 0)
           | 15 ->
@@ -523,7 +601,7 @@ let () =
               (push_env w_8) ((Dynarray.get w_8.state.e) 1);
               (assert_env_length w_8) 6;
               let keep_5 = ((env_call w_8) [ 1; 3 ]) 2 in
-              w_8.state.k <- Memo.appends [ Memo.from_constructor 30; keep_5; w_8.state.k ];
+              w_8.state.k <- Memo.appends [ Memo.from_constructor 31; keep_5; w_8.state.k ];
               w_8.state.c <- pc_to_exp 8;
               stepped w_8
           | 16 ->
@@ -537,7 +615,7 @@ let () =
               (push_env w_8) ((Dynarray.get w_8.state.e) 1);
               (assert_env_length w_8) 7;
               let keep_6 = ((env_call w_8) [ 1; 3; 4 ]) 2 in
-              w_8.state.k <- Memo.appends [ Memo.from_constructor 31; keep_6; w_8.state.k ];
+              w_8.state.k <- Memo.appends [ Memo.from_constructor 32; keep_6; w_8.state.k ];
               w_8.state.c <- pc_to_exp 8;
               stepped w_8))
     9
@@ -552,24 +630,24 @@ let () =
       | Some x_5 -> (
           ignore (pop_env w_10);
           match Word.get_value (fst x_5) with
-          | 20 ->
+          | 21 ->
               (assert_env_length w_10) 3;
               (push_env w_10) ((Dynarray.get w_10.state.e) 1);
               (assert_env_length w_10) 4;
               (push_env w_10) ((Dynarray.get w_10.state.e) 0);
               (assert_env_length w_10) 5;
               let keep_9 = ((env_call w_10) []) 2 in
-              w_10.state.k <- Memo.appends [ Memo.from_constructor 34; keep_9; w_10.state.k ];
+              w_10.state.k <- Memo.appends [ Memo.from_constructor 35; keep_9; w_10.state.k ];
               w_10.state.c <- pc_to_exp 8;
               stepped w_10
-          | 21 ->
+          | 22 ->
               (assert_env_length w_10) 3;
               (push_env w_10) ((Dynarray.get w_10.state.e) 2);
               (assert_env_length w_10) 4;
               (push_env w_10) ((Dynarray.get w_10.state.e) 0);
               (assert_env_length w_10) 5;
               let keep_10 = ((env_call w_10) []) 2 in
-              w_10.state.k <- Memo.appends [ Memo.from_constructor 35; keep_10; w_10.state.k ];
+              w_10.state.k <- Memo.appends [ Memo.from_constructor 36; keep_10; w_10.state.k ];
               w_10.state.c <- pc_to_exp 8;
               stepped w_10))
     10
@@ -584,17 +662,17 @@ let () =
       | Some x_6 -> (
           ignore (pop_env w_11);
           match Word.get_value (fst x_6) with
-          | 22 ->
+          | 23 ->
               (assert_env_length w_11) 3;
               (push_env w_11) ((Dynarray.get w_11.state.e) 1);
               (assert_env_length w_11) 4;
               (push_env w_11) ((Dynarray.get w_11.state.e) 0);
               (assert_env_length w_11) 5;
               let keep_12 = ((env_call w_11) []) 2 in
-              w_11.state.k <- Memo.appends [ Memo.from_constructor 37; keep_12; w_11.state.k ];
+              w_11.state.k <- Memo.appends [ Memo.from_constructor 38; keep_12; w_11.state.k ];
               w_11.state.c <- pc_to_exp 8;
               stepped w_11
-          | 23 ->
+          | 24 ->
               let [ x0_18; x1_9 ] = Memo.splits (snd x_6) in
               (push_env w_11) x0_18;
               (push_env w_11) x1_9;
@@ -616,10 +694,66 @@ let () =
               (push_env w_11) (Memo.appends [ Memo.from_constructor 4; x0_20; x1_11 ]);
               (assert_env_length w_11) 7;
               let keep_13 = ((env_call w_11) []) 2 in
-              w_11.state.k <- Memo.appends [ Memo.from_constructor 38; keep_13; w_11.state.k ];
+              w_11.state.k <- Memo.appends [ Memo.from_constructor 39; keep_13; w_11.state.k ];
               w_11.state.c <- pc_to_exp 8;
               stepped w_11))
     11
+
+let () =
+  add_exp
+    (fun w_12 ->
+      (assert_env_length w_12) 3;
+      let last_7 = Source.E 2 in
+      match (resolve w_12) last_7 with
+      | None -> ()
+      | Some x_7 -> (
+          ignore (pop_env w_12);
+          match Word.get_value (fst x_7) with
+          | 20 ->
+              let [ x0_21; x1_12 ] = Memo.splits (snd x_7) in
+              (push_env w_12) x0_21;
+              (push_env w_12) x1_12;
+              (assert_env_length w_12) 4;
+              (push_env w_12) ((Dynarray.get w_12.state.e) 2);
+              (assert_env_length w_12) 5;
+              (push_env w_12) ((Dynarray.get w_12.state.e) 1);
+              (assert_env_length w_12) 6;
+              (push_env w_12) ((Dynarray.get w_12.state.e) 3);
+              (assert_env_length w_12) 7;
+              let x1_13 = pop_env w_12 in
+              let x0_22 = pop_env w_12 in
+              (push_env w_12) (Memo.appends [ Memo.from_constructor 4; x0_22; x1_13 ]);
+              (assert_env_length w_12) 6;
+              let keep_15 = ((env_call w_12) [ 0; 1 ]) 2 in
+              w_12.state.k <- Memo.appends [ Memo.from_constructor 40; keep_15; w_12.state.k ];
+              w_12.state.c <- pc_to_exp 8;
+              stepped w_12
+          | 25 ->
+              let [ x0_23; x1_14 ] = Memo.splits (snd x_7) in
+              (push_env w_12) x0_23;
+              (push_env w_12) x1_14;
+              (assert_env_length w_12) 4;
+              (push_env w_12) ((Dynarray.get w_12.state.e) 2);
+              (assert_env_length w_12) 5;
+              (push_env w_12) ((Dynarray.get w_12.state.e) 1);
+              (assert_env_length w_12) 6;
+              (push_env w_12) ((Dynarray.get w_12.state.e) 0);
+              (assert_env_length w_12) 7;
+              (push_env w_12) ((Dynarray.get w_12.state.e) 3);
+              (assert_env_length w_12) 8;
+              let x1_15 = pop_env w_12 in
+              let x0_24 = pop_env w_12 in
+              (push_env w_12) (Memo.appends [ Memo.from_constructor 4; x0_24; x1_15 ]);
+              (assert_env_length w_12) 7;
+              let x1_16 = pop_env w_12 in
+              let x0_25 = pop_env w_12 in
+              (push_env w_12) (Memo.appends [ Memo.from_constructor 4; x0_25; x1_16 ]);
+              (assert_env_length w_12) 6;
+              let keep_16 = ((env_call w_12) [ 0; 1 ]) 2 in
+              w_12.state.k <- Memo.appends [ Memo.from_constructor 41; keep_16; w_12.state.k ];
+              w_12.state.c <- pc_to_exp 8;
+              stepped w_12))
+    12
 
 let () = Value.set_constructor_degree 0 1
 let () = Value.set_constructor_degree 1 1
@@ -639,24 +773,27 @@ let () = Value.set_constructor_degree 14 1
 let () = Value.set_constructor_degree 15 (-1)
 let () = Value.set_constructor_degree 16 (-2)
 let () = Value.set_constructor_degree 17 0
-let () = Value.set_constructor_degree 18 0
-let () = Value.set_constructor_degree 19 (-1)
-let () = Value.set_constructor_degree 20 1
+let () = Value.set_constructor_degree 18 1
+let () = Value.set_constructor_degree 19 0
+let () = Value.set_constructor_degree 20 (-1)
 let () = Value.set_constructor_degree 21 1
 let () = Value.set_constructor_degree 22 1
-let () = Value.set_constructor_degree 23 (-1)
+let () = Value.set_constructor_degree 23 1
 let () = Value.set_constructor_degree 24 (-1)
-let () = Value.set_constructor_degree 25 0
-let () = Value.set_constructor_degree 26 (-2)
-let () = Value.set_constructor_degree 27 0
-let () = Value.set_constructor_degree 28 (-2)
-let () = Value.set_constructor_degree 29 (-3)
-let () = Value.set_constructor_degree 30 (-2)
-let () = Value.set_constructor_degree 31 (-3)
-let () = Value.set_constructor_degree 32 (-1)
-let () = Value.set_constructor_degree 33 (-2)
-let () = Value.set_constructor_degree 34 0
+let () = Value.set_constructor_degree 25 (-1)
+let () = Value.set_constructor_degree 26 0
+let () = Value.set_constructor_degree 27 (-2)
+let () = Value.set_constructor_degree 28 0
+let () = Value.set_constructor_degree 29 (-2)
+let () = Value.set_constructor_degree 30 (-3)
+let () = Value.set_constructor_degree 31 (-2)
+let () = Value.set_constructor_degree 32 (-3)
+let () = Value.set_constructor_degree 33 (-1)
+let () = Value.set_constructor_degree 34 (-1)
 let () = Value.set_constructor_degree 35 0
-let () = Value.set_constructor_degree 36 (-1)
-let () = Value.set_constructor_degree 37 0
+let () = Value.set_constructor_degree 36 0
+let () = Value.set_constructor_degree 37 (-1)
 let () = Value.set_constructor_degree 38 0
+let () = Value.set_constructor_degree 39 0
+let () = Value.set_constructor_degree 40 (-2)
+let () = Value.set_constructor_degree 41 (-2)

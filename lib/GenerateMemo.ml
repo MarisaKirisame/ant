@@ -6,9 +6,7 @@ open State
 open Word
 
 (*todo: implement tail call*)
-(*todo: use CPS*)
 (*todo: do not do a stack machine*)
-(*todo: no transit step*)
 
 (* As K come with interpretative overhead,
  *   we want to use K as little as possible,
@@ -46,8 +44,7 @@ let rec optimize_ir ir =
 let code (doc : document) = Code (Raw doc)
 
 let uncode (Code ir) : document =
-  print_endline (show_ir ir);
-  (* ir_to_doc ir *)
+  (*print_endline (show_ir ir);*)
   ir_to_doc (optimize_ir ir)
 
 let from_ir (Code ir) = ir
@@ -58,6 +55,7 @@ type ctx = {
   ctag : (string, int) Hashtbl.t;
   constructor_degree : int Dynarray.t;
   conts : (string * (world code -> words code -> unit code)) Dynarray.t;
+  mutable conts_count : int;
   func_pc : (string, int) Hashtbl.t;
 }
 
@@ -65,7 +63,8 @@ let add_cont (ctx : ctx) (name : string) (arity : int) (app : world code -> word
   Hashtbl.add_exn ctx.arity ~key:name ~data:arity;
   Hashtbl.add_exn ctx.ctag ~key:name ~data:(Hashtbl.length ctx.ctag);
   Dynarray.add_last ctx.constructor_degree (1 - arity);
-  Dynarray.add_last ctx.conts (name, app)
+  Dynarray.add_last ctx.conts (name, app);
+  ctx.conts_count <- ctx.conts_count + 1
 
 let fresh_name : (string, int) Hashtbl.t = Hashtbl.create (module Core.String)
 
@@ -198,6 +197,7 @@ let new_ctx () : ctx =
       ctag = Hashtbl.create (module Core.String);
       constructor_degree = Dynarray.create ();
       conts = Dynarray.create ();
+      conts_count = 0;
       func_pc = Hashtbl.create (module Core.String);
     }
   in
@@ -250,6 +250,7 @@ let ant_pp_adt_constructors (e : ctx) adt_name ctors =
       register_constructor)
     ctors
 
+(*todo: distinguish ffi inner type.*)
 let ant_pp_adt_ffi e adt_name ctors =
   string
     ("let from_ocaml_" ^ adt_name ^ " x = match x with | "
@@ -302,8 +303,12 @@ let new_scope () = { meta_env = make_linear (Hashtbl.create (module Core.String)
 let push_s s = { s with env_length = s.env_length + 1; progressed = true }
 
 let extend_s s name =
+  print_endline ("extending: " ^ name);
+
   let meta_env = write_linear s.meta_env in
+
   Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length);
+
   { s with meta_env = make_linear meta_env; env_length = s.env_length + 1 }
 
 let drop_s s name =
@@ -329,9 +334,11 @@ let dup_fv (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t lin
 let empty_fv () : (string, unit) Hashtbl.t linear = make_linear (Hashtbl.create (module Core.String))
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
+  Hashtbl.iter_keys (read_linear s.meta_env) ~f:(fun x -> print_endline ("dropping has:" ^ x));
   let new_s, n =
     List.fold_left
       (fun (s, n) var ->
+        print_endline ("dropping: " ^ var);
         match Hashtbl.find_exn (read_linear s.meta_env) var with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
       (s, 0) vars
   in
@@ -400,8 +407,7 @@ let keep_only (s : scope) (fv : (string, unit) Hashtbl.t linear) : int Dynarray.
         Dynarray.add_last keep_idx i)
       else ())
     keep;
-  Hashtbl.iteri (read_linear s.meta_env) ~f:(fun ~key ~data ->
-      if Option.is_some data then ignore (Hashtbl.add meta_env ~key ~data:None));
+  Hashtbl.iteri (read_linear s.meta_env) ~f:(fun ~key ~data:_ -> ignore (Hashtbl.add meta_env ~key ~data:None));
   (keep_idx, { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
 
 let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) : unit code =
@@ -474,14 +480,13 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
           fv = fv_expr x1 (dup_fv k.fv);
         }
   | App (GVar f, xs) ->
-      let cont_name = "cont_" ^ string_of_int (Dynarray.length ctx.conts) in
+      let cont_name = "cont_" ^ string_of_int ctx.conts_count in
       let keep, keep_s = keep_only s k.fv in
       (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
       let keep_length = keep_s.env_length in
       add_cont ctx cont_name (keep_length + 1) (fun w tl ->
           seqs
             [
-              (fun _ -> assert_env_length w (int keep_length));
               (fun _ -> set_k w (get_next_cont tl));
               (fun _ -> restore_env w (int keep_length) tl);
               (fun _ -> k.k (push_s keep_s) w);
@@ -555,7 +560,13 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
   | Let (BOne (PVar l, v), r) ->
       ant_pp_expr ctx s v
         {
-          k = (fun s w -> ant_pp_expr ctx (extend_s s l) r { k = (fun s w -> drop s [ l ] w k); fv = k.fv } w);
+          k =
+            (fun s w ->
+              ant_pp_expr ctx
+                (extend_s (pop_s s) l)
+                r
+                { k = (fun s w -> drop s [ l ] w k); fv = add_fv l (dup_fv k.fv) }
+                w);
           fv = fv_pat (PVar l) (fv_expr r (dup_fv k.fv));
         }
   | _ -> failwith ("ant_pp_expr: " ^ show_expr c)
@@ -694,6 +705,44 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
   | _ -> failwith (show_stmt s)
 
 let generate_apply_cont ctx =
+  set_code apply_cont
+    (lam "w" (fun w ->
+         (* We have to be careful: ctx.conts will grow as we apply the lambdas, 
+          *   so we cannot do a single map over the whole array, 
+          *   instead we have to take elements out on by one.
+          *)
+         let cont_codes = Dynarray.create () in
+         let rec loop () =
+           match Dynarray.pop_last_opt ctx.conts with
+           | None -> cont_codes
+           | Some (name, action) ->
+               let code =
+                 string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ")
+                 ^^ uncode (action w (code $ string "tl"))
+               in
+               Dynarray.add_last cont_codes code;
+               loop ()
+         in
+         let rec loop i =
+           if i == Dynarray.length ctx.conts then cont_codes
+           else
+             let name, action = Dynarray.get ctx.conts i in
+             let code =
+               string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ")
+               ^^ uncode (action w (code $ string "tl"))
+             in
+             Dynarray.add_last cont_codes code;
+             loop (i + 1)
+         in
+         seq
+           (assert_env_length w (int 1))
+           (fun _ ->
+             code
+             $ string "match resolve " ^^ uncode w
+               ^^ string " K with | None -> () | Some (hd, tl) -> match Word.get_value hd with "
+               ^^ separate (break 1) (Dynarray.to_list (loop 0)))))
+
+let generate_apply_cont_ ctx =
   set_code apply_cont
     (lam "w" (fun w ->
          seq

@@ -28,6 +28,7 @@ type expr =
   | ECons of expr * expr
   | EMatchList of expr * expr * expr
   | EFix of expr
+  | EHole
 ;;
 
 type value = 
