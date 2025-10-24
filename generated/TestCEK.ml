@@ -32,7 +32,6 @@ let () =
           match Word.get_value hd with
           | 0 -> exec_done w_3
           | 3 ->
-              (assert_env_length w_3) 1;
               w_3.state.k <- get_next_cont tl;
               ((restore_env w_3) 1) tl;
               (assert_env_length w_3) 2;

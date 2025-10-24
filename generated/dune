@@ -1,7 +1,9 @@
 (executable
  (public_name GeneratedMain)
  (name GeneratedMain)
- (libraries ant))
+ (libraries ant)
+ (preprocess
+  (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))
 
 (env
  (dev
