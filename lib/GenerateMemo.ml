@@ -44,7 +44,7 @@ let rec optimize_ir ir =
 let code (doc : document) = Code (Raw doc)
 
 let uncode (Code ir) : document =
-  (*print_endline (show_ir ir);*)
+  print_endline (show_ir ir);
   ir_to_doc (optimize_ir ir)
 
 let from_ir (Code ir) = ir
@@ -303,8 +303,6 @@ let new_scope () = { meta_env = make_linear (Hashtbl.create (module Core.String)
 let push_s s = { s with env_length = s.env_length + 1; progressed = true }
 
 let extend_s s name =
-  print_endline ("extending: " ^ name);
-
   let meta_env = write_linear s.meta_env in
 
   Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length);
@@ -334,11 +332,9 @@ let dup_fv (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t lin
 let empty_fv () : (string, unit) Hashtbl.t linear = make_linear (Hashtbl.create (module Core.String))
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
-  Hashtbl.iter_keys (read_linear s.meta_env) ~f:(fun x -> print_endline ("dropping has:" ^ x));
   let new_s, n =
     List.fold_left
       (fun (s, n) var ->
-        print_endline ("dropping: " ^ var);
         match Hashtbl.find_exn (read_linear s.meta_env) var with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
       (s, 0) vars
   in
