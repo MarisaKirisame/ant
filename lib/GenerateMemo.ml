@@ -13,7 +13,7 @@ open Word
  *   instead storing the computed temporary variables onto the env as a stack,
  *   only using K whenever we do a non-tail function call.
  *)
-type ir = Raw of document | Seqs of ir list | Unit | Function of string
+type ir = Raw of document | Unit | Seqs of ir list | Function of string | Paren of ir | App of ir * ir list
 
 let rec ir_to_doc ir =
   match ir with
@@ -23,6 +23,8 @@ let rec ir_to_doc ir =
   | Seqs (x :: xs) -> parens (List.fold_left (fun acc x -> acc ^^ string ";" ^^ ir_to_doc x) (ir_to_doc x) xs)
   | Unit -> string "()"
   | Function str -> string str
+  | Paren inner -> string "(" ^^ ir_to_doc inner ^^ string ")"
+  | App (fn, args) -> List.fold_left (fun acc x -> acc ^^ string " " ^^ ir_to_doc x) (ir_to_doc fn) args
 
 type 'a code = Code of ir
 
@@ -40,6 +42,10 @@ let rec optimize_ir ir =
       Seqs (List.flatten (List.map (fun ir -> match ir with Unit -> [] | Seqs xs -> xs | x -> [ x ]) xs))
   | Function f -> Function f
   | Unit -> Unit
+  | App (Paren (App (fn, args1)), args2) ->
+      optimize_ir (App (optimize_ir fn, List.map optimize_ir args1 @ List.map optimize_ir args2))
+  | App (fn, args) -> App (optimize_ir fn, List.map optimize_ir args)
+  | Paren ir -> Paren (optimize_ir ir)
 
 let code (doc : document) = Code (Raw doc)
 
@@ -47,8 +53,8 @@ let uncode (Code ir) : document =
   print_endline (show_ir ir);
   ir_to_doc (optimize_ir ir)
 
-let from_ir (Code ir) = ir
-let to_ir ir = Code ir
+let to_ir (Code ir) = ir
+let from_ir ir = Code ir
 
 type ctx = {
   arity : (string, int) Hashtbl.t;
@@ -106,7 +112,8 @@ let lam4 (a : string) (b : string) (c : string) (d : string) (f : 'a code -> 'b 
     ^^ uncode (f (code a) (code b) (code c) (code d))
     ^^ string ")"
 
-let app (f : ('a -> 'b) code) (a : 'a code) : 'b code = code $ parens (group (uncode f ^^ space ^^ uncode a))
+(* let app (f : ('a -> 'b) code) (a : 'a code) : 'b code = code $ parens (group (uncode f ^^ space ^^ uncode a)) *)
+let app (f : ('a -> 'b) code) (a : 'a code) : 'b code = Code (Paren (App (to_ir f, [ to_ir a ])))
 let app2 (f : ('a -> 'b -> 'c) code) (a : 'a code) (b : 'b code) : 'c code = app (app f a) b
 let app3 (f : ('a -> 'b -> 'c -> 'd) code) (a : 'a code) (b : 'b code) (c : 'c code) : 'd code = app (app2 f a b) c
 
@@ -120,8 +127,8 @@ let app5 (f : ('a -> 'b -> 'c -> 'd -> 'e -> 'f) code) (a : 'a code) (b : 'b cod
 let assert_env_length (w : world code) (e : int code) : unit code = app2 (code $ string "assert_env_length") w e
 let return_n (w : world code) (n : int code) (exp : exp code) : unit code = app3 (code $ string "return_n") w n exp
 let drop_n (w : world code) (e : int code) (n : int code) : unit code = app3 (code $ string "drop_n") w e n
-let pc_to_exp (pc : int code) : exp code = app (to_ir $ Function "pc_to_exp") pc
-let seq (x : unit code) (y : unit -> 'a code) : 'a code = to_ir (Seqs [ from_ir x; from_ir (y ()) ])
+let pc_to_exp (pc : int code) : exp code = app (from_ir $ Function "pc_to_exp") pc
+let seq (x : unit code) (y : unit -> 'a code) : 'a code = from_ir (Seqs [ to_ir x; to_ir (y ()) ])
 let seqs (xs : (unit -> unit code) list) : unit code = List.fold_left seq unit xs
 
 let seq_b1 (x : unit code) (y : unit -> unit code) : unit code =
