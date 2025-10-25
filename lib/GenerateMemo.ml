@@ -338,6 +338,8 @@ module RBTree = struct
   let to_list (n : 'a t) = List.map fst (RBMap.to_list n)
   (* let of_list ~ord xs : 'a t = RBMap.of_list ~ord (List.map (fun x -> (x, ())) xs) *)
 
+  let iteri (n : 'a t) ~(f : 'a -> unit) : unit = ignore (RBMap.map (fun k _ -> f k) n)
+
 end
 
 let ord_str : string ord = { cmp = fun x y -> if x < y then Lt else if x > y then Gt else Eq }
@@ -620,12 +622,12 @@ let pop_s s = pop_n s 1
 (*todo: we actually need to dup a bunch. lets switch to a functional data structure. *)
 let dup_s s = { s with meta_env = make_linear (read_linear s.meta_env); env_length = s.env_length }
 
-type kont = { k : scope -> world code -> unit code; fv : (string, unit) Hashtbl.t linear }
+type kont = { k : scope -> world code -> unit code; fv : string RBTree.t linear }
 
-let dup_fv (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
-  make_linear (Hashtbl.copy (read_linear fv))
+let dup_fv (fv : string RBTree.t linear) : string RBTree.t linear =
+  make_linear (read_linear fv)
 
-let empty_fv () : (string, unit) Hashtbl.t linear = make_linear (Hashtbl.create (module Core.String))
+let empty_fv () : string RBTree.t linear = make_linear RBTree.empty
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
   let new_s, n =
@@ -644,17 +646,17 @@ let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit cod
 let return (s : scope) (w : world code) : unit code =
   seq (assert_env_length w (int s.env_length)) (fun _ -> return_n w (int s.env_length) (pc_to_exp (int apply_cont)))
 
-let add_fv (v : string) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
+let add_fv (v : string) (fv : string RBTree.t linear) : string RBTree.t linear =
   let fv = write_linear fv in
-  ignore (Hashtbl.add fv ~key:v ~data:());
+  let (fv, _) = RBTree.add ~ord:ord_str fv v in
   make_linear fv
 
-let remove_fv (v : string) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
+let remove_fv (v : string) (fv : string RBTree.t linear) : string RBTree.t linear =
   let fv = write_linear fv in
-  ignore (Hashtbl.remove fv v);
+  let fv = RBTree.erase ~ord:ord_str v fv in
   make_linear fv
 
-let rec fv_expr (e : expr) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
+let rec fv_expr (e : expr) (fv : string RBTree.t linear) : string RBTree.t linear =
   match e with
   | Ctor _ | Int _ | GVar _ -> fv
   | App (f, xs) -> fv_exprs xs (fv_expr f fv)
@@ -665,10 +667,10 @@ let rec fv_expr (e : expr) (fv : (string, unit) Hashtbl.t linear) : (string, uni
   | Let (BOne (l, v), r) -> fv_expr v (fv_pat l (fv_expr r fv))
   | _ -> failwith ("fv_expr: " ^ show_expr e)
 
-and fv_exprs (es : expr list) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
+and fv_exprs (es : expr list) (fv : string RBTree.t linear) : string RBTree.t linear =
   List.fold_left (fun fv e -> fv_expr e fv) fv es
 
-and fv_pat (pat : pattern) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
+and fv_pat (pat : pattern) (fv : string RBTree.t linear) : string RBTree.t linear =
   match pat with
   | PApp (_, None) -> fv
   | PApp (_, Some x) -> fv_pat x fv
@@ -676,16 +678,16 @@ and fv_pat (pat : pattern) (fv : (string, unit) Hashtbl.t linear) : (string, uni
   | PVar name -> remove_fv name fv
   | _ -> failwith (show_pattern pat)
 
-and fv_cases (MatchPattern c : cases) (fv : (string, unit) Hashtbl.t linear) : (string, unit) Hashtbl.t linear =
+and fv_cases (MatchPattern c : cases) (fv : string RBTree.t linear) : string RBTree.t linear =
   List.fold_left (fun fv (pat, e) -> fv_pat pat (fv_expr e fv)) fv c
 
 type keep_t = { mutable keep : bool; mutable source : string option }
 
-let keep_only (s : scope) (fv : (string, unit) Hashtbl.t linear) : int Dynarray.t * scope =
+let keep_only (s : scope) (fv : string RBTree.t linear) : int Dynarray.t * scope =
   let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
   RBMap.iteri (read_linear s.meta_env) ~f:(fun key data ->
       match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key });
-  Hashtbl.iter_keys (read_linear fv) ~f:(fun v ->
+  RBTree.iteri (read_linear fv) ~f:(fun v ->
       let i = Option.get (RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) v) in
       (Dynarray.get keep i).keep <- true);
   let keep_idx : int Dynarray.t = Dynarray.create () in
@@ -695,17 +697,7 @@ let keep_only (s : scope) (fv : (string, unit) Hashtbl.t linear) : int Dynarray.
         | None -> (i + 1, acc)
         | Some v -> (i + 1, RBMap.add_exn ~ord:ord_str acc v (Some (Dynarray.length keep_idx))))
       else (i + 1, acc)) (0, RBMap.empty) keep in
-  (* Dynarray.iteri
-    (fun i k ->
-      if k.keep then (
-        (match k.source with
-        | None -> ()
-        | Some v -> Hashtbl.add_exn meta_env ~key:v ~data:(Some (Dynarray.length keep_idx)));
-        Dynarray.add_last keep_idx i)
-      else ())
-    keep; *)
-  (* RBMap.iteri (read_linear s.meta_env) ~f:(fun key data:_ -> ignore (Hashtbl.add meta_env ~key ~data:None)); *)
-  let others = RBMap.map (fun key data -> None) (read_linear s.meta_env) in
+  let others = RBMap.map (fun _ _ -> None) (read_linear s.meta_env) in
   let meta_env = RBMap.append_trees meta_env others in
   (keep_idx, { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
 
