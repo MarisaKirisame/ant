@@ -111,19 +111,40 @@ module RBMap = struct
     match node with
     | Node (Black, _, _, _, _) -> true
     | _ -> false
-  let rec ins ~(ord : 'k ord) (node : ('k, 'v) t) (kx : 'k) (vx : 'v) : ('k, 'v) t =
-    match node with
-    | Leaf -> Node (Red, Leaf, kx, vx, Leaf)
+  let rec ins ~(ord : 'k ord) ~replace (n : ('k, 'v) t) (kx : 'k) (vx : 'v) : ('k, 'v) t * _ =
+    match n with
+    | Leaf ->
+      (Node (Red, Leaf, kx, vx, Leaf), `Ok)
     | Node (Red, a, ky, vy, b) ->
       (match ord.cmp kx ky with
-      | Lt -> Node (Red, ins ~ord a kx vx, ky, vy, b)
-      | Gt -> Node (Red, a, ky, vy, (ins ~ord b kx vx))
-      | Eq -> Node (Red, a, kx, vx, b))
+      | Lt ->
+        let (r, s) = ins ~ord ~replace a kx vx in
+        (Node (Red, r, ky, vy, b), s)
+      | Gt ->
+        let (r, s) = (ins ~ord ~replace b kx vx) in
+        (Node (Red, a, ky, vy, r), s)
+      | Eq ->
+        if replace then
+          (Node (Red, a, kx, vx, b), `Duplicate)
+        else
+          (Node (Red, a, ky, vy, b), `Duplicate))
     | Node (Black, a, ky, vy, b) ->
       match ord.cmp kx ky with
-      | Lt -> balance1 (ins ~ord a kx vx) ky vy b
-      | Gt -> balance2 a ky vy (ins ~ord b kx vx)
-      | Eq -> Node (Black, a, kx, vx, b)
+      | Lt ->
+        let (r, s) = ins ~ord ~replace a kx vx in
+        (balance1 r ky vy b, s)
+      | Gt ->
+        let (r, s) = ins ~ord ~replace b kx vx in
+        (balance2 a ky vy r, s)
+      | Eq -> 
+        if replace then
+          (Node (Black, a, kx, vx, b), `Duplicate)
+        else
+          (Node (Black, a, ky, vy, b), `Duplicate)
+  (* let rec ins ~(ord : 'k ord) (n : ('k, 'v) t) (kx : 'k) (vx : 'v) : ('k, 'v) t * bool =
+    let flag = ref false in
+    let r = ins_core ~ord ~flag n kx vx in
+    (r, !flag) *)
   let set_black (node : ('k, 'v) t) =
     match node with
     | Node (_, l, k, v, r) -> Node (Black, l, k, v, r)
@@ -132,11 +153,31 @@ module RBMap = struct
     match node with
     | Node (_, l, k, v, r) -> Node (Red, l, k, v, r)
     | e -> e
-  let insert ~ord (node : ('k, 'v) t) (k : 'k) (v : 'v) =
-    if is_red node then
-      set_black (ins ~ord node k v)
+  let add ~ord (n : ('k, 'v) t) (k : 'k) (v : 'v) : ('k, 'v) t * _ =
+    if is_red n then
+      let (r, s) = ins ~ord ~replace:false n k v in
+      match s with
+      | `Ok -> (set_black r, s)
+      | `Duplicate -> (n, s)
     else
-      ins ~ord node k v
+      ins ~ord ~replace:false n k v
+  exception KeyDup
+  let add_exn ~ord n k v =
+    if is_red n then
+      let (r, s) = ins ~ord ~replace:false n k v in
+      match s with
+      | `Ok -> set_black r
+      | `Duplicate -> raise KeyDup
+    else
+      fst (ins ~ord ~replace:false n k v)
+  let set ~ord n k v =
+    if is_red n then
+      let (r, s) = ins ~ord ~replace:true n k v in
+      match s with
+      | `Ok -> set_black r
+      | `Duplicate -> r
+    else
+      fst (ins ~ord ~replace:true n k v)
   let bal_left l k v r =
     match l, k, v, r with
     | Node (Red, a, kx, vx, b), k, v, r -> node Red (node Black a kx vx b) k v r
@@ -222,8 +263,15 @@ module RBMap = struct
     | Leaf -> Leaf
     | Node (color, lchild, key, value, rchild) -> node color (map f lchild) key (f key value) (map f rchild)
 
+  let iteri (n : ('k, 'a) t) ~(f : 'k -> 'a -> unit) : unit = ignore (map f n)
+
   let to_list n = fold_right (fun xs k v -> (k, v) :: xs) [] n
-  let of_list ~ord xs = List.fold_left (fun n (k, v) -> insert ~ord n k v) empty xs
+  (* let of_list ~ord xs = List.fold_left (fun n (k, v) -> set ~ord n k v) empty xs *)
+
+  let find_exn ~ord n k =
+    match find ~ord n k with
+    | None -> raise Not_found
+    | Some v -> v
 
   let string_of_color = function Red -> "R" | Black -> "B"
 
@@ -259,8 +307,14 @@ module RBTree = struct
 
   let singleton x : 'a t = RBMap.singleton x ()
 
-  let insert ~ord (n : 'a t) (k : 'k) : 'a t =
-    RBMap.insert ~ord n k ()
+  let add ~ord (n : 'a t) (k : 'k) : 'a t * _ =
+    RBMap.add ~ord n k ()
+
+  let add_exn ~ord (n : 'a t) (k : 'k) : 'a t =
+    RBMap.add_exn ~ord n k ()
+
+  let set ~ord (n : 'a t) (k : 'k) : 'a t =
+    RBMap.set ~ord n k ()
 
   let erase ~ord x (n : 'a t) : 'a t = RBMap.erase ~ord x n
   
@@ -282,9 +336,12 @@ module RBTree = struct
   let contains ~ord (t : 'a t) x : bool = Option.is_some (RBMap.find ~ord t x)
 
   let to_list (n : 'a t) = List.map fst (RBMap.to_list n)
-  let of_list ~ord xs : 'a t = RBMap.of_list ~ord (List.map (fun x -> (x, ())) xs)
+  (* let of_list ~ord xs : 'a t = RBMap.of_list ~ord (List.map (fun x -> (x, ())) xs) *)
 
 end
+
+let ord_str : string ord = { cmp = fun x y -> if x < y then Lt else if x > y then Gt else Eq }
+let ord_int : int ord = { cmp = fun x y -> if x < y then Lt else if x > y then Gt else Eq }
 
 type ctx = {
   arity : (string, int) Hashtbl.t;
@@ -525,31 +582,33 @@ let ant_pp_adt (e : ctx) adt_name ctors =
 
 let apply_cont : pc = add_code None
 
-type env = (string, int) Hashtbl.t
+type env = (string, int) RBMap.t
 
-let new_env () : env = Hashtbl.create (module Core.String)
+let new_env () : env = RBMap.empty
 
 type scope = {
-  meta_env : (string, int option) Hashtbl.t linear;
+  meta_env : (string, int option) RBMap.t linear;
   (*Note: env_length is not the amount of entries in meta_env above! It is the length of the environment when executing the cek machine.*)
   env_length : int;
   progressed : bool;
 }
 
-let new_scope () = { meta_env = make_linear (Hashtbl.create (module Core.String)); env_length = 0; progressed = false }
+let new_scope () = { meta_env = make_linear RBMap.empty; env_length = 0; progressed = false }
 let push_s s = { s with env_length = s.env_length + 1; progressed = true }
 
 let extend_s s name =
   let meta_env = write_linear s.meta_env in
 
-  Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length);
+  (* Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length); *)
+  let meta_env = RBMap.add_exn ~ord:ord_str meta_env name (Some s.env_length) in
 
   { s with meta_env = make_linear meta_env; env_length = s.env_length + 1 }
 
 let drop_s s name =
-  assert (Option.is_some (Hashtbl.find_exn (read_linear s.meta_env) name));
+  assert (Option.is_some (RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) name));
   let meta_env = write_linear s.meta_env in
-  Hashtbl.remove meta_env name;
+  (* Hashtbl.remove meta_env name; *)
+  let meta_env = RBMap.erase ~ord:ord_str name meta_env in
   { s with meta_env = make_linear meta_env; env_length = s.env_length - 1 }
 
 let pop_n s n =
@@ -559,7 +618,7 @@ let pop_n s n =
 let pop_s s = pop_n s 1
 
 (*todo: we actually need to dup a bunch. lets switch to a functional data structure. *)
-let dup_s s = { s with meta_env = make_linear (Hashtbl.copy (read_linear s.meta_env)); env_length = s.env_length }
+let dup_s s = { s with meta_env = make_linear (read_linear s.meta_env); env_length = s.env_length }
 
 type kont = { k : scope -> world code -> unit code; fv : (string, unit) Hashtbl.t linear }
 
@@ -572,7 +631,7 @@ let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit cod
   let new_s, n =
     List.fold_left
       (fun (s, n) var ->
-        match Hashtbl.find_exn (read_linear s.meta_env) var with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
+        match RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) var with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
       (s, 0) vars
   in
   seqs
@@ -624,14 +683,19 @@ type keep_t = { mutable keep : bool; mutable source : string option }
 
 let keep_only (s : scope) (fv : (string, unit) Hashtbl.t linear) : int Dynarray.t * scope =
   let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
-  Hashtbl.iteri (read_linear s.meta_env) ~f:(fun ~key ~data ->
+  RBMap.iteri (read_linear s.meta_env) ~f:(fun key data ->
       match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key });
   Hashtbl.iter_keys (read_linear fv) ~f:(fun v ->
-      let i = Option.get (Hashtbl.find_exn (read_linear s.meta_env) v) in
+      let i = Option.get (RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) v) in
       (Dynarray.get keep i).keep <- true);
   let keep_idx : int Dynarray.t = Dynarray.create () in
-  let meta_env : (string, int option) Hashtbl.t = Hashtbl.create (module Core.String) in
-  Dynarray.iteri
+  let (_, meta_env) = Dynarray.fold_left (fun (i, acc) k -> if k.keep then (
+        Dynarray.add_last keep_idx i;
+        match k.source with
+        | None -> (i + 1, acc)
+        | Some v -> (i + 1, RBMap.add_exn ~ord:ord_str acc v (Some (Dynarray.length keep_idx))))
+      else (i + 1, acc)) (0, RBMap.empty) keep in
+  (* Dynarray.iteri
     (fun i k ->
       if k.keep then (
         (match k.source with
@@ -639,8 +703,10 @@ let keep_only (s : scope) (fv : (string, unit) Hashtbl.t linear) : int Dynarray.
         | Some v -> Hashtbl.add_exn meta_env ~key:v ~data:(Some (Dynarray.length keep_idx)));
         Dynarray.add_last keep_idx i)
       else ())
-    keep;
-  Hashtbl.iteri (read_linear s.meta_env) ~f:(fun ~key ~data:_ -> ignore (Hashtbl.add meta_env ~key ~data:None));
+    keep; *)
+  (* RBMap.iteri (read_linear s.meta_env) ~f:(fun key data:_ -> ignore (Hashtbl.add meta_env ~key ~data:None)); *)
+  let others = RBMap.map (fun key data -> None) (read_linear s.meta_env) in
+  let meta_env = RBMap.append_trees meta_env others in
   (keep_idx, { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
 
 let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) : unit code =
@@ -650,7 +716,7 @@ let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) 
 let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -> unit code =
   match c with
   | Var name ->
-      let loc = Option.get (Hashtbl.find_exn (read_linear s.meta_env) name) in
+      let loc = Option.get (RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) name) in
       fun w ->
         seqs
           [
