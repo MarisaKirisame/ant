@@ -367,17 +367,14 @@ let ant_pp_adt_constructors (e : ctx) adt_name ctors =
       Dynarray.add_last e.constructor_degree (1 - List.length types);
       let param_names = List.mapi (fun i _ -> "x" ^ string_of_int i) types in
       let param_docs = List.map string param_names in
-      let head =
-        string "let "
-        ^^ string (adt_name ^ "_" ^ con_name)
-        ^^ (if param_docs = [] then empty else space ^^ separate space param_docs)
-        ^^ string ": Value.seq = Memo.appends ["
-      in
-      let elements =
-        let ctor_tag = int (Hashtbl.find_exn e.ctag con_name) in
-        uncode (from_constructor ctor_tag) :: List.map string param_names
-      in
-      head ^^ separate (string ";") elements ^^ string "]")
+      let param_codes : Value.seq code list = List.map (fun name -> code (string name)) param_names in
+      let ctor_tag = int (Hashtbl.find_exn e.ctag con_name) in
+      let body = memo_appends (from_constructor ctor_tag :: param_codes) in
+      string "let "
+      ^^ string (adt_name ^ "_" ^ con_name)
+      ^^ (if param_docs = [] then empty else space ^^ separate space param_docs)
+      ^^ string ": Value.seq = "
+      ^^ uncode body)
     ctors
 
 (*todo: distinguish ffi inner type.*)
@@ -733,12 +730,12 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                         match pat with
                         | PApp (cname, None) ->
                             string "| "
-                            ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
+                            ^^ uncode (int (Hashtbl.find_exn ctx.ctag cname))
                             ^^ string " -> "
                             ^^ (uncode $ ant_pp_expr ctx s expr k w)
                         | PApp (cname, Some (PVar x0)) ->
                             string "| "
-                            ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
+                            ^^ uncode (int (Hashtbl.find_exn ctx.ctag cname))
                             ^^ string " -> "
                             ^^
                             let x0_s = gensym "x0" |> string in
@@ -755,7 +752,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                                      w))
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
                             string "| "
-                            ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
+                            ^^ uncode (int (Hashtbl.find_exn ctx.ctag cname))
                             ^^ string " -> "
                             ^^
                             let x0_s = gensym "x0" |> string in
@@ -778,7 +775,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                                          w)))
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1; PVar x2 ])) ->
                             string "| "
-                            ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag cname))
+                            ^^ uncode (int (Hashtbl.find_exn ctx.ctag cname))
                             ^^ string " -> "
                             ^^
                             let x0_s = gensym "x0" |> string in
@@ -849,23 +846,14 @@ let generate_apply_cont ctx =
           *   instead we have to take elements out on by one.
           *)
          let cont_codes = Dynarray.create () in
-         let rec loop () =
-           match Dynarray.pop_last_opt ctx.conts with
-           | None -> cont_codes
-           | Some (name, action) ->
-               let code =
-                 string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ")
-                 ^^ uncode (action w (code $ string "tl"))
-               in
-               Dynarray.add_last cont_codes code;
-               loop ()
-         in
          let rec loop i =
            if i == Dynarray.length ctx.conts then cont_codes
            else
              let name, action = Dynarray.get ctx.conts i in
              let code =
-               string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ")
+               string "| "
+               ^^ uncode (int (Hashtbl.find_exn ctx.ctag name))
+               ^^ string " -> "
                ^^ uncode (action w (code $ string "tl"))
              in
              Dynarray.add_last cont_codes code;
@@ -894,7 +882,9 @@ let generate_apply_cont_ ctx =
                ^^ string " with "
                ^^ separate_map (break 1)
                     (fun (name, action) ->
-                      string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ")
+                      string "| "
+                      ^^ uncode (int (Hashtbl.find_exn ctx.ctag name))
+                      ^^ string " -> "
                       ^^ uncode (action w (code $ string "tl")))
                     (Dynarray.to_list ctx.conts))))
 
@@ -904,18 +894,19 @@ let pp_cek_ant x =
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
   ^^ break 1 ^^ string "let memo = Array.init "
-  ^^ string (string_of_int (Dynarray.length codes))
+  ^^ uncode (int (Dynarray.length codes))
   ^^ string "(fun _ -> ref State.BlackHole)" ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
-            string ("let ()" ^ " = add_exp ")
+            string "let () = add_exp "
             ^^ uncode (Option.get (Dynarray.get codes i))
             ^^ string " "
-            ^^ string (string_of_int i)))
+            ^^ uncode (int i)))
   ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length ctx.constructor_degree) (fun i ->
-            string
-              ("let () = Value.set_constructor_degree " ^ string_of_int i ^ " " ^ "("
-              ^ string_of_int (Dynarray.get ctx.constructor_degree i)
-              ^ ")")))
+            string "let () = Value.set_constructor_degree "
+            ^^ uncode (int i)
+            ^^ string " ("
+            ^^ uncode (int (Dynarray.get ctx.constructor_degree i))
+            ^^ string ")"))
