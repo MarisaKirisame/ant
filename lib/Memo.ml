@@ -9,7 +9,6 @@
  *)
 open BatFingerTree
 open Word
-open Common
 module Hasher = Hash.MCRC32C
 open Base
 
@@ -19,9 +18,8 @@ open Base
 module Hashtbl = Core.Hashtbl
 open Value
 open State
+open Common
 
-let ( % ) f g x = f (g x)
-let ( $ ) f x = f x
 let log x = print_endline x
 let log x = ignore x
 
