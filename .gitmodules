@@ -1,9 +1,9 @@
 [submodule "lib/hwsl2_core"]
-	path = lib/hwsl2_core
-	url = git@github.com:MarisaKirisame/hwsl2_core.git
+        path = lib/hwsl2_core
+        url = https://github.com/MarisaKirisame/hwsl2_core.git
 [submodule "lib/monoid_hash"]
-	path = lib/monoid_hash
-	url = git@github.com:waterlens/monoid-hash.git
+        path = lib/monoid_hash
+        url = https://github.com/waterlens/monoid-hash.git
 [submodule "lib/hashtbl"]
-	path = lib/hashtbl
-	url = git@github.com:waterlens/hashtbl.git
+        path = lib/hashtbl
+        url = https://github.com/waterlens/hashtbl.git
