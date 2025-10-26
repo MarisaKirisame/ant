@@ -5,6 +5,25 @@ open Memo
 open State
 open Code
 
+(*
+ * GenerateMemo builds the code generator that emits the specialised CEK VM.
+ * There are three layers that cooperate:
+ *   - Helpers in [Code] provide a small IR DSL.  Everything in this file
+ *     should construct documents through those helpers instead of
+ *     concatenating strings by hand.
+ *   - A collection of combinators below (scope handling,
+ *     continuation registry) tracks meta information such as constructor
+ *     tags, environment layouts, and the code fragments for each generated
+ *     continuation.
+ *   - The printers at the bottom (`ant_pp_*`, `generate_apply_cont`,
+ *     `pp_cek_ant`) walk syntax/IR and produce OCaml source that encodes
+ *     the CEK state machine, storing the resulting snippets in [codes] for
+ *     later emission.
+ * The goal is that high level transformations only talk in terms of the
+ * DSL (int/lam/app/seq/…) while environment bookkeeping and code emission
+ * stay centralised here.
+ *)
+
 (*todo: implement tail call*)
 (*todo: do not do a stack machine*)
 
