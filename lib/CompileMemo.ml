@@ -6,7 +6,7 @@ open State
 open Code
 
 (*
- * Compile builds the code generator that emits the specialised CEK VM.
+ * CompileMemo builds the code generator that emits the specialised CEK VM.
  * There are three layers that cooperate:
  *   - Helpers in [Code] provide a small IR DSL.  Everything in this file
  *     should construct documents through those helpers instead of
@@ -15,7 +15,7 @@ open Code
  *     continuation registry) tracks meta information such as constructor
  *     tags, environment layouts, and the code fragments for each generated
  *     continuation.
- *   - The printers at the bottom (`compile_pp_*`, `generate_apply_cont`,
+ *   - The printers at the bottom (`compile_*`, `generate_apply_cont`,
  *     `pp_cek_ant`) walk syntax/IR and produce OCaml source that encodes
  *     the CEK state machine, storing the resulting snippets in [codes] for
  *     later emission.
@@ -112,7 +112,7 @@ let add_code_k (k : pc -> (world -> unit) code * 'a) : 'a =
   set_code pc code;
   ret
 
-let compile_pp_ocaml_adt adt_name ctors =
+let compile_ocaml_adt adt_name ctors =
   string
     ("type ocaml_" ^ adt_name ^ " = "
     ^ String.concat " | "
@@ -122,7 +122,7 @@ let compile_pp_ocaml_adt adt_name ctors =
              else con_name ^ " of " ^ String.concat " * " (List.map (fun _ -> "Value.seq") types))
            ctors))
 
-let compile_pp_adt_constructors (e : ctx) adt_name ctors =
+let compile_adt_constructors (e : ctx) adt_name ctors =
   separate_map (break 1)
     (fun (con_name, types) ->
       Hashtbl.add_exn ~key:con_name ~data:(List.length types) e.arity;
@@ -140,7 +140,7 @@ let compile_pp_adt_constructors (e : ctx) adt_name ctors =
     ctors
 
 (*todo: distinguish ffi inner type.*)
-let compile_pp_adt_ffi e adt_name ctors =
+let compile_adt_ffi e adt_name ctors =
   string
     ("let from_ocaml_" ^ adt_name ^ " x = match x with | "
     ^ String.concat " | "
@@ -175,10 +175,10 @@ let compile_pp_adt_ffi e adt_name ctors =
   in
   head ^^ string (cases ^ " | _ -> failwith \"unreachable\"")
 
-let compile_pp_adt (e : ctx) adt_name ctors =
-  let generate_ocaml_adt = compile_pp_ocaml_adt adt_name ctors in
-  let generate_adt_constructors = compile_pp_adt_constructors e adt_name ctors in
-  generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1 ^^ compile_pp_adt_ffi e adt_name ctors
+let compile_adt (e : ctx) adt_name ctors =
+  let generate_ocaml_adt = compile_ocaml_adt adt_name ctors in
+  let generate_adt_constructors = compile_adt_constructors e adt_name ctors in
+  generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1 ^^ compile_adt_ffi e adt_name ctors
 
 let apply_cont : pc = add_code None
 
@@ -578,7 +578,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
 
 let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
-  | Type (TBOne (name, Enum { params = _; ctors })) -> compile_pp_adt ctx name ctors
+  | Type (TBOne (name, Enum { params = _; ctors })) -> compile_adt ctx name ctors
   | Type (TBRec _) -> failwith "Not implemented (TODO)"
   | Term (x, Lam (ps, term)) ->
       let s =

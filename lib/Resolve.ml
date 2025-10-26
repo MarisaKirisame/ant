@@ -1,4 +1,5 @@
 open Syntax
+module Hashtbl = Core.Hashtbl
 
 type ctx = { func : (string, unit) Hashtbl.t }
 
