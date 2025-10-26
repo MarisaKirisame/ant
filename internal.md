@@ -1,5 +1,5 @@
 # TODO: break into multiple documents, figure out how code should link to docs
-# Partial Memoization
+# Prefix Memoization
 
 ## Background
 Incremental Computing aim to speed up computation by reusing previous results. 
