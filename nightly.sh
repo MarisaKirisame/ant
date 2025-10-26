@@ -34,7 +34,7 @@ run_project() {
   activate_switch
   export OCAMLRUNPARAM=b
   dune exec ant -- examples/Test.ant generated/TestCEK.ml --cek
-  dune --action-stdout-on-success=swallow --action-stderr-on-success=must-be-empty fmt || true
+  dune fmt &> /dev/null || true
   dune exec GeneratedMain
 }
 

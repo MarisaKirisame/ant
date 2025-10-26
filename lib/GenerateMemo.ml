@@ -26,281 +26,221 @@ module RBMap = struct
   let node c l k v r = Node (c, l, k, v, r)
 
   let rec depth (f : int -> int -> int) n =
-    match n with
-    | Leaf -> 0
-    | Node (_, l, _, _, r) -> (f (depth f l) (depth f r)) + 1
+    match n with Leaf -> 0 | Node (_, l, _, _, r) -> f (depth f l) (depth f r) + 1
 
   let rec min n : ('k * 'v) option =
-    match n with
-    | Leaf -> None
-    | Node (_, Leaf, k, v, _) -> Some (k, v)
-    | Node (_, l, _, _, _) -> min l
+    match n with Leaf -> None | Node (_, Leaf, k, v, _) -> Some (k, v) | Node (_, l, _, _, _) -> min l
+
   let rec max n : ('k * 'v) option =
-    match n with
-    | Leaf -> None
-    | Node (_, _, k, v, Leaf) -> Some (k, v)
-    | Node (_, _, _, _, r) -> max r
+    match n with Leaf -> None | Node (_, _, k, v, Leaf) -> Some (k, v) | Node (_, _, _, _, r) -> max r
+
   let rec fold_left (f : 's -> 'k -> 'v -> 's) (init : 's) (n : ('k, 'v) t) : 's =
-    match n with
-    | Leaf -> init
-    | Node (_, l, k, v, r) -> fold_left f (f (fold_left f init l) k v) r
+    match n with Leaf -> init | Node (_, l, k, v, r) -> fold_left f (f (fold_left f init l) k v) r
+
   let rec fold_right (f : 's -> 'k -> 'v -> 's) (init : 's) (n : ('k, 'v) t) : 's =
-    match n with
-    | Leaf -> init
-    | Node (_, l, k, v, r) -> fold_right f (f (fold_right f init r) k v) l
-  let singleton (k : 'k) (v : 'v) : ('k, 'v) t =
-    Node (Red, Leaf, k, v, Leaf)
+    match n with Leaf -> init | Node (_, l, k, v, r) -> fold_right f (f (fold_right f init r) k v) l
+
+  let singleton (k : 'k) (v : 'v) : ('k, 'v) t = Node (Red, Leaf, k, v, Leaf)
+
   let balance1 (n : ('k, 'v) t) (kz : 'k) (vz : 'v) (d : ('k, 'v) t) =
     match n with
-    | Node (Red, Node (Red, a, kx, vx, b), ky, vy, c)
-    | Node (Red, a, kx, vx, Node (Red, b, ky, vy, c)) -> node Red (node Black a kx vx b) ky vy (node Black c kz vz d)
+    | Node (Red, Node (Red, a, kx, vx, b), ky, vy, c) | Node (Red, a, kx, vx, Node (Red, b, ky, vy, c)) ->
+        node Red (node Black a kx vx b) ky vy (node Black c kz vz d)
     | a -> Node (Black, a, kz, vz, d)
+
   let balance2 (a : ('k, 'v) t) (kx : 'k) (vx : 'v) (d : ('k, 'v) t) =
     match d with
-    | Node (Red, Node (Red, b, ky, vy, c), kz, vz, d)
-    | Node (Red, b, ky, vy, Node (Red, c, kz, vz, d)) -> node Red (node Black a kx vx b) ky vy (node Black c kz vz d)
+    | Node (Red, Node (Red, b, ky, vy, c), kz, vz, d) | Node (Red, b, ky, vy, Node (Red, c, kz, vz, d)) ->
+        node Red (node Black a kx vx b) ky vy (node Black c kz vz d)
     | b -> Node (Black, a, kx, vx, b)
-  let is_red (node : ('k, 'v) t) : bool =
-    match node with
-    | Node (Red, _, _, _, _) -> true
-    | _ -> false
-  let is_black (node : ('k, 'v) t) : bool =
-    match node with
-    | Node (Black, _, _, _, _) -> true
-    | _ -> false
+
+  let is_red (node : ('k, 'v) t) : bool = match node with Node (Red, _, _, _, _) -> true | _ -> false
+  let is_black (node : ('k, 'v) t) : bool = match node with Node (Black, _, _, _, _) -> true | _ -> false
+
   let rec ins ~(ord : 'k ord) ~replace (n : ('k, 'v) t) (kx : 'k) (vx : 'v) : ('k, 'v) t * _ =
     match n with
-    | Leaf ->
-      (Node (Red, Leaf, kx, vx, Leaf), `Ok)
-    | Node (Red, a, ky, vy, b) ->
-      (match ord.cmp kx ky with
-      | Lt ->
-        let (r, s) = ins ~ord ~replace a kx vx in
-        (Node (Red, r, ky, vy, b), s)
-      | Gt ->
-        let (r, s) = (ins ~ord ~replace b kx vx) in
-        (Node (Red, a, ky, vy, r), s)
-      | Eq ->
-        if replace then
-          (Node (Red, a, kx, vx, b), `Duplicate)
-        else
-          (Node (Red, a, ky, vy, b), `Duplicate))
-    | Node (Black, a, ky, vy, b) ->
-      match ord.cmp kx ky with
-      | Lt ->
-        let (r, s) = ins ~ord ~replace a kx vx in
-        (balance1 r ky vy b, s)
-      | Gt ->
-        let (r, s) = ins ~ord ~replace b kx vx in
-        (balance2 a ky vy r, s)
-      | Eq -> 
-        if replace then
-          (Node (Black, a, kx, vx, b), `Duplicate)
-        else
-          (Node (Black, a, ky, vy, b), `Duplicate)
+    | Leaf -> (Node (Red, Leaf, kx, vx, Leaf), `Ok)
+    | Node (Red, a, ky, vy, b) -> (
+        match ord.cmp kx ky with
+        | Lt ->
+            let r, s = ins ~ord ~replace a kx vx in
+            (Node (Red, r, ky, vy, b), s)
+        | Gt ->
+            let r, s = ins ~ord ~replace b kx vx in
+            (Node (Red, a, ky, vy, r), s)
+        | Eq -> if replace then (Node (Red, a, kx, vx, b), `Duplicate) else (Node (Red, a, ky, vy, b), `Duplicate))
+    | Node (Black, a, ky, vy, b) -> (
+        match ord.cmp kx ky with
+        | Lt ->
+            let r, s = ins ~ord ~replace a kx vx in
+            (balance1 r ky vy b, s)
+        | Gt ->
+            let r, s = ins ~ord ~replace b kx vx in
+            (balance2 a ky vy r, s)
+        | Eq -> if replace then (Node (Black, a, kx, vx, b), `Duplicate) else (Node (Black, a, ky, vy, b), `Duplicate))
+
   (* let rec ins ~(ord : 'k ord) (n : ('k, 'v) t) (kx : 'k) (vx : 'v) : ('k, 'v) t * bool =
     let flag = ref false in
     let r = ins_core ~ord ~flag n kx vx in
     (r, !flag) *)
-  let set_black (node : ('k, 'v) t) =
-    match node with
-    | Node (_, l, k, v, r) -> Node (Black, l, k, v, r)
-    | e -> e
-  let set_red (node : ('k, 'v) t) =
-    match node with
-    | Node (_, l, k, v, r) -> Node (Red, l, k, v, r)
-    | e -> e
+  let set_black (node : ('k, 'v) t) = match node with Node (_, l, k, v, r) -> Node (Black, l, k, v, r) | e -> e
+  let set_red (node : ('k, 'v) t) = match node with Node (_, l, k, v, r) -> Node (Red, l, k, v, r) | e -> e
+
   let add ~ord (n : ('k, 'v) t) (k : 'k) (v : 'v) : ('k, 'v) t * _ =
     if is_red n then
-      let (r, s) = ins ~ord ~replace:false n k v in
-      match s with
-      | `Ok -> (set_black r, s)
-      | `Duplicate -> (n, s)
-    else
-      ins ~ord ~replace:false n k v
+      let r, s = ins ~ord ~replace:false n k v in
+      match s with `Ok -> (set_black r, s) | `Duplicate -> (n, s)
+    else ins ~ord ~replace:false n k v
+
   exception KeyDup
+
   let add_exn ~ord n k v =
     if is_red n then
-      let (r, s) = ins ~ord ~replace:false n k v in
-      match s with
-      | `Ok -> set_black r
-      | `Duplicate -> raise KeyDup
-    else
-      Stdlib.fst (ins ~ord ~replace:false n k v)
+      let r, s = ins ~ord ~replace:false n k v in
+      match s with `Ok -> set_black r | `Duplicate -> raise KeyDup
+    else Stdlib.fst (ins ~ord ~replace:false n k v)
+
   let set ~ord n k v =
     if is_red n then
-      let (r, s) = ins ~ord ~replace:true n k v in
-      match s with
-      | `Ok -> set_black r
-      | `Duplicate -> r
-    else
-      Stdlib.fst (ins ~ord ~replace:true n k v)
+      let r, s = ins ~ord ~replace:true n k v in
+      match s with `Ok -> set_black r | `Duplicate -> r
+    else Stdlib.fst (ins ~ord ~replace:true n k v)
+
   let bal_left l k v r =
-    match l, k, v, r with
+    match (l, k, v, r) with
     | Node (Red, a, kx, vx, b), k, v, r -> node Red (node Black a kx vx b) k v r
     | l, k, v, Node (Black, a, ky, vy, b) -> balance2 l k v (node Red a ky vy b)
-    | l, k, v, Node (Red, (Node (Black, a, ky, vy, b)), kz, vz, c) -> node Red (node Black l k v a) ky vy (balance2 b kz vz (set_red c))
+    | l, k, v, Node (Red, Node (Black, a, ky, vy, b), kz, vz, c) ->
+        node Red (node Black l k v a) ky vy (balance2 b kz vz (set_red c))
     | l, k, v, r -> node Red l k v r (* unreachable *)
+
   let bal_right l k v r =
     match r with
     | Node (Red, b, ky, vy, c) -> node Red l k v (node Black b ky vy c)
-    | _ ->
-      match l with
-      | Node (Black, a, kx, vx, b) -> balance1 (node Red a kx vx b) k v r
-      | Node (Red, a, kx, vx, Node (Black, b, ky, vy, c)) -> node Red (balance1 (set_red a) kx vx b) ky vy (node Black c k v r)
-      | _ -> node Red l k v r
-  (** number of elements *)
-  let rec size t =
-    match t with
-    | Leaf -> 0
-    | Node (_, x, _, _, y) -> size x + size y + 1
+    | _ -> (
+        match l with
+        | Node (Black, a, kx, vx, b) -> balance1 (node Red a kx vx b) k v r
+        | Node (Red, a, kx, vx, Node (Black, b, ky, vy, c)) ->
+            node Red (balance1 (set_red a) kx vx b) ky vy (node Black c k v r)
+        | _ -> node Red l k v r)
+
+  let rec size t = match t with Leaf -> 0 | Node (_, x, _, _, y) -> size x + size y + 1
+
   let rec append_trees (l : ('k, 'v) t) (r : ('k, 'v) t) : ('k, 'v) t =
-    match l, r with
+    match (l, r) with
     | Leaf, x -> x
     | x, Leaf -> x
-    | Node (Red, a, kx, vx, b), Node (Red, c, ky, vy, d) ->
-      (match append_trees b c with
-      | Node (Red, b', kz, vz, c') -> node Red (node Red a kx vx b') kz vz (node Red c' ky vy d)
-      | bc -> node Red a kx vx (node Red bc ky vy d))
-    | Node (Black, a, kx, vx, b), Node (Black, c, ky, vy, d) ->
-      (match append_trees b c with
-      | Node (Red, b', kz, vz, c') -> node Red (node Black a kx vx b') kz vz (node Black c' ky vy d)
-      | bc -> bal_left a kx vx (node Black bc ky vy d))
+    | Node (Red, a, kx, vx, b), Node (Red, c, ky, vy, d) -> (
+        match append_trees b c with
+        | Node (Red, b', kz, vz, c') -> node Red (node Red a kx vx b') kz vz (node Red c' ky vy d)
+        | bc -> node Red a kx vx (node Red bc ky vy d))
+    | Node (Black, a, kx, vx, b), Node (Black, c, ky, vy, d) -> (
+        match append_trees b c with
+        | Node (Red, b', kz, vz, c') -> node Red (node Black a kx vx b') kz vz (node Black c' ky vy d)
+        | bc -> bal_left a kx vx (node Black bc ky vy d))
     | a, Node (Red, b, kx, vx, c) -> node Red (append_trees a b) kx vx c
     | Node (Red, a, kx, vx, b), c -> node Red a kx vx (append_trees b c)
+
   let rec delete ~ord x t =
     match t with
     | Leaf -> Leaf
-    | Node (_, a, y, v, b) ->
-      match ord.cmp x y with
-      | Lt ->
-        if is_black a then bal_left (delete ~ord x a) y v b
-        else node Red (delete ~ord x a) y v b
-      | Gt ->
-        if is_black b then bal_right a y v (delete ~ord x b)
-        else node Red a y v (delete ~ord x b)
-      | Eq -> append_trees a b
-  let erase ~ord x t = let t = delete ~ord x t in set_black t
+    | Node (_, a, y, v, b) -> (
+        match ord.cmp x y with
+        | Lt -> if is_black a then bal_left (delete ~ord x a) y v b else node Red (delete ~ord x a) y v b
+        | Gt -> if is_black b then bal_right a y v (delete ~ord x b) else node Red a y v (delete ~ord x b)
+        | Eq -> append_trees a b)
+
+  let erase ~ord x t =
+    let t = delete ~ord x t in
+    set_black t
 
   let rec all (p : 'k -> 'v -> bool) n : bool =
-    match n with
-    | Leaf -> true
-    | Node (_, l, k, v, r) -> p k v && all p l && all p r
+    match n with Leaf -> true | Node (_, l, k, v, r) -> p k v && all p l && all p r
+
   let rec any (p : 'k -> 'v -> bool) n : bool =
-    match n with
-    | Leaf -> false
-    | Node (_, l, k, v, r) -> p k v || any p l || any p r
+    match n with Leaf -> false | Node (_, l, k, v, r) -> p k v || any p l || any p r
 
   let rec find_core ~ord t x : ('k * 'v) option =
     match t with
     | Leaf -> None
-    | Node (_, a, ky, vy, b) ->
-      match ord.cmp x ky with
-      | Lt -> find_core ~ord a x
-      | Gt -> find_core ~ord b x
-      | Eq -> Some (ky, vy)
+    | Node (_, a, ky, vy, b) -> (
+        match ord.cmp x ky with Lt -> find_core ~ord a x | Gt -> find_core ~ord b x | Eq -> Some (ky, vy))
+
   let rec find ~ord t x : 'v option =
     match t with
     | Leaf -> None
-    | Node (_, a, ky, vy, b) ->
-      match ord.cmp x ky with
-      | Lt -> find ~ord a x
-      | Gt -> find ~ord b x
-      | Eq -> Some vy
+    | Node (_, a, ky, vy, b) -> ( match ord.cmp x ky with Lt -> find ~ord a x | Gt -> find ~ord b x | Eq -> Some vy)
+
   let rec lower_bound ~ord n x lb : ('k * 'v) option =
-    match n, x, lb with
+    match (n, x, lb) with
     | Leaf, _, lb -> lb
-    | Node (_, a, ky, vy, b), x, lb ->
-      match ord.cmp x ky with
-      | Lt -> lower_bound ~ord a x lb
-      | Gt -> lower_bound ~ord b x (Some (ky, vy))
-      | Eq -> Some (ky, vy)
+    | Node (_, a, ky, vy, b), x, lb -> (
+        match ord.cmp x ky with
+        | Lt -> lower_bound ~ord a x lb
+        | Gt -> lower_bound ~ord b x (Some (ky, vy))
+        | Eq -> Some (ky, vy))
+
   let rec map (f : 'k -> 'a -> 'b) (n : ('k, 'a) t) : ('k, 'b) t =
     match n with
     | Leaf -> Leaf
     | Node (color, lchild, key, value, rchild) -> node color (map f lchild) key (f key value) (map f rchild)
 
   let iteri (n : ('k, 'a) t) ~(f : 'k -> 'a -> unit) : unit = ignore (map f n)
-
   let to_list n = fold_right (fun xs k v -> (k, v) :: xs) [] n
   (* let of_list ~ord xs = List.fold_left (fun n (k, v) -> set ~ord n k v) empty xs *)
 
-  let find_exn ~ord n k =
-    match find ~ord n k with
-    | None -> raise Not_found
-    | Some v -> v
-
+  let find_exn ~ord n k = match find ~ord n k with None -> raise Not_found | Some v -> v
   let string_of_color = function Red -> "R" | Black -> "B"
 
-  let rec pp ?(kpp = (fun _ -> "<key>")) ?(vpp = (fun _ -> "<val>")) ?(indent = 0) (node : ('k, 'v) t) : unit =
+  let rec pp ?(kpp = fun _ -> "<key>") ?(vpp = fun _ -> "<val>") ?(indent = 0) (node : ('k, 'v) t) : unit =
     let pad = String.make indent ' ' in
     match node with
     | Leaf -> Printf.printf "%sLeaf\n" pad
     | Node (c, l, k, v, r) ->
-      Printf.printf "%sNode(%s) k=%s v=%s\n" pad (string_of_color c) (kpp k) (vpp v);
-      pp ~kpp ~vpp ~indent:(indent + 2) l;
-      pp ~kpp ~vpp ~indent:(indent + 2) r
+        Printf.printf "%sNode(%s) k=%s v=%s\n" pad (string_of_color c) (kpp k) (vpp v);
+        pp ~kpp ~vpp ~indent:(indent + 2) l;
+        pp ~kpp ~vpp ~indent:(indent + 2) r
 
-  let to_string ?(kpp = (fun _ -> "<key>")) ?(vpp = (fun _ -> "<val>")) (node : ('k, 'v) t) : string =
+  let to_string ?(kpp = fun _ -> "<key>") ?(vpp = fun _ -> "<val>") (node : ('k, 'v) t) : string =
     let b = Buffer.create 256 in
     let rec aux indent node =
       let pad = String.make indent ' ' in
       match node with
       | Leaf -> Buffer.add_string b (pad ^ "Leaf\n")
       | Node (c, l, k, v, r) ->
-        Buffer.add_string b (Printf.sprintf "%sNode(%s) k=%s v=%s\n" pad (string_of_color c) (kpp k) (vpp v));
-        aux (indent + 2) l;
-        aux (indent + 2) r
+          Buffer.add_string b (Printf.sprintf "%sNode(%s) k=%s v=%s\n" pad (string_of_color c) (kpp k) (vpp v));
+          aux (indent + 2) l;
+          aux (indent + 2) r
     in
     aux 0 node;
     Buffer.contents b
 end
 
 module RBTree = struct
-
   type 'a t = ('a, unit) RBMap.t
 
   let empty : 'a t = RBMap.empty
-
   let singleton x : 'a t = RBMap.singleton x ()
-
-  let add ~ord (n : 'a t) (k : 'k) : 'a t * _ =
-    RBMap.add ~ord n k ()
-
-  let add_exn ~ord (n : 'a t) (k : 'k) : 'a t =
-    RBMap.add_exn ~ord n k ()
-
-  let set ~ord (n : 'a t) (k : 'k) : 'a t =
-    RBMap.set ~ord n k ()
-
+  let add ~ord (n : 'a t) (k : 'k) : 'a t * _ = RBMap.add ~ord n k ()
+  let add_exn ~ord (n : 'a t) (k : 'k) : 'a t = RBMap.add_exn ~ord n k ()
+  let set ~ord (n : 'a t) (k : 'k) : 'a t = RBMap.set ~ord n k ()
   let erase ~ord x (n : 'a t) : 'a t = RBMap.erase ~ord x n
-  
   let all (p : 'a -> bool) (n : 'a t) = RBMap.all (fun k _ -> p k) n
-
   let any (p : 'a -> bool) (n : 'a t) = RBMap.any (fun k _ -> p k) n
-
-  let fold_left (f : 's -> 'a -> 's) (init : 's) (n : 'a t) : 's =
-    RBMap.fold_left (fun s k v -> f s k) init n
-  
-  let fold_right (f : 's -> 'a -> 's) (init : 's) (n : 'a t) : 's =
-    RBMap.fold_right (fun s k v -> f s k) init n
-
+  let fold_left (f : 's -> 'a -> 's) (init : 's) (n : 'a t) : 's = RBMap.fold_left (fun s k v -> f s k) init n
+  let fold_right (f : 's -> 'a -> 's) (init : 's) (n : 'a t) : 's = RBMap.fold_right (fun s k v -> f s k) init n
   let depth (f : int -> int -> int) (n : 'a t) = RBMap.depth f n
   let size (n : 'a t) = RBMap.size n
-
   let union (a : 'a t) (b : 'a t) : 'a t = RBMap.append_trees a b
-
   let contains ~ord (t : 'a t) x : bool = Option.is_some (RBMap.find ~ord t x)
-
   let to_list (n : 'a t) = Stdlib.List.map Stdlib.fst (RBMap.to_list n)
   (* let of_list ~ord xs : 'a t = RBMap.of_list ~ord (List.map (fun x -> (x, ())) xs) *)
 
   let iteri (n : 'a t) ~(f : 'a -> unit) : unit = ignore (RBMap.map (fun k _ -> f k) n)
-
 end
 
-let ord_str : string ord = { cmp = fun x y -> if x < y then Lt else if x > y then Gt else Eq }
-let ord_int : int ord = { cmp = fun x y -> if x < y then Lt else if x > y then Gt else Eq }
+let ord_str : string ord = { cmp = (fun x y -> if x < y then Lt else if x > y then Gt else Eq) }
+let ord_int : int ord = { cmp = (fun x y -> if x < y then Lt else if x > y then Gt else Eq) }
 
 type ctx = {
   arity : (string, int) Hashtbl.t;
@@ -373,8 +313,7 @@ let ant_pp_adt_constructors (e : ctx) adt_name ctors =
       string "let "
       ^^ string (adt_name ^ "_" ^ con_name)
       ^^ (if param_docs = [] then empty else space ^^ separate space param_docs)
-      ^^ string ": Value.seq = "
-      ^^ uncode body)
+      ^^ string ": Value.seq = " ^^ uncode body)
     ctors
 
 (*todo: distinguish ffi inner type.*)
@@ -389,31 +328,29 @@ let ant_pp_adt_ffi e adt_name ctors =
              ^ " -> " ^ adt_name ^ "_" ^ con_name ^ " " ^ String.concat " " args)
            ctors))
   ^^ break 1
-  ^^ (
-      let head =
-        string
-          ("let to_ocaml_" ^ adt_name
-         ^ " x = let (h, t) = Option.get (Memo.list_match x) in match ")
-        ^^ uncode (word_get_value (code $ string "h"))
-        ^^ string " with | "
-      in
-      let cases =
-        String.concat " | "
-          (List.map
-             (fun (con_name, types) ->
-               string_of_int (Hashtbl.find_exn e.ctag con_name)
-               ^ " -> "
-               ^
-               if List.length types = 0 then con_name
-               else
-                 "let ["
-                 ^ String.concat ";" (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-                 ^ "] = Memo.splits t in " ^ con_name ^ "("
-                 ^ String.concat "," (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-                 ^ ")")
-             ctors)
-      in
-      head ^^ string cases)
+  ^^
+  let head =
+    string ("let to_ocaml_" ^ adt_name ^ " x = let (h, t) = Option.get (Memo.list_match x) in match ")
+    ^^ uncode (word_get_value (code $ string "h"))
+    ^^ string " with | "
+  in
+  let cases =
+    String.concat " | "
+      (List.map
+         (fun (con_name, types) ->
+           string_of_int (Hashtbl.find_exn e.ctag con_name)
+           ^ " -> "
+           ^
+           if List.length types = 0 then con_name
+           else
+             "let ["
+             ^ String.concat ";" (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
+             ^ "] = Memo.splits t in " ^ con_name ^ "("
+             ^ String.concat "," (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
+             ^ ")")
+         ctors)
+  in
+  head ^^ string (cases ^ " | _ -> failwith \"unreachable\"")
 
 let ant_pp_adt (e : ctx) adt_name ctors =
   let generate_ocaml_adt = ant_pp_ocaml_adt adt_name ctors in
@@ -462,16 +399,16 @@ let dup_s s = { s with meta_env = make_linear (read_linear s.meta_env); env_leng
 
 type kont = { k : scope -> world code -> unit code; fv : string RBTree.t linear }
 
-let dup_fv (fv : string RBTree.t linear) : string RBTree.t linear =
-  make_linear (read_linear fv)
-
+let dup_fv (fv : string RBTree.t linear) : string RBTree.t linear = make_linear (read_linear fv)
 let empty_fv () : string RBTree.t linear = make_linear RBTree.empty
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
   let new_s, n =
     List.fold_left
       (fun (s, n) var ->
-        match RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) var with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
+        match RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) var with
+        | None -> (s, n)
+        | Some _ -> (drop_s s var, n + 1))
       (s, 0) vars
   in
   seqs
@@ -486,7 +423,7 @@ let return (s : scope) (w : world code) : unit code =
 
 let add_fv (v : string) (fv : string RBTree.t linear) : string RBTree.t linear =
   let fv = write_linear fv in
-  let (fv, _) = RBTree.add ~ord:ord_str fv v in
+  let fv, _ = RBTree.add ~ord:ord_str fv v in
   make_linear fv
 
 let remove_fv (v : string) (fv : string RBTree.t linear) : string RBTree.t linear =
@@ -529,12 +466,17 @@ let keep_only (s : scope) (fv : string RBTree.t linear) : int Dynarray.t * scope
       let i = Option.get (RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) v) in
       (Dynarray.get keep i).keep <- true);
   let keep_idx : int Dynarray.t = Dynarray.create () in
-  let (_, meta_env) = Dynarray.fold_left (fun (i, acc) k -> if k.keep then (
-        Dynarray.add_last keep_idx i;
-        match k.source with
-        | None -> (i + 1, acc)
-        | Some v -> (i + 1, RBMap.add_exn ~ord:ord_str acc v (Some (Dynarray.length keep_idx))))
-      else (i + 1, acc)) (0, RBMap.empty) keep in
+  let _, meta_env =
+    Dynarray.fold_left
+      (fun (i, acc) k ->
+        if k.keep then (
+          Dynarray.add_last keep_idx i;
+          match k.source with
+          | None -> (i + 1, acc)
+          | Some v -> (i + 1, RBMap.add_exn ~ord:ord_str acc v (Some (Dynarray.length keep_idx))))
+        else (i + 1, acc))
+      (0, RBMap.empty) keep
+  in
   let others = RBMap.map (fun _ _ -> None) (read_linear s.meta_env) in
   let meta_env = RBMap.append_trees meta_env others in
   (keep_idx, { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
@@ -804,12 +746,11 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                         | _ -> failwith (show_pattern pat))
                       c
                   in
+                  let default_case = string "| _ -> failwith \"unreachable\"" in
                   code
                     (string " (match "
                     ^^ uncode (word_get_value (zro x))
-                    ^^ string " with "
-                    ^^ t
-                    ^^ string ")")))))
+                    ^^ string " with " ^^ t ^^ break 1 ^^ default_case ^^ string ")")))))
 
 let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
@@ -833,8 +774,9 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
             ^^ string ("(pc_to_exp " ^ string_of_int entry_code ^ ")")
             ^^ string "(Dynarray.of_list" ^^ string "["
             ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
-            ^^ string "]" ^^ string ")" ^^ string "(" ^^ uncode (from_constructor cont_done_tag) ^^ string ")"
-            ^^ string " memo" ))
+            ^^ string "]" ^^ string ")" ^^ string "("
+            ^^ uncode (from_constructor cont_done_tag)
+            ^^ string ")" ^^ string " memo" ))
   | Fun (_name, _args, _body) -> failwith "Not implemented (TODO)"
   | _ -> failwith (show_stmt s)
 
@@ -867,7 +809,9 @@ let generate_apply_cont ctx =
                ^^ string " K with | None -> () | Some (hd, tl) -> match "
                ^^ uncode (word_get_value (code $ string "hd"))
                ^^ string " with "
-               ^^ separate (break 1) (Dynarray.to_list (loop 0)))))
+               ^^ separate (break 1) (Dynarray.to_list (loop 0))
+               ^^ break 1
+               ^^ string "| _ -> failwith \"unreachable\"")))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
@@ -886,7 +830,9 @@ let generate_apply_cont_ ctx =
                       ^^ uncode (int (Hashtbl.find_exn ctx.ctag name))
                       ^^ string " -> "
                       ^^ uncode (action w (code $ string "tl")))
-                    (Dynarray.to_list ctx.conts))))
+                    (Dynarray.to_list ctx.conts)
+               ^^ break 1
+               ^^ string "| _ -> failwith \"unreachable\"")))
 
 let pp_cek_ant x =
   let ctx = new_ctx () in
@@ -898,10 +844,7 @@ let pp_cek_ant x =
   ^^ string "(fun _ -> ref State.BlackHole)" ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
-            string "let () = add_exp "
-            ^^ uncode (Option.get (Dynarray.get codes i))
-            ^^ string " "
-            ^^ uncode (int i)))
+            string "let () = add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ string " " ^^ uncode (int i)))
   ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length ctx.constructor_degree) (fun i ->
