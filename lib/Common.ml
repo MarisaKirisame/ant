@@ -9,6 +9,8 @@ let debug str f =
   print_endline ("ok! " ^ str);
   ret
 
+let ( $ ) f x = f x
+
 type 'a linear = { mutable value : 'a option }
 
 let make_linear x = { value = Some x }

@@ -84,7 +84,7 @@ let seq_b1 (x : unit code) (y : unit -> unit code) : unit code =
   code $ parens (group (uncode x ^^ string ";" ^^ break 1 ^^ uncode (y ())))
 
 let zro (x : ('a * 'b) code) : 'a code = app (code $ string "fst") x
-let fst (x : ('a * 'b) code) : 'b code = app (code $ string "snd") x
+let snd (x : ('a * 'b) code) : 'b code = app (code $ string "snd") x
 let add (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " + " ^^ uncode y)
 let dyn_array_get (arr : 'a Dynarray.t code) (i : int code) : 'a code = app2 (code $ string "Dynarray.get") arr i
 let dyn_array_remove_last (arr : 'a Dynarray.t code) : unit code =
