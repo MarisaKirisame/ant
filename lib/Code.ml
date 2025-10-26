@@ -83,8 +83,9 @@ let seqs (xs : (unit -> unit code) list) : unit code = Stdlib.List.fold_left seq
 let seq_b1 (x : unit code) (y : unit -> unit code) : unit code =
   code $ parens (group (uncode x ^^ string ";" ^^ break 1 ^^ uncode (y ())))
 
+(*Indexing should start at 0*)
 let zro (x : ('a * 'b) code) : 'a code = app (code $ string "fst") x
-let snd (x : ('a * 'b) code) : 'b code = app (code $ string "snd") x
+let pair_value (x : (Word.t * Value.seq) code) : Value.seq code = app (code $ string "snd") x
 let add (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " + " ^^ uncode y)
 let dyn_array_get (arr : 'a Dynarray.t code) (i : int code) : 'a code = app2 (code $ string "Dynarray.get") arr i
 let dyn_array_remove_last (arr : 'a Dynarray.t code) : unit code =
@@ -131,6 +132,7 @@ let memo_appends (xs : Value.seq code list) : Value.seq code =
 let memo_from_int (i : int code) : Value.seq code = app (code $ string "Memo.from_int") i
 let int_from_word (w : Word.t code) : int code = app (code $ string "Word.to_int") w
 let memo_splits (seq : Value.seq code) : Value.seq list code = app (code $ string "Memo.splits") seq
+let word_get_value (w : Word.t code) : int code = app (code $ string "Word.get_value") w
 
 let let_in (a : string) (value : 'a code) (body : 'a code -> 'b code) : 'b code =
   let name_doc = string (gensym a) in
