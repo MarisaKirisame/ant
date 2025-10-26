@@ -31,7 +31,7 @@ let driver input output print_ast compile_pat print_ant print_cek_ant tyck print
     if print_ast then output_pp (Syntax.pp_prog ast);
     if compile_pat then output_pp (Pat.show_all_pattern_matrixes ast);
     if print_ant then output_pp (Syntax.pp_ant ast);
-    if print_cek_ant then output_pp (GenerateMemo.pp_cek_ant ast);
+    if print_cek_ant then output_pp (Compile.pp_cek_ant ast);
     if tyck then output_pp (Tyck.pp_inferred (Tyck.infer_prog ast));
     if print_cps_transformed then output_pp (Syntax.pp_prog (Transform.cps_prog ast))
     else if print_de then output_pp (Syntax.pp_prog (Transform.defunc_prog ast))

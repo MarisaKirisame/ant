@@ -204,7 +204,7 @@ type env = { arity : (string, int) Hashtbl.t; ctag : (string, int) Hashtbl.t }
 
 let new_env () : env = { arity = Hashtbl.create (module Core.String); ctag = Hashtbl.create (module Core.String) }
 
-let ant_pp_ocaml_adt adt_name ctors =
+let compile_pp_ocaml_adt adt_name ctors =
   string
     ("type ocaml_" ^ adt_name ^ " = "
     ^ String.concat " | "
@@ -220,7 +220,7 @@ let ant_pp_ocaml_adt adt_name ctors =
                       types))
            ctors))
 
-let ant_pp_adt_constructors (e : env) adt_name ctors =
+let compile_pp_adt_constructors (e : env) adt_name ctors =
   separate_map (break 1)
     (fun (con_name, types) ->
       Hashtbl.add_exn ~key:con_name ~data:(List.length types) e.arity;
@@ -253,7 +253,7 @@ let ant_pp_adt_constructors (e : env) adt_name ctors =
       set_constructor_degree ^^ break 1 ^^ register_constructor)
     ctors
 
-let ant_pp_adt_ffi e adt_name ctors =
+let compile_pp_adt_ffi e adt_name ctors =
   ignore e;
   string
     ("let from_ocaml_" ^ adt_name ^ " x = match x with | "
@@ -290,39 +290,39 @@ let ant_pp_adt_ffi e adt_name ctors =
                   ^ ")")
               ctors))
 
-let ant_pp_adt (e : env) adt_name ctors =
+let compile_pp_adt (e : env) adt_name ctors =
   (*force evaluation order via let*)
-  let generate_ocaml_adt = ant_pp_ocaml_adt adt_name ctors in
-  let generate_adt_constructors = ant_pp_adt_constructors e adt_name ctors in
-  generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1 ^^ ant_pp_adt_ffi e adt_name ctors
+  let generate_ocaml_adt = compile_pp_ocaml_adt adt_name ctors in
+  let generate_adt_constructors = compile_pp_adt_constructors e adt_name ctors in
+  generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1 ^^ compile_pp_adt_ffi e adt_name ctors
 
-let rec ant_pp_expr (e : expr) : document =
+let rec compile_pp_expr (e : expr) : document =
   match e with
-  | Lam (xs, e) -> string "fun " ^^ separate_map space pp_pattern' xs ^^ string " -> " ^^ ant_pp_expr e
+  | Lam (xs, e) -> string "fun " ^^ separate_map space pp_pattern' xs ^^ string " -> " ^^ compile_pp_expr e
   | Match (value, MatchPattern cases) ->
-      string "match (" ^^ string "to_ocaml_int_list" ^^ string " " ^^ ant_pp_expr value ^^ string ") with | "
+      string "match (" ^^ string "to_ocaml_int_list" ^^ string " " ^^ compile_pp_expr value ^^ string ") with | "
       ^^ separate_map
            (break 1 ^^ string "|")
-           (fun (pat, expr) -> pp_pattern pat ^^ string " -> " ^^ ant_pp_expr expr)
+           (fun (pat, expr) -> pp_pattern pat ^^ string " -> " ^^ compile_pp_expr expr)
            cases
   | Var x -> string x
   | App (Ctor cname, []) -> string "int_list_" ^^ string cname
   | App (Ctor cname, es) ->
-      string "int_list_" ^^ string cname ^^ string "(" ^^ separate_map (string ",") ant_pp_expr es ^^ string ")"
-  | App (f, xs) -> string "(" ^^ separate_map (string " ") ant_pp_expr (f :: xs) ^^ string ")"
-  | Op (op, l, r) -> string "(" ^^ ant_pp_expr l ^^ string op ^^ ant_pp_expr r ^^ string ")"
+      string "int_list_" ^^ string cname ^^ string "(" ^^ separate_map (string ",") compile_pp_expr es ^^ string ")"
+  | App (f, xs) -> string "(" ^^ separate_map (string " ") compile_pp_expr (f :: xs) ^^ string ")"
+  | Op (op, l, r) -> string "(" ^^ compile_pp_expr l ^^ string op ^^ compile_pp_expr r ^^ string ")"
   | Int i -> string "(" ^^ string (string_of_int i) ^^ string ")"
   | _ -> failwith (show_expr e)
 
-let ant_pp_stmt (e : env) (s : stmt) : document =
+let compile_pp_stmt (e : env) (s : stmt) : document =
   match s with
-  | Type (TBOne (name, Enum { params = _; ctors })) -> (* TODO *) ant_pp_adt e name ctors
+  | Type (TBOne (name, Enum { params = _; ctors })) -> (* TODO *) compile_pp_adt e name ctors
   | Type (TBRec _) -> failwith "Not implemented (TODO)"
   | Term (x, tm) ->
       let name = match x with Some x -> pp_pattern x | None -> underscore in
-      string "let rec" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group @@ ant_pp_expr tm ^^ string ";;"
+      string "let rec" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group @@ compile_pp_expr tm ^^ string ";;"
   | Fun (_name, _args, _body) -> failwith "Not implemented (TODO)"
 
 let pp_ant x =
   string "open Ant" ^^ break 1 ^^ string "module Word = Seq.Word" ^^ break 1
-  ^^ separate_map (break 1) (ant_pp_stmt (new_env ())) x
+  ^^ separate_map (break 1) (compile_pp_stmt (new_env ())) x
