@@ -1,6 +1,5 @@
 open Core
 open PPrint
-
 open Ir
 open State
 open Word
@@ -9,7 +8,6 @@ open Common
 type 'a code = Code of ir
 
 let code (doc : document) = Code (Raw doc)
-
 let to_ir (Code ir) = ir
 let from_ir ir = Code ir
 
@@ -49,8 +47,8 @@ let lam3 (a : string) (b : string) (c : string) (f : 'a code -> 'b code -> 'c co
     ^^ uncode (f (code a_doc) (code b_doc) (code c_doc))
     ^^ string ")"
 
-let lam4 (a : string) (b : string) (c : string) (d : string)
-    (f : 'a code -> 'b code -> 'c code -> 'd code -> 'e code) : ('a -> 'b -> 'c -> 'd -> 'e) code =
+let lam4 (a : string) (b : string) (c : string) (d : string) (f : 'a code -> 'b code -> 'c code -> 'd code -> 'e code) :
+    ('a -> 'b -> 'c -> 'd -> 'e) code =
   let a_doc = string (gensym a) in
   let b_doc = string (gensym b) in
   let c_doc = string (gensym c) in
@@ -62,8 +60,7 @@ let lam4 (a : string) (b : string) (c : string) (d : string)
 
 let app (f : ('a -> 'b) code) (a : 'a code) : 'b code = Code (Paren (App (to_ir f, [ to_ir a ])))
 let app2 (f : ('a -> 'b -> 'c) code) (a : 'a code) (b : 'b code) : 'c code = app (app f a) b
-let app3 (f : ('a -> 'b -> 'c -> 'd) code) (a : 'a code) (b : 'b code) (c : 'c code) : 'd code =
-  app (app2 f a b) c
+let app3 (f : ('a -> 'b -> 'c -> 'd) code) (a : 'a code) (b : 'b code) (c : 'c code) : 'd code = app (app2 f a b) c
 
 let app4 (f : ('a -> 'b -> 'c -> 'd -> 'e) code) (a : 'a code) (b : 'b code) (c : 'c code) (d : 'd code) : 'e code =
   app (app3 f a b c) d
@@ -75,7 +72,6 @@ let app5 (f : ('a -> 'b -> 'c -> 'd -> 'e -> 'f) code) (a : 'a code) (b : 'b cod
 let assert_env_length (w : world code) (e : int code) : unit code = app2 (code $ string "assert_env_length") w e
 let return_n (w : world code) (n : int code) (exp : exp code) : unit code = app3 (code $ string "return_n") w n exp
 let drop_n (w : world code) (e : int code) (n : int code) : unit code = app3 (code $ string "drop_n") w e n
-
 let pc_to_exp (pc : int code) : exp code = app (from_ir (Function "pc_to_exp")) pc
 let seq (x : unit code) (y : unit -> 'a code) : 'a code = from_ir (Seqs [ to_ir x; to_ir (y ()) ])
 let seqs (xs : (unit -> unit code) list) : unit code = Stdlib.List.fold_left seq unit xs
@@ -88,9 +84,7 @@ let zro (x : ('a * 'b) code) : 'a code = app (code $ string "fst") x
 let pair_value (x : (Word.t * Value.seq) code) : Value.seq code = app (code $ string "snd") x
 let add (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " + " ^^ uncode y)
 let dyn_array_get (arr : 'a Dynarray.t code) (i : int code) : 'a code = app2 (code $ string "Dynarray.get") arr i
-let dyn_array_remove_last (arr : 'a Dynarray.t code) : unit code =
-  app (code $ string "Dynarray.remove_last") arr
-
+let dyn_array_remove_last (arr : 'a Dynarray.t code) : unit code = app (code $ string "Dynarray.remove_last") arr
 let world_state (w : world code) : state code = code $ parens (uncode w ^^ string ".state")
 let state_env (s : state code) : env code = code $ parens (uncode s ^^ string ".e")
 let world_env (w : world code) : env code = state_env @@ world_state w
@@ -107,7 +101,6 @@ let set_k (w : world code) (k : kont code) : unit code =
 let from_constructor (ctag : int code) : Value.seq code = app (code $ string "Memo.from_constructor") ctag
 let to_unit (x : 'a code) : unit code = app (code $ string "ignore") x
 let pop_env (w : world code) : Value.value code = app (code $ string "pop_env") w
-
 let goto (w : world code) pc : unit code = seq (set_c w (pc_to_exp (int pc))) (fun _ -> stepped w)
 let push_env (w : world code) (v : Value.seq code) : unit code = app2 (code $ string "push_env") w v
 let get_env (w : world code) (i : int code) : Value.seq code = dyn_array_get (state_env @@ world_state w) i
@@ -136,8 +129,7 @@ let word_get_value (w : Word.t code) : int code = app (code $ string "Word.get_v
 
 let let_in (a : string) (value : 'a code) (body : 'a code -> 'b code) : 'b code =
   let name_doc = string (gensym a) in
-  code
-  $ string "let " ^^ name_doc ^^ string " = " ^^ uncode value ^^ string " in " ^^ uncode (body (code name_doc))
+  code $ string "let " ^^ name_doc ^^ string " = " ^^ uncode value ^^ string " in " ^^ uncode (body (code name_doc))
 
 let list_literal (xs : 'a code list) : 'a list code =
   code $ string "[" ^^ separate (string ";") (Stdlib.List.map uncode xs) ^^ string "]"
@@ -147,10 +139,9 @@ let list_literal_of (f : 'a -> 'b code) (xs : 'a list) : 'b list code = list_lit
 let match_option (x : 'a option code) (none : unit -> 'b code) (a : string) (some : 'a code -> 'b code) : 'b code =
   let name_doc = string (gensym a) in
   code
-  $
-  string "match "
-  ^^ uncode x ^^ string " with | None -> " ^^ uncode (none ()) ^^ string " | Some " ^^ name_doc ^^ string " -> "
-  ^^ uncode (some (code name_doc))
+  $ string "match " ^^ uncode x ^^ string " with | None -> "
+    ^^ uncode (none ())
+    ^^ string " | Some " ^^ name_doc ^^ string " -> "
+    ^^ uncode (some (code name_doc))
 
-let src_E (i : int) : Reference.source code =
-  code $ parens (string "Source.E " ^^ string (Int.to_string i))
+let src_E (i : int) : Reference.source code = code $ parens (string "Source.E " ^^ string (Int.to_string i))
