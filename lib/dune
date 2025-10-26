@@ -6,8 +6,8 @@
   Lexer
   Tokens
   Parser
-  Pat
   Syntax
+  Pat
   Reference
   Tyck
   Resolve
@@ -25,7 +25,8 @@
   Ir
   Code
   Rbmap
-  Compile)
+  CompileSeq
+  CompileMemo)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq))
  (foreign_stubs
