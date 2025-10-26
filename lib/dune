@@ -23,6 +23,7 @@
   Common
   batFingerTree
   Ir
+  Code
   GenerateMemo)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq))
