@@ -1,7 +1,6 @@
 open PPrint
 
 type ir = Raw of document | Unit | Seqs of ir list | Function of string | Paren of ir | App of ir * ir list
-type 'a code = Code of ir
 
 let rec ir_to_doc ir =
   match ir with
@@ -32,11 +31,3 @@ let rec optimize_ir ir =
       optimize_ir (App (optimize_ir fn, List.map optimize_ir args1 @ List.map optimize_ir args2))
   | App (fn, args) -> App (optimize_ir fn, List.map optimize_ir args)
   | Paren ir -> Paren (optimize_ir ir)
-
-let code (doc : document) = Code (Raw doc)
-let to_ir (Code ir) = ir
-let from_ir ir = Code ir
-
-let uncode (Code ir) : document =
-  print_endline (show_ir ir);
-  ir_to_doc (optimize_ir ir)
