@@ -392,23 +392,31 @@ let ant_pp_adt_ffi e adt_name ctors =
              ^ " -> " ^ adt_name ^ "_" ^ con_name ^ " " ^ String.concat " " args)
            ctors))
   ^^ break 1
-  ^^ string
-       ("let to_ocaml_" ^ adt_name
-      ^ " x = let (h, t) = Option.get (Memo.list_match x) in match (Word.get_value h) with | "
-       ^ String.concat " | "
-           (List.map
-              (fun (con_name, types) ->
-                string_of_int (Hashtbl.find_exn e.ctag con_name)
-                ^ " -> "
-                ^
-                if List.length types = 0 then con_name
-                else
-                  "let ["
-                  ^ String.concat ";" (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-                  ^ "] = Memo.splits t in " ^ con_name ^ "("
-                  ^ String.concat "," (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-                  ^ ")")
-              ctors))
+  ^^ (
+      let head =
+        string
+          ("let to_ocaml_" ^ adt_name
+         ^ " x = let (h, t) = Option.get (Memo.list_match x) in match ")
+        ^^ uncode (word_get_value (code $ string "h"))
+        ^^ string " with | "
+      in
+      let cases =
+        String.concat " | "
+          (List.map
+             (fun (con_name, types) ->
+               string_of_int (Hashtbl.find_exn e.ctag con_name)
+               ^ " -> "
+               ^
+               if List.length types = 0 then con_name
+               else
+                 "let ["
+                 ^ String.concat ";" (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
+                 ^ "] = Memo.splits t in " ^ con_name ^ "("
+                 ^ String.concat "," (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
+                 ^ ")")
+             ctors)
+      in
+      head ^^ string cases)
 
 let ant_pp_adt (e : ctx) adt_name ctors =
   let generate_ocaml_adt = ant_pp_ocaml_adt adt_name ctors in
@@ -738,7 +746,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                               (seq
                                  (code
                                     (string "let [" ^^ x0_s ^^ string "] ="
-                                    ^^ uncode (memo_splits (snd x))
+                                    ^^ uncode (memo_splits (pair_value x))
                                     ^^ string " in "
                                     ^^ uncode (push_env w (code x0_s))))
                                  (fun _ ->
@@ -756,7 +764,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                               (seq
                                  (code
                                     (string "let [" ^^ x0_s ^^ string "; " ^^ x1_s ^^ string "] ="
-                                    ^^ uncode (memo_splits (snd x))
+                                    ^^ uncode (memo_splits (pair_value x))
                                     ^^ string " in "
                                     ^^ uncode (push_env w (code x0_s))))
                                  (fun _ ->
@@ -781,7 +789,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                                  (code
                                     (string "let [" ^^ x0_s ^^ string "; " ^^ x1_s ^^ string "; " ^^ x2_s
                                    ^^ string "] ="
-                                    ^^ uncode (memo_splits (snd x))
+                                    ^^ uncode (memo_splits (pair_value x))
                                     ^^ string " in "
                                     ^^ uncode (push_env w (code x0_s))))
                                  (fun _ ->
@@ -799,7 +807,12 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                         | _ -> failwith (show_pattern pat))
                       c
                   in
-                  code (string " (match Word.get_value " ^^ (uncode $ zro x) ^^ string " with " ^^ t ^^ string ")")))))
+                  code
+                    (string " (match "
+                    ^^ uncode (word_get_value (zro x))
+                    ^^ string " with "
+                    ^^ t
+                    ^^ string ")")))))
 
 let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
@@ -863,7 +876,9 @@ let generate_apply_cont ctx =
            (fun _ ->
              code
              $ string "match resolve " ^^ uncode w
-               ^^ string " K with | None -> () | Some (hd, tl) -> match Word.get_value hd with "
+               ^^ string " K with | None -> () | Some (hd, tl) -> match "
+               ^^ uncode (word_get_value (code $ string "hd"))
+               ^^ string " with "
                ^^ separate (break 1) (Dynarray.to_list (loop 0)))))
 
 let generate_apply_cont_ ctx =
@@ -874,7 +889,9 @@ let generate_apply_cont_ ctx =
            (fun _ ->
              code
              $ string "match resolve " ^^ uncode w
-               ^^ string " K with | None -> () | Some (hd, tl) -> match Word.get_value hd with "
+               ^^ string " K with | None -> () | Some (hd, tl) -> match "
+               ^^ uncode (word_get_value (code $ string "hd"))
+               ^^ string " with "
                ^^ separate_map (break 1)
                     (fun (name, action) ->
                       string ("| " ^ string_of_int (Hashtbl.find_exn ctx.ctag name) ^ " -> ")

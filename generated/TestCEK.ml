@@ -4,11 +4,11 @@ open Memo
 open Value
 let memo = Array.init 4(fun _ -> ref State.BlackHole)
 type ocaml_int_list = Nil | Cons of Value.seq * Value.seq
-let int_list_Nil : Value.seq = Memo.appends [Memo.from_constructor 1]
-let int_list_Cons x0 x1: Value.seq = Memo.appends [Memo.from_constructor 2;x0;x1]
+let int_list_Nil: Value.seq = Memo.appends [(Memo.from_constructor 1)]
+let int_list_Cons x0 x1: Value.seq = Memo.appends [(Memo.from_constructor 2);x0;x1]
 let from_ocaml_int_list x = match x with | Nil -> int_list_Nil  | Cons(x0, x1) -> int_list_Cons x0 x1
 let to_ocaml_int_list x = let (h, t) = Option.get (Memo.list_match x) in match (Word.get_value h) with | 1 -> Nil | 2 -> let [x0;x1] = Memo.splits t in Cons(x0,x1)
-let rec list_incr (x0 : Value.seq): Value.seq = exec_cek (pc_to_exp 1)(Dynarray.of_list[(x0)])(Memo.from_constructor 0) memo
+let rec list_incr (x0 : Value.seq): Value.seq = exec_cek (pc_to_exp 1)(Dynarray.of_list[(x0)])((Memo.from_constructor 0)) memo
 let () = add_exp (fun w_3 -> ((assert_env_length w_3 1);match resolve w_3 K with | None -> () | Some (hd, tl) -> match Word.get_value hd with | 0 -> (exec_done w_3)
 | 3 -> (((w_3.state).k <- (get_next_cont tl));(restore_env w_3 1 tl);(assert_env_length w_3 2);let x1_2 = (pop_env w_3) in let x0_2 = (pop_env w_3) in (push_env w_3 (Memo.appends [(Memo.from_constructor 2);x0_2;x1_2]));(assert_env_length w_3 1);(drop_n w_3 1 0);(assert_env_length w_3 1);(return_n w_3 1 (pc_to_exp 0))))) 0
 let () = add_exp (fun w_0 -> ((assert_env_length w_0 1);(push_env w_0 (Dynarray.get ((w_0.state).e) 0));((w_0.state).c <- (pc_to_exp 3));(stepped w_0))) 1
