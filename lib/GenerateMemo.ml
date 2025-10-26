@@ -365,17 +365,19 @@ let ant_pp_adt_constructors (e : ctx) adt_name ctors =
       Hashtbl.add_exn ~key:con_name ~data:(List.length types) e.arity;
       Hashtbl.add_exn ~key:con_name ~data:(Hashtbl.length e.ctag) e.ctag;
       Dynarray.add_last e.constructor_degree (1 - List.length types);
-      let register_constructor =
-        string
-          ("let " ^ adt_name ^ "_" ^ con_name ^ " "
-          ^ String.concat " " (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-          ^ ": Value.seq = Memo.appends ["
-          ^ String.concat ";"
-              (("Memo.from_constructor " ^ string_of_int (Hashtbl.find_exn e.ctag con_name))
-              :: List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-          ^ "]")
+      let param_names = List.mapi (fun i _ -> "x" ^ string_of_int i) types in
+      let param_docs = List.map string param_names in
+      let head =
+        string "let "
+        ^^ string (adt_name ^ "_" ^ con_name)
+        ^^ (if param_docs = [] then empty else space ^^ separate space param_docs)
+        ^^ string ": Value.seq = Memo.appends ["
       in
-      register_constructor)
+      let elements =
+        let ctor_tag = int (Hashtbl.find_exn e.ctag con_name) in
+        uncode (from_constructor ctor_tag) :: List.map string param_names
+      in
+      head ^^ separate (string ";") elements ^^ string "]")
     ctors
 
 (*todo: distinguish ffi inner type.*)
@@ -736,7 +738,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                               (seq
                                  (code
                                     (string "let [" ^^ x0_s ^^ string "] ="
-                                    ^^ uncode (memo_splits (fst x))
+                                    ^^ uncode (memo_splits (snd x))
                                     ^^ string " in "
                                     ^^ uncode (push_env w (code x0_s))))
                                  (fun _ ->
@@ -754,7 +756,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                               (seq
                                  (code
                                     (string "let [" ^^ x0_s ^^ string "; " ^^ x1_s ^^ string "] ="
-                                    ^^ uncode (memo_splits (fst x))
+                                    ^^ uncode (memo_splits (snd x))
                                     ^^ string " in "
                                     ^^ uncode (push_env w (code x0_s))))
                                  (fun _ ->
@@ -779,7 +781,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                                  (code
                                     (string "let [" ^^ x0_s ^^ string "; " ^^ x1_s ^^ string "; " ^^ x2_s
                                    ^^ string "] ="
-                                    ^^ uncode (memo_splits (fst x))
+                                    ^^ uncode (memo_splits (snd x))
                                     ^^ string " in "
                                     ^^ uncode (push_env w (code x0_s))))
                                  (fun _ ->
@@ -811,6 +813,7 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
       in
       let arg_num = s.env_length in
       let name = match x with Some (PVar x) -> x | _ -> failwith "bad match" in
+      let cont_done_tag = int (Hashtbl.find_exn ctx.ctag "cont_done") in
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
           ( lam "w" (fun w -> ant_pp_expr ctx s term { k = (fun s w -> return s w); fv = empty_fv () } w),
@@ -820,9 +823,8 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
             ^^ string ("(pc_to_exp " ^ string_of_int entry_code ^ ")")
             ^^ string "(Dynarray.of_list" ^^ string "["
             ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
-            ^^ string "]" ^^ string ")" ^^ string "(Memo.from_constructor "
-            ^^ string (string_of_int (Hashtbl.find_exn ctx.ctag "cont_done"))
-            ^^ string ")" ^^ string " memo" ))
+            ^^ string "]" ^^ string ")" ^^ string "(" ^^ uncode (from_constructor cont_done_tag) ^^ string ")"
+            ^^ string " memo" ))
   | Fun (_name, _args, _body) -> failwith "Not implemented (TODO)"
   | _ -> failwith (show_stmt s)
 
