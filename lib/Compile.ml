@@ -6,7 +6,7 @@ open State
 open Code
 
 (*
- * GenerateMemo builds the code generator that emits the specialised CEK VM.
+ * Compile builds the code generator that emits the specialised CEK VM.
  * There are three layers that cooperate:
  *   - Helpers in [Code] provide a small IR DSL.  Everything in this file
  *     should construct documents through those helpers instead of
@@ -15,7 +15,7 @@ open Code
  *     continuation registry) tracks meta information such as constructor
  *     tags, environment layouts, and the code fragments for each generated
  *     continuation.
- *   - The printers at the bottom (`ant_pp_*`, `generate_apply_cont`,
+ *   - The printers at the bottom (`compile_pp_*`, `generate_apply_cont`,
  *     `pp_cek_ant`) walk syntax/IR and produce OCaml source that encodes
  *     the CEK state machine, storing the resulting snippets in [codes] for
  *     later emission.
@@ -112,7 +112,7 @@ let add_code_k (k : pc -> (world -> unit) code * 'a) : 'a =
   set_code pc code;
   ret
 
-let ant_pp_ocaml_adt adt_name ctors =
+let compile_pp_ocaml_adt adt_name ctors =
   string
     ("type ocaml_" ^ adt_name ^ " = "
     ^ String.concat " | "
@@ -122,7 +122,7 @@ let ant_pp_ocaml_adt adt_name ctors =
              else con_name ^ " of " ^ String.concat " * " (List.map (fun _ -> "Value.seq") types))
            ctors))
 
-let ant_pp_adt_constructors (e : ctx) adt_name ctors =
+let compile_pp_adt_constructors (e : ctx) adt_name ctors =
   separate_map (break 1)
     (fun (con_name, types) ->
       Hashtbl.add_exn ~key:con_name ~data:(List.length types) e.arity;
@@ -140,7 +140,7 @@ let ant_pp_adt_constructors (e : ctx) adt_name ctors =
     ctors
 
 (*todo: distinguish ffi inner type.*)
-let ant_pp_adt_ffi e adt_name ctors =
+let compile_pp_adt_ffi e adt_name ctors =
   string
     ("let from_ocaml_" ^ adt_name ^ " x = match x with | "
     ^ String.concat " | "
@@ -175,10 +175,10 @@ let ant_pp_adt_ffi e adt_name ctors =
   in
   head ^^ string (cases ^ " | _ -> failwith \"unreachable\"")
 
-let ant_pp_adt (e : ctx) adt_name ctors =
-  let generate_ocaml_adt = ant_pp_ocaml_adt adt_name ctors in
-  let generate_adt_constructors = ant_pp_adt_constructors e adt_name ctors in
-  generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1 ^^ ant_pp_adt_ffi e adt_name ctors
+let compile_pp_adt (e : ctx) adt_name ctors =
+  let generate_ocaml_adt = compile_pp_ocaml_adt adt_name ctors in
+  let generate_adt_constructors = compile_pp_adt_constructors e adt_name ctors in
+  generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1 ^^ compile_pp_adt_ffi e adt_name ctors
 
 let apply_cont : pc = add_code None
 
@@ -308,7 +308,7 @@ let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) 
   let make_code w = f { s with progressed = false } w in
   if s.progressed then goto w (add_code $ Some (lam "w" make_code)) else make_code w
 
-let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -> unit code =
+let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -> unit code =
   match c with
   | Var name ->
       let loc = Option.get (RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) name) in
@@ -320,9 +320,9 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
             (fun _ -> k.k (push_s s) w);
           ]
   | Match (value, cases) ->
-      ant_pp_expr ctx s value
+      compile_pp_expr ctx s value
         {
-          k = (fun s -> reading s $ fun s w -> ant_pp_cases ctx (dup_s s) cases k w);
+          k = (fun s -> reading s $ fun s w -> compile_pp_cases ctx (dup_s s) cases k w);
           fv = fv_cases cases (dup_fv k.fv);
         }
   | Ctor cname ->
@@ -334,7 +334,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
             (fun _ -> k.k (push_s s) w);
           ]
   | App (Ctor cname, [ x0 ]) ->
-      ant_pp_expr ctx s x0
+      compile_pp_expr ctx s x0
         {
           k =
             (fun s w ->
@@ -349,11 +349,11 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
           fv = k.fv;
         }
   | App (Ctor cname, [ x0; x1 ]) ->
-      ant_pp_expr ctx s x0
+      compile_pp_expr ctx s x0
         {
           k =
             (fun s w ->
-              ant_pp_expr ctx s x1
+              compile_pp_expr ctx s x1
                 {
                   k =
                     (fun s w ->
@@ -386,7 +386,7 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
               (fun _ -> k.k (push_s keep_s) w);
             ]);
       let xs_length = List.length xs in
-      ant_pp_exprs ctx s xs
+      compile_pp_exprs ctx s xs
         {
           k =
             (fun s w ->
@@ -405,11 +405,11 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
           fv = k.fv;
         }
   | Op ("+", x0, x1) ->
-      ant_pp_expr ctx s x0
+      compile_pp_expr ctx s x0
         {
           k =
             (fun s w ->
-              ant_pp_expr ctx s x1
+              compile_pp_expr ctx s x1
                 {
                   k =
                     (fun s ->
@@ -452,25 +452,26 @@ let rec ant_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -
             (fun _ -> k.k (push_s s) w);
           ]
   | Let (BOne (PVar l, v), r) ->
-      ant_pp_expr ctx s v
+      compile_pp_expr ctx s v
         {
           k =
             (fun s w ->
-              ant_pp_expr ctx
+              compile_pp_expr ctx
                 (extend_s (pop_s s) l)
                 r
                 { k = (fun s w -> drop s [ l ] w k); fv = add_fv l (dup_fv k.fv) }
                 w);
           fv = fv_pat (PVar l) (fv_expr r (dup_fv k.fv));
         }
-  | _ -> failwith ("ant_pp_expr: " ^ show_expr c)
+  | _ -> failwith ("compile_pp_expr: " ^ show_expr c)
 
-and ant_pp_exprs (ctx : ctx) (s : scope) (cs : expr list) (k : kont) : world code -> unit code =
+and compile_pp_exprs (ctx : ctx) (s : scope) (cs : expr list) (k : kont) : world code -> unit code =
   match cs with
   | [] -> fun w -> k.k s w
-  | c :: cs -> ant_pp_expr ctx s c { k = (fun s w -> ant_pp_exprs ctx s cs k w); fv = fv_exprs cs (dup_fv k.fv) }
+  | c :: cs ->
+      compile_pp_expr ctx s c { k = (fun s w -> compile_pp_exprs ctx s cs k w); fv = fv_exprs cs (dup_fv k.fv) }
 
-and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : world code -> unit code =
+and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : world code -> unit code =
  fun w ->
   seq
     (assert_env_length w (int s.env_length))
@@ -497,7 +498,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                             string "| "
                             ^^ uncode (int (Hashtbl.find_exn ctx.ctag cname))
                             ^^ string " -> "
-                            ^^ (uncode $ ant_pp_expr ctx s expr k w)
+                            ^^ (uncode $ compile_pp_expr ctx s expr k w)
                         | PApp (cname, Some (PVar x0)) ->
                             string "| "
                             ^^ uncode (int (Hashtbl.find_exn ctx.ctag cname))
@@ -512,7 +513,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                                     ^^ string " in "
                                     ^^ uncode (push_env w (code x0_s))))
                                  (fun _ ->
-                                   ant_pp_expr ctx (extend_s s x0) expr
+                                   compile_pp_expr ctx (extend_s s x0) expr
                                      { k = (fun s w -> drop s [ x0 ] w k); fv = k.fv }
                                      w))
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
@@ -533,7 +534,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                                    seq
                                      (push_env w (code x1_s))
                                      (fun _ ->
-                                       ant_pp_expr ctx
+                                       compile_pp_expr ctx
                                          (extend_s (extend_s s x0) x1)
                                          expr
                                          { k = (fun s w -> drop s [ x1; x0 ] w k); fv = k.fv }
@@ -560,7 +561,7 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                                        (fun _ -> push_env w (code x1_s));
                                        (fun _ -> push_env w (code x2_s));
                                        (fun _ ->
-                                         ant_pp_expr ctx
+                                         compile_pp_expr ctx
                                            (extend_s (extend_s (extend_s s x0) x1) x2)
                                            expr
                                            { k = (fun s w -> drop s [ x2; x1; x0 ] w k); fv = k.fv }
@@ -575,9 +576,9 @@ and ant_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : w
                     ^^ uncode (word_get_value (zro x))
                     ^^ string " with " ^^ t ^^ break 1 ^^ default_case ^^ string ")")))))
 
-let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
+let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
-  | Type (TBOne (name, Enum { params = _; ctors })) -> ant_pp_adt ctx name ctors
+  | Type (TBOne (name, Enum { params = _; ctors })) -> compile_pp_adt ctx name ctors
   | Type (TBRec _) -> failwith "Not implemented (TODO)"
   | Term (x, Lam (ps, term)) ->
       let s =
@@ -590,7 +591,7 @@ let ant_pp_stmt (ctx : ctx) (s : stmt) : document =
       let cont_done_tag = int (Hashtbl.find_exn ctx.ctag "cont_done") in
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
-          ( lam "w" (fun w -> ant_pp_expr ctx s term { k = (fun s w -> return s w); fv = empty_fv () } w),
+          ( lam "w" (fun w -> compile_pp_expr ctx s term { k = (fun s w -> return s w); fv = empty_fv () } w),
             string "let rec" ^^ space ^^ string name ^^ space
             ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
             ^^ string ": Value.seq " ^^ string "=" ^^ space ^^ group @@ string "exec_cek "
@@ -659,7 +660,7 @@ let generate_apply_cont_ ctx =
 
 let pp_cek_ant x =
   let ctx = new_ctx () in
-  let generated_stmt = separate_map (break 1) (ant_pp_stmt ctx) x in
+  let generated_stmt = separate_map (break 1) (compile_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
   ^^ break 1 ^^ string "let memo = Array.init "
