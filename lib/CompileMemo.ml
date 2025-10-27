@@ -32,38 +32,22 @@ open Code
  *   instead storing the computed temporary variables onto the env as a stack,
  *   only using K whenever we do a non-tail function call.
  *)
-(* The following is almost a reimplementation of Lean 4's RBMap *)
 
-module RBMap = Rbmap
+module OrdStr = struct
+  type t = string
 
-type ordering = RBMap.ordering
-type 'a ord = 'a RBMap.ord
-
-module RBTree = struct
-  type 'a t = ('a, unit) RBMap.t
-
-  let empty : 'a t = RBMap.empty
-  let singleton x : 'a t = RBMap.singleton x ()
-  let add ~ord (n : 'a t) (k : 'k) : 'a t * _ = RBMap.add ~ord n k ()
-  let add_exn ~ord (n : 'a t) (k : 'k) : 'a t = RBMap.add_exn ~ord n k ()
-  let set ~ord (n : 'a t) (k : 'k) : 'a t = RBMap.set ~ord n k ()
-  let erase ~ord x (n : 'a t) : 'a t = RBMap.erase ~ord x n
-  let all (p : 'a -> bool) (n : 'a t) = RBMap.all (fun k _ -> p k) n
-  let any (p : 'a -> bool) (n : 'a t) = RBMap.any (fun k _ -> p k) n
-  let fold_left (f : 's -> 'a -> 's) (init : 's) (n : 'a t) : 's = RBMap.fold_left (fun s k v -> f s k) init n
-  let fold_right (f : 's -> 'a -> 's) (init : 's) (n : 'a t) : 's = RBMap.fold_right (fun s k v -> f s k) init n
-  let depth (f : int -> int -> int) (n : 'a t) = RBMap.depth f n
-  let size (n : 'a t) = RBMap.size n
-  let union (a : 'a t) (b : 'a t) : 'a t = RBMap.append_trees a b
-  let contains ~ord (t : 'a t) x : bool = Option.is_some (RBMap.find ~ord t x)
-  let to_list (n : 'a t) = Stdlib.List.map Stdlib.fst (RBMap.to_list n)
-  (* let of_list ~ord xs : 'a t = RBMap.of_list ~ord (List.map (fun x -> (x, ())) xs) *)
-
-  let iteri (n : 'a t) ~(f : 'a -> unit) : unit = ignore (RBMap.map (fun k _ -> f k) n)
+  let compare (x : string) (y : string) : int = if x < y then -1 else if x > y then 1 else 0
 end
 
-let ord_str : string ord = { cmp = (fun x y -> if x < y then RBMap.Lt else if x > y then RBMap.Gt else RBMap.Eq) }
-let ord_int : int ord = { cmp = (fun x y -> if x < y then RBMap.Lt else if x > y then RBMap.Gt else RBMap.Eq) }
+exception DupKey
+
+module MakeMap (Ord : Stdlib.Map.OrderedType) = struct
+  include Stdlib.Map.Make (Ord)
+
+  let add_exn x data t = if exists (fun y _ -> y == x) t then raise DupKey else add x data t
+end
+
+module MapStr = MakeMap (OrdStr)
 
 type ctx = {
   arity : (string, int) Hashtbl.t;
@@ -182,33 +166,33 @@ let compile_adt (e : ctx) adt_name ctors =
 
 let apply_cont : pc = add_code None
 
-type env = (string, int) RBMap.t
+type env = int MapStr.t
 
-let new_env () : env = RBMap.empty
+let new_env () : env = MapStr.empty
 
 type scope = {
-  meta_env : (string, int option) RBMap.t linear;
+  meta_env : int option MapStr.t linear;
   (*Note: env_length is not the amount of entries in meta_env above! It is the length of the environment when executing the cek machine.*)
   env_length : int;
   progressed : bool;
 }
 
-let new_scope () = { meta_env = make_linear RBMap.empty; env_length = 0; progressed = false }
+let new_scope () = { meta_env = make_linear MapStr.empty; env_length = 0; progressed = false }
 let push_s s = { s with env_length = s.env_length + 1; progressed = true }
 
 let extend_s s name =
   let meta_env = write_linear s.meta_env in
 
   (* Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length); *)
-  let meta_env = RBMap.add_exn ~ord:ord_str meta_env name (Some s.env_length) in
+  let meta_env = MapStr.add_exn name (Some s.env_length) meta_env in
 
   { s with meta_env = make_linear meta_env; env_length = s.env_length + 1 }
 
 let drop_s s name =
-  assert (Option.is_some (RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) name));
+  assert (Option.is_some (MapStr.find name (read_linear s.meta_env)));
   let meta_env = write_linear s.meta_env in
   (* Hashtbl.remove meta_env name; *)
-  let meta_env = RBMap.erase ~ord:ord_str name meta_env in
+  let meta_env = MapStr.remove name meta_env in
   { s with meta_env = make_linear meta_env; env_length = s.env_length - 1 }
 
 let pop_n s n =
@@ -220,18 +204,16 @@ let pop_s s = pop_n s 1
 (*todo: we actually need to dup a bunch. lets switch to a functional data structure. *)
 let dup_s s = { s with meta_env = make_linear (read_linear s.meta_env); env_length = s.env_length }
 
-type kont = { k : scope -> world code -> unit code; fv : string RBTree.t linear }
+type kont = { k : scope -> world code -> unit code; fv : unit MapStr.t linear }
 
-let dup_fv (fv : string RBTree.t linear) : string RBTree.t linear = make_linear (read_linear fv)
-let empty_fv () : string RBTree.t linear = make_linear RBTree.empty
+let dup_fv (fv : unit MapStr.t linear) : unit MapStr.t linear = make_linear (read_linear fv)
+let empty_fv () : unit MapStr.t linear = make_linear MapStr.empty
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
   let new_s, n =
     List.fold_left
       (fun (s, n) var ->
-        match RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) var with
-        | None -> (s, n)
-        | Some _ -> (drop_s s var, n + 1))
+        match MapStr.find var (read_linear s.meta_env) with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
       (s, 0) vars
   in
   seqs
@@ -244,17 +226,17 @@ let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit cod
 let return (s : scope) (w : world code) : unit code =
   seq (assert_env_length w (int s.env_length)) (fun _ -> return_n w (int s.env_length) (pc_to_exp (int apply_cont)))
 
-let add_fv (v : string) (fv : string RBTree.t linear) : string RBTree.t linear =
+let add_fv (v : string) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   let fv = write_linear fv in
-  let fv, _ = RBTree.add ~ord:ord_str fv v in
+  let fv = MapStr.add v () fv in
   make_linear fv
 
-let remove_fv (v : string) (fv : string RBTree.t linear) : string RBTree.t linear =
+let remove_fv (v : string) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   let fv = write_linear fv in
-  let fv = RBTree.erase ~ord:ord_str v fv in
+  let fv = MapStr.remove v fv in
   make_linear fv
 
-let rec fv_expr (e : expr) (fv : string RBTree.t linear) : string RBTree.t linear =
+let rec fv_expr (e : expr) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   match e with
   | Ctor _ | Int _ | GVar _ -> fv
   | App (f, xs) -> fv_exprs xs (fv_expr f fv)
@@ -265,10 +247,10 @@ let rec fv_expr (e : expr) (fv : string RBTree.t linear) : string RBTree.t linea
   | Let (BOne (l, v), r) -> fv_expr v (fv_pat l (fv_expr r fv))
   | _ -> failwith ("fv_expr: " ^ show_expr e)
 
-and fv_exprs (es : expr list) (fv : string RBTree.t linear) : string RBTree.t linear =
+and fv_exprs (es : expr list) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   List.fold_left (fun fv e -> fv_expr e fv) fv es
 
-and fv_pat (pat : pattern) (fv : string RBTree.t linear) : string RBTree.t linear =
+and fv_pat (pat : pattern) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   match pat with
   | PApp (_, None) -> fv
   | PApp (_, Some x) -> fv_pat x fv
@@ -276,18 +258,21 @@ and fv_pat (pat : pattern) (fv : string RBTree.t linear) : string RBTree.t linea
   | PVar name -> remove_fv name fv
   | _ -> failwith (show_pattern pat)
 
-and fv_cases (MatchPattern c : cases) (fv : string RBTree.t linear) : string RBTree.t linear =
+and fv_cases (MatchPattern c : cases) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   List.fold_left (fun fv (pat, e) -> fv_pat pat (fv_expr e fv)) fv c
 
 type keep_t = { mutable keep : bool; mutable source : string option }
 
-let keep_only (s : scope) (fv : string RBTree.t linear) : int Dynarray.t * scope =
+let keep_only (s : scope) (fv : unit MapStr.t linear) : int Dynarray.t * scope =
   let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
-  RBMap.iteri (read_linear s.meta_env) ~f:(fun key data ->
-      match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key });
-  RBTree.iteri (read_linear fv) ~f:(fun v ->
-      let i = Option.get (RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) v) in
-      (Dynarray.get keep i).keep <- true);
+  MapStr.iter
+    (fun key data -> match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key })
+    (read_linear s.meta_env);
+  MapStr.iter
+    (fun v _ ->
+      let i = Option.get (MapStr.find v (read_linear s.meta_env)) in
+      (Dynarray.get keep i).keep <- true)
+    (read_linear fv);
   let keep_idx : int Dynarray.t = Dynarray.create () in
   let _, meta_env =
     Dynarray.fold_left
@@ -296,12 +281,12 @@ let keep_only (s : scope) (fv : string RBTree.t linear) : int Dynarray.t * scope
           Dynarray.add_last keep_idx i;
           match k.source with
           | None -> (i + 1, acc)
-          | Some v -> (i + 1, RBMap.add_exn ~ord:ord_str acc v (Some (Dynarray.length keep_idx))))
+          | Some v -> (i + 1, MapStr.add_exn v (Some (Dynarray.length keep_idx)) acc))
         else (i + 1, acc))
-      (0, RBMap.empty) keep
+      (0, MapStr.empty) keep
   in
-  let others = RBMap.map (fun _ _ -> None) (read_linear s.meta_env) in
-  let meta_env = RBMap.append_trees meta_env others in
+  let others = MapStr.map (fun _ -> None) (read_linear s.meta_env) in
+  let meta_env = MapStr.union (fun _ x _ -> Some x) meta_env others in
   (keep_idx, { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
 
 let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) : unit code =
@@ -311,7 +296,7 @@ let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) 
 let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -> unit code =
   match c with
   | Var name ->
-      let loc = Option.get (RBMap.find_exn ~ord:ord_str (read_linear s.meta_env) name) in
+      let loc = Option.get (MapStr.find name (read_linear s.meta_env)) in
       fun w ->
         seqs
           [

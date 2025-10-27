@@ -24,7 +24,6 @@
   batFingerTree
   Ir
   Code
-  Rbmap
   CompileSeq
   CompileMemo)
  (preprocess
