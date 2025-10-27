@@ -33,6 +33,7 @@ run_project() {
   ensure_switch
   activate_switch
   export OCAMLRUNPARAM=b
+  dune exec ant -- examples/Test.ant generated/TestSeq.ml --print-ant
   dune exec ant -- examples/Test.ant generated/TestCEK.ml --cek
   dune fmt &> /dev/null || true
   dune exec GeneratedMain
