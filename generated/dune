@@ -1,6 +1,6 @@
-(executable
- (public_name GeneratedMain)
- (name GeneratedMain)
+(executables
+ (names GeneratedMain RunLive RunTest)
+ (public_names GeneratedMain run_live run_test)
  (libraries ant)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))
