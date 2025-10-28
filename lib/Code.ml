@@ -47,8 +47,8 @@ let lam3_ (a : string) (b : string) (c : string) (f : 'a code -> 'b code -> 'c c
     ^^ uncode (f (code a_doc) (code b_doc) (code c_doc))
     ^^ string ")"
 
-let lam4_ (a : string) (b : string) (c : string) (d : string) (f : 'a code -> 'b code -> 'c code -> 'd code -> 'e code) :
-    ('a -> 'b -> 'c -> 'd -> 'e) code =
+let lam4_ (a : string) (b : string) (c : string) (d : string) (f : 'a code -> 'b code -> 'c code -> 'd code -> 'e code)
+    : ('a -> 'b -> 'c -> 'd -> 'e) code =
   let a_doc = string (gensym a) in
   let b_doc = string (gensym b) in
   let c_doc = string (gensym c) in
@@ -104,8 +104,10 @@ let set_k_ (w : world code) (k : kont code) : unit code =
 let from_constructor_ (ctag : int code) : Value.seq code = app_ (code $ string "Memo.from_constructor") ctag
 let to_unit_ (x : 'a code) : unit code = app_ (code $ string "ignore") x
 let pop_env_ (w : world code) : Value.value code = app_ (code $ string "pop_env") w
+
 let goto_ (w : world code) (pc_value : pc) : unit code =
   seq_ (set_c_ w (pc_to_exp_ (pc_ pc_value))) (fun _ -> stepped_ w)
+
 let push_env_ (w : world code) (v : Value.seq code) : unit code = app2_ (code $ string "push_env") w v
 let get_env_ (w : world code) (i : int code) : Value.seq code = dyn_array_get_ (state_env_ @@ world_state_ w) i
 let exec_done_ (w : world code) : unit code = app_ (code $ string "exec_done") w
