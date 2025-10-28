@@ -31,6 +31,14 @@ let new_env () : env = { arity = Hashtbl.create (module Core.String); ctag = Has
 let compile_seq_ty ty =
   match ty with TNamed "int" -> string "int" | TNamed _ -> string "Seq.seq" | _ -> failwith (show_ty ty)
 
+let with_registered_constructor (e : env) con_name types k =
+  let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
+  let arity = List.length params in
+  Hashtbl.add_exn ~key:con_name ~data:arity e.arity;
+  let constructor_index = Hashtbl.length e.ctag in
+  Hashtbl.add_exn ~key:con_name ~data:constructor_index e.ctag;
+  k ~params ~arity ~constructor_index
+
 let compile_ocaml_adt adt_name ctors =
   let ctor_doc (con_name, types) =
     let head = string con_name in
@@ -49,33 +57,30 @@ let compile_ocaml_adt adt_name ctors =
 let compile_adt_constructors (e : env) adt_name ctors =
   separate_map (break 1)
     (fun (con_name, types) ->
-      let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
-      Hashtbl.add_exn ~key:con_name ~data:(List.length params) e.arity;
-      let constructor_index = Hashtbl.length e.ctag in
-      let degree = 1 - List.length params in
-      let degree_code = paren_if_negative (int degree) degree in
-      let set_constructor_degree_doc =
-        string "let () = " ^^ doc_of_code (app2 seq_set_constructor_degree (int constructor_index) degree_code)
-      in
-      Hashtbl.add_exn ~key:con_name ~data:constructor_index e.ctag;
-      let param_docs = List.map (fun (_, name) -> string name) params in
-      let params_doc = if param_docs = [] then empty else space ^^ separate space param_docs in
-      let value_codes =
-        List.map
-          (fun (ty, name) ->
-            let name_code = var name in
-            match ty with
-            | TNamed "int" -> app seq_from_int name_code
-            | TNamed _ -> name_code
-            | _ -> failwith (show_ty ty))
-          params
-      in
-      let body = seq_appends (app seq_from_constructor (int constructor_index) :: value_codes) in
-      let register_constructor_doc =
-        string "let " ^^ string adt_name ^^ string "_" ^^ string con_name ^^ params_doc ^^ space
-        ^^ string ": Seq.seq = " ^^ doc_of_code body
-      in
-      group set_constructor_degree_doc ^^ break 1 ^^ group register_constructor_doc)
+      with_registered_constructor e con_name types (fun ~params ~arity ~constructor_index ->
+          let degree = 1 - arity in
+          let degree_code = paren_if_negative (int degree) degree in
+          let set_constructor_degree_doc =
+            string "let () = " ^^ doc_of_code (app2 seq_set_constructor_degree (int constructor_index) degree_code)
+          in
+          let param_docs = List.map (fun (_, name) -> string name) params in
+          let params_doc = if param_docs = [] then empty else space ^^ separate space param_docs in
+          let value_codes =
+            List.map
+              (fun (ty, name) ->
+                let name_code = var name in
+                match ty with
+                | TNamed "int" -> app seq_from_int name_code
+                | TNamed _ -> name_code
+                | _ -> failwith (show_ty ty))
+              params
+          in
+          let body = seq_appends (app seq_from_constructor (int constructor_index) :: value_codes) in
+          let register_constructor_doc =
+            string "let " ^^ string adt_name ^^ string "_" ^^ string con_name ^^ params_doc ^^ space
+            ^^ string ": Seq.seq = " ^^ doc_of_code body
+          in
+          group set_constructor_degree_doc ^^ break 1 ^^ group register_constructor_doc))
     ctors
 
 let compile_adt_ffi e adt_name ctors =

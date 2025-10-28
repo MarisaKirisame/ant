@@ -36,9 +36,9 @@ let () =
               w_3.state.k <- get_next_cont tl;
               restore_env w_3 1 tl;
               assert_env_length w_3 2;
-              let x1_2 = pop_env w_3 in
-              let x0_2 = pop_env w_3 in
-              push_env w_3 (Memo.appends [ Memo.from_constructor 2; x0_2; x1_2 ]);
+              let x1_1 = pop_env w_3 in
+              let x0_1 = pop_env w_3 in
+              push_env w_3 (Memo.appends [ Memo.from_constructor 2; x0_1; x1_1 ]);
               assert_env_length w_3 1;
               drop_n w_3 1 0;
               assert_env_length w_3 1;
@@ -61,13 +61,13 @@ let () =
       assert_env_length w_2 5;
       match resolve w_2 (Source.E 3) with
       | None -> ()
-      | Some x0_1 -> (
+      | Some x0_0 -> (
           match resolve w_2 (Source.E 4) with
           | None -> ()
-          | Some x1_1 ->
+          | Some x1_0 ->
               ignore (pop_env w_2);
               ignore (pop_env w_2);
-              push_env w_2 (Memo.from_int (Word.to_int (fst x0_1) + Word.to_int (fst x1_1)));
+              push_env w_2 (Memo.from_int (Word.to_int (fst x0_0) + Word.to_int (fst x1_0)));
               assert_env_length w_2 4;
               push_env w_2 (Dynarray.get w_2.state.e 2);
               assert_env_length w_2 5;
@@ -93,9 +93,11 @@ let () =
               assert_env_length w_1 2;
               return_n w_1 2 (pc_to_exp 0)
           | 2 ->
-              let [ x0_0; x1_0 ] = Memo.splits (snd x_0) in
-              push_env w_1 x0_0;
-              push_env w_1 x1_0;
+              let splits_0 = Memo.splits (snd x_0) in
+              let split0_0 = List.nth splits_0 0 in
+              let split1_0 = List.nth splits_0 1 in
+              push_env w_1 split0_0;
+              push_env w_1 split1_0;
               assert_env_length w_1 3;
               push_env w_1 (Dynarray.get w_1.state.e 1);
               assert_env_length w_1 4;

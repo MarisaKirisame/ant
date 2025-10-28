@@ -8,7 +8,7 @@ Instead of caching whole function calls, Ant records reusable fragments of the c
 - **Finger-tree values.**  Environments and continuations are stored as finger trees annotated with monoid hashes and degree measures.  This lets Ant split/compare prefixes without rescanning the full structure (see `internal.md` for details).
 - **Prefix memoisation.**  When the current state matches a memoised fragment `F[XS] -> G[XS]`, Ant substitutes the live bindings and jumps directly to `G`, avoiding redundant work on the shared prefix.
 
-For a deeper design write-up, start with `internal.md`.
+For deeper dives, see the internal architecture guide (`internal.md`) and the motivation overview in `docs/motivation.md`.
 
 ## Architecture at a Glance
 - **Front-end.**  `Lexer.mll`, `Parser.mly`, and `Syntax.ml` define the surface language, with `Resolve.ml` promoting known functions to globals before type checking.
