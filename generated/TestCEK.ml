@@ -42,7 +42,7 @@ let () =
               assert_env_length w_3 1;
               drop_n w_3 1 0;
               assert_env_length w_3 1;
-              return_n w_3 1 (pc_to_exp 0)
+              return_n w_3 1 (pc_to_exp (int_to_pc 0))
           | _ -> failwith "unreachable"))
     0
 
@@ -51,7 +51,7 @@ let () =
     (fun w_0 ->
       assert_env_length w_0 1;
       push_env w_0 (Dynarray.get w_0.state.e 0);
-      w_0.state.c <- pc_to_exp 3;
+      w_0.state.c <- pc_to_exp (int_to_pc 3);
       stepped w_0)
     1
 
@@ -73,7 +73,7 @@ let () =
               assert_env_length w_2 5;
               let keep_0 = env_call w_2 [ 3 ] 1 in
               w_2.state.k <- Memo.appends [ Memo.from_constructor 3; keep_0; w_2.state.k ];
-              w_2.state.c <- pc_to_exp 1;
+              w_2.state.c <- pc_to_exp (int_to_pc 1);
               stepped w_2))
     2
 
@@ -91,7 +91,7 @@ let () =
               assert_env_length w_1 1;
               push_env w_1 (Memo.from_constructor 1);
               assert_env_length w_1 2;
-              return_n w_1 2 (pc_to_exp 0)
+              return_n w_1 2 (pc_to_exp (int_to_pc 0))
           | 2 ->
               let splits_0 = Memo.splits (snd x_0) in
               let split0_0 = List.nth splits_0 0 in
@@ -102,7 +102,7 @@ let () =
               push_env w_1 (Dynarray.get w_1.state.e 1);
               assert_env_length w_1 4;
               push_env w_1 (Memo.from_int 1);
-              w_1.state.c <- pc_to_exp 2;
+              w_1.state.c <- pc_to_exp (int_to_pc 2);
               stepped w_1
           | _ -> failwith "unreachable"))
     3

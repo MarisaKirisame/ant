@@ -81,19 +81,12 @@ let new_ctx () : ctx =
 
 let codes : (world -> unit) code option Dynarray.t = Dynarray.create ()
 
-type pc = Pc of int
-
-let pc_to_int (Pc pc) = pc
-
-let int_to_pc pc = Pc pc
-
 let add_code (c : (world -> unit) code option) : pc =
   let pc = Dynarray.length codes in
   Dynarray.add_last codes c;
   int_to_pc pc
 
-let set_code (pc : pc) (c : (world -> unit) code) : unit =
-  Dynarray.set codes (pc_to_int pc) (Some c)
+let set_code (pc : pc) (c : (world -> unit) code) : unit = Dynarray.set codes (pc_to_int pc) (Some c)
 
 let add_code_k (k : pc -> (world -> unit) code * 'a) : 'a =
   let pc = add_code None in
@@ -245,8 +238,7 @@ let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit cod
     ]
 
 let return (s : scope) (w : world code) : unit code =
-  seq (assert_env_length w (int s.env_length))
-    (fun _ -> return_n w (int s.env_length) (pc_to_exp (int (pc_to_int apply_cont))))
+  seq (assert_env_length w (int s.env_length)) (fun _ -> return_n w (int s.env_length) (pc_to_exp (pc apply_cont)))
 
 let add_fv (v : string) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   let fv = write_linear fv in
@@ -407,7 +399,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                         set_k w
                           (memo_appends
                              [ from_constructor (int (Hashtbl.find_exn ctx.ctag cont_name)); keep; world_kont w ])));
-                  (fun _ -> goto w (pc_to_int (Hashtbl.find_exn ctx.func_pc f)));
+                  (fun _ -> goto w (Hashtbl.find_exn ctx.func_pc f));
                 ]);
           fv = k.fv;
         }
