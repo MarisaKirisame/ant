@@ -17,3 +17,8 @@ let write_linear x =
   let v = Option.get x.value in
   x.value <- None;
   v
+
+type pc = Pc of int
+
+let pc_to_int (Pc pc) = pc
+let int_to_pc pc = Pc pc

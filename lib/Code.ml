@@ -72,7 +72,10 @@ let app5 (f : ('a -> 'b -> 'c -> 'd -> 'e -> 'f) code) (a : 'a code) (b : 'b cod
 let assert_env_length (w : world code) (e : int code) : unit code = app2 (code $ string "assert_env_length") w e
 let return_n (w : world code) (n : int code) (exp : exp code) : unit code = app3 (code $ string "return_n") w n exp
 let drop_n (w : world code) (e : int code) (n : int code) : unit code = app3 (code $ string "drop_n") w e n
-let pc_to_exp (pc : int code) : exp code = app (from_ir (Function "pc_to_exp")) pc
+let pc_to_int_ (pc : int code) : int code = app (code $ string "pc_to_int") pc
+let int_to_pc_ (int : int code) : pc code = app (code $ string "int_to_pc") int
+let pc_to_exp (pc : pc code) : exp code = app (from_ir (Function "pc_to_exp")) pc
+let pc (Pc i : pc) : pc code = int_to_pc_ (int i)
 let seq (x : unit code) (y : unit -> 'a code) : 'a code = from_ir (Seqs [ to_ir x; to_ir (y ()) ])
 let seqs (xs : (unit -> unit code) list) : unit code = Stdlib.List.fold_left seq unit xs
 
@@ -101,7 +104,7 @@ let set_k (w : world code) (k : kont code) : unit code =
 let from_constructor (ctag : int code) : Value.seq code = app (code $ string "Memo.from_constructor") ctag
 let to_unit (x : 'a code) : unit code = app (code $ string "ignore") x
 let pop_env (w : world code) : Value.value code = app (code $ string "pop_env") w
-let goto (w : world code) pc : unit code = seq (set_c w (pc_to_exp (int pc))) (fun _ -> stepped w)
+let goto (w : world code) (pc_ : pc) : unit code = seq (set_c w (pc_to_exp (pc pc_))) (fun _ -> stepped w)
 let push_env (w : world code) (v : Value.seq code) : unit code = app2 (code $ string "push_env") w v
 let get_env (w : world code) (i : int code) : Value.seq code = dyn_array_get (state_env @@ world_state w) i
 let exec_done (w : world code) : unit code = app (code $ string "exec_done") w
