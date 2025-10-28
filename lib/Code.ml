@@ -135,6 +135,7 @@ let list_literal (xs : 'a code list) : 'a list code =
   code $ string "[" ^^ separate (string ";") (Stdlib.List.map uncode xs) ^^ string "]"
 
 let list_literal_of (f : 'a -> 'b code) (xs : 'a list) : 'b list code = list_literal (Stdlib.List.map f xs)
+let list_nth (xs : 'a list code) (i : int code) : 'a code = app2 (code $ string "List.nth") xs i
 
 let match_option (x : 'a option code) (none : unit -> 'b code) (a : string) (some : 'a code -> 'b code) : 'b code =
   let name_doc = string (gensym a) in

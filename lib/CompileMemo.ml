@@ -111,21 +111,37 @@ let compile_ocaml_adt adt_name ctors =
              else con_name ^ " of " ^ String.concat " * " (List.map (fun _ -> "Value.seq") types))
            ctors))
 
+let with_registered_constructor (ctx : ctx) con_name types k =
+  let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
+  let arity = List.length params in
+  Hashtbl.add_exn ~key:con_name ~data:arity ctx.arity;
+  let constructor_index = Hashtbl.length ctx.ctag in
+  Hashtbl.add_exn ~key:con_name ~data:constructor_index ctx.ctag;
+  Dynarray.add_last ctx.constructor_degree (1 - arity);
+  k ~params ~arity ~constructor_index
+
+let with_splits count splits k =
+  let_in "splits" splits (fun parts ->
+      let rec gather idx acc =
+        if idx = count then k (List.rev acc)
+        else
+          let_in ("split" ^ string_of_int idx) (list_nth parts (int idx)) (fun value -> gather (idx + 1) (value :: acc))
+      in
+      gather 0 [])
+
 let compile_adt_constructors (e : ctx) adt_name ctors =
   separate_map (break 1)
     (fun (con_name, types) ->
-      Hashtbl.add_exn ~key:con_name ~data:(List.length types) e.arity;
-      Hashtbl.add_exn ~key:con_name ~data:(Hashtbl.length e.ctag) e.ctag;
-      Dynarray.add_last e.constructor_degree (1 - List.length types);
-      let param_names = List.mapi (fun i _ -> "x" ^ string_of_int i) types in
-      let param_docs = List.map string param_names in
-      let param_codes : Value.seq code list = List.map (fun name -> code (string name)) param_names in
-      let ctor_tag = int (Hashtbl.find_exn e.ctag con_name) in
-      let body = memo_appends (from_constructor ctor_tag :: param_codes) in
-      string "let "
-      ^^ string (adt_name ^ "_" ^ con_name)
-      ^^ (if param_docs = [] then empty else space ^^ separate space param_docs)
-      ^^ string ": Value.seq = " ^^ uncode body)
+      with_registered_constructor e con_name types (fun ~params ~arity:_ ~constructor_index ->
+          let param_names = List.map snd params in
+          let param_docs = List.map string param_names in
+          let param_codes : Value.seq code list = List.map (fun name -> code (string name)) param_names in
+          let ctor_tag = int constructor_index in
+          let body = memo_appends (from_constructor ctor_tag :: param_codes) in
+          string "let "
+          ^^ string (adt_name ^ "_" ^ con_name)
+          ^^ (if param_docs = [] then empty else space ^^ separate space param_docs)
+          ^^ string ": Value.seq = " ^^ uncode body))
     ctors
 
 (*todo: distinguish ffi inner type.*)
@@ -494,70 +510,59 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                             string "| "
                             ^^ uncode (int (Hashtbl.find_exn ctx.ctag cname))
                             ^^ string " -> "
-                            ^^
-                            let x0_s = gensym "x0" |> string in
-                            uncode
-                              (seq
-                                 (code
-                                    (string "let [" ^^ x0_s ^^ string "] ="
-                                    ^^ uncode (memo_splits (pair_value x))
-                                    ^^ string " in "
-                                    ^^ uncode (push_env w (code x0_s))))
-                                 (fun _ ->
-                                   compile_pp_expr ctx (extend_s s x0) expr
-                                     { k = (fun s w -> drop s [ x0 ] w k); fv = k.fv }
-                                     w))
+                            ^^ uncode
+                                 (with_splits 1
+                                    (memo_splits (pair_value x))
+                                    (function
+                                      | [ x0_v ] ->
+                                          seq (push_env w x0_v) (fun _ ->
+                                              compile_pp_expr ctx (extend_s s x0) expr
+                                                { k = (fun s w -> drop s [ x0 ] w k); fv = k.fv }
+                                                w)
+                                      | _ -> failwith "with_splits: unexpected arity"))
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
                             string "| "
                             ^^ uncode (int (Hashtbl.find_exn ctx.ctag cname))
                             ^^ string " -> "
-                            ^^
-                            let x0_s = gensym "x0" |> string in
-                            let x1_s = gensym "x1" |> string in
-                            uncode
-                              (seq
-                                 (code
-                                    (string "let [" ^^ x0_s ^^ string "; " ^^ x1_s ^^ string "] ="
-                                    ^^ uncode (memo_splits (pair_value x))
-                                    ^^ string " in "
-                                    ^^ uncode (push_env w (code x0_s))))
-                                 (fun _ ->
-                                   seq
-                                     (push_env w (code x1_s))
-                                     (fun _ ->
-                                       compile_pp_expr ctx
-                                         (extend_s (extend_s s x0) x1)
-                                         expr
-                                         { k = (fun s w -> drop s [ x1; x0 ] w k); fv = k.fv }
-                                         w)))
+                            ^^ uncode
+                                 (with_splits 2
+                                    (memo_splits (pair_value x))
+                                    (function
+                                      | [ x0_v; x1_v ] ->
+                                          seqs
+                                            [
+                                              (fun _ -> push_env w x0_v);
+                                              (fun _ -> push_env w x1_v);
+                                              (fun _ ->
+                                                compile_pp_expr ctx
+                                                  (extend_s (extend_s s x0) x1)
+                                                  expr
+                                                  { k = (fun s w -> drop s [ x1; x0 ] w k); fv = k.fv }
+                                                  w);
+                                            ]
+                                      | _ -> failwith "with_splits: unexpected arity"))
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1; PVar x2 ])) ->
                             string "| "
                             ^^ uncode (int (Hashtbl.find_exn ctx.ctag cname))
                             ^^ string " -> "
-                            ^^
-                            let x0_s = gensym "x0" |> string in
-                            let x1_s = gensym "x1" |> string in
-                            let x2_s = gensym "x2" |> string in
-                            uncode
-                              (seq
-                                 (code
-                                    (string "let [" ^^ x0_s ^^ string "; " ^^ x1_s ^^ string "; " ^^ x2_s
-                                   ^^ string "] ="
-                                    ^^ uncode (memo_splits (pair_value x))
-                                    ^^ string " in "
-                                    ^^ uncode (push_env w (code x0_s))))
-                                 (fun _ ->
-                                   seqs
-                                     [
-                                       (fun _ -> push_env w (code x1_s));
-                                       (fun _ -> push_env w (code x2_s));
-                                       (fun _ ->
-                                         compile_pp_expr ctx
-                                           (extend_s (extend_s (extend_s s x0) x1) x2)
-                                           expr
-                                           { k = (fun s w -> drop s [ x2; x1; x0 ] w k); fv = k.fv }
-                                           w);
-                                     ]))
+                            ^^ uncode
+                                 (with_splits 3
+                                    (memo_splits (pair_value x))
+                                    (function
+                                      | [ x0_v; x1_v; x2_v ] ->
+                                          seqs
+                                            [
+                                              (fun _ -> push_env w x0_v);
+                                              (fun _ -> push_env w x1_v);
+                                              (fun _ -> push_env w x2_v);
+                                              (fun _ ->
+                                                compile_pp_expr ctx
+                                                  (extend_s (extend_s (extend_s s x0) x1) x2)
+                                                  expr
+                                                  { k = (fun s w -> drop s [ x2; x1; x0 ] w k); fv = k.fv }
+                                                  w);
+                                            ]
+                                      | _ -> failwith "with_splits: unexpected arity"))
                         | _ -> failwith (show_pattern pat))
                       c
                   in
