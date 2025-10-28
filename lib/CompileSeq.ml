@@ -20,7 +20,7 @@ let option_get = option_fn "get"
 let list_literal_of_codes (xs : 'a code list) : 'a list code =
   code (string "[" ^^ separate (string "; ") (List.map doc_of_code xs) ^^ string "]")
 
-let seq_appends xs = app seq_appends_fn (list_literal_of_codes xs)
+let seq_appends xs = app_ seq_appends_fn (list_literal_of_codes xs)
 let var name : 'a code = code (string name)
 let paren_if_negative (i : int code) value = if value < 0 then from_ir (Ir.Paren (Code.to_ir i)) else i
 
@@ -59,9 +59,9 @@ let compile_adt_constructors (e : env) adt_name ctors =
     (fun (con_name, types) ->
       with_registered_constructor e con_name types (fun ~params ~arity ~constructor_index ->
           let degree = 1 - arity in
-          let degree_code = paren_if_negative (int degree) degree in
+          let degree_code = paren_if_negative (int_ degree) degree in
           let set_constructor_degree_doc =
-            string "let () = " ^^ doc_of_code (app2 seq_set_constructor_degree (int constructor_index) degree_code)
+            string "let () = " ^^ doc_of_code (app2_ seq_set_constructor_degree (int_ constructor_index) degree_code)
           in
           let param_docs = List.map (fun (_, name) -> string name) params in
           let params_doc = if param_docs = [] then empty else space ^^ separate space param_docs in
@@ -70,12 +70,12 @@ let compile_adt_constructors (e : env) adt_name ctors =
               (fun (ty, name) ->
                 let name_code = var name in
                 match ty with
-                | TNamed "int" -> app seq_from_int name_code
+                | TNamed "int" -> app_ seq_from_int name_code
                 | TNamed _ -> name_code
                 | _ -> failwith (show_ty ty))
               params
           in
-          let body = seq_appends (app seq_from_constructor (int constructor_index) :: value_codes) in
+          let body = seq_appends (app_ seq_from_constructor (int_ constructor_index) :: value_codes) in
           let register_constructor_doc =
             string "let " ^^ string adt_name ^^ string "_" ^^ string con_name ^^ params_doc ^^ space
             ^^ string ": Seq.seq = " ^^ doc_of_code body
@@ -114,7 +114,7 @@ let compile_adt_ffi e adt_name ctors =
             string "let ["
             ^^ separate (string "; ") (List.map (fun (_, name) -> string name) params)
             ^^ string "] = "
-            ^^ doc_of_code (app seq_splits (var "t"))
+         ^^ doc_of_code (app_ seq_splits (var "t"))
             ^^ space ^^ string "in"
           in
           let converted_args =
@@ -122,7 +122,7 @@ let compile_adt_ffi e adt_name ctors =
               (List.map
                  (fun (ty, name) ->
                    match ty with
-                   | TNamed "int" -> doc_of_code (app seq_to_int (var name))
+                   | TNamed "int" -> doc_of_code (app_ seq_to_int (var name))
                    | TNamed _ -> string name
                    | _ -> failwith (show_ty ty))
                  params)
@@ -136,9 +136,9 @@ let compile_adt_ffi e adt_name ctors =
     group @@ string "let to_ocaml_" ^^ string adt_name ^^ space ^^ string "x ="
     ^^ nest 2
          (break 1 ^^ string "let (h, t) = "
-         ^^ doc_of_code (app option_get (app seq_list_match (var "x")))
+         ^^ doc_of_code (app_ option_get (app_ seq_list_match (var "x")))
          ^^ space ^^ string "in" ^^ break 1 ^^ string "match "
-         ^^ parens (doc_of_code (app word_get_value (var "h")))
+         ^^ parens (doc_of_code (app_ word_get_value (var "h")))
          ^^ space ^^ string "with"
          ^^ concat_map (fun case -> break 1 ^^ case) (List.map to_case ctors @ [ default_case ]))
   in
