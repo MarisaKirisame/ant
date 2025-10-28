@@ -114,7 +114,7 @@ let compile_adt_ffi e adt_name ctors =
             string "let ["
             ^^ separate (string "; ") (List.map (fun (_, name) -> string name) params)
             ^^ string "] = "
-         ^^ doc_of_code (app_ seq_splits (var "t"))
+            ^^ doc_of_code (app_ seq_splits (var "t"))
             ^^ space ^^ string "in"
           in
           let converted_args =

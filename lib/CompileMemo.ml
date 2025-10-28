@@ -118,8 +118,10 @@ let with_splits count splits k =
       let rec gather idx acc =
         if idx = count then k (List.rev acc)
         else
-          let_in_ ("split" ^ string_of_int idx) (list_nth_ parts (int_ idx)) (fun value ->
-              gather (idx + 1) (value :: acc))
+          let_in_
+            ("split" ^ string_of_int idx)
+            (list_nth_ parts (int_ idx))
+            (fun value -> gather (idx + 1) (value :: acc))
       in
       gather 0 [])
 
@@ -239,7 +241,9 @@ let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit cod
     ]
 
 let return (s : scope) (w : world code) : unit code =
-  seq_ (assert_env_length_ w (int_ s.env_length)) (fun _ -> return_n_ w (int_ s.env_length) (pc_to_exp_ (pc_ apply_cont)))
+  seq_
+    (assert_env_length_ w (int_ s.env_length))
+    (fun _ -> return_n_ w (int_ s.env_length) (pc_to_exp_ (pc_ apply_cont)))
 
 let add_fv (v : string) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   let fv = write_linear fv in
@@ -343,9 +347,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                   (fun _ -> assert_env_length_ w (int_ s.env_length));
                   (fun _ ->
                     let_in_ "x0" (pop_env_ w) (fun x0 ->
-                        push_env_ w
-                          (memo_appends_
-                             [ from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname)); x0 ])));
+                        push_env_ w (memo_appends_ [ from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname)); x0 ])));
                   (fun _ -> k.k (push_s (pop_s s)) w);
                 ]);
           fv = k.fv;
@@ -367,11 +369,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                                 let_in_ "x0" (pop_env_ w) (fun x0 ->
                                     push_env_ w
                                       (memo_appends_
-                                         [
-                                           from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname));
-                                           x0;
-                                           x1;
-                                         ]))));
+                                         [ from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname)); x0; x1 ]))));
                           (fun _ -> k.k (push_s (pop_s (pop_s s))) w);
                         ]);
                   fv = k.fv;
@@ -405,11 +403,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                       (fun keep ->
                         set_k_ w
                           (memo_appends_
-                             [
-                               from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cont_name));
-                               keep;
-                               world_kont_ w;
-                             ])));
+                             [ from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cont_name)); keep; world_kont_ w ])));
                   (fun _ -> goto_ w (Hashtbl.find_exn ctx.func_pc f));
                 ]);
           fv = k.fv;
@@ -445,9 +439,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                                         (fun _ ->
                                           push_env_ w
                                             (memo_from_int_
-                                               (add_
-                                                  (int_from_word_ (zro_ x0))
-                                                  (int_from_word_ (zro_ x1)))));
+                                               (add_ (int_from_word_ (zro_ x0)) (int_from_word_ (zro_ x1)))));
                                         (fun _ -> k.k (push_s (pop_s (pop_s s))) w);
                                       ])));
                         ]);
@@ -616,28 +608,28 @@ let generate_apply_cont ctx =
          let cont_codes = Dynarray.create () in
          let rec loop i =
            if i == Dynarray.length ctx.conts then cont_codes
-         else
-            let name, action = Dynarray.get ctx.conts i in
-            let code =
-              string "| "
-              ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag name))
-              ^^ string " -> "
-              ^^ uncode (action w (code $ string "tl"))
-            in
-            Dynarray.add_last cont_codes code;
-            loop (i + 1)
-        in
-        seq_
-          (assert_env_length_ w (int_ 1))
-          (fun _ ->
-            code
-            $ string "match resolve " ^^ uncode w
-              ^^ string " K with | None -> () | Some (hd, tl) -> match "
-              ^^ uncode (word_get_value_ (code $ string "hd"))
-              ^^ string " with "
-              ^^ separate (break 1) (Dynarray.to_list (loop 0))
-              ^^ break 1
-              ^^ string "| _ -> failwith \"unreachable\"")))
+           else
+             let name, action = Dynarray.get ctx.conts i in
+             let code =
+               string "| "
+               ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag name))
+               ^^ string " -> "
+               ^^ uncode (action w (code $ string "tl"))
+             in
+             Dynarray.add_last cont_codes code;
+             loop (i + 1)
+         in
+         seq_
+           (assert_env_length_ w (int_ 1))
+           (fun _ ->
+             code
+             $ string "match resolve " ^^ uncode w
+               ^^ string " K with | None -> () | Some (hd, tl) -> match "
+               ^^ uncode (word_get_value_ (code $ string "hd"))
+               ^^ string " with "
+               ^^ separate (break 1) (Dynarray.to_list (loop 0))
+               ^^ break 1
+               ^^ string "| _ -> failwith \"unreachable\"")))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
