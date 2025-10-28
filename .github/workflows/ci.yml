@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache opam switch
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.opam
+            ~/.cache/opam
+          key: ${{ runner.os }}-ocaml-5.2-${{ hashFiles('**/*.opam', 'opam.locked') }}
+          restore-keys: |
+            ${{ runner.os }}-ocaml-5.2-
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.2
+          opam-pin: false
+
+      - name: Cache dune build
+        uses: actions/cache@v4
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      - name: Install dependencies
+        run: opam install . --deps-only --with-test
+        env:
+          OPAMYES: "true"
+
+      - name: Run pipeline
+        run: opam exec -- make run
