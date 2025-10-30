@@ -1,9 +1,6 @@
 (* Dispatches to either RunLive.exe or RunTest.exe based on the CLI argument. *)
 
-let usage =
-  "Usage: GeneratedMain <live|test> [args...]\n\
-   - live: run RunLive executable\n\
-   - test: run RunTest executable"
+let usage = "Usage: GeneratedMain <live|test> [args...]\n- live: run RunLive executable\n- test: run RunTest executable"
 
 let candidate_paths target =
   let base_names =
@@ -19,8 +16,7 @@ let candidate_paths target =
   let dirs = [ exe_dir; cwd; default_dir; install_dir ] in
   List.concat_map (fun dir -> List.map (Filename.concat dir) base_names) dirs
 
-let find_executable target =
-  candidate_paths target |> List.find_opt Sys.file_exists
+let find_executable target = candidate_paths target |> List.find_opt Sys.file_exists
 
 let exec_child target extra_args =
   match find_executable target with
@@ -35,17 +31,13 @@ let () =
   match Array.to_list Sys.argv with
   | _ :: mode :: rest -> (
       let target =
-        match String.lowercase_ascii mode with
-        | "live" -> Some "RunLive"
-        | "test" -> Some "RunTest"
-        | _ -> None
+        match String.lowercase_ascii mode with "live" -> Some "RunLive" | "test" -> Some "RunTest" | _ -> None
       in
       match target with
       | Some target -> (
           try exec_child target rest
           with Unix.Unix_error (err, _, _) ->
-            prerr_endline
-              (Printf.sprintf "Failed to execute %s: %s" target (Unix.error_message err));
+            prerr_endline (Printf.sprintf "Failed to execute %s: %s" target (Unix.error_message err));
             exit 1)
       | None ->
           prerr_endline usage;
