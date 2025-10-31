@@ -10,6 +10,7 @@ type expr =
   | OEVar of int
   | OEAbs of expr
   | OEApp of expr * expr
+  | OELet of expr * expr
   | OETrue
   | OEFalse
   | OEIf of expr * expr * expr

@@ -12,7 +12,7 @@ let to_ir (Code ir) = ir
 let from_ir ir = Code ir
 
 let uncode (Code ir) : document =
-  print_endline (show_ir ir);
+  (*print_endline (show_ir ir);*)
   ir_to_doc (optimize_ir ir)
 
 let fresh_name : (string, int) Hashtbl.t = Hashtbl.create (module String)
