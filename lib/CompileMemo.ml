@@ -194,16 +194,35 @@ type scope = {
   progressed : bool;
 }
 
+let check_scope s =
+  let seen : bool Array.t = Array.init s.env_length (fun _ -> false) in
+  MapStr.iter
+    (fun key data ->
+      match data with
+      | None -> ()
+      | Some i ->
+          if not (i < s.env_length) then
+            failwith
+              ("check_scope: variable " ^ key ^ " mapped to invalid index " ^ string_of_int i ^ " with env_length "
+             ^ string_of_int s.env_length)
+          else if Array.get seen i then
+            failwith ("check_scope: variable " ^ key ^ " mapped to duplicate index " ^ string_of_int i)
+          else Array.set seen i true)
+    (read_linear s.meta_env)
+
 let new_scope () = { meta_env = make_linear MapStr.empty; env_length = 0; progressed = false }
 let push_s s = { s with env_length = s.env_length + 1; progressed = true }
 
 let extend_s s name =
+  check_scope s;
   let meta_env = write_linear s.meta_env in
 
   (* Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length); *)
   let meta_env = MapStr.add_exn name (Some s.env_length) meta_env in
 
-  { s with meta_env = make_linear meta_env; env_length = s.env_length + 1 }
+  let ret = { s with meta_env = make_linear meta_env; env_length = s.env_length + 1 } in
+  check_scope ret;
+  ret
 
 let drop_s s name =
   assert (Option.is_some (MapStr.find name (read_linear s.meta_env)));
@@ -213,8 +232,11 @@ let drop_s s name =
   { s with meta_env = make_linear meta_env; env_length = s.env_length - 1 }
 
 let pop_n s n =
+  check_scope s;
   assert (s.env_length >= n);
-  { s with meta_env = s.meta_env; env_length = s.env_length - n }
+  let ret = { s with meta_env = s.meta_env; env_length = s.env_length - n } in
+  check_scope ret;
+  ret
 
 let pop_s s = pop_n s 1
 
@@ -282,8 +304,8 @@ and fv_cases (MatchPattern c : cases) (fv : unit MapStr.t linear) : unit MapStr.
 
 type keep_t = { mutable keep : bool; mutable source : string option }
 
-
 let keep_only (s : scope) (fv : unit MapStr.t linear) : int Dynarray.t * scope =
+  check_scope s;
   let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
   MapStr.iter
     (fun key data -> match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key })
@@ -298,16 +320,21 @@ let keep_only (s : scope) (fv : unit MapStr.t linear) : int Dynarray.t * scope =
     Dynarray.fold_left
       (fun (i, acc) k ->
         if k.keep then (
+          let ret =
+            match k.source with
+            | None -> (i + 1, acc)
+            | Some v -> (i + 1, MapStr.add_exn v (Some (Dynarray.length keep_idx)) acc)
+          in
           Dynarray.add_last keep_idx i;
-          match k.source with
-          | None -> (i + 1, acc)
-          | Some v -> (i + 1, MapStr.add_exn v (Some (Dynarray.length keep_idx)) acc))
+          ret)
         else (i + 1, acc))
       (0, MapStr.empty) keep
   in
   let others = MapStr.map (fun _ -> None) (read_linear s.meta_env) in
   let meta_env = MapStr.union (fun _ x _ -> Some x) meta_env others in
-  (keep_idx, { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx })
+  let s = { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx } in
+  check_scope s;
+  (keep_idx, s)
 
 let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) : unit code =
   let make_code w = f { s with progressed = false } w in
@@ -316,7 +343,11 @@ let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) 
 let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -> unit code =
   match c with
   | Var name ->
-      let loc = Option.get (MapStr.find name (read_linear s.meta_env)) in
+      let loc =
+        match MapStr.find name (read_linear s.meta_env) with
+        | Some loc -> loc
+        | None -> failwith ("compile_pp_expr cannot find var: " ^ name)
+      in
       fun w ->
         seqs_
           [
@@ -379,17 +410,21 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
           fv = fv_expr x1 (dup_fv k.fv);
         }
   | App (GVar f, xs) ->
+      check_scope s;
       let cont_name = "cont_" ^ string_of_int ctx.conts_count in
       let keep, keep_s = keep_only s k.fv in
       (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
       let keep_length = keep_s.env_length in
       add_cont ctx cont_name (keep_length + 1) (fun w tl ->
-          seqs_
-            [
-              (fun _ -> set_k_ w (get_next_cont_ tl));
-              (fun _ -> restore_env_ w (int_ keep_length) tl);
-              (fun _ -> k.k (push_s keep_s) w);
-            ]);
+          let code =
+            seqs_
+              [
+                (fun _ -> set_k_ w (get_next_cont_ tl));
+                (fun _ -> restore_env_ w (int_ keep_length) tl);
+                (fun _ -> k.k (push_s keep_s) w);
+              ]
+          in
+          code);
       let xs_length = List.length xs in
       compile_pp_exprs ctx s xs
         {
@@ -458,10 +493,12 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
             (fun _ -> k.k (push_s s) w);
           ]
   | Let (BOne (PVar l, v), r) ->
+      check_scope s;
       compile_pp_expr ctx s v
         {
           k =
             (fun s w ->
+              check_scope s;
               compile_pp_expr ctx
                 (extend_s (pop_s s) l)
                 r
@@ -590,7 +627,7 @@ let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
             string "let rec" ^^ space ^^ string name ^^ space
             ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
             ^^ string ": Value.seq " ^^ string "=" ^^ space ^^ group @@ string "exec_cek "
-            ^^ string ("(pc_to_exp " ^ string_of_int (pc_to_int entry_code) ^ ")")
+            ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
             ^^ string "(Dynarray.of_list" ^^ string "["
             ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
             ^^ string "]" ^^ string ")" ^^ string "("
@@ -658,7 +695,7 @@ let pp_cek_ant x =
   let generated_stmt = separate_map (break 1) (compile_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
-  ^^ break 1 ^^ string "let memo = Array.init "
+  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ string "let memo = Array.init "
   ^^ uncode (int_ (Dynarray.length codes))
   ^^ string "(fun _ -> ref State.BlackHole)" ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)

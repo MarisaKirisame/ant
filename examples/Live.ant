@@ -8,13 +8,6 @@ type list 'a =
   | Cons of 'a * list 'a
 ;;
 
-let index = fun x n ->
-  match x with
-  | Cons (xh, xt) -> 
-    (match n with
-    | Z -> xh
-    | S m -> index xt m);;
-
 type expr =
   | EInt of int
   | EPlus of expr * expr
@@ -42,6 +35,13 @@ type value =
   | VFix of expr * list value
 ;;
 
+let index = fun x n ->
+  match x with
+  | Cons (xh, xt) -> 
+    (match n with
+    | Z -> xh
+    | S m -> index xt m);;
+
 let vadd = fun l r ->
   match l with
   | VInt li ->
@@ -63,7 +63,7 @@ let eval = fun expr env ->
     (match fv with 
     | VAbs (e, env_) -> eval e (Cons xv env_)
     | VFix (e, env_) -> eval e (Cons xv (Cons fv env_)))
-  (*| ETrue -> VTrue
+  | ETrue -> VTrue
   | EFalse -> VFalse
   | EIf (i, t, e) -> 
     (match eval i env with
@@ -74,5 +74,5 @@ let eval = fun expr env ->
   | EMatchList (v, n, c) ->
     (match eval v env with
     | VNil -> eval n env
-    | VCons (x, xs) -> eval c (Cons xs (Cons x env)))*)
+    | VCons (x, xs) -> eval c (Cons xs (Cons x env)))
 ;;

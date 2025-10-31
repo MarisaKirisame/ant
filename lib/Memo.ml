@@ -314,7 +314,7 @@ let add_exp (f : world -> unit) (pc_ : int) : unit =
   assert (pc == pc_);
   Dynarray.add_last pc_map { step = f; pc }
 
-let pc_to_exp (pc : int) : exp = Dynarray.get pc_map pc
+let pc_to_exp (Pc pc) : exp = Dynarray.get pc_map pc
 let from_constructor (ctag : int) : seq = Generic.singleton (Word (Word.make Word.constructor_tag ctag))
 let from_int (i : int) : seq = Generic.singleton (Word (Word.make Word.int_tag i))
 
