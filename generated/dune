@@ -1,7 +1,16 @@
-(executables
- (names GeneratedMain RunLive RunTest)
- (public_names GeneratedMain run_live run_test)
+(library
+ (name runmodes)
+ (modules LiveCEK RunLive RunTest)
  (libraries ant)
+ (wrapped false)
+ (preprocess
+  (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name GeneratedMain)
+ (public_name GeneratedMain)
+ (modules GeneratedMain)
+ (libraries runmodes)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))
 

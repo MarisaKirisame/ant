@@ -186,7 +186,7 @@ let state_from_tstate (s : state) (t : tstate) : state =
     match tv with Here v -> subst (fun (S i) -> Option.some $ unLower (Dynarray.get t.ts i)) v | Lower v -> v
   in
   let ret = { c = t.tc; e = Dynarray.map transform t.te; k = transform t.tk; sc = 0 } in
-  log ("state_from_tstate " ^ string_of_cek ret);
+  log "state_from_tstate ";
   ret
 
 let rec val_refs_aux (x : value) (rs : reference list) : reference list =
@@ -211,16 +211,13 @@ let rec climb_aux (state : state) (store : store) (tstate : tstate) (fetch_value
   (* This is the only place where tstate is used. Maybe just remove the idea of blackhole? *)
   | BlackHole -> climb_halfway (state_from_tstate state tstate) update
   | Need { current; next } -> (
-      log ("request: " ^ request_to_string next.request);
       match fetch_value state store tstate next.request with
       | None -> climb_halfway (copy_state current) update
       | Some fr -> (
           match Hashtbl.find next.lookup (fr_to_fh fr) with
           | None ->
-              log ("adding new log at depth: " ^ string_of_int depth);
               let bh = ref BlackHole in
               Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
-              log ("current: " ^ string_of_cek (copy_state current));
               let state =
                 subst_state (copy_state current) (fun s ->
                     if Source.( = ) s next.request.src then Option.some $ seq_of_fetch_result fr else None)
@@ -250,7 +247,7 @@ let improve update u =
   | Halfway (Shared l), Halfway (Shared r) -> assert (l.sc < r.sc));
   (match u with
   | BlackHole -> ()
-  | Need { current = Shared x; _ } | Done (Shared x) | Halfway (Shared x) -> log ("improving with: " ^ string_of_cek x));
+  | Need { current = Shared x; _ } | Done (Shared x) | Halfway (Shared x) -> log "improving with: ");
   update := u
 
 let update (state : state) (store : store) (memo : memo_t) (update : update) : state =
@@ -263,7 +260,7 @@ let update (state : state) (store : store) (memo : memo_t) (update : update) : s
         improve update (Done (Shared d));
         raise (DoneExec d))
       (fun y _ ->
-        log ("update of state:" ^ string_of_cek state);
+        log "update of state:";
         fast_forward_to state store y)
       memo
   in
@@ -280,7 +277,7 @@ let update (state : state) (store : store) (memo : memo_t) (update : update) : s
  *)
 let ant_step (x : state) (m : memo_t) : state =
   let y, store, update_ = locate x m in
-  log ("located a state: " ^ string_of_cek y);
+  log "located a state: ";
   let y = try update y store m update_ with DoneExec d -> raise (DoneExec (fast_forward_to x store d)) in
   fast_forward_to x store y
 
