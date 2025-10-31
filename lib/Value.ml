@@ -44,12 +44,19 @@ let measure (et : fg_et) : measure_t =
   match et with
   | Word w ->
       let degree =
-        match Word.get_tag w with
-        | 0 -> 1
-        | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
-        | _ -> failwith "unknown tag"
+        match w with
+        | Int _ -> 1
+        | ConstructorTag value -> Dynarray.get constructor_degree_table value
       in
-      { degree; max_degree = degree; full = Some { length = 1; hash = Hasher.from_int w } }
+      let (w_repr_tag, w_repr_value) = Word.raw_repr w in
+      {
+        degree;
+        max_degree = degree;
+        full = Some {
+          length = 1;
+          hash = Hasher.mul (Hasher.from_int w_repr_tag) (Hasher.from_int w_repr_value)
+        }
+      }
   | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
 
 (* Split at the values level, not the finger tree node level
@@ -110,7 +117,7 @@ let string_of_reference (r : reference) : string =
   ^ string_of_int r.values_count ^ ")"
 
 let string_of_fg_et (et : fg_et) : string =
-  match et with Word w -> "Word(" ^ string_of_int w ^ ")" | Reference r -> string_of_reference r
+  match et with Word w -> "Word(" ^ Word.to_string w ^ ")" | Reference r -> string_of_reference r
 
 let rec string_of_value (v : value) : string =
   if Generic.is_empty v then ""

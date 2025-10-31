@@ -73,19 +73,18 @@ let set_constructor_degree (ctag : int) (degree : int) : unit =
 
 let measure (w : Word.t) : measure =
   let degree =
-    match Word.get_tag w with
-    | 0 -> 1
-    | 1 -> Dynarray.get constructor_degree_table (Word.get_value w)
-    | _ -> failwith "unknown tag"
+    match w with
+    | Int _ -> 1
+    | ConstructorTag value -> Dynarray.get constructor_degree_table value
   in
   { length = 1; degree; max_degree = degree }
 
 type seq = (Word.t, measure) Generic.fg
 
-let from_constructor (ctag : int) : seq = Generic.singleton (Word.make Word.constructor_tag ctag)
-let from_int (i : int) : seq = Generic.singleton (Word.make Word.int_tag i)
+let from_constructor (ctag : int) : seq = Generic.singleton (Word.ConstructorTag ctag)
+let from_int (i : int) : seq = Generic.singleton (Word.Int i)
 
-let to_int (s : seq) : int =
+let to_word (s : seq) : Word.t =
   assert (Generic.size s = 1);
   Generic.head_exn s
 

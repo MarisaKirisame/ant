@@ -15,25 +15,22 @@ Tag = 1:
   The value is a constructor.
 *)
 module Word = struct
-  type t = int
-  type tag = (*unsigned*) int
-
-  let tag_width = 1
-
   type value = int
+  type t = Int of value | ConstructorTag of value
 
-  let max_tag = (1 lsl tag_width) - 1
-  let int_tag = 0
-  let constructor_tag = 1
-  let tag_bitmask_distance = Sys.int_size - 1 - tag_width
-  let tag_to_bitmask (t : tag) : t = t lsl tag_bitmask_distance
-  let bitmask_to_tag (t : tag) : t = t lsr tag_bitmask_distance
-  let make (t : tag) (v : value) : t = v lor tag_to_bitmask t
-  let get_bitmask (t : t) : tag = t land tag_to_bitmask max_tag
-  let get_tag (t : t) : tag = bitmask_to_tag (get_bitmask t)
-  let get_value (t : t) : value = t land lnot (tag_to_bitmask max_tag)
+  let get_value (t : t) : int =
+    match t with
+    | Int value -> value
+    | ConstructorTag value -> value
 
-  (*fast path to/from int*)
-  let from_int (t : t) : int = t
-  let to_int (i : int) : t = i
+  (* Returns a hashable representation of a Word.t. *)
+  let raw_repr (t : t) : int * int =
+    match t with
+    | Int value -> (0, value)
+    | ConstructorTag value -> (1, value)
+
+  let to_string (t : t) : string =
+    match t with
+    | Int value -> "Int(" ^ string_of_int value ^ ")"
+    | ConstructorTag value -> "ConstructorTag(" ^ string_of_int value ^ ")"
 end
