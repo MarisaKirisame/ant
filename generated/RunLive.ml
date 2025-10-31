@@ -20,21 +20,88 @@ type expr =
 
 type value = OVInt of int | OVNil | OVCons of value * value [@@deriving show]
 
-let rec pp_expr fmt expr =
-  match expr with
-  | OEInt i -> Format.pp_print_int fmt i
-  | OEPlus (lhs, rhs) -> Format.fprintf fmt "(%a + %a)" pp_expr lhs pp_expr rhs
-  | OEVar i -> Format.fprintf fmt "v%d" i
-  | OEAbs body -> Format.fprintf fmt "(fun . %a)" pp_expr body
-  | OEApp (fn, arg) -> Format.fprintf fmt "(%a %a)" pp_expr fn pp_expr arg
-  | OETrue -> Format.pp_print_string fmt "true"
-  | OEFalse -> Format.pp_print_string fmt "false"
-  | OEIf (cond, thn, els) -> Format.fprintf fmt "(if %a then %a else %a)" pp_expr cond pp_expr thn pp_expr els
-  | OENil -> Format.pp_print_string fmt "[]"
-  | OECons (hd, tl) -> Format.fprintf fmt "(%a :: %a)" pp_expr hd pp_expr tl
-  | OEMatchList (target, nil_case, cons_case) ->
-      Format.fprintf fmt "(match %a with [] -> %a | Cons -> %a)" pp_expr target pp_expr nil_case pp_expr cons_case
-  | OEFix body -> Format.fprintf fmt "(fix %a)" pp_expr body
+let pp_expr : Format.formatter -> expr -> unit =
+  let base_names =
+    [|
+      "a";
+      "b";
+      "c";
+      "d";
+      "e";
+      "f";
+      "g";
+      "h";
+      "i";
+      "j";
+      "k";
+      "l";
+      "m";
+      "n";
+      "o";
+      "p";
+      "q";
+      "r";
+      "s";
+      "t";
+      "u";
+      "v";
+      "w";
+      "x";
+      "y";
+      "z";
+    |]
+  in
+  let fresh_name =
+    let used = Hashtbl.create 16 in
+    let counter = ref 0 in
+    fun ?hint () ->
+      let base =
+        match hint with
+        | Some h -> h
+        | None ->
+            let n = !counter in
+            incr counter;
+            let candidate = base_names.(n mod Array.length base_names) in
+            let suffix = n / Array.length base_names in
+            if suffix = 0 then candidate else candidate ^ string_of_int suffix
+      in
+      let count = match Hashtbl.find_opt used base with Some c -> c | None -> 0 in
+      Hashtbl.replace used base (count + 1);
+      if count = 0 then base else base ^ string_of_int count
+  in
+  let rec lookup ctx idx =
+    match (ctx, idx) with
+    | name :: _, 0 -> name
+    | _ :: rest, n when n > 0 -> lookup rest (n - 1)
+    | _ -> Printf.sprintf "free%d" idx
+  in
+  let rec aux ctx fmt expr =
+    match expr with
+    | OEInt i -> Format.pp_print_int fmt i
+    | OEPlus (lhs, rhs) -> Format.fprintf fmt "(%a + %a)" (aux ctx) lhs (aux ctx) rhs
+    | OEVar idx -> Format.pp_print_string fmt (lookup ctx idx)
+    | OEAbs body ->
+        let name = fresh_name ~hint:"x" () in
+        Format.fprintf fmt "(fun %s -> %a)" name (aux (name :: ctx)) body
+    | OEApp (fn, arg) -> Format.fprintf fmt "(%a %a)" (aux ctx) fn (aux ctx) arg
+    | OETrue -> Format.pp_print_string fmt "true"
+    | OEFalse -> Format.pp_print_string fmt "false"
+    | OEIf (cond, thn, els) -> Format.fprintf fmt "(if %a then %a else %a)" (aux ctx) cond (aux ctx) thn (aux ctx) els
+    | OENil -> Format.pp_print_string fmt "[]"
+    | OECons (hd, tl) -> Format.fprintf fmt "(%a :: %a)" (aux ctx) hd (aux ctx) tl
+    | OEMatchList (target, nil_case, cons_case) ->
+        let head_name = fresh_name ~hint:"hd" () in
+        let tail_name = fresh_name ~hint:"tl" () in
+        Format.fprintf fmt "(match %a with [] -> %a | %s :: %s -> %a)" (aux ctx) target (aux ctx) nil_case head_name
+          tail_name
+          (aux (tail_name :: head_name :: ctx))
+          cons_case
+    | OEFix body ->
+        let func_name = fresh_name ~hint:"f" () in
+        let arg_name = fresh_name ~hint:"xs" () in
+        Format.fprintf fmt "(fix %s %s. %a)" func_name arg_name (aux (arg_name :: func_name :: ctx)) body
+  in
+  aux []
 
 let expr_to_string expr = Format.asprintf "%a" pp_expr expr
 
@@ -49,6 +116,7 @@ let rec expr_from_ocaml e =
   | OEInt i -> expr_EInt (Memo.from_int i)
   | OEPlus (x, y) -> expr_EPlus (expr_from_ocaml x) (expr_from_ocaml y)
   | OEVar i -> expr_EVar (int_from_ocaml (nat_from_int i))
+  | OELet (l, r) -> expr_ELet (expr_from_ocaml l) (expr_from_ocaml r)
   | OETrue -> expr_ETrue
   | OEFalse -> expr_EFalse
   | OENil -> expr_ENil
@@ -94,7 +162,19 @@ let run () : unit =
     let rec build n acc = if n == 0 then acc else build (n - 1) (OECons (OEInt 1, acc)) in
     build x OENil
   in
+  let nats x =
+    let rec build n = if n == x then OENil else OECons (OEInt n, build (n + 1)) in
+    build 0
+  in
   print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 40))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 45))));
-  ignore (eval_expression (OECons (OEInt 12, OEApp (mapinc, repeat_list 45))));
+  let rec loop n =
+    if n > 0 then (
+      ignore (eval_expression (OEApp (mapinc, nats 40)));
+      loop (n - 1))
+  in
+  loop 50;
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 40))));
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45))));
+  ignore (eval_expression (OELet (mapinc, OEApp (OEVar 0, nats 45))));
   ()
