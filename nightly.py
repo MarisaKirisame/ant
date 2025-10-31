@@ -119,6 +119,30 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         ],
         env=env,
     )
+    #opam_exec(
+    #    [
+    #        "dune",
+    #        "exec",
+    #        "ant",
+    #        "--",
+    #        "examples/Live.ant",
+    #        "generated/LiveSeq.ml",
+    #        "--print-ant",
+    #    ],
+    #    env=env,
+    #)
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Live.ant",
+            "generated/LiveCEK.ml",
+            "--cek",
+        ],
+        env=env,
+    )
 
 
 def run_project() -> None:

@@ -21,6 +21,7 @@ type expr =
   | EVar of nat
   | EAbs of expr
   | EApp of expr * expr
+  | ELet of expr * expr
   | ETrue
   | EFalse
   | EIf of expr * expr * expr
@@ -54,6 +55,7 @@ let eval = fun expr env ->
   | EPlus (x, y) -> vadd (eval x env) (eval y env)
   | EVar idx -> index env idx
   | EAbs e -> VAbs e env
+  | ELet (lhs, rhs) -> eval rhs (Cons (eval lhs env) env)
   | EFix e -> VFix e env
   | EApp (f, x) ->
     let fv = eval f env in
@@ -61,7 +63,7 @@ let eval = fun expr env ->
     (match fv with 
     | VAbs (e, env_) -> eval e (Cons xv env_)
     | VFix (e, env_) -> eval e (Cons xv (Cons fv env_)))
-  | ETrue -> VTrue
+  (*| ETrue -> VTrue
   | EFalse -> VFalse
   | EIf (i, t, e) -> 
     (match eval i env with
@@ -72,5 +74,5 @@ let eval = fun expr env ->
   | EMatchList (v, n, c) ->
     (match eval v env with
     | VNil -> eval n env
-    | VCons (x, xs) -> eval c (Cons xs (Cons x env)))
+    | VCons (x, xs) -> eval c (Cons xs (Cons x env)))*)
 ;;

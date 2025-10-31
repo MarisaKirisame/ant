@@ -274,6 +274,15 @@ and fv_cases (MatchPattern c : cases) (fv : unit MapStr.t) : unit MapStr.t =
 type keep_t = { mutable keep : bool; mutable source : string option }
 
 let keep_only (s : scope) (fv : unit MapStr.t) : int Dynarray.t * scope =
+  MapStr.iter
+    (fun v _ ->
+      if not (MapStr.mem v s.meta_env) then
+        failwith ("keep_only: free variable " ^ v ^ " not found in meta_env"))
+    fv;
+    MapStr.iter
+    (fun name data  -> match data with
+    | None -> ()
+    | Some i -> if i >= s.env_length then failwith ("keep_only: bad scope " ^ name)) s.meta_env;
   let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
   MapStr.iter
     (fun key data -> match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key })
