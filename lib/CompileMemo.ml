@@ -188,7 +188,7 @@ type env = int MapStr.t
 let new_env () : env = MapStr.empty
 
 type scope = {
-  meta_env : int option MapStr.t linear;
+  meta_env : int option MapStr.t;
   (*Note: env_length is not the amount of entries in meta_env above! It is the length of the environment when executing the cek machine.*)
   env_length : int;
   progressed : bool;
@@ -208,28 +208,28 @@ let check_scope s =
           else if Array.get seen i then
             failwith ("check_scope: variable " ^ key ^ " mapped to duplicate index " ^ string_of_int i)
           else Array.set seen i true)
-    (read_linear s.meta_env)
+    s.meta_env
 
-let new_scope () = { meta_env = make_linear MapStr.empty; env_length = 0; progressed = false }
+let new_scope () = { meta_env = MapStr.empty; env_length = 0; progressed = false }
 let push_s s = { s with env_length = s.env_length + 1; progressed = true }
 
 let extend_s s name =
   check_scope s;
-  let meta_env = write_linear s.meta_env in
+  let meta_env = s.meta_env in
 
   (* Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length); *)
   let meta_env = MapStr.add_exn name (Some s.env_length) meta_env in
 
-  let ret = { s with meta_env = make_linear meta_env; env_length = s.env_length + 1 } in
+  let ret = { s with meta_env; env_length = s.env_length + 1 } in
   check_scope ret;
   ret
 
 let drop_s s name =
-  assert (Option.is_some (MapStr.find name (read_linear s.meta_env)));
-  let meta_env = write_linear s.meta_env in
+  assert (Option.is_some (MapStr.find name s.meta_env));
+  let meta_env = s.meta_env in
   (* Hashtbl.remove meta_env name; *)
   let meta_env = MapStr.remove name meta_env in
-  { s with meta_env = make_linear meta_env; env_length = s.env_length - 1 }
+  { s with meta_env; env_length = s.env_length - 1 }
 
 let pop_n s n =
   check_scope s;
@@ -241,18 +241,17 @@ let pop_n s n =
 let pop_s s = pop_n s 1
 
 (*todo: we actually need to dup a bunch. lets switch to a functional data structure. *)
-let dup_s s = { s with meta_env = make_linear (read_linear s.meta_env); env_length = s.env_length }
+(* let dup_s s = { s with meta_env = s.meta_env; env_length = s.env_length } *)
 
-type kont = { k : scope -> world code -> unit code; fv : unit MapStr.t linear }
+type kont = { k : scope -> world code -> unit code; fv : unit MapStr.t }
 
-let dup_fv (fv : unit MapStr.t linear) : unit MapStr.t linear = make_linear (read_linear fv)
-let empty_fv () : unit MapStr.t linear = make_linear MapStr.empty
+let dup_fv (fv : unit MapStr.t) : unit MapStr.t = fv
+let empty_fv () : unit MapStr.t = MapStr.empty
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
   let new_s, n =
     List.fold_left
-      (fun (s, n) var ->
-        match MapStr.find var (read_linear s.meta_env) with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
+      (fun (s, n) var -> match MapStr.find var s.meta_env with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
       (s, 0) vars
   in
   seqs_
@@ -267,17 +266,10 @@ let return (s : scope) (w : world code) : unit code =
     (assert_env_length_ w (int_ s.env_length))
     (fun _ -> return_n_ w (int_ s.env_length) (pc_to_exp_ (pc_ apply_cont)))
 
-let add_fv (v : string) (fv : unit MapStr.t linear) : unit MapStr.t linear =
-  let fv = write_linear fv in
-  let fv = MapStr.add v () fv in
-  make_linear fv
+let add_fv (v : string) (fv : unit MapStr.t) : unit MapStr.t = MapStr.add v () fv
+let remove_fv (v : string) (fv : unit MapStr.t) : unit MapStr.t = MapStr.remove v fv
 
-let remove_fv (v : string) (fv : unit MapStr.t linear) : unit MapStr.t linear =
-  let fv = write_linear fv in
-  let fv = MapStr.remove v fv in
-  make_linear fv
-
-let rec fv_expr (e : expr) (fv : unit MapStr.t linear) : unit MapStr.t linear =
+let rec fv_expr (e : expr) (fv : unit MapStr.t) : unit MapStr.t =
   match e with
   | Ctor _ | Int _ | GVar _ -> fv
   | App (f, xs) -> fv_exprs xs (fv_expr f fv)
@@ -288,10 +280,9 @@ let rec fv_expr (e : expr) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   | Let (BOne (l, v), r) -> fv_expr v (fv_pat l (fv_expr r fv))
   | _ -> failwith ("fv_expr: " ^ show_expr e)
 
-and fv_exprs (es : expr list) (fv : unit MapStr.t linear) : unit MapStr.t linear =
-  List.fold_left (fun fv e -> fv_expr e fv) fv es
+and fv_exprs (es : expr list) (fv : unit MapStr.t) : unit MapStr.t = List.fold_left (fun fv e -> fv_expr e fv) fv es
 
-and fv_pat (pat : pattern) (fv : unit MapStr.t linear) : unit MapStr.t linear =
+and fv_pat (pat : pattern) (fv : unit MapStr.t) : unit MapStr.t =
   match pat with
   | PApp (_, None) | PAny -> fv
   | PApp (_, Some x) -> fv_pat x fv
@@ -299,26 +290,24 @@ and fv_pat (pat : pattern) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   | PVar name -> remove_fv name fv
   | _ -> failwith (show_pattern pat)
 
-and fv_cases (MatchPattern c : cases) (fv : unit MapStr.t linear) : unit MapStr.t linear =
+and fv_cases (MatchPattern c : cases) (fv : unit MapStr.t) : unit MapStr.t =
   List.fold_left (fun fv (pat, e) -> fv_pat pat (fv_expr e fv)) fv c
 
 type keep_t = { mutable keep : bool; mutable source : string option }
 
-let keep_only (s : scope) (fv : unit MapStr.t linear) : int Dynarray.t * scope =
+let keep_only (s : scope) (fv : unit MapStr.t) : int Dynarray.t * scope =
   check_scope s;
   let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
   MapStr.iter
     (fun key data -> match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key })
-    (read_linear s.meta_env);
+    s.meta_env;
   MapStr.iter
     (fun v _ ->
       let i =
-        match MapStr.find_opt v (read_linear s.meta_env) with
-        | Some (Some i) -> i
-        | _ -> failwith ("keep_only not found:" ^ v)
+        match MapStr.find_opt v s.meta_env with Some (Some i) -> i | _ -> failwith ("keep_only not found:" ^ v)
       in
       (Dynarray.get keep i).keep <- true)
-    (read_linear fv);
+    fv;
   let keep_idx : int Dynarray.t = Dynarray.create () in
   let _, meta_env =
     Dynarray.fold_left
@@ -334,9 +323,9 @@ let keep_only (s : scope) (fv : unit MapStr.t linear) : int Dynarray.t * scope =
         else (i + 1, acc))
       (0, MapStr.empty) keep
   in
-  let others = MapStr.map (fun _ -> None) (read_linear s.meta_env) in
+  let others = MapStr.map (fun _ -> None) s.meta_env in
   let meta_env = MapStr.union (fun _ x _ -> Some x) meta_env others in
-  let s = { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx } in
+  let s = { s with meta_env; env_length = Dynarray.length keep_idx } in
   check_scope s;
   (keep_idx, s)
 
@@ -348,7 +337,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
   match c with
   | Var name ->
       let loc =
-        match MapStr.find name (read_linear s.meta_env) with
+        match MapStr.find name s.meta_env with
         | Some loc -> loc
         | None -> failwith ("compile_pp_expr cannot find var: " ^ name)
       in
@@ -361,10 +350,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
           ]
   | Match (value, cases) ->
       compile_pp_expr ctx s value
-        {
-          k = (fun s -> reading s $ fun s w -> compile_pp_cases ctx (dup_s s) cases k w);
-          fv = fv_cases cases (dup_fv k.fv);
-        }
+        { k = (fun s -> reading s $ fun s w -> compile_pp_cases ctx s cases k w); fv = fv_cases cases (dup_fv k.fv) }
   | Ctor cname ->
       fun w ->
         seqs_
@@ -576,7 +562,6 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                   let t =
                     separate_map (break 1)
                       (fun (pat, expr) ->
-                        let s = dup_s s in
                         (*todo: special casing for now, as pat design need changes. *)
                         match pat with
                         | PApp (cname, None) ->
