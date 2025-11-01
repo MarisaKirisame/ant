@@ -293,7 +293,7 @@ and fv_exprs (es : expr list) (fv : unit MapStr.t linear) : unit MapStr.t linear
 
 and fv_pat (pat : pattern) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   match pat with
-  | PApp (_, None) -> fv
+  | PApp (_, None) | PAny -> fv
   | PApp (_, Some x) -> fv_pat x fv
   | PTup xs -> List.fold_left (fun fv x -> fv_pat x fv) fv xs
   | PVar name -> remove_fv name fv
@@ -312,7 +312,11 @@ let keep_only (s : scope) (fv : unit MapStr.t linear) : int Dynarray.t * scope =
     (read_linear s.meta_env);
   MapStr.iter
     (fun v _ ->
-      let i = Option.get (MapStr.find v (read_linear s.meta_env)) in
+      let i =
+        match MapStr.find_opt v (read_linear s.meta_env) with
+        | Some (Some i) -> i
+        | _ -> failwith ("keep_only not found:" ^ v)
+      in
       (Dynarray.get keep i).keep <- true)
     (read_linear fv);
   let keep_idx : int Dynarray.t = Dynarray.create () in
@@ -408,6 +412,44 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                 }
                 w);
           fv = fv_expr x1 (dup_fv k.fv);
+        }
+  | App (Ctor cname, [ x0; x1; x2 ]) ->
+      compile_pp_expr ctx s x0
+        {
+          k =
+            (fun s w ->
+              compile_pp_expr ctx s x1
+                {
+                  k =
+                    (fun s w ->
+                      compile_pp_expr ctx s x2
+                        {
+                          k =
+                            (fun s w ->
+                              seqs_
+                                [
+                                  (fun _ -> assert_env_length_ w (int_ s.env_length));
+                                  (fun _ ->
+                                    let_in_ "x2" (pop_env_ w) (fun x2 ->
+                                        let_in_ "x1" (pop_env_ w) (fun x1 ->
+                                            let_in_ "x0" (pop_env_ w) (fun x0 ->
+                                                push_env_ w
+                                                  (memo_appends_
+                                                     [
+                                                       from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname));
+                                                       x0;
+                                                       x1;
+                                                       x2;
+                                                     ])))));
+                                  (fun _ -> k.k (push_s (pop_s (pop_s (pop_s s)))) w);
+                                ]);
+                          fv = k.fv;
+                        }
+                        w);
+                  fv = fv_expr x1 (dup_fv k.fv);
+                }
+                w);
+          fv = fv_expr x2 (fv_expr x1 (dup_fv k.fv));
         }
   | App (GVar f, xs) ->
       check_scope s;
@@ -599,6 +641,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                                                   w);
                                             ]
                                       | _ -> failwith "with_splits: unexpected arity"))
+                        | PAny -> string "| _ ->" ^^ (uncode $ compile_pp_expr ctx s expr k w)
                         | _ -> failwith (show_pattern pat))
                       c
                   in
