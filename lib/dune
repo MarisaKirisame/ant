@@ -25,7 +25,8 @@
   Ir
   Code
   CompileSeq
-  CompileMemo)
+  CompileMemo
+  Compile)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq))
  (foreign_stubs
