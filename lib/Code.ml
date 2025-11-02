@@ -180,3 +180,5 @@ let match_int_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a code) : 'a 
   let alts = Stdlib.List.map (fun (c, body) -> (Raw (string (string_of_int c)), to_ir body)) fs in
   let alts = List.append alts [ (Raw (string "_"), to_ir dflt) ] in
   from_ir (Match (to_ir x, alts))
+
+let unreachable_ : 'a code = code $ string "failwith \"unreachable\""
