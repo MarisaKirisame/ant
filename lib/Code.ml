@@ -11,6 +11,7 @@ let code (doc : document) = Code (Raw doc)
 let to_ir (Code ir) = ir
 let from_ir ir = Code ir
 let raw (s : string) = code $ string s
+let paren : 'a code -> 'a code = fun c -> from_ir (Paren (to_ir c))
 
 let uncode (Code ir) : document =
   (*print_endline (show_ir ir);*)

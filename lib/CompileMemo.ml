@@ -618,7 +618,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                       c
                   in
                   let default_case = (raw "_", unreachable_) in
-                  match_int_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])))))
+                  paren $ match_int_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])))))
 
 let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
@@ -671,7 +671,8 @@ let generate_apply_cont ctx =
                (resolve_ w (code $ string "K"))
                (fun _ -> unit_)
                "hd" "tl"
-               (fun hd tl -> match_int_default_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) unreachable_))))
+               (fun hd tl ->
+                 paren $ match_int_default_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) unreachable_))))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
@@ -684,11 +685,12 @@ let generate_apply_cont_ ctx =
                (fun _ -> unit_)
                "hd" "tl"
                (fun hd tl ->
-                 match_int_default_ (word_get_value_ hd)
-                   (List.init (Dynarray.length ctx.conts) (fun i ->
-                        let name, action = Dynarray.get ctx.conts i in
-                        (Hashtbl.find_exn ctx.ctag name, action w tl)))
-                   unreachable_))))
+                 paren
+                 $ match_int_default_ (word_get_value_ hd)
+                     (List.init (Dynarray.length ctx.conts) (fun i ->
+                          let name, action = Dynarray.get ctx.conts i in
+                          (Hashtbl.find_exn ctx.ctag name, action w tl)))
+                     unreachable_))))
 
 let pp_cek_ant x =
   let ctx = new_ctx () in
