@@ -176,9 +176,12 @@ let match_resolve_destruct_ (x : (Word.t * Value.seq) option code) (none : unit 
              to_ir (some (code name_hd) (code name_tl)) );
          ] ))
 
-let match_int_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a code) : 'a code =
-  let alts = Stdlib.List.map (fun (c, body) -> (Raw (string (string_of_int c)), to_ir body)) fs in
-  let alts = List.append alts [ (Raw (string "_"), to_ir dflt) ] in
+let match_int_ (x : int code) (fs : (int code * 'a code) list) : 'a code =
+  let alts = Stdlib.List.map (fun (c, body) -> (to_ir c, to_ir body)) fs in
   from_ir (Match (to_ir x, alts))
+
+let match_int_default_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a code) : 'a code =
+  let alts = Stdlib.List.map (fun (c, body) -> (int_ c, body)) fs in
+  match_int_ x (alts @ [ (raw "_", dflt) ])
 
 let unreachable_ : 'a code = code $ string "failwith \"unreachable\""
