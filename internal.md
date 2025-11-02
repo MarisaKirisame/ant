@@ -84,6 +84,86 @@ The memo trie guarantees progress by transitioning nodes through
 `BlackHole -> Halfway -> Need/Done`.  Once a node reaches `Done` the enclosed CEK
 state can be reused without repeating the intermediate transitions.
 
+## Dependency Tracking (Current)
+
+This section summarises how Ant tracks dependencies inside the memoising CEK VM
+today.  It pulls together the responsibilities of `Memo.ml`, `Value.ml`,
+`Seq.ml`, and `State.ml`.
+
+### Goals
+
+- Prevent re-executing CEK steps when rerunning programs with identical inputs.
+- Record precisely which slices of the CEK state must be materialised to replay
+  a cached fragment.
+- Detect missing prerequisites early so we can resume stepping rather than
+  jumping to a stale state.
+
+Dependency tracking reuses the CEK state, source identifiers, and finger-tree
+values described in **Runtime Representation**.  The dependency-specific
+bookkeeping is that every `Reference` records `src`, `offset`, and
+`values_count`, making each memo entry explicit about the slice that must be
+materialised before reuse.
+
+Degree and hash measures flow through the same structures: a fully realised
+slice retains its length and CRC32C hash (`Value.measure.full`), while the
+presence of any `Reference` clears the hash and signals that dependency
+resolution still has work to do.
+
+### Memo Nodes and Dependency State
+
+- **Memo array (`State.memo_t`)** stores one `memo_node_t ref` per program
+  counter.
+- **Node variants (`State.memo_node_t`)**:
+  - `BlackHole`: untouched; no dependency information yet.
+  - `Halfway`: a partially evaluated state that advanced the program but still
+    requires more work.
+  - `Need`: records a `fetch_request` (source, offset, word count) plus a hash
+    table of observed fetch results so we can branch on their content.
+  - `Done`: a fully materialised state ready for fast-forwarding.
+- **Lookup tables (`State.lookup_t`)** map content hashes to child nodes,
+  forming a trie over the fetched prefixes.
+
+### Execution Flow
+
+1. **Locate (`Memo.locate`)** walks the memo nodes from the current state,
+   cloning values into a transient `tstate` that marks each slot as materialised
+   (`Here`) or deferred (`Lower`).
+2. **Resolve (`Memo.resolve_seq`)** encounters a `Reference` and records the
+   missing dependency via `register_memo_need_unfetched`, switching the node to
+   `Need`.
+3. **Fetch (`Memo.fetch_value`)** pulls the requested slice from the source.  Any
+   unused prefix/suffix becomes a new `Reference` stored in the memo store for
+   reuse.
+4. **Hash & branch** – we hash the fetched words (`Memo.fr_to_fh`) and index the
+   `lookup` table.  Absent hashes allocate new child nodes so divergent prefix
+   contents lead to distinct dependency paths.
+5. **Fast-forward (`Memo.fast_forward_to`)** substitutes all resolved
+   dependencies and jumps to the cached state once the node reaches `Done`.
+6. **Record progress (`Memo.improve`)** updates nodes to `Halfway` or `Done`,
+   asserting that step counts increase so reuse never regresses execution.
+
+### Invariants
+
+- **Depth discipline** – references only point to equal or shallower depths,
+  preventing cycles on unfetched data.
+- **Monotone fetch lengths** – `Memo.get_word_count` grows exponentially with
+  store depth, guaranteeing we eventually materialise entire structures.
+- **Hash coherence** – cached hashes exist only for fully materialised slices;
+  encountering a reference forces a refetch the first time we need its content.
+- **Step monotonicity** – `Memo.improve` refuses to downgrade `Need`/`Done`
+  nodes and ensures every reuse advances the CEK step counter.
+
+### Known Limitations
+
+- **Partial fetch churn** – repeated small fetches can occur when references keep
+  slicing the same value before exponential growth kicks in.
+- **Hash collisions** – CRC32C collisions fall back to normal stepping; frequent
+  collisions would erode dependency precision.
+- **Granularity** – dependencies are tracked at slice boundaries, not at the
+  level of individual continuation arguments.
+- **Store retention** – the store is append-only; we rely on future fetches to
+  reuse indices and do not currently garbage collect old slices.
+
 ## Code Generation Helpers (`Code.ml`, `Ir.ml`)
 
 - `Code.ml` offers a small EDSL for describing OCaml expressions with hole types
