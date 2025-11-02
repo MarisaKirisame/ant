@@ -560,81 +560,65 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                 (fun _ ->
                   let s = pop_s s in
                   let t =
-                    separate_map (break 1)
+                    Stdlib.List.map
                       (fun (pat, expr) ->
                         (*todo: special casing for now, as pat design need changes. *)
                         match pat with
-                        | PApp (cname, None) ->
-                            string "| "
-                            ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag cname))
-                            ^^ string " -> "
-                            ^^ (uncode $ compile_pp_expr ctx s expr k w)
+                        | PApp (cname, None) -> (int_ (Hashtbl.find_exn ctx.ctag cname), compile_pp_expr ctx s expr k w)
                         | PApp (cname, Some (PVar x0)) ->
-                            string "| "
-                            ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag cname))
-                            ^^ string " -> "
-                            ^^ uncode
-                                 (with_splits 1
-                                    (memo_splits_ (pair_value_ x))
-                                    (function
-                                      | [ x0_v ] ->
-                                          seq_ (push_env_ w x0_v) (fun _ ->
-                                              compile_pp_expr ctx (extend_s s x0) expr
-                                                { k = (fun s w -> drop s [ x0 ] w k); fv = k.fv }
-                                                w)
-                                      | _ -> failwith "with_splits: unexpected arity"))
+                            ( int_ (Hashtbl.find_exn ctx.ctag cname),
+                              with_splits 1
+                                (memo_splits_ (pair_value_ x))
+                                (function
+                                  | [ x0_v ] ->
+                                      seq_ (push_env_ w x0_v) (fun _ ->
+                                          compile_pp_expr ctx (extend_s s x0) expr
+                                            { k = (fun s w -> drop s [ x0 ] w k); fv = k.fv }
+                                            w)
+                                  | _ -> failwith "with_splits: unexpected arity") )
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
-                            string "| "
-                            ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag cname))
-                            ^^ string " -> "
-                            ^^ uncode
-                                 (with_splits 2
-                                    (memo_splits_ (pair_value_ x))
-                                    (function
-                                      | [ x0_v; x1_v ] ->
-                                          seqs_
-                                            [
-                                              (fun _ -> push_env_ w x0_v);
-                                              (fun _ -> push_env_ w x1_v);
-                                              (fun _ ->
-                                                compile_pp_expr ctx
-                                                  (extend_s (extend_s s x0) x1)
-                                                  expr
-                                                  { k = (fun s w -> drop s [ x1; x0 ] w k); fv = k.fv }
-                                                  w);
-                                            ]
-                                      | _ -> failwith "with_splits: unexpected arity"))
+                            ( int_ (Hashtbl.find_exn ctx.ctag cname),
+                              with_splits 2
+                                (memo_splits_ (pair_value_ x))
+                                (function
+                                  | [ x0_v; x1_v ] ->
+                                      seqs_
+                                        [
+                                          (fun _ -> push_env_ w x0_v);
+                                          (fun _ -> push_env_ w x1_v);
+                                          (fun _ ->
+                                            compile_pp_expr ctx
+                                              (extend_s (extend_s s x0) x1)
+                                              expr
+                                              { k = (fun s w -> drop s [ x1; x0 ] w k); fv = k.fv }
+                                              w);
+                                        ]
+                                  | _ -> failwith "with_splits: unexpected arity") )
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1; PVar x2 ])) ->
-                            string "| "
-                            ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag cname))
-                            ^^ string " -> "
-                            ^^ uncode
-                                 (with_splits 3
-                                    (memo_splits_ (pair_value_ x))
-                                    (function
-                                      | [ x0_v; x1_v; x2_v ] ->
-                                          seqs_
-                                            [
-                                              (fun _ -> push_env_ w x0_v);
-                                              (fun _ -> push_env_ w x1_v);
-                                              (fun _ -> push_env_ w x2_v);
-                                              (fun _ ->
-                                                compile_pp_expr ctx
-                                                  (extend_s (extend_s (extend_s s x0) x1) x2)
-                                                  expr
-                                                  { k = (fun s w -> drop s [ x2; x1; x0 ] w k); fv = k.fv }
-                                                  w);
-                                            ]
-                                      | _ -> failwith "with_splits: unexpected arity"))
-                        | PAny -> string "| _ ->" ^^ (uncode $ compile_pp_expr ctx s expr k w)
+                            ( int_ (Hashtbl.find_exn ctx.ctag cname),
+                              with_splits 3
+                                (memo_splits_ (pair_value_ x))
+                                (function
+                                  | [ x0_v; x1_v; x2_v ] ->
+                                      seqs_
+                                        [
+                                          (fun _ -> push_env_ w x0_v);
+                                          (fun _ -> push_env_ w x1_v);
+                                          (fun _ -> push_env_ w x2_v);
+                                          (fun _ ->
+                                            compile_pp_expr ctx
+                                              (extend_s (extend_s (extend_s s x0) x1) x2)
+                                              expr
+                                              { k = (fun s w -> drop s [ x2; x1; x0 ] w k); fv = k.fv }
+                                              w);
+                                        ]
+                                  | _ -> failwith "with_splits: unexpected arity") )
+                        | PAny -> (raw "_", compile_pp_expr ctx s expr k w)
                         | _ -> failwith (show_pattern pat))
                       c
                   in
-                  let default_case = string "| _ -> failwith \"unreachable\"" in
-                  code
-                    (string " (match "
-                    ^^ uncode (word_get_value_ (zro_ x))
-                    ^^ string " with " ^^ t ^^ break 1 ^^ default_case ^^ string ")")))))
+                  let default_case = (raw "_", unreachable_) in
+                  match_int_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])))))
 
 let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
@@ -687,7 +671,7 @@ let generate_apply_cont ctx =
                (resolve_ w (code $ string "K"))
                (fun _ -> unit_)
                "hd" "tl"
-               (fun hd tl -> match_int_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) unreachable_))))
+               (fun hd tl -> match_int_default_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) unreachable_))))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
@@ -700,7 +684,7 @@ let generate_apply_cont_ ctx =
                (fun _ -> unit_)
                "hd" "tl"
                (fun hd tl ->
-                 match_int_ (word_get_value_ hd)
+                 match_int_default_ (word_get_value_ hd)
                    (List.init (Dynarray.length ctx.conts) (fun i ->
                         let name, action = Dynarray.get ctx.conts i in
                         (Hashtbl.find_exn ctx.ctag name, action w tl)))
