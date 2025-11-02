@@ -737,3 +737,7 @@ let pp_cek_ant x =
             ^^ string " ("
             ^^ uncode (int_ (Dynarray.get ctx.constructor_degree i))
             ^^ string ")"))
+
+module Backend = struct
+  let compile = pp_cek_ant
+end
