@@ -274,12 +274,12 @@ let () =
       assert_env_length w_5 1;
       match resolve w_5 K with
       | None -> ()
-      | Some (hd, tl) -> (
-          match Word.get_value hd with
+      | Some (hd_0, tl_0) -> (
+          match Word.get_value hd_0 with
           | 0 -> exec_done w_5
           | 41 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 0 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 0 tl_0;
               assert_env_length w_5 1;
               drop_n w_5 1 0;
               assert_env_length w_5 1;
@@ -287,27 +287,27 @@ let () =
               assert_env_length w_5 1;
               return_n w_5 1 (pc_to_exp (int_to_pc 0))
           | 42 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 2 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 2 tl_0;
               assert_env_length w_5 3;
               push_env w_5 (Dynarray.get w_5.state.e 2);
               w_5.state.c <- pc_to_exp (int_to_pc 6);
               stepped w_5
           | 43 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 0 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 0 tl_0;
               w_5.state.c <- pc_to_exp (int_to_pc 7);
               stepped w_5
           | 44 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 0 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 0 tl_0;
               assert_env_length w_5 1;
               drop_n w_5 1 0;
               assert_env_length w_5 1;
               return_n w_5 1 (pc_to_exp (int_to_pc 0))
           | 45 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 2 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 2 tl_0;
               assert_env_length w_5 3;
               push_env w_5 (Dynarray.get w_5.state.e 0);
               assert_env_length w_5 4;
@@ -320,20 +320,20 @@ let () =
               w_5.state.c <- pc_to_exp (int_to_pc 4);
               stepped w_5
           | 46 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 2 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 2 tl_0;
               assert_env_length w_5 3;
               push_env w_5 (Dynarray.get w_5.state.e 2);
               w_5.state.c <- pc_to_exp (int_to_pc 8);
               stepped w_5
           | 47 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 4 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 4 tl_0;
               w_5.state.c <- pc_to_exp (int_to_pc 9);
               stepped w_5
           | 48 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 2 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 2 tl_0;
               assert_env_length w_5 3;
               push_env w_5 (Dynarray.get w_5.state.e 1);
               assert_env_length w_5 4;
@@ -344,20 +344,20 @@ let () =
               w_5.state.c <- pc_to_exp (int_to_pc 4);
               stepped w_5
           | 49 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 3 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 3 tl_0;
               w_5.state.c <- pc_to_exp (int_to_pc 10);
               stepped w_5
           | 50 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 2 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 2 tl_0;
               assert_env_length w_5 3;
               push_env w_5 (Dynarray.get w_5.state.e 2);
               w_5.state.c <- pc_to_exp (int_to_pc 12);
               stepped w_5
           | 51 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 1 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 1 tl_0;
               assert_env_length w_5 2;
               drop_n w_5 2 0;
               assert_env_length w_5 2;
@@ -367,8 +367,8 @@ let () =
               assert_env_length w_5 1;
               return_n w_5 1 (pc_to_exp (int_to_pc 0))
           | 52 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 3 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 3 tl_0;
               assert_env_length w_5 4;
               push_env w_5 (Dynarray.get w_5.state.e 1);
               assert_env_length w_5 5;
@@ -381,8 +381,8 @@ let () =
               w_5.state.c <- pc_to_exp (int_to_pc 4);
               stepped w_5
           | 53 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 1 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 1 tl_0;
               assert_env_length w_5 2;
               drop_n w_5 2 0;
               assert_env_length w_5 2;
@@ -392,8 +392,8 @@ let () =
               assert_env_length w_5 1;
               return_n w_5 1 (pc_to_exp (int_to_pc 0))
           | 54 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 3 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 3 tl_0;
               assert_env_length w_5 4;
               push_env w_5 (Dynarray.get w_5.state.e 0);
               assert_env_length w_5 5;
@@ -412,22 +412,22 @@ let () =
               w_5.state.c <- pc_to_exp (int_to_pc 4);
               stepped w_5
           | 55 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 0 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 0 tl_0;
               assert_env_length w_5 1;
               drop_n w_5 1 0;
               assert_env_length w_5 1;
               return_n w_5 1 (pc_to_exp (int_to_pc 0))
           | 56 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 0 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 0 tl_0;
               assert_env_length w_5 1;
               drop_n w_5 1 0;
               assert_env_length w_5 1;
               return_n w_5 1 (pc_to_exp (int_to_pc 0))
           | 57 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 1 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 1 tl_0;
               assert_env_length w_5 2;
               let x1_18 = pop_env w_5 in
               let x0_35 = pop_env w_5 in
@@ -437,15 +437,15 @@ let () =
               assert_env_length w_5 1;
               return_n w_5 1 (pc_to_exp (int_to_pc 0))
           | 58 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 0 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 0 tl_0;
               assert_env_length w_5 1;
               drop_n w_5 1 0;
               assert_env_length w_5 1;
               return_n w_5 1 (pc_to_exp (int_to_pc 0))
           | 59 ->
-              w_5.state.k <- get_next_cont tl;
-              restore_env w_5 0 tl;
+              w_5.state.k <- get_next_cont tl_0;
+              restore_env w_5 0 tl_0;
               assert_env_length w_5 1;
               drop_n w_5 1 0;
               assert_env_length w_5 1;

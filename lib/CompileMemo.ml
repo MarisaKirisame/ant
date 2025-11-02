@@ -672,30 +672,23 @@ let generate_apply_cont ctx =
           *   instead we have to take elements out on by one.
           *)
          let cont_codes = Dynarray.create () in
-         let rec loop i =
+         let rec loop tl i =
            if i == Dynarray.length ctx.conts then cont_codes
            else
              let name, action = Dynarray.get ctx.conts i in
-             let code =
-               string "| "
-               ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag name))
-               ^^ string " -> "
-               ^^ uncode (action w (code $ string "tl"))
-             in
+             let code = (Hashtbl.find_exn ctx.ctag name, action w tl) in
              Dynarray.add_last cont_codes code;
-             loop (i + 1)
+             loop tl (i + 1)
          in
          seq_
            (assert_env_length_ w (int_ 1))
            (fun _ ->
-             code
-             $ string "match resolve " ^^ uncode w
-               ^^ string " K with | None -> () | Some (hd, tl) -> match "
-               ^^ uncode (word_get_value_ (code $ string "hd"))
-               ^^ string " with "
-               ^^ separate (break 1) (Dynarray.to_list (loop 0))
-               ^^ break 1
-               ^^ string "| _ -> failwith \"unreachable\"")))
+             match_resolve_destruct_
+               (resolve_ w (code $ string "K"))
+               (fun _ -> unit_)
+               "hd" "tl"
+               (fun hd tl ->
+                 match_int_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) (raw "failwith \"unreachable\"")))))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont

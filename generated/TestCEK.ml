@@ -30,12 +30,12 @@ let () =
       assert_env_length w_3 1;
       match resolve w_3 K with
       | None -> ()
-      | Some (hd, tl) -> (
-          match Word.get_value hd with
+      | Some (hd_0, tl_0) -> (
+          match Word.get_value hd_0 with
           | 0 -> exec_done w_3
           | 3 ->
-              w_3.state.k <- get_next_cont tl;
-              restore_env w_3 1 tl;
+              w_3.state.k <- get_next_cont tl_0;
+              restore_env w_3 1 tl_0;
               assert_env_length w_3 2;
               let x1_1 = pop_env w_3 in
               let x0_1 = pop_env w_3 in
