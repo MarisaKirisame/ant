@@ -10,6 +10,7 @@ type 'a code = Code of ir
 let code (doc : document) = Code (Raw doc)
 let to_ir (Code ir) = ir
 let from_ir ir = Code ir
+let raw (s : string) = code $ string s
 
 let uncode (Code ir) : document =
   (*print_endline (show_ir ir);*)
@@ -148,10 +149,34 @@ let list_nth_ (xs : 'a list code) (i : int code) : 'a code = app2_ (from_ir $ Fu
 
 let match_option_ (x : 'a option code) (none : unit -> 'b code) (a : string) (some : 'a code -> 'b code) : 'b code =
   let name_doc = string (gensym a) in
-  code
-  $ string "match " ^^ uncode x ^^ string " with | None -> "
-    ^^ uncode (none ())
-    ^^ string " | Some " ^^ name_doc ^^ string " -> "
-    ^^ uncode (some (code name_doc))
+  from_ir
+    (Match
+       ( to_ir x,
+         [ (Raw (string "None"), to_ir (none ())); (Raw (string "Some " ^^ name_doc), to_ir (some (code name_doc))) ] ))
 
 let src_E_ (i : int) : Reference.source code = code $ parens (string "Source.E " ^^ string (Int.to_string i))
+
+let match_resolve_ (x : (Word.t * Value.seq) option code) (none : unit -> 'a code) (a : string)
+    (some : (Word.t * Value.seq) code -> 'a code) : 'a code =
+  let name = string (gensym a) in
+  from_ir
+    (Match
+       (to_ir x, [ (Raw (string "None"), to_ir (none ())); (Raw (string "Some " ^^ name), to_ir (some (code name))) ]))
+
+let match_resolve_destruct_ (x : (Word.t * Value.seq) option code) (none : unit -> 'a code) (hd : string) (tl : string)
+    (some : Word.t code -> Value.seq code -> 'a code) : 'a code =
+  let name_hd = string (gensym hd) in
+  let name_tl = string (gensym tl) in
+  from_ir
+    (Match
+       ( to_ir x,
+         [
+           (Raw (string "None"), to_ir (none ()));
+           ( Raw (string "Some (" ^^ name_hd ^^ string ", " ^^ name_tl ^^ string ")"),
+             to_ir (some (code name_hd) (code name_tl)) );
+         ] ))
+
+let match_int_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a code) : 'a code =
+  let alts = Stdlib.List.map (fun (c, body) -> (Raw (string (string_of_int c)), to_ir body)) fs in
+  let alts = List.append alts [ (Raw (string "_"), to_ir dflt) ] in
+  from_ir (Match (to_ir x, alts))
