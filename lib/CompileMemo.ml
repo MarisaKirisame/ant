@@ -687,8 +687,7 @@ let generate_apply_cont ctx =
                (resolve_ w (code $ string "K"))
                (fun _ -> unit_)
                "hd" "tl"
-               (fun hd tl ->
-                 match_int_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) (raw "failwith \"unreachable\"")))))
+               (fun hd tl -> match_int_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) unreachable_))))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
@@ -696,20 +695,16 @@ let generate_apply_cont_ ctx =
          seq_
            (assert_env_length_ w (int_ 1))
            (fun _ ->
-             code
-             $ string "match resolve " ^^ uncode w
-               ^^ string " K with | None -> () | Some (hd, tl) -> match "
-               ^^ uncode (word_get_value_ (code $ string "hd"))
-               ^^ string " with "
-               ^^ separate_map (break 1)
-                    (fun (name, action) ->
-                      string "| "
-                      ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag name))
-                      ^^ string " -> "
-                      ^^ uncode (action w (code $ string "tl")))
-                    (Dynarray.to_list ctx.conts)
-               ^^ break 1
-               ^^ string "| _ -> failwith \"unreachable\"")))
+             match_resolve_destruct_
+               (resolve_ w (code $ string "K"))
+               (fun _ -> unit_)
+               "hd" "tl"
+               (fun hd tl ->
+                 match_int_ (word_get_value_ hd)
+                   (List.init (Dynarray.length ctx.conts) (fun i ->
+                        let name, action = Dynarray.get ctx.conts i in
+                        (Hashtbl.find_exn ctx.ctag name, action w tl)))
+                   unreachable_))))
 
 let pp_cek_ant x =
   let ctx = new_ctx () in
