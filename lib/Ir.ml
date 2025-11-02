@@ -1,6 +1,13 @@
 open PPrint
 
-type ir = Raw of document | Unit | Seqs of ir list | Function of string | Paren of ir | App of ir * ir list
+type ir =
+  | Raw of document
+  | Unit
+  | Seqs of ir list
+  | Function of string
+  | Paren of ir
+  | App of ir * ir list
+  | Lam of ir * ir
 
 let rec ir_to_doc ir =
   match ir with
@@ -12,6 +19,7 @@ let rec ir_to_doc ir =
   | Function str -> string str
   | Paren inner -> string "(" ^^ ir_to_doc inner ^^ string ")"
   | App (fn, args) -> List.fold_left (fun acc x -> acc ^^ string " " ^^ ir_to_doc x) (ir_to_doc fn) args
+  | Lam (args, body) -> string "fun " ^^ ir_to_doc args ^^ string " -> " ^^ ir_to_doc body
 
 let show_ir ir =
   let doc = ir_to_doc ir in
@@ -31,3 +39,4 @@ let rec optimize_ir ir =
       optimize_ir (App (optimize_ir fn, List.map optimize_ir args1 @ List.map optimize_ir args2))
   | App (fn, args) -> App (optimize_ir fn, List.map optimize_ir args)
   | Paren ir -> Paren (optimize_ir ir)
+  | Lam (args, body) -> Lam (args, optimize_ir body)

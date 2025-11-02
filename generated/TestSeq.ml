@@ -3,9 +3,9 @@ module Word = Seq.Word
 
 type ocaml_int_list = Nil | Cons of int * Seq.seq
 
-let () = (Seq.set_constructor_degree 0) 1
+let () = Seq.set_constructor_degree 0 1
 let int_list_Nil : Seq.seq = Seq.appends [ Seq.from_constructor 0 ]
-let () = (Seq.set_constructor_degree 1) (-1)
+let () = Seq.set_constructor_degree 1 (-1)
 let int_list_Cons x0 x1 : Seq.seq = Seq.appends [ Seq.from_constructor 1; Seq.from_int x0; x1 ]
 let from_ocaml_int_list x = match x with Nil -> int_list_Nil | Cons (x0, x1) -> int_list_Cons x0 x1
 
