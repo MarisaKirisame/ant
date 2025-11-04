@@ -315,10 +315,10 @@ let add_exp (f : world -> unit) (pc_ : int) : unit =
   Dynarray.add_last pc_map { step = f; pc }
 
 let pc_to_exp (Pc pc) : exp = Dynarray.get pc_map pc
-let from_constructor (ctag : int) : seq = Generic.singleton (Word (Word.make Word.constructor_tag ctag))
-let from_int (i : int) : seq = Generic.singleton (Word (Word.make Word.int_tag i))
+let from_constructor (ctag : int) : seq = Generic.singleton (Word (Word.ConstructorTag ctag))
+let from_int (i : int) : seq = Generic.singleton (Word (Word.Int i))
 
-let to_int (s : seq) : int =
+let to_word (s : seq) : Word.t =
   assert ((Generic.measure ~monoid ~measure s).degree = 1);
   assert ((Generic.measure ~monoid ~measure s).max_degree = 1);
   assert (Generic.size s = 1);

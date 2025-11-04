@@ -134,7 +134,7 @@ let memo_appends_ (xs : Value.seq code list) : Value.seq code =
     (code (string "[" ^^ separate (string ";") (Stdlib.List.map uncode xs) ^^ string "]"))
 
 let memo_from_int_ (i : int code) : Value.seq code = app_ (from_ir $ Function "Memo.from_int") i
-let int_from_word_ (w : Word.t code) : int code = app_ (from_ir $ Function "Word.to_int") w
+let int_from_word_ (w : Word.t code) : int code = app_ (from_ir $ Function "Word.get_value") w
 let memo_splits_ (seq : Value.seq code) : Value.seq list code = app_ (from_ir $ Function "Memo.splits") seq
 let word_get_value_ (w : Word.t code) : int code = app_ (from_ir $ Function "Word.get_value") w
 

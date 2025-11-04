@@ -1,6 +1,7 @@
 open LiveCEK
 open Ant
 open Common
+open Word
 
 type nat = OZ | OS of nat
 
@@ -130,7 +131,7 @@ let rec expr_from_ocaml e =
 
 let rec value_to_ocaml v =
   match to_ocaml_value v with
-  | VInt i -> OVInt (Memo.to_int i)
+  | VInt i -> OVInt (Word.get_value (Memo.to_word i))
   | VNil -> OVNil
   | VCons (x, y) -> OVCons (value_to_ocaml x, value_to_ocaml y)
 
