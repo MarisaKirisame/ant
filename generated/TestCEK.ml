@@ -68,7 +68,7 @@ let () =
           | Some x1_0 ->
               ignore (pop_env w_2);
               ignore (pop_env w_2);
-              push_env w_2 (Memo.from_int (Word.to_int (fst x0_0) + Word.to_int (fst x1_0)));
+              push_env w_2 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
               assert_env_length w_2 4;
               push_env w_2 (Dynarray.get w_2.state.e 2);
               assert_env_length w_2 5;
