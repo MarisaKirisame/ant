@@ -103,7 +103,9 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "--",
             "examples/Test.ant",
             "generated/TestSeq.ml",
-            "--print-ant",
+            "--compile",
+            "--backend",
+            "seq",
         ],
         env=env,
     )
@@ -115,7 +117,9 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "--",
             "examples/Test.ant",
             "generated/TestCEK.ml",
-            "--cek",
+            "--compile",
+            "--backend",
+            "memo",
         ],
         env=env,
     )
@@ -127,7 +131,9 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
     #        "--",
     #        "examples/Live.ant",
     #        "generated/LiveSeq.ml",
-    #        "--print-ant",
+    #        "--compile",
+    #        "--backend",
+    #        "seq",
     #    ],
     #    env=env,
     #)
@@ -139,7 +145,9 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "--",
             "examples/Live.ant",
             "generated/LiveCEK.ml",
-            "--cek",
+            "--compile",
+            "--backend",
+            "memo",
         ],
         env=env,
     )

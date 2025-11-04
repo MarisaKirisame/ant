@@ -8,6 +8,11 @@ type list 'a =
   | Cons of 'a * list 'a
 ;;
 
+type option 'a =
+  | None
+  | Some of 'a
+;;
+
 type expr =
   | EInt of int
   | EPlus of expr * expr
@@ -33,46 +38,78 @@ type value =
   | VNil
   | VCons of value * value
   | VFix of expr * list value
+  | VStuck of stuck
+;;
+
+type vtype =
+  | VTInt
+  | VTFunc
+  | VTBool
+  | VTList
+;;
+
+type stuck =
+  | SHole of list value
+  | STypeError of value * vtype
+  | SIndexError
+  | SApp of stuck * expr
+  | SAdd0 of stuck * expr
+  | SAdd1 of value * stuck
+  | SIf of value * expr * expr
+  | SMatchList of value * expr * expr
 ;;
 
 let index = fun x n ->
   match x with
   | Cons (xh, xt) -> 
     (match n with
-    | Z -> xh
-    | S m -> index xt m);;
-
-let vadd = fun l r ->
-  match l with
-  | VInt li ->
-    (match r with 
-    | VInt ri -> VInt (li + ri))
-;;
+    | Z -> Some xh
+    | S m -> index xt m)
+  | _ -> None;;
 
 let eval = fun expr env ->
   match expr with
   | EInt i -> VInt i
-  | EPlus (x, y) -> vadd (eval x env) (eval y env)
-  | EVar idx -> index env idx
+  | EPlus (x, y) ->
+    let xv = eval x env in
+    (match xv with
+    | VInt xi -> 
+      let yv = eval y env in
+      (match yv with
+      | VInt yi -> VInt (xi + yi)
+      | VStuck ys -> VStuck (SAdd1 xv ys)
+      | _ -> VStuck (STypeError yv VInt))
+    | VStuck xs -> VStuck (SAdd0 xv y)
+    | _ -> VStuck (STypeError xv VTInt))
+  | EVar idx -> 
+    (match index env idx with
+    | Some v -> v
+    | None -> VStuck SIndexError)
   | EAbs e -> VAbs e env
   | ELet (lhs, rhs) -> eval rhs (Cons (eval lhs env) env)
   | EFix e -> VFix e env
   | EApp (f, x) ->
     let fv = eval f env in
-    let xv = eval x env in
     (match fv with 
-    | VAbs (e, env_) -> eval e (Cons xv env_)
-    | VFix (e, env_) -> eval e (Cons xv (Cons fv env_)))
+    | VAbs (e, env_) -> eval e (Cons (eval x env) env_)
+    | VFix (e, env_) -> eval e (Cons (eval x env) (Cons fv env_))
+    | VStuck fs -> VStuck (SApp fs x)
+    | _ -> VStuck (STypeError fv VTFunc))
+  | EHole -> VStuck (SHole env)
   | ETrue -> VTrue
   | EFalse -> VFalse
   | EIf (i, t, e) -> 
     (match eval i env with
     | VTrue -> eval t env
-    | VFalse -> eval e env)
+    | VFalse -> eval e env
+    | VStuck is -> VStuck (SIf is t e)
+    | _ -> VStuck (STypeError i VTBool))
   | ENil -> VNil
   | ECons (x, xs) -> VCons (eval x env) (eval xs env)
   | EMatchList (v, n, c) ->
     (match eval v env with
     | VNil -> eval n env
-    | VCons (x, xs) -> eval c (Cons xs (Cons x env)))
+    | VCons (x, xs) -> eval c (Cons xs (Cons x env))
+    | VStuck vs -> VStuck (SMatchList vs n c)
+    | _ -> VStuck (STypeError VTList))
 ;;

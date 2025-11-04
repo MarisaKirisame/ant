@@ -181,3 +181,7 @@ let compile_pp_stmt (e : env) (s : stmt) : document =
 let compile_ant x =
   string "open Ant" ^^ break 1 ^^ string "module Word = Seq.Word" ^^ break 1
   ^^ separate_map (break 1) (compile_pp_stmt (new_env ())) x
+
+module Backend = struct
+  let compile = compile_ant
+end

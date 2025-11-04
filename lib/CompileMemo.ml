@@ -188,7 +188,7 @@ type env = int MapStr.t
 let new_env () : env = MapStr.empty
 
 type scope = {
-  meta_env : int option MapStr.t linear;
+  meta_env : int option MapStr.t;
   (*Note: env_length is not the amount of entries in meta_env above! It is the length of the environment when executing the cek machine.*)
   env_length : int;
   progressed : bool;
@@ -208,28 +208,28 @@ let check_scope s =
           else if Array.get seen i then
             failwith ("check_scope: variable " ^ key ^ " mapped to duplicate index " ^ string_of_int i)
           else Array.set seen i true)
-    (read_linear s.meta_env)
+    s.meta_env
 
-let new_scope () = { meta_env = make_linear MapStr.empty; env_length = 0; progressed = false }
+let new_scope () = { meta_env = MapStr.empty; env_length = 0; progressed = false }
 let push_s s = { s with env_length = s.env_length + 1; progressed = true }
 
 let extend_s s name =
   check_scope s;
-  let meta_env = write_linear s.meta_env in
+  let meta_env = s.meta_env in
 
   (* Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length); *)
   let meta_env = MapStr.add_exn name (Some s.env_length) meta_env in
 
-  let ret = { s with meta_env = make_linear meta_env; env_length = s.env_length + 1 } in
+  let ret = { s with meta_env; env_length = s.env_length + 1 } in
   check_scope ret;
   ret
 
 let drop_s s name =
-  assert (Option.is_some (MapStr.find name (read_linear s.meta_env)));
-  let meta_env = write_linear s.meta_env in
+  assert (Option.is_some (MapStr.find name s.meta_env));
+  let meta_env = s.meta_env in
   (* Hashtbl.remove meta_env name; *)
   let meta_env = MapStr.remove name meta_env in
-  { s with meta_env = make_linear meta_env; env_length = s.env_length - 1 }
+  { s with meta_env; env_length = s.env_length - 1 }
 
 let pop_n s n =
   check_scope s;
@@ -241,18 +241,17 @@ let pop_n s n =
 let pop_s s = pop_n s 1
 
 (*todo: we actually need to dup a bunch. lets switch to a functional data structure. *)
-let dup_s s = { s with meta_env = make_linear (read_linear s.meta_env); env_length = s.env_length }
+(* let dup_s s = { s with meta_env = s.meta_env; env_length = s.env_length } *)
 
-type kont = { k : scope -> world code -> unit code; fv : unit MapStr.t linear }
+type kont = { k : scope -> world code -> unit code; fv : unit MapStr.t }
 
-let dup_fv (fv : unit MapStr.t linear) : unit MapStr.t linear = make_linear (read_linear fv)
-let empty_fv () : unit MapStr.t linear = make_linear MapStr.empty
+let dup_fv (fv : unit MapStr.t) : unit MapStr.t = fv
+let empty_fv () : unit MapStr.t = MapStr.empty
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
   let new_s, n =
     List.fold_left
-      (fun (s, n) var ->
-        match MapStr.find var (read_linear s.meta_env) with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
+      (fun (s, n) var -> match MapStr.find var s.meta_env with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
       (s, 0) vars
   in
   seqs_
@@ -267,17 +266,10 @@ let return (s : scope) (w : world code) : unit code =
     (assert_env_length_ w (int_ s.env_length))
     (fun _ -> return_n_ w (int_ s.env_length) (pc_to_exp_ (pc_ apply_cont)))
 
-let add_fv (v : string) (fv : unit MapStr.t linear) : unit MapStr.t linear =
-  let fv = write_linear fv in
-  let fv = MapStr.add v () fv in
-  make_linear fv
+let add_fv (v : string) (fv : unit MapStr.t) : unit MapStr.t = MapStr.add v () fv
+let remove_fv (v : string) (fv : unit MapStr.t) : unit MapStr.t = MapStr.remove v fv
 
-let remove_fv (v : string) (fv : unit MapStr.t linear) : unit MapStr.t linear =
-  let fv = write_linear fv in
-  let fv = MapStr.remove v fv in
-  make_linear fv
-
-let rec fv_expr (e : expr) (fv : unit MapStr.t linear) : unit MapStr.t linear =
+let rec fv_expr (e : expr) (fv : unit MapStr.t) : unit MapStr.t =
   match e with
   | Ctor _ | Int _ | GVar _ -> fv
   | App (f, xs) -> fv_exprs xs (fv_expr f fv)
@@ -288,33 +280,34 @@ let rec fv_expr (e : expr) (fv : unit MapStr.t linear) : unit MapStr.t linear =
   | Let (BOne (l, v), r) -> fv_expr v (fv_pat l (fv_expr r fv))
   | _ -> failwith ("fv_expr: " ^ show_expr e)
 
-and fv_exprs (es : expr list) (fv : unit MapStr.t linear) : unit MapStr.t linear =
-  List.fold_left (fun fv e -> fv_expr e fv) fv es
+and fv_exprs (es : expr list) (fv : unit MapStr.t) : unit MapStr.t = List.fold_left (fun fv e -> fv_expr e fv) fv es
 
-and fv_pat (pat : pattern) (fv : unit MapStr.t linear) : unit MapStr.t linear =
+and fv_pat (pat : pattern) (fv : unit MapStr.t) : unit MapStr.t =
   match pat with
-  | PApp (_, None) -> fv
+  | PApp (_, None) | PAny -> fv
   | PApp (_, Some x) -> fv_pat x fv
   | PTup xs -> List.fold_left (fun fv x -> fv_pat x fv) fv xs
   | PVar name -> remove_fv name fv
   | _ -> failwith (show_pattern pat)
 
-and fv_cases (MatchPattern c : cases) (fv : unit MapStr.t linear) : unit MapStr.t linear =
+and fv_cases (MatchPattern c : cases) (fv : unit MapStr.t) : unit MapStr.t =
   List.fold_left (fun fv (pat, e) -> fv_pat pat (fv_expr e fv)) fv c
 
 type keep_t = { mutable keep : bool; mutable source : string option }
 
-let keep_only (s : scope) (fv : unit MapStr.t linear) : int Dynarray.t * scope =
+let keep_only (s : scope) (fv : unit MapStr.t) : int Dynarray.t * scope =
   check_scope s;
   let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
   MapStr.iter
     (fun key data -> match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key })
-    (read_linear s.meta_env);
+    s.meta_env;
   MapStr.iter
     (fun v _ ->
-      let i = Option.get (MapStr.find v (read_linear s.meta_env)) in
+      let i =
+        match MapStr.find_opt v s.meta_env with Some (Some i) -> i | _ -> failwith ("keep_only not found:" ^ v)
+      in
       (Dynarray.get keep i).keep <- true)
-    (read_linear fv);
+    fv;
   let keep_idx : int Dynarray.t = Dynarray.create () in
   let _, meta_env =
     Dynarray.fold_left
@@ -330,9 +323,9 @@ let keep_only (s : scope) (fv : unit MapStr.t linear) : int Dynarray.t * scope =
         else (i + 1, acc))
       (0, MapStr.empty) keep
   in
-  let others = MapStr.map (fun _ -> None) (read_linear s.meta_env) in
+  let others = MapStr.map (fun _ -> None) s.meta_env in
   let meta_env = MapStr.union (fun _ x _ -> Some x) meta_env others in
-  let s = { s with meta_env = make_linear meta_env; env_length = Dynarray.length keep_idx } in
+  let s = { s with meta_env; env_length = Dynarray.length keep_idx } in
   check_scope s;
   (keep_idx, s)
 
@@ -344,7 +337,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
   match c with
   | Var name ->
       let loc =
-        match MapStr.find name (read_linear s.meta_env) with
+        match MapStr.find name s.meta_env with
         | Some loc -> loc
         | None -> failwith ("compile_pp_expr cannot find var: " ^ name)
       in
@@ -357,10 +350,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
           ]
   | Match (value, cases) ->
       compile_pp_expr ctx s value
-        {
-          k = (fun s -> reading s $ fun s w -> compile_pp_cases ctx (dup_s s) cases k w);
-          fv = fv_cases cases (dup_fv k.fv);
-        }
+        { k = (fun s -> reading s $ fun s w -> compile_pp_cases ctx s cases k w); fv = fv_cases cases (dup_fv k.fv) }
   | Ctor cname ->
       fun w ->
         seqs_
@@ -408,6 +398,44 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                 }
                 w);
           fv = fv_expr x1 (dup_fv k.fv);
+        }
+  | App (Ctor cname, [ x0; x1; x2 ]) ->
+      compile_pp_expr ctx s x0
+        {
+          k =
+            (fun s w ->
+              compile_pp_expr ctx s x1
+                {
+                  k =
+                    (fun s w ->
+                      compile_pp_expr ctx s x2
+                        {
+                          k =
+                            (fun s w ->
+                              seqs_
+                                [
+                                  (fun _ -> assert_env_length_ w (int_ s.env_length));
+                                  (fun _ ->
+                                    let_in_ "x2" (pop_env_ w) (fun x2 ->
+                                        let_in_ "x1" (pop_env_ w) (fun x1 ->
+                                            let_in_ "x0" (pop_env_ w) (fun x0 ->
+                                                push_env_ w
+                                                  (memo_appends_
+                                                     [
+                                                       from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname));
+                                                       x0;
+                                                       x1;
+                                                       x2;
+                                                     ])))));
+                                  (fun _ -> k.k (push_s (pop_s (pop_s (pop_s s)))) w);
+                                ]);
+                          fv = k.fv;
+                        }
+                        w);
+                  fv = fv_expr x1 (dup_fv k.fv);
+                }
+                w);
+          fv = fv_expr x2 (fv_expr x1 (dup_fv k.fv));
         }
   | App (GVar f, xs) ->
       check_scope s;
@@ -532,81 +560,65 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                 (fun _ ->
                   let s = pop_s s in
                   let t =
-                    separate_map (break 1)
+                    Stdlib.List.map
                       (fun (pat, expr) ->
-                        let s = dup_s s in
                         (*todo: special casing for now, as pat design need changes. *)
                         match pat with
-                        | PApp (cname, None) ->
-                            string "| "
-                            ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag cname))
-                            ^^ string " -> "
-                            ^^ (uncode $ compile_pp_expr ctx s expr k w)
+                        | PApp (cname, None) -> (int_ (Hashtbl.find_exn ctx.ctag cname), compile_pp_expr ctx s expr k w)
                         | PApp (cname, Some (PVar x0)) ->
-                            string "| "
-                            ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag cname))
-                            ^^ string " -> "
-                            ^^ uncode
-                                 (with_splits 1
-                                    (memo_splits_ (pair_value_ x))
-                                    (function
-                                      | [ x0_v ] ->
-                                          seq_ (push_env_ w x0_v) (fun _ ->
-                                              compile_pp_expr ctx (extend_s s x0) expr
-                                                { k = (fun s w -> drop s [ x0 ] w k); fv = k.fv }
-                                                w)
-                                      | _ -> failwith "with_splits: unexpected arity"))
+                            ( int_ (Hashtbl.find_exn ctx.ctag cname),
+                              with_splits 1
+                                (memo_splits_ (pair_value_ x))
+                                (function
+                                  | [ x0_v ] ->
+                                      seq_ (push_env_ w x0_v) (fun _ ->
+                                          compile_pp_expr ctx (extend_s s x0) expr
+                                            { k = (fun s w -> drop s [ x0 ] w k); fv = k.fv }
+                                            w)
+                                  | _ -> failwith "with_splits: unexpected arity") )
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
-                            string "| "
-                            ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag cname))
-                            ^^ string " -> "
-                            ^^ uncode
-                                 (with_splits 2
-                                    (memo_splits_ (pair_value_ x))
-                                    (function
-                                      | [ x0_v; x1_v ] ->
-                                          seqs_
-                                            [
-                                              (fun _ -> push_env_ w x0_v);
-                                              (fun _ -> push_env_ w x1_v);
-                                              (fun _ ->
-                                                compile_pp_expr ctx
-                                                  (extend_s (extend_s s x0) x1)
-                                                  expr
-                                                  { k = (fun s w -> drop s [ x1; x0 ] w k); fv = k.fv }
-                                                  w);
-                                            ]
-                                      | _ -> failwith "with_splits: unexpected arity"))
+                            ( int_ (Hashtbl.find_exn ctx.ctag cname),
+                              with_splits 2
+                                (memo_splits_ (pair_value_ x))
+                                (function
+                                  | [ x0_v; x1_v ] ->
+                                      seqs_
+                                        [
+                                          (fun _ -> push_env_ w x0_v);
+                                          (fun _ -> push_env_ w x1_v);
+                                          (fun _ ->
+                                            compile_pp_expr ctx
+                                              (extend_s (extend_s s x0) x1)
+                                              expr
+                                              { k = (fun s w -> drop s [ x1; x0 ] w k); fv = k.fv }
+                                              w);
+                                        ]
+                                  | _ -> failwith "with_splits: unexpected arity") )
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1; PVar x2 ])) ->
-                            string "| "
-                            ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag cname))
-                            ^^ string " -> "
-                            ^^ uncode
-                                 (with_splits 3
-                                    (memo_splits_ (pair_value_ x))
-                                    (function
-                                      | [ x0_v; x1_v; x2_v ] ->
-                                          seqs_
-                                            [
-                                              (fun _ -> push_env_ w x0_v);
-                                              (fun _ -> push_env_ w x1_v);
-                                              (fun _ -> push_env_ w x2_v);
-                                              (fun _ ->
-                                                compile_pp_expr ctx
-                                                  (extend_s (extend_s (extend_s s x0) x1) x2)
-                                                  expr
-                                                  { k = (fun s w -> drop s [ x2; x1; x0 ] w k); fv = k.fv }
-                                                  w);
-                                            ]
-                                      | _ -> failwith "with_splits: unexpected arity"))
+                            ( int_ (Hashtbl.find_exn ctx.ctag cname),
+                              with_splits 3
+                                (memo_splits_ (pair_value_ x))
+                                (function
+                                  | [ x0_v; x1_v; x2_v ] ->
+                                      seqs_
+                                        [
+                                          (fun _ -> push_env_ w x0_v);
+                                          (fun _ -> push_env_ w x1_v);
+                                          (fun _ -> push_env_ w x2_v);
+                                          (fun _ ->
+                                            compile_pp_expr ctx
+                                              (extend_s (extend_s (extend_s s x0) x1) x2)
+                                              expr
+                                              { k = (fun s w -> drop s [ x2; x1; x0 ] w k); fv = k.fv }
+                                              w);
+                                        ]
+                                  | _ -> failwith "with_splits: unexpected arity") )
+                        | PAny -> (raw "_", compile_pp_expr ctx s expr k w)
                         | _ -> failwith (show_pattern pat))
                       c
                   in
-                  let default_case = string "| _ -> failwith \"unreachable\"" in
-                  code
-                    (string " (match "
-                    ^^ uncode (word_get_value_ (zro_ x))
-                    ^^ string " with " ^^ t ^^ break 1 ^^ default_case ^^ string ")")))))
+                  let default_case = (raw "_", unreachable_) in
+                  paren $ match_int_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])))))
 
 let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
@@ -644,30 +656,23 @@ let generate_apply_cont ctx =
           *   instead we have to take elements out on by one.
           *)
          let cont_codes = Dynarray.create () in
-         let rec loop i =
+         let rec loop tl i =
            if i == Dynarray.length ctx.conts then cont_codes
            else
              let name, action = Dynarray.get ctx.conts i in
-             let code =
-               string "| "
-               ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag name))
-               ^^ string " -> "
-               ^^ uncode (action w (code $ string "tl"))
-             in
+             let code = (Hashtbl.find_exn ctx.ctag name, action w tl) in
              Dynarray.add_last cont_codes code;
-             loop (i + 1)
+             loop tl (i + 1)
          in
          seq_
            (assert_env_length_ w (int_ 1))
            (fun _ ->
-             code
-             $ string "match resolve " ^^ uncode w
-               ^^ string " K with | None -> () | Some (hd, tl) -> match "
-               ^^ uncode (word_get_value_ (code $ string "hd"))
-               ^^ string " with "
-               ^^ separate (break 1) (Dynarray.to_list (loop 0))
-               ^^ break 1
-               ^^ string "| _ -> failwith \"unreachable\"")))
+             match_resolve_destruct_
+               (resolve_ w (code $ string "K"))
+               (fun _ -> unit_)
+               "hd" "tl"
+               (fun hd tl ->
+                 paren $ match_int_default_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) unreachable_))))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
@@ -675,20 +680,17 @@ let generate_apply_cont_ ctx =
          seq_
            (assert_env_length_ w (int_ 1))
            (fun _ ->
-             code
-             $ string "match resolve " ^^ uncode w
-               ^^ string " K with | None -> () | Some (hd, tl) -> match "
-               ^^ uncode (word_get_value_ (code $ string "hd"))
-               ^^ string " with "
-               ^^ separate_map (break 1)
-                    (fun (name, action) ->
-                      string "| "
-                      ^^ uncode (int_ (Hashtbl.find_exn ctx.ctag name))
-                      ^^ string " -> "
-                      ^^ uncode (action w (code $ string "tl")))
-                    (Dynarray.to_list ctx.conts)
-               ^^ break 1
-               ^^ string "| _ -> failwith \"unreachable\"")))
+             match_resolve_destruct_
+               (resolve_ w (code $ string "K"))
+               (fun _ -> unit_)
+               "hd" "tl"
+               (fun hd tl ->
+                 paren
+                 $ match_int_default_ (word_get_value_ hd)
+                     (List.init (Dynarray.length ctx.conts) (fun i ->
+                          let name, action = Dynarray.get ctx.conts i in
+                          (Hashtbl.find_exn ctx.ctag name, action w tl)))
+                     unreachable_))))
 
 let pp_cek_ant x =
   let ctx = new_ctx () in
@@ -709,3 +711,7 @@ let pp_cek_ant x =
             ^^ string " ("
             ^^ uncode (int_ (Dynarray.get ctx.constructor_degree i))
             ^^ string ")"))
+
+module Backend = struct
+  let compile = pp_cek_ant
+end
