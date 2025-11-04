@@ -72,11 +72,7 @@ let set_constructor_degree (ctag : int) (degree : int) : unit =
   Dynarray.add_last constructor_degree_table degree
 
 let measure (w : Word.t) : measure =
-  let degree =
-    match w with
-    | Int _ -> 1
-    | ConstructorTag value -> Dynarray.get constructor_degree_table value
-  in
+  let degree = match w with Int _ -> 1 | ConstructorTag value -> Dynarray.get constructor_degree_table value in
   { length = 1; degree; max_degree = degree }
 
 type seq = (Word.t, measure) Generic.fg

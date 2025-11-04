@@ -449,7 +449,7 @@ let () =
           | Some x1_0 ->
               ignore (pop_env w_6);
               ignore (pop_env w_6);
-              push_env w_6 (Memo.from_int (Word.to_int (fst x0_0) + Word.to_int (fst x1_0)));
+              push_env w_6 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
               assert_env_length w_6 5;
               let x0_1 = pop_env w_6 in
               push_env w_6 (Memo.appends [ Memo.from_constructor 19; x0_1 ]);

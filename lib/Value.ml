@@ -43,19 +43,12 @@ let monoid : measure_t monoid =
 let measure (et : fg_et) : measure_t =
   match et with
   | Word w ->
-      let degree =
-        match w with
-        | Int _ -> 1
-        | ConstructorTag value -> Dynarray.get constructor_degree_table value
-      in
-      let (w_repr_tag, w_repr_value) = Word.raw_repr w in
+      let degree = match w with Int _ -> 1 | ConstructorTag value -> Dynarray.get constructor_degree_table value in
+      let w_repr_tag, w_repr_value = Word.raw_repr w in
       {
         degree;
         max_degree = degree;
-        full = Some {
-          length = 1;
-          hash = Hasher.mul (Hasher.from_int w_repr_tag) (Hasher.from_int w_repr_value)
-        }
+        full = Some { length = 1; hash = Hasher.mul (Hasher.from_int w_repr_tag) (Hasher.from_int w_repr_value) };
       }
   | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
 

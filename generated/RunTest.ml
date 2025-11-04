@@ -5,10 +5,10 @@ module Word = Ant.Word.Word
 type ocaml_int_list = Nil | Cons of int * Seq.seq
 
 let () = Seq.set_constructor_degree 0 1
-let int_list_Nil : Seq.seq = Seq.appends [ Seq.from_constructor 0 ]
+let word_list_Nil : Seq.seq = Seq.appends [ Seq.from_constructor 0 ]
 let () = Seq.set_constructor_degree 1 (-1)
-let int_list_Cons x0 x1 : Seq.seq = Seq.appends [ Seq.from_constructor 1; Seq.from_int x0; x1 ]
-let from_ocaml_int_list = function Nil -> int_list_Nil | Cons (x0, x1) -> int_list_Cons x0 x1
+let word_list_Cons x0 x1 : Seq.seq = Seq.appends [ Seq.from_constructor 1; Seq.from_int x0; x1 ]
+let from_ocaml_int_list = function Nil -> word_list_Nil | Cons (x0, x1) -> word_list_Cons x0 x1
 
 let to_ocaml_int_list x =
   let h, t = Option.get (Seq.list_match x) in
@@ -16,14 +16,14 @@ let to_ocaml_int_list x =
   | 0 -> Nil
   | 1 ->
       let [ x0; x1 ] = Seq.splits t in
-      Cons (Seq.to_int x0, x1)
+      Cons (Word.get_value (Seq.to_word x0), x1)
   | _ -> failwith "unreachable"
 
 let rec list_incr x =
-  match to_ocaml_int_list x with Nil -> int_list_Nil | Cons (xh, xt) -> int_list_Cons (xh + 1) (list_incr xt)
+  match to_ocaml_int_list x with Nil -> word_list_Nil | Cons (xh, xt) -> word_list_Cons (xh + 1) (list_incr xt)
 
 let rec to_ocaml x = match to_ocaml_int_list x with Nil -> [] | Cons (xh, xt) -> xh :: to_ocaml xt
-let rec from_ocaml x = match x with [] -> int_list_Nil | xh :: xt -> int_list_Cons xh (from_ocaml xt)
+let rec from_ocaml x = match x with [] -> word_list_Nil | xh :: xt -> word_list_Cons xh (from_ocaml xt)
 let run_once x = List.map string_of_int (to_ocaml (list_incr (from_ocaml x)))
 let list_length = 100
 
