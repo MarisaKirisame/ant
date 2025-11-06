@@ -164,19 +164,16 @@ let run () : unit =
     let rec build n acc = if n == 0 then acc else build (n - 1) (OECons (OEInt 1, acc)) in
     build x OENil
   in
-  let nats x =
-    let rec build n = if n == x then OENil else OECons (OEInt n, build (n + 1)) in
+  let nats x acc =
+    let rec build n = if n == x then acc else OECons (OEInt n, build (n + 1)) in
     build 0
   in
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 2))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 40))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 45))));
-  let rec loop n =
-    if n > 0 then (
-      ignore (eval_expression (OEApp (mapinc, nats 40)));
-      loop (n - 1))
-  in
-  loop 50;
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 40))));
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45))));
-  ignore (eval_expression (OELet (mapinc, OEApp (OEVar 0, nats 45))));
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 40 OENil))));
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45 OENil))));
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 46 OENil))));
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45 (nats 45 OENil)))));
+  print_endline (value_to_string (eval_expression (OELet (mapinc, OEApp (OEVar 0, nats 45 OENil)))));
   ()

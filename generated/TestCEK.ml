@@ -4,7 +4,7 @@ open Memo
 open Value
 open Common
 
-let memo = Array.init 4 (fun _ -> ref State.BlackHole)
+let memo = init_memo ()
 
 type ocaml_int_list = Nil | Cons of Value.seq * Value.seq
 
@@ -108,7 +108,7 @@ let () =
           | _ -> failwith "unreachable"))
     3
 
-let () = Value.set_constructor_degree 0 1
-let () = Value.set_constructor_degree 1 1
-let () = Value.set_constructor_degree 2 (-1)
-let () = Value.set_constructor_degree 3 (-1)
+let () = Words.set_constructor_degree 0 1
+let () = Words.set_constructor_degree 1 1
+let () = Words.set_constructor_degree 2 (-1)
+let () = Words.set_constructor_degree 3 (-1)
