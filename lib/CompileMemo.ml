@@ -709,16 +709,15 @@ let pp_cek_ant x =
   let generated_stmt = separate_map (break 1) (compile_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
-  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ ctor_tag_decls ctx ^^ break 1 ^^ string "let memo = Array.init "
-  ^^ uncode (int_ (Dynarray.length codes))
-  ^^ string "(fun _ -> ref State.BlackHole)" ^^ break 1 ^^ generated_stmt ^^ break 1
+  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ string "let memo = init_memo () " ^^ break 1 ^^ generated_stmt
+  ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string "let () = add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i)))
   ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length ctx.constructor_degree) (fun i ->
-            string "let () = Value.set_constructor_degree "
+            string "let () = Words.set_constructor_degree "
             ^^ uncode (int_ i)
             ^^ string " ("
             ^^ uncode (int_ (Dynarray.get ctx.constructor_degree i))

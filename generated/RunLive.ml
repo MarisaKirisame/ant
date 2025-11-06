@@ -353,12 +353,14 @@ let run () : unit =
     let rec build n acc = if n == 0 then acc else build (n - 1) (OECons (OEInt 1, acc)) in
     build x OENil
   in
-  let nats x =
-    let rec build n = if n == x then OENil else OECons (OEInt n, build (n + 1)) in
+  let nats x acc =
+    let rec build n = if n == x then acc else OECons (OEInt n, build (n + 1)) in
     build 0
   in
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 2))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 40))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 45))));
+<<<<<<< HEAD
   let rec loop n =
     if n > 0 then (
       ignore (eval_expression (OEApp (mapinc, nats 40)));
@@ -388,6 +390,13 @@ let run () : unit =
           repl ())
   in
   (*repl ();*)
+=======
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 40 OENil))));
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45 OENil))));
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 46 OENil))));
+  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45 (nats 45 OENil)))));
+  print_endline (value_to_string (eval_expression (OELet (mapinc, OEApp (OEVar 0, nats 45 OENil)))));
+>>>>>>> 71db6e1 (save)
   ()
 (*
 (fix f xs. match xs with [] -> xs | hd :: tl -> (hd + 1) :: (f tl))(0 :: 1 :: 2 :: [])

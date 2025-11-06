@@ -4,11 +4,15 @@ open Memo
 open Value
 open Common
 
+<<<<<<< HEAD
 let tag_cont_done = 0
 let tag_Nil = 1
 let tag_Cons = 2
 let tag_cont_1 = 3
 let memo = Array.init 4 (fun _ -> ref State.BlackHole)
+=======
+let memo = init_memo ()
+>>>>>>> 71db6e1 (save)
 
 type ocaml_int_list = Nil | Cons of Value.seq * Value.seq
 
@@ -112,7 +116,7 @@ let () =
           | _ -> failwith "unreachable"))
     3
 
-let () = Value.set_constructor_degree 0 1
-let () = Value.set_constructor_degree 1 1
-let () = Value.set_constructor_degree 2 (-1)
-let () = Value.set_constructor_degree 3 (-1)
+let () = Words.set_constructor_degree 0 1
+let () = Words.set_constructor_degree 1 1
+let () = Words.set_constructor_degree 2 (-1)
+let () = Words.set_constructor_degree 3 (-1)
