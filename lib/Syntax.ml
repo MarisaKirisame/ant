@@ -186,9 +186,9 @@ let pp_stmt =
       @@ (if is_and then string "and" else string "type")
       ^^ space
       ^^ (match params with
-         | [] -> empty
-         | [ x ] -> string "'" ^^ string x ^^ space
-         | _ -> (parens @@ separate_map (string ",") (fun param -> string "'" ^^ string param) params) ^^ space)
+        | [] -> empty
+        | [ x ] -> string "'" ^^ string x ^^ space
+        | _ -> (parens @@ separate_map (string ",") (fun param -> string "'" ^^ string param) params) ^^ space)
       ^^ string name ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ string "|" ^^ space
       ^^ separate_map (break 1 ^^ string "|" ^^ space) pp_ctor ctors
     in
