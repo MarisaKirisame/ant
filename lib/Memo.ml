@@ -1,12 +1,3 @@
-(* Required reading: Seq.ml
- *
- * This file contian all code that deals with memoiziation.
- * There is multiple mutually recursive component which together enable memoization.
- * However, three of them are the most critical:
- *   The Reference type. It represent fragment of the finger tree that is unavailable, as we're working on fragment of the tree.
- *   The Store. It give meaning to Reference type in the tree.
- *   The memo. It is a fusion between hashtable and trie, somewhat like the patrica trie, to traverse prefix at exponential rate.
- *)
 open BatFingerTree
 open Word
 module Hasher = Hash.MCRC32C
@@ -19,95 +10,30 @@ module Hashtbl = Core.Hashtbl
 open Value
 open State
 open Common
+open Core
 
 let log x = print_endline x
 let log x = ignore x
 
-(* todo: when the full suffix is fetched, try to extend at front. *)
-type fetch_result = { fetched : words; prefix : reference option; suffix : reference option }
-and words = seq
-
 (* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
+type words = seq
 type exec_result = { words : words; step : int; without_memo_step : int }
 
-let source_to_string (src : source) =
-  match src with E i -> "E" ^ string_of_int i | S i -> "S" ^ string_of_int i | K -> "K"
+let source_to_string (src : source) = match src with E i -> "E" ^ string_of_int i | K -> "K"
 
-let request_to_string (req : fetch_request) =
-  "at " ^ source_to_string req.src ^ "+" ^ string_of_int req.offset ^ ", " ^ string_of_int req.word_count ^ " words"
-
-let fr_to_fh (fr : fetch_result) : fetch_hash =
-  let ret = Hasher.hash (Option.value_exn (Generic.measure ~measure ~monoid fr.fetched).full).hash in
-  ret
-
-let get_value (state : state) (store : store option) (src : source) : value =
+let get_value (state : 'a cek) (src : source) : 'a =
   match src with
   | E i ->
       assert (i < Dynarray.length state.e);
       Dynarray.get state.e i
-  | S i ->
-      assert (i < Dynarray.length (Option.value_exn store));
-      Dynarray.get (Option.value_exn store) i
   | K -> state.k
 
-(* Where does the references in tstate point to? 
- * Note that references in Here can only point to S.
- *)
-type tvalue = Here of seq | Lower of seq
-type tstore = tvalue Dynarray.t
-type tstate = { mutable tc : exp; mutable te : tvalue Dynarray.t; mutable tk : tvalue; mutable ts : tstore }
-
-let set_tvalue (ts : tstate) (src : source) (tv : tvalue) : unit =
-  match src with E i -> Dynarray.set ts.te i tv | S i -> Dynarray.set ts.ts i tv | K -> ts.tk <- tv
-
-let init_store () : store = Dynarray.create ()
-
-let add_to_store (store : store) (tstore : tstore) (v : value) : reference =
-  let d = (Generic.measure ~monoid ~measure v).degree in
-  (* if it is 0 it must be empty and we should not be adding *)
-  assert (d > 0);
-  let r = { src = S (Dynarray.length store); offset = 0; values_count = d } in
-  Dynarray.add_last store v;
-  Dynarray.add_last tstore (Lower (Generic.singleton (Reference r)));
-  r
-
-let seq_of_fetch_result (fr : fetch_result) : seq =
-  let words = fr.fetched in
-  let with_prefix =
-    match fr.prefix with
-    | None -> words
-    | Some r -> Generic.append ~monoid ~measure (Generic.singleton (Reference r)) words
-  in
-  let with_suffix =
-    match fr.suffix with
-    | None -> with_prefix
-    | Some r -> Generic.append ~monoid ~measure with_prefix (Generic.singleton (Reference r))
-  in
-  with_suffix
-
-let fetch_value (state : state) (store : store) (tstate : tstate) (req : fetch_request) : fetch_result option =
-  let v = get_value state (Some store) req.src in
-  let x, y = pop_n v req.offset in
-  let words, rest =
-    Generic.split ~monoid ~measure
-      (fun m -> not (match m.full with Some f -> f.length <= req.word_count | None -> false))
-      y
-  in
-  let m = Generic.measure ~monoid ~measure words in
-  let length = (Option.value_exn m.full).length in
-  assert (length <= req.word_count);
-  if (not (Generic.is_empty rest)) && length != req.word_count then
-    (* We could try to return the shorten fragment and continue.
-     * however i doubt it is reusable so we are just cluttering the hashtable*)
-    None
-  else
-    let have_prefix = not (Generic.is_empty x) in
-    let have_suffix = not (Generic.is_empty rest) in
-    let prefix = if have_prefix then add_to_store store tstate.ts x |> Some else None in
-    let suffix = if have_suffix then add_to_store store tstate.ts rest |> Some else None in
-    let fr = { fetched = words; prefix; suffix } in
-    set_tvalue tstate req.src (Here (seq_of_fetch_result fr));
-    Some fr
+let set_value (state : 'a cek) (src : source) (v : 'a) : unit =
+  match src with
+  | E i ->
+      assert (i < Dynarray.length state.e);
+      Dynarray.set state.e i v
+  | K -> state.k <- v
 
 let rec subst (resolve : source -> seq option) (x : seq) : seq =
   let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
@@ -128,40 +54,6 @@ let subst_state (x : state) (resolve : source -> seq option) : state =
   let sc = x.sc in
   { c; e; k; sc }
 
-(* fast forward state x to state y via store *)
-let fast_forward_to (x : state) (store : store) (y : state) : state =
-  let state = subst_state y (Option.some % get_value x (Some store)) in
-  let sc = state.sc + x.sc in
-  { c = state.c; e = state.e; k = state.k; sc }
-
-(* Stepping require an unfetched fragment. register the current state. *)
-let register_memo_need_unfetched (state : state) (request : fetch_request) (update : update) : unit =
-  match !update with
-  | BlackHole | Halfway _ ->
-      let lookup = Hashtbl.create (module Core.Int) in
-      log ("updating need with: " ^ string_of_cek state);
-      update := Need { next = { request; lookup }; current = Shared state }
-  | Need _ -> ()
-  | Done _ -> failwith "Done canot be fetching"
-
-let single_reference (src : source) : seq = Generic.singleton (Reference { src; offset = 0; values_count = 1 })
-let print_state (cek : state) msg : unit = print_endline (msg ^ ": pc=" ^ string_of_int cek.c.pc)
-
-(* Each execution cycle in ant consist of 3 steps:
- * - Locating a node from the memo tree, which consist of an updatable intermediate state.
- * - Updating that state in the memo tree by moving forward.
- * - Forwarding to that state.
- * These 3 steps use and improve the memo tree at the same time.
- *)
-
-let tstate_from_state (s : state) : tstate =
-  {
-    tc = s.c;
-    te = Dynarray.mapi (fun i _ -> Lower (single_reference (E i))) s.e;
-    tk = Lower (single_reference K);
-    ts = Dynarray.create ();
-  }
-
 let dyn_array_update (f : 'a -> 'a) (arr : 'a Dynarray.t) : unit =
   let len = Dynarray.length arr in
   for i = 0 to len - 1 do
@@ -174,23 +66,6 @@ let dyn_array_rev_update (f : 'a -> 'a) (arr : 'a Dynarray.t) : unit =
     Dynarray.set arr i (f (Dynarray.get arr i))
   done
 
-let unHere (Here seq) = seq
-let unLower (Lower seq) = seq
-
-let state_from_tstate (s : state) (t : tstate) : state =
-  dyn_array_rev_update
-    (fun v ->
-      match v with
-      | Here v -> Lower (subst (fun (S i) -> Option.some $ unLower (Dynarray.get t.ts i)) v)
-      | Lower v -> Lower v)
-    t.ts;
-  let transform (tv : tvalue) : value =
-    match tv with Here v -> subst (fun (S i) -> Option.some $ unLower (Dynarray.get t.ts i)) v | Lower v -> v
-  in
-  let ret = { c = t.tc; e = Dynarray.map transform t.te; k = transform t.tk; sc = 0 } in
-  log "state_from_tstate ";
-  ret
-
 let rec val_refs_aux (x : value) (rs : reference list) : reference list =
   let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
   assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
@@ -201,113 +76,11 @@ let state_refs (state : state) : reference list =
   let k = val_refs_aux state.k e in
   k
 
-exception DoneExec of state
-
-let rec climb_aux (state : state) (store : store) (tstate : tstate) (fetch_value_can_fail : bool)
-    (climb_done : state -> 'a) (climb_halfway : state -> update -> 'a) (update : update) (depth : int) : 'a =
-  match !update with
-  | Halfway s ->
-      log ("climb_halfway depth: " ^ string_of_int depth);
-      climb_halfway (copy_state s) update
-  | Done d -> climb_done (copy_state d)
-  (* This is the only place where tstate is used. Maybe just remove the idea of blackhole? *)
-  | BlackHole -> climb_halfway (state_from_tstate state tstate) update
-  | Need { current; next } -> (
-      match fetch_value state store tstate next.request with
-      | None -> climb_halfway (copy_state current) update
-      | Some fr -> (
-          match Hashtbl.find next.lookup (fr_to_fh fr) with
-          | None ->
-              let bh = ref BlackHole in
-              Hashtbl.add_exn next.lookup ~key:(fr_to_fh fr) ~data:bh;
-              let state =
-                subst_state (copy_state current) (fun s ->
-                    if Source.( = ) s next.request.src then Option.some $ seq_of_fetch_result fr else None)
-              in
-              climb_halfway state bh
-          | Some m -> climb_aux state store tstate fetch_value_can_fail climb_done climb_halfway m (depth + 1)))
-
-let rec climb (state : state) (store : store) (fetch_value_can_fail : bool) (climb_done : state -> 'a)
-    (climb_halfway : state -> update -> 'a) (memo : memo_t) : 'a =
-  let tstate = tstate_from_state state in
-  climb_aux state store tstate fetch_value_can_fail climb_done climb_halfway (Array.get memo state.c.pc) 0
-
-(* find a node on the tree as far as possible. *)
-let locate (state : state) (memo : memo_t) : state * store * update =
-  let store = init_store () in
-  climb state store false
-    (fun d -> raise (DoneExec (fast_forward_to state store d)))
-    (fun state update -> (state, store, update))
-    memo
-
-let improve update u =
-  (match (!update, u) with
-  | Need _, _ -> failwith "impossible to improve Need"
-  | Done _, _ -> failwith "impossible to improve Done"
-  | _, BlackHole -> failwith "blakchole does not improve"
-  | BlackHole, _ | _, Need _ | _, Done _ -> ()
-  | Halfway (Shared l), Halfway (Shared r) -> assert (l.sc < r.sc));
-  (match u with
-  | BlackHole -> ()
-  | Need { current = Shared x; _ } | Done (Shared x) | Halfway (Shared x) -> log "improving with: ");
-  update := u
-
-let update (state : state) (store : store) (memo : memo_t) (update : update) : state =
-  let sc_before = state.sc in
-  let state =
-    let store = init_store () in
-    climb state store true
-      (fun d ->
-        let d = fast_forward_to state store d in
-        improve update (Done (Shared d));
-        raise (DoneExec d))
-      (fun y _ ->
-        log "update of state:";
-        fast_forward_to state store y)
-      memo
-  in
-  assert (sc_before <= state.sc);
-  if sc_before == state.sc then (
-    log ("before step taken:sc=" ^ string_of_int state.sc ^ ", pc=" ^ string_of_int state.c.pc);
-    ignore (state.c.step (make_world state store update));
-    log ("after step taken:sc=" ^ string_of_int state.sc ^ ", pc=" ^ string_of_int state.c.pc));
-  if sc_before < state.sc then improve update (Halfway (Shared state));
-  state
-
-(* The point of the ant_step function is to both improve the memo tree, creating larger and larger skip,
- * as well as actually moving forward along the tree as well.
- *)
-let ant_step (x : state) (m : memo_t) : state =
-  let y, store, update_ = locate x m in
-  log "located a state: ";
-  let y = try update y store m update_ with DoneExec d -> raise (DoneExec (fast_forward_to x store d)) in
-  fast_forward_to x store y
-
-let pow2_int x = 1 lsl x
-let get_word_count (store : store) : int = pow2_int $ Dynarray.length store
-
-let rec resolve_seq (w : world) (x : seq) : (Word.t * seq) option =
-  let m = Generic.measure ~monoid ~measure x in
-  assert (m.degree = 1);
-  assert (m.max_degree = 1);
-  let tl, hd = Generic.front_exn ~monoid ~measure x in
-  match hd with
-  | Word w -> Some (w, tl)
-  | Reference ref ->
-      register_memo_need_unfetched w.state
-        { src = ref.src; offset = ref.offset; word_count = get_word_count w.store }
-        w.update;
-      None
-
-(* Src cannot be a Store, as we are resolving location at the top level, while only non-top-level have store. *)
 let rec resolve (w : world) (src : source) : (Word.t * seq) option =
-  (* Note that we deliberately not pass store into get_value. 
-   * The store is only used for fetch length calculation, and the actual content is discarded.
-   *)
-  let v = get_value w.state None src in
-  assert ((Generic.measure ~monoid ~measure v).degree = 1);
-  assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
-  resolve_seq w v
+  set_value w.resolved src true;
+  let v = get_value w.state src in
+  let vt, vh = Generic.front_exn ~monoid ~measure v in
+  match vh with Word vh -> Some (vh, vt) | _ -> failwith "cannot resolve reference"
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
 
@@ -417,19 +190,91 @@ let assert_env_length (w : world) (e : int) : unit =
   if l <> e then print_endline ("env_length should be " ^ string_of_int e ^ " but is " ^ string_of_int l);
   assert (l = e)
 
-let exec_done (w : world) : unit =
-  improve w.update (Done (Shared w.state));
-  raise (DoneExec w.state)
+let init_memo () : memo = ref []
 
-let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : exec_result =
+let lookup_step (value : state) (m : memo) : step option =
+  let rec aux acc = function
+    | [] -> acc
+    | step :: rest ->
+        let acc =
+          if Dependency.can_step_through step value then
+            match acc with None -> Some step | Some step' -> if step.sc > step'.sc then Some step else Some step'
+          else acc
+        in
+        aux acc rest
+  in
+  aux None !m
+
+type 'a bin = 'a digit list
+and 'a digit = Zero | One of 'a
+
+let rec inc (f : 'a -> 'a -> 'a) (x : 'a) (y : 'a bin) : 'a bin =
+  match y with [] -> [ One x ] | Zero :: ys -> One x :: ys | One y :: ys -> Zero :: inc f (f x y) ys
+
+let rec fold_bin (f : 'a -> 'a -> 'a) (acc : 'a option) (x : 'a bin) : 'a option =
+  match x with
+  | [] -> acc
+  | Zero :: xs -> fold_bin f acc xs
+  | One x :: xs -> ( match acc with Some acc -> fold_bin f (Some (f acc x)) xs | None -> fold_bin f (Some x) xs)
+
+type history = slice bin ref
+
+(* we dont really need state for composition, but it is good for bug catching. *)
+and slice = { state : state; step : step }
+
+let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : words =
+  let raw_step s =
+    let w = make_world (copy_state s) m in
+    s.c.step w;
+    w.state
+  in
+  let rec raw_step_n s n = if n = 0 then s else raw_step_n (raw_step s) (n - 1) in
+  let dbg_step_through step state =
+    assert (step.sc > 0);
+    let x = Dependency.step_through step state in
+    let y = raw_step_n state step.sc in
+    if not (Dependency.state_equal x y) then (
+      print_endline "state before step:";
+      print_endline (string_of_cek state);
+      print_endline "state after step:";
+      print_endline (string_of_cek x);
+      print_endline "expected:";
+      print_endline (string_of_cek y));
+    assert (Dependency.state_equal x y);
+    x
+  in
   let state = { c; e; k; sc = 0 } in
   let i = ref 0 in
-  let rec exec state =
-    log ("step " ^ string_of_int !i ^ ": " ^ string_of_int state.sc);
-    i := !i + 1;
-    exec (ant_step state m)
+  let hist : history = ref [] in
+  (*note that the two argument are reversed*)
+  let compose_slice (y : slice) (x : slice) =
+    let step = Dependency.compose_step x.step y.step in
+    m := step :: !m;
+    { state = x.state; step }
   in
-  try exec state
-  with DoneExec state ->
-    assert (Dynarray.length state.e = 1);
-    { words = Dynarray.get_last state.e; step = !i; without_memo_step = state.sc }
+  let rec exec state =
+    if is_done state then state
+    else (
+      log ("step " ^ string_of_int !i ^ ": " ^ string_of_int state.sc);
+      i := !i + 1;
+      match lookup_step state m with
+      | Some step ->
+          hist := inc compose_slice { state; step } !hist;
+          dbg_step_through step state |> exec
+      | None ->
+          let old = copy_state state in
+          let w = make_world state m in
+          state.c.step w;
+          let step = Dependency.make_step old w.resolved m in
+          m := step :: !m;
+          hist := inc compose_slice { state = old; step } !hist;
+          let st = dbg_step_through step old in
+          exec st)
+  in
+  let state = exec state in
+  assert (Dynarray.length state.e = 1);
+  ignore (fold_bin compose_slice None !hist);
+  print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int state.sc ^ " step.");
+  Dynarray.get_last state.e
+
+let exec_done _ = failwith "exec is done, should not call step anymore"

@@ -1,4 +1,6 @@
 open Value
+open Pattern
+open BatFingerTree
 module Hashtbl = Core.Hashtbl
 
 type env = value Dynarray.t
@@ -21,70 +23,87 @@ and exp = {
 
 and kont = value
 
-and state = {
+and 'a cek = {
   mutable c : exp;
-  mutable e : env;
-  mutable k : kont;
+  mutable e : 'a Dynarray.t;
+  mutable k : 'a;
   (* step_count *)
   mutable sc : int;
 }
 
-and recording = { s : store; u : update }
+and state = value cek
+and step = { src : pattern cek; dst : value cek; sc : int }
+and memo = step list ref
+and world = { state : state; memo : memo; resolved : bool cek }
 
-(* The Store
- * A fetch can be partial, so the remaining fragment need to be fetched again.
- *   they are appended into the Store.
- * Partial fetching on consecutive value result in exponentially longer and longer fetching length,
- *   done by pairing each value a ref of length, aliased on all fetch of the same origin, growing exponentially.
- *)
-and store = value Dynarray.t
-and update = memo_node_t ref
-and world = { state : state; store : store; update : update }
+let cek_get (cek : 'a cek) (src : Source.t) : 'a =
+  match src with
+  | Source.E i ->
+      assert (i < Dynarray.length cek.e);
+      Dynarray.get cek.e i
+  | Source.K -> cek.k
 
-(* The memo trie is the key data structure that handle all memoization logic.
- *   It contain a fetch request, which try to fetch a reference of a length.
- *   The segment then is hashed and compared to value in a hashtable.
- *   The value inside a hashtable is another cek machine.
- *   We are doing some work here to ensure every progress advance the execution: 
- *     there is no zero-distance jump.
- *)
-and memo_t = memo_node_t ref Array.t
-
-(*   A
- *  | |
- *  B C
- *)
-(* The node always start from BlackHole, and may become Halfway, and finally be Need, Continue, or Done. *)
-and memo_node_t =
-  (* We know transiting need to resolve a fetch_request to continue. *)
-  | Need of { current : shared; next : memo_next_t }
-  (* The machine evaluate to a value. *)
-  | Done of shared
-  (* We know a bit, but the evaluation is ended prematurely. Still it is better to skip to there. *)
-  | Halfway of shared
-  (* We are figuring out this entry. *)
-  (* Ref: the concept of Haskell's black hole *)
-  | BlackHole
-
-and memo_next_t = { request : fetch_request; lookup : lookup_t }
-and fetch_request = { src : source; offset : int; word_count : int }
-
-(*todo: maybe try janestreet's hashtable. we want lookup to be as fast as possible so it might be worth to ffi some SOTA*)
-and lookup_t = (fetch_hash, memo_node_t ref) Hashtbl.t
-and fetch_hash = int
-and shared = Shared of state
-
-let make_world state store update : world = { state; store; update }
-
-let copy_state (Shared s) : state =
+let copy_state s : state =
   let c = s.c in
   let e = Dynarray.map (fun v -> v) s.e in
   let k = s.k in
   let sc = s.sc in
   { c; e; k; sc }
 
+(*the order is not fixed. use this for AC stuff*)
+let fold_ek (s : 'a cek) (acc : 'acc) (f : 'acc -> 'a -> 'acc) : 'acc =
+  let acc = Dynarray.fold_left (fun acc v -> f acc v) acc s.e in
+  f acc s.k
+
+let zip_ek (s1 : 'a cek) (s2 : 'b cek) : ('a * 'b) cek option =
+  if Dynarray.length s1.e != Dynarray.length s2.e then None
+  else (
+    assert (Dynarray.length s1.e = Dynarray.length s2.e);
+    let c = s1.c in
+    let e = Dynarray.init (Dynarray.length s1.e) (fun i -> (Dynarray.get s1.e i, Dynarray.get s2.e i)) in
+    let k = (s1.k, s2.k) in
+    let sc = s1.sc in
+    Some { c; e; k; sc })
+
+let map_ek (f : 'a -> 'b) (s : 'a cek) : 'b cek =
+  let c = s.c in
+  let e = Dynarray.map f s.e in
+  let k = f s.k in
+  let sc = s.sc in
+  { c; e; k; sc }
+
+let maps_ek (f : 'a -> source -> 'b) (s : 'a cek) : 'b cek =
+  let c = s.c in
+  let e = Dynarray.mapi (fun i v -> f v (Source.E i)) s.e in
+  let k = f s.k Source.K in
+  let sc = s.sc in
+  { c; e; k; sc }
+
+let make_world state memo : world = { state; memo; resolved = map_ek (fun _ -> false) state }
+
+let rec option_list_to_list_option (lst : 'a option list) : 'a list option =
+  match lst with
+  | [] -> Some []
+  | x :: xs -> (
+      match x with
+      | Some v -> ( match option_list_to_list_option xs with Some vs -> Some (v :: vs) | None -> None)
+      | _ -> None)
+
+let option_ek_to_ek_option (s : 'a option cek) : 'a cek option =
+  let c = s.c in
+  let e =
+    let lst = Dynarray.to_list s.e in
+    match option_list_to_list_option lst with Some vs -> Some (Dynarray.of_list vs) | None -> None
+  in
+  match (e, s.k) with Some e, Some v -> Some { c; e; k = v; sc = s.sc } | _ -> None
+
 let string_of_cek (s : state) : string =
   assert (s.sc <= 10000);
   "pc: " ^ string_of_int s.c.pc
   ^ (", e: " ^ (Dynarray.to_list s.e |> List.map string_of_value |> String.concat ", "))
   ^ ", k: " ^ string_of_value s.k ^ ", sc: " ^ string_of_int s.sc
+
+let is_done (s : state) : bool =
+  match Generic.front_exn s.k ~monoid:Value.monoid ~measure:Value.measure with
+  | _, Word w -> ( match w with ConstructorTag ct when ct = 0 -> s.c.pc = 0 | _ -> false)
+  | _ -> failwith "unreachable"

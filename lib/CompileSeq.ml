@@ -30,9 +30,9 @@ let new_env () : env = { arity = Hashtbl.create (module Core.String); ctag = Has
 
 let compile_seq_ty ty =
   match ty with
-  | TApply (TInt, []) -> string "int"
+  | TApply (TInt, []) | TInt -> string "int"
   | TApply _ -> string "Seq.seq"
-  | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_ty ty)
+  | _ -> failwith ("compile_seq_ty: " ^ Syntax.string_of_document @@ Syntax.pp_ty ty)
 
 let with_registered_constructor (e : env) con_name types k =
   let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
