@@ -11,11 +11,12 @@
   Reference
   Tyck
   Resolve
-  Seq
   Transform
   Fresh
   Memo
+  Dependency
   Word
+  Words
   Value
   State
   Hash
