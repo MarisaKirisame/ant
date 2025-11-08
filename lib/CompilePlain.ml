@@ -46,6 +46,8 @@ let rec compile_pat (p : pattern) : document =
   | PApp (name, None) -> string name
   | PApp (name, Some p') -> string name ^^ string " " ^^ compile_pat p'
 
+and parens_compile_pat p = parens (compile_pat p)
+
 let rec compile_expr (e : expr) : document =
   match e with
   | Unit -> string "()"
@@ -63,7 +65,7 @@ let rec compile_expr (e : expr) : document =
   | Tup xs -> string "(" ^^ separate_map (string ", ") compile_expr xs ^^ string ")"
   | Arr xs -> string "[]" ^^ separate_map (string "; ") compile_expr xs ^^ string "]"
   | Lam (ps, value) ->
-      string "fun " ^^ separate_map (string " ") compile_pat ps ^^ string " -> " ^^ parens_compile_expr value
+      string "fun " ^^ separate_map (string " ") parens_compile_pat ps ^^ string " -> " ^^ parens_compile_expr value
   | Let (binding, value) -> compile_binding binding (parens_compile_expr value)
   | Sel (expr, prop) -> parens_compile_expr expr ^^ string "." ^^ string prop
   | If (c, p, n) ->
@@ -71,9 +73,7 @@ let rec compile_expr (e : expr) : document =
       ^^ parens_compile_expr n
   | Match (tgt, MatchPattern cases) ->
       string "match " ^^ compile_expr tgt ^^ string " with "
-      ^^ separate_map (string "| ")
-           (fun (p, e) -> parens (compile_pat p) ^^ string " -> " ^^ parens_compile_expr e)
-           cases
+      ^^ separate_map (string "| ") (fun (p, e) -> parens_compile_pat p ^^ string " -> " ^^ parens_compile_expr e) cases
 
 and parens_compile_expr e = parens (compile_expr e)
 
@@ -83,7 +83,7 @@ and compile_binding (b : binding) (cont : document) : document =
   | BOne (p, e) | BCont (p, e) -> string "let " ^^ compile_let (p, e) ^^ string " in " ^^ cont
   | BRec xs | BRecC xs -> string "let rec " ^^ separate_map (string " and ") compile_let xs ^^ string " in " ^^ cont
 
-and compile_let (p, e) = parens (compile_pat p) ^^ string " = " ^^ parens (compile_expr e)
+and compile_let (p, e) = parens_compile_pat p ^^ string " = " ^^ parens (compile_expr e)
 
 let compile_stmt (x : stmt) : document =
   match x with
@@ -92,7 +92,7 @@ let compile_stmt (x : stmt) : document =
   | Term (pat, e) -> (
       match pat with
       | None -> compile_expr e
-      | Some pat -> string "let rec " ^^ parens (compile_pat pat) ^^ string " = " ^^ compile_expr e)
+      | Some pat -> string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e)
 
 let compile_plain (xs : stmt list) : document =
   let ys = List.map compile_stmt xs in
