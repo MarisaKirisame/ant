@@ -41,9 +41,6 @@ type pattern = (match_words, measure) gap_seq
 and match_words = { words : words; children : pattern; val_count : int }
 and measure = { degree : int; max_degree : int }
 
-type prefixes = (match_prefix, measure) gap_seq
-and match_prefix = { words : words; val_count : int }
-
 let monoid : measure monoid =
   {
     zero = { degree = 0; max_degree = 0 };
