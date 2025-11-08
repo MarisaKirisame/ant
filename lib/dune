@@ -24,9 +24,10 @@
   batFingerTree
   Ir
   Code
+  Compile
   CompileSeq
   CompileMemo
-  Compile)
+  CompilePlain)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq))
  (foreign_stubs

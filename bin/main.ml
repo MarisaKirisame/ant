@@ -55,8 +55,14 @@ let print_ast =
 
 let backend =
   let doc = "Backend used to compile the ant source, defaulting to memo" in
-  let cdds = [ ("memo", (module Compile.Memo : Compile.Backend)); ("seq", (module Compile.Seq : Compile.Backend)) ] in
-  Arg.(value & opt (enum cdds) (module Compile.Memo : Compile.Backend) & info [ "b"; "backend" ] ~doc)
+  let cdds =
+    [
+      ("memo", (module CompileMemo.Backend : Compile.Backend));
+      ("seq", (module CompileSeq.Backend : Compile.Backend));
+      ("plain", (module CompilePlain.Backend));
+    ]
+  in
+  Arg.(value & opt (enum cdds) (module CompileMemo.Backend : Compile.Backend) & info [ "b"; "backend" ] ~doc)
 
 let compile_ant =
   let doc = "Compile the ant source" in
