@@ -50,14 +50,10 @@ let monoid : measure monoid =
 let match_words_measure (slice : match_words slice) : measure =
   { degree = slice.offset + slice.a.val_count; max_degree = slice.offset + slice.a.val_count }
 
-let match_prefix_measure (slice : match_prefix slice) : measure =
-  { degree = slice.offset + slice.a.val_count; max_degree = slice.offset + slice.a.val_count }
-
 type reads = (read, measure) gap_seq
 and read = { length : int; val_count : int }
 
 let pattern_to_reads (p : pattern) : reads list = failwith "unimplemented"
-let pattern_to_prefixes (p : pattern) : prefixes list = failwith "unimplemented"
 
 (*lets ignore CEK stuff for now, those codes should be trivial.*)
 type memo =
@@ -88,13 +84,12 @@ let find_step (m : memo) (s : seq) : (seq * step) = failwith "unimplemented"
 let raw_step (s : seq) : step = failwith "unimplemented"
 
 (*antiunification. symmetric*)
-let pattern_antiunify (x : pattern) (y : pattern) : pattern = failwith "unimplemented"
+let antiunify (x : pattern) (y : pattern) : pattern = failwith "unimplemented"
 
-let prefixes_antiunify (x : prefixes) (y : prefixes) : prefixes = failwith "unimplemented"
 let reads_intersect (x : reads) (y : reads) : reads = failwith "unimplemented"
 (* Walk down and insert the step there.
  * One might have failed on a Branch.
- * In that case call pattern_ or prefixes_antiunify on branch and the remaining pattern and insert new Branch nodes.
+ * In that case call antiunify on branch and the remaining pattern and insert new Branch nodes.
  * Insert one final Branch node via reads_intersection to distinguish the two branches.
  *)
 let insert_step (m : memo) (step : step) : memo = failwith "unimplemented"
