@@ -51,7 +51,7 @@ let match_words_measure (slice : match_words slice) : measure =
   { degree = slice.offset + slice.a.val_count; max_degree = slice.offset + slice.a.val_count }
 
 type reads = (read, measure) gap_seq
-and read = { length : int; val_count : int }
+and read = { length : int;  children : reads; val_count : int }
 
 let pattern_to_reads (p : pattern) : reads list = failwith "unimplemented"
 
@@ -67,6 +67,7 @@ and step = {
   sc : int;
 }
 
+let seq_to_pattern (s : seq) (r : reads) : pattern = failwith "unimplemented"
 (*match x with y z -> z*)
 let subtract (x : pattern) (y : pattern) : pattern option = failwith "unimplemented"
 
