@@ -136,11 +136,24 @@ let memo_appends_ (xs : Value.seq code list) : Value.seq code =
 let memo_from_int_ (i : int code) : Value.seq code = app_ (from_ir $ Function "Memo.from_int") i
 let int_from_word_ (w : Word.t code) : int code = app_ (from_ir $ Function "Word.get_value") w
 let memo_splits_ (seq : Value.seq code) : Value.seq list code = app_ (from_ir $ Function "Memo.splits") seq
+
+let memo_list_match_ (seq : Value.seq code) : (Word.t * Value.seq) option code =
+  app_ (from_ir $ Function "Memo.list_match") seq
+
 let word_get_value_ (w : Word.t code) : int code = app_ (from_ir $ Function "Word.get_value") w
+let option_get_ (c : 'a option code) : 'a code = app_ (from_ir $ Function "Option.get") c
 
 let let_in_ (a : string) (value : 'a code) (body : 'a code -> 'b code) : 'b code =
   let name_doc = string (gensym a) in
-  code $ string "let " ^^ name_doc ^^ string " = " ^^ uncode value ^^ string " in " ^^ uncode (body (code name_doc))
+  Code (LetIn (Raw name_doc, to_ir value, to_ir (body (code name_doc))))
+
+let tuple2_ (a : 'a code) (b : 'b code) : ('a * 'b) code = code (parens (uncode a ^^ string ", " ^^ uncode b))
+let pair_ (a : 'a code) (b : 'b code) : ('a * 'b) code = tuple2_ a b
+
+let let_pat_in_ (pat : 'a code) (value : 'a code) (body : 'b code) : 'b code =
+  Code (LetIn (to_ir pat, to_ir value, to_ir body))
+
+let list_ (xs : 'a code list) : 'a list code = code (brackets (separate_map (string "; ") (fun x -> uncode x) xs))
 
 let list_literal_ (xs : 'a code list) : 'a list code =
   code $ string "[" ^^ separate (string ";") (Stdlib.List.map uncode xs) ^^ string "]"
@@ -186,3 +199,7 @@ let match_int_default_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a cod
   match_int_ x (alts @ [ (raw "_", dflt) ])
 
 let unreachable_ : 'a code = code $ string "failwith \"unreachable\""
+
+(* let match_ctor_tag_default_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a code) : 'a code =
+  let alts = Stdlib.List.map (fun (c, body) -> (int_ c, body)) fs in
+  match_int_ x (alts @ [ (raw "_", dflt) ]) *)
