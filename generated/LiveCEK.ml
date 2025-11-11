@@ -68,8 +68,8 @@ let memo = Array.init 13 (fun _ -> ref State.BlackHole)
 
 type ocaml_nat = Z | S of Value.seq
 
-let nat_Z : Value.seq = Memo.appends [ Memo.from_constructor 1 ]
-let nat_S x0 : Value.seq = Memo.appends [ Memo.from_constructor 2; x0 ]
+let nat_Z : Value.seq = Memo.appends [ Memo.from_constructor tag_Z ]
+let nat_S x0 : Value.seq = Memo.appends [ Memo.from_constructor tag_S; x0 ]
 let from_ocaml_nat x = match x with Z -> nat_Z | S x0 -> nat_S x0
 
 let to_ocaml_nat x =
@@ -83,8 +83,8 @@ let to_ocaml_nat x =
 
 type ocaml_list = Nil | Cons of Value.seq * Value.seq
 
-let list_Nil : Value.seq = Memo.appends [ Memo.from_constructor 3 ]
-let list_Cons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 4; x0; x1 ]
+let list_Nil : Value.seq = Memo.appends [ Memo.from_constructor tag_Nil ]
+let list_Cons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_Cons; x0; x1 ]
 let from_ocaml_list x = match x with Nil -> list_Nil | Cons (x0, x1) -> list_Cons x0 x1
 
 let to_ocaml_list x =
@@ -98,8 +98,8 @@ let to_ocaml_list x =
 
 type ocaml_option = None | Some of Value.seq
 
-let option_None : Value.seq = Memo.appends [ Memo.from_constructor 5 ]
-let option_Some x0 : Value.seq = Memo.appends [ Memo.from_constructor 6; x0 ]
+let option_None : Value.seq = Memo.appends [ Memo.from_constructor tag_None ]
+let option_Some x0 : Value.seq = Memo.appends [ Memo.from_constructor tag_Some; x0 ]
 let from_ocaml_option x = match x with None -> option_None | Some x0 -> option_Some x0
 
 let to_ocaml_option x =
@@ -127,20 +127,20 @@ type ocaml_expr =
   | EFix of Value.seq
   | EHole
 
-let expr_EInt x0 : Value.seq = Memo.appends [ Memo.from_constructor 7; x0 ]
-let expr_EPlus x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 8; x0; x1 ]
-let expr_EVar x0 : Value.seq = Memo.appends [ Memo.from_constructor 9; x0 ]
-let expr_EAbs x0 : Value.seq = Memo.appends [ Memo.from_constructor 10; x0 ]
-let expr_EApp x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 11; x0; x1 ]
-let expr_ELet x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 12; x0; x1 ]
-let expr_ETrue : Value.seq = Memo.appends [ Memo.from_constructor 13 ]
-let expr_EFalse : Value.seq = Memo.appends [ Memo.from_constructor 14 ]
-let expr_EIf x0 x1 x2 : Value.seq = Memo.appends [ Memo.from_constructor 15; x0; x1; x2 ]
-let expr_ENil : Value.seq = Memo.appends [ Memo.from_constructor 16 ]
-let expr_ECons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 17; x0; x1 ]
-let expr_EMatchList x0 x1 x2 : Value.seq = Memo.appends [ Memo.from_constructor 18; x0; x1; x2 ]
-let expr_EFix x0 : Value.seq = Memo.appends [ Memo.from_constructor 19; x0 ]
-let expr_EHole : Value.seq = Memo.appends [ Memo.from_constructor 20 ]
+let expr_EInt x0 : Value.seq = Memo.appends [ Memo.from_constructor tag_EInt; x0 ]
+let expr_EPlus x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_EPlus; x0; x1 ]
+let expr_EVar x0 : Value.seq = Memo.appends [ Memo.from_constructor tag_EVar; x0 ]
+let expr_EAbs x0 : Value.seq = Memo.appends [ Memo.from_constructor tag_EAbs; x0 ]
+let expr_EApp x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_EApp; x0; x1 ]
+let expr_ELet x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_ELet; x0; x1 ]
+let expr_ETrue : Value.seq = Memo.appends [ Memo.from_constructor tag_ETrue ]
+let expr_EFalse : Value.seq = Memo.appends [ Memo.from_constructor tag_EFalse ]
+let expr_EIf x0 x1 x2 : Value.seq = Memo.appends [ Memo.from_constructor tag_EIf; x0; x1; x2 ]
+let expr_ENil : Value.seq = Memo.appends [ Memo.from_constructor tag_ENil ]
+let expr_ECons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_ECons; x0; x1 ]
+let expr_EMatchList x0 x1 x2 : Value.seq = Memo.appends [ Memo.from_constructor tag_EMatchList; x0; x1; x2 ]
+let expr_EFix x0 : Value.seq = Memo.appends [ Memo.from_constructor tag_EFix; x0 ]
+let expr_EHole : Value.seq = Memo.appends [ Memo.from_constructor tag_EHole ]
 
 let from_ocaml_expr x =
   match x with
@@ -208,14 +208,14 @@ type ocaml_value =
   | VFix of Value.seq * Value.seq
   | VStuck of Value.seq
 
-let value_VInt x0 : Value.seq = Memo.appends [ Memo.from_constructor 21; x0 ]
-let value_VAbs x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 22; x0; x1 ]
-let value_VTrue : Value.seq = Memo.appends [ Memo.from_constructor 23 ]
-let value_VFalse : Value.seq = Memo.appends [ Memo.from_constructor 24 ]
-let value_VNil : Value.seq = Memo.appends [ Memo.from_constructor 25 ]
-let value_VCons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 26; x0; x1 ]
-let value_VFix x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 27; x0; x1 ]
-let value_VStuck x0 : Value.seq = Memo.appends [ Memo.from_constructor 28; x0 ]
+let value_VInt x0 : Value.seq = Memo.appends [ Memo.from_constructor tag_VInt; x0 ]
+let value_VAbs x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_VAbs; x0; x1 ]
+let value_VTrue : Value.seq = Memo.appends [ Memo.from_constructor tag_VTrue ]
+let value_VFalse : Value.seq = Memo.appends [ Memo.from_constructor tag_VFalse ]
+let value_VNil : Value.seq = Memo.appends [ Memo.from_constructor tag_VNil ]
+let value_VCons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_VCons; x0; x1 ]
+let value_VFix x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_VFix; x0; x1 ]
+let value_VStuck x0 : Value.seq = Memo.appends [ Memo.from_constructor tag_VStuck; x0 ]
 
 let from_ocaml_value x =
   match x with
@@ -253,10 +253,10 @@ let to_ocaml_value x =
 
 type ocaml_vtype = VTInt | VTFunc | VTBool | VTList
 
-let vtype_VTInt : Value.seq = Memo.appends [ Memo.from_constructor 29 ]
-let vtype_VTFunc : Value.seq = Memo.appends [ Memo.from_constructor 30 ]
-let vtype_VTBool : Value.seq = Memo.appends [ Memo.from_constructor 31 ]
-let vtype_VTList : Value.seq = Memo.appends [ Memo.from_constructor 32 ]
+let vtype_VTInt : Value.seq = Memo.appends [ Memo.from_constructor tag_VTInt ]
+let vtype_VTFunc : Value.seq = Memo.appends [ Memo.from_constructor tag_VTFunc ]
+let vtype_VTBool : Value.seq = Memo.appends [ Memo.from_constructor tag_VTBool ]
+let vtype_VTList : Value.seq = Memo.appends [ Memo.from_constructor tag_VTList ]
 
 let from_ocaml_vtype x =
   match x with VTInt -> vtype_VTInt | VTFunc -> vtype_VTFunc | VTBool -> vtype_VTBool | VTList -> vtype_VTList
@@ -280,14 +280,14 @@ type ocaml_stuck =
   | SIf of Value.seq * Value.seq * Value.seq
   | SMatchList of Value.seq * Value.seq * Value.seq
 
-let stuck_SHole x0 : Value.seq = Memo.appends [ Memo.from_constructor 33; x0 ]
-let stuck_STypeError x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 34; x0; x1 ]
-let stuck_SIndexError : Value.seq = Memo.appends [ Memo.from_constructor 35 ]
-let stuck_SApp x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 36; x0; x1 ]
-let stuck_SAdd0 x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 37; x0; x1 ]
-let stuck_SAdd1 x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 38; x0; x1 ]
-let stuck_SIf x0 x1 x2 : Value.seq = Memo.appends [ Memo.from_constructor 39; x0; x1; x2 ]
-let stuck_SMatchList x0 x1 x2 : Value.seq = Memo.appends [ Memo.from_constructor 40; x0; x1; x2 ]
+let stuck_SHole x0 : Value.seq = Memo.appends [ Memo.from_constructor tag_SHole; x0 ]
+let stuck_STypeError x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_STypeError; x0; x1 ]
+let stuck_SIndexError : Value.seq = Memo.appends [ Memo.from_constructor tag_SIndexError ]
+let stuck_SApp x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_SApp; x0; x1 ]
+let stuck_SAdd0 x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_SAdd0; x0; x1 ]
+let stuck_SAdd1 x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_SAdd1; x0; x1 ]
+let stuck_SIf x0 x1 x2 : Value.seq = Memo.appends [ Memo.from_constructor tag_SIf; x0; x1; x2 ]
+let stuck_SMatchList x0 x1 x2 : Value.seq = Memo.appends [ Memo.from_constructor tag_SMatchList; x0; x1; x2 ]
 
 let from_ocaml_stuck x =
   match x with
