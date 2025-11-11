@@ -153,28 +153,28 @@ let compile_adt_ffi e adt_name ctors =
            ctors))
   ^^ break 1
   ^^
-  let head =
-    string ("let to_ocaml_" ^ adt_name ^ " x = let (h, t) = Option.get (Memo.list_match x) in match ")
-    ^^ uncode (word_get_value_ (code $ string "h"))
-    ^^ string " with | "
-  in
-  let cases =
-    String.concat " | "
-      (List.map
+  let head = string ("let to_ocaml_" ^ adt_name ^ " x = ") in
+  let h = raw (gensym "h") in
+  let t = raw (gensym "t") in
+  let discr =
+    match_int_default_ (word_get_value_ h)
+      (Stdlib.List.map
          (fun (con_name, types) ->
-           string_of_int (Hashtbl.find_exn e.ctag con_name)
-           ^ " -> "
-           ^
-           if List.length types = 0 then con_name
-           else
-             "let ["
-             ^ String.concat ";" (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-             ^ "] = Memo.splits t in " ^ con_name ^ "("
-             ^ String.concat "," (List.mapi (fun i _ -> "x" ^ string_of_int i) types)
-             ^ ")")
+           let tag = Hashtbl.find_exn e.ctag con_name in
+           let body =
+             if List.length types = 0 then raw con_name
+             else
+               let names = List.mapi (fun i _ -> gensym ("x" ^ string_of_int i)) types in
+               let_pat_in_
+                 (list_ (List.map raw names))
+                 (memo_splits_ t)
+                 (app_ (raw con_name) (raw ("(" ^ String.concat "," names ^ ")")))
+           in
+           (tag, body))
          ctors)
+      unreachable_
   in
-  head ^^ string (cases ^ " | _ -> failwith \"unreachable\"")
+  head ^^ uncode (let_pat_in_ (pair_ h t) (option_get_ (memo_list_match_ (raw "x"))) discr)
 
 let compile_adt (e : ctx) adt_name ctors =
   let generate_ocaml_adt = compile_ocaml_adt adt_name ctors in
