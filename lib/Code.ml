@@ -190,6 +190,10 @@ let match_resolve_destruct_ (x : (Word.t * Value.seq) option code) (none : unit 
              to_ir (some (code name_hd) (code name_tl)) );
          ] ))
 
+let match_raw_ (x : int code) (fs : (document * 'a code) list) : 'a code =
+  let alts = Stdlib.List.map (fun (c, body) -> (Raw c, to_ir body)) fs in
+  from_ir (Match (to_ir x, alts))
+
 let match_int_ (x : int code) (fs : (int code * 'a code) list) : 'a code =
   let alts = Stdlib.List.map (fun (c, body) -> (to_ir c, to_ir body)) fs in
   from_ir (Match (to_ir x, alts))
@@ -200,6 +204,12 @@ let match_int_default_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a cod
 
 let unreachable_ : 'a code = code $ string "failwith \"unreachable\""
 
-(* let match_ctor_tag_default_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a code) : 'a code =
-  let alts = Stdlib.List.map (fun (c, body) -> (int_ c, body)) fs in
-  match_int_ x (alts @ [ (raw "_", dflt) ]) *)
+let match_ctor_tag_default_ (x : int code) (fs : (string * 'a code) list) (dflt : 'a code) : 'a code =
+  let dummy_name = string (gensym "c") in
+  let alts =
+    Stdlib.List.map
+      (fun (tag_name, body) ->
+        (Raw (dummy_name ^^ string " when " ^^ dummy_name ^^ string " = " ^^ string tag_name), to_ir body))
+      fs
+  in
+  from_ir (Match (to_ir x, alts @ [ (Raw (string "_"), to_ir dflt) ]))
