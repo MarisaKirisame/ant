@@ -52,24 +52,31 @@ module MapStr = MakeMap (OrdStr)
 type ctx = {
   arity : (string, int) Hashtbl.t;
   ctag : (string, int) Hashtbl.t;
+  ctag_name : (string, string) Hashtbl.t;
   constructor_degree : int Dynarray.t;
   conts : (string * (world code -> words code -> unit code)) Dynarray.t;
   mutable conts_count : int;
   func_pc : (string, pc) Hashtbl.t;
 }
 
+let get_ctor_tag_name (name : string) : string = "tag_" ^ name
+
 let add_cont (ctx : ctx) (name : string) (arity : int) (app : world code -> words code -> unit code) : unit =
   Hashtbl.add_exn ctx.arity ~key:name ~data:arity;
   Hashtbl.add_exn ctx.ctag ~key:name ~data:(Hashtbl.length ctx.ctag);
+  Hashtbl.add_exn ctx.ctag_name ~key:name ~data:(get_ctor_tag_name name);
   Dynarray.add_last ctx.constructor_degree (1 - arity);
   Dynarray.add_last ctx.conts (name, app);
   ctx.conts_count <- ctx.conts_count + 1
+
+let ctor_tag_name (ctx : ctx) (cname : string) : int code = raw (Hashtbl.find_exn ctx.ctag_name cname)
 
 let new_ctx () : ctx =
   let ctx =
     {
       arity = Hashtbl.create (module Core.String);
       ctag = Hashtbl.create (module Core.String);
+      ctag_name = Hashtbl.create (module Core.String);
       constructor_degree = Dynarray.create ();
       conts = Dynarray.create ();
       conts_count = 0;
@@ -110,6 +117,7 @@ let with_registered_constructor (ctx : ctx) con_name types k =
   Hashtbl.add_exn ~key:con_name ~data:arity ctx.arity;
   let constructor_index = Hashtbl.length ctx.ctag in
   Hashtbl.add_exn ~key:con_name ~data:constructor_index ctx.ctag;
+  Hashtbl.add_exn ~key:con_name ~data:(get_ctor_tag_name con_name) ctx.ctag_name;
   Dynarray.add_last ctx.constructor_degree (1 - arity);
   k ~params ~arity ~constructor_index
 
@@ -157,10 +165,10 @@ let compile_adt_ffi e adt_name ctors =
   let h = raw (gensym "h") in
   let t = raw (gensym "t") in
   let discr =
-    match_int_default_ (word_get_value_ h)
+    match_ctor_tag_default_ (word_get_value_ h)
       (Stdlib.List.map
          (fun (con_name, types) ->
-           let tag = Hashtbl.find_exn e.ctag con_name in
+           let tag_name = Hashtbl.find_exn e.ctag_name con_name in
            let body =
              if List.length types = 0 then raw con_name
              else
@@ -170,7 +178,7 @@ let compile_adt_ffi e adt_name ctors =
                  (memo_splits_ t)
                  (app_ (raw con_name) (raw ("(" ^ String.concat "," names ^ ")")))
            in
-           (tag, body))
+           (tag_name, body))
          ctors)
       unreachable_
   in
@@ -356,7 +364,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
         seqs_
           [
             (fun _ -> assert_env_length_ w (int_ s.env_length));
-            (fun _ -> push_env_ w (from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname))));
+            (fun _ -> push_env_ w (from_constructor_ (ctor_tag_name ctx cname)));
             (fun _ -> k.k (push_s s) w);
           ]
   | App (Ctor cname, [ x0 ]) ->
@@ -369,7 +377,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                   (fun _ -> assert_env_length_ w (int_ s.env_length));
                   (fun _ ->
                     let_in_ "x0" (pop_env_ w) (fun x0 ->
-                        push_env_ w (memo_appends_ [ from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname)); x0 ])));
+                        push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0 ])));
                   (fun _ -> k.k (push_s (pop_s s)) w);
                 ]);
           fv = k.fv;
@@ -389,9 +397,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                           (fun _ ->
                             let_in_ "x1" (pop_env_ w) (fun x1 ->
                                 let_in_ "x0" (pop_env_ w) (fun x0 ->
-                                    push_env_ w
-                                      (memo_appends_
-                                         [ from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname)); x0; x1 ]))));
+                                    push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0; x1 ]))));
                           (fun _ -> k.k (push_s (pop_s (pop_s s))) w);
                         ]);
                   fv = k.fv;
@@ -421,12 +427,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                                             let_in_ "x0" (pop_env_ w) (fun x0 ->
                                                 push_env_ w
                                                   (memo_appends_
-                                                     [
-                                                       from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cname));
-                                                       x0;
-                                                       x1;
-                                                       x2;
-                                                     ])))));
+                                                     [ from_constructor_ (ctor_tag_name ctx cname); x0; x1; x2 ])))));
                                   (fun _ -> k.k (push_s (pop_s (pop_s (pop_s s)))) w);
                                 ]);
                           fv = k.fv;
@@ -466,8 +467,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                       (env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ xs_length))
                       (fun keep ->
                         set_k_ w
-                          (memo_appends_
-                             [ from_constructor_ (int_ (Hashtbl.find_exn ctx.ctag cont_name)); keep; world_kont_ w ])));
+                          (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ w ])));
                   (fun _ -> goto_ w (Hashtbl.find_exn ctx.func_pc f));
                 ]);
           fv = k.fv;
@@ -559,14 +559,19 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                 (to_unit_ $ pop_env_ w)
                 (fun _ ->
                   let s = pop_s s in
+                  let dummy = gensym "c" in
+                  let g cname =
+                    string dummy ^^ string " when " ^^ string dummy ^^ string " = "
+                    ^^ string (Hashtbl.find_exn ctx.ctag_name cname)
+                  in
                   let t =
                     Stdlib.List.map
                       (fun (pat, expr) ->
                         (*todo: special casing for now, as pat design need changes. *)
                         match pat with
-                        | PApp (cname, None) -> (int_ (Hashtbl.find_exn ctx.ctag cname), compile_pp_expr ctx s expr k w)
+                        | PApp (cname, None) -> (g cname, compile_pp_expr ctx s expr k w)
                         | PApp (cname, Some (PVar x0)) ->
-                            ( int_ (Hashtbl.find_exn ctx.ctag cname),
+                            ( g cname,
                               with_splits 1
                                 (memo_splits_ (pair_value_ x))
                                 (function
@@ -577,7 +582,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                                             w)
                                   | _ -> failwith "with_splits: unexpected arity") )
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
-                            ( int_ (Hashtbl.find_exn ctx.ctag cname),
+                            ( g cname,
                               with_splits 2
                                 (memo_splits_ (pair_value_ x))
                                 (function
@@ -595,7 +600,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                                         ]
                                   | _ -> failwith "with_splits: unexpected arity") )
                         | PApp (cname, Some (PTup [ PVar x0; PVar x1; PVar x2 ])) ->
-                            ( int_ (Hashtbl.find_exn ctx.ctag cname),
+                            ( g cname,
                               with_splits 3
                                 (memo_splits_ (pair_value_ x))
                                 (function
@@ -613,12 +618,12 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                                               w);
                                         ]
                                   | _ -> failwith "with_splits: unexpected arity") )
-                        | PAny -> (raw "_", compile_pp_expr ctx s expr k w)
+                        | PAny -> (string "_", compile_pp_expr ctx s expr k w)
                         | _ -> failwith (show_pattern pat))
                       c
                   in
-                  let default_case = (raw "_", unreachable_) in
-                  paren $ match_int_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])))))
+                  let default_case = (string "_", unreachable_) in
+                  paren $ match_raw_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])))))
 
 let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
   match s with
@@ -632,7 +637,7 @@ let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
       in
       let arg_num = s.env_length in
       let name = match x with Some (PVar x) -> x | _ -> failwith "bad match" in
-      let cont_done_tag = int_ (Hashtbl.find_exn ctx.ctag "cont_done") in
+      let cont_done_tag = ctor_tag_name ctx "cont_done" in
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
           ( lam_ "w" (fun w -> compile_pp_expr ctx s term { k = (fun s w -> return s w); fv = empty_fv () } w),
@@ -660,7 +665,7 @@ let generate_apply_cont ctx =
            if i == Dynarray.length ctx.conts then cont_codes
            else
              let name, action = Dynarray.get ctx.conts i in
-             let code = (Hashtbl.find_exn ctx.ctag name, action w tl) in
+             let code = (Hashtbl.find_exn ctx.ctag_name name, action w tl) in
              Dynarray.add_last cont_codes code;
              loop tl (i + 1)
          in
@@ -672,7 +677,7 @@ let generate_apply_cont ctx =
                (fun _ -> unit_)
                "hd" "tl"
                (fun hd tl ->
-                 paren $ match_int_default_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) unreachable_))))
+                 paren $ match_ctor_tag_default_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) unreachable_))))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
@@ -686,18 +691,26 @@ let generate_apply_cont_ ctx =
                "hd" "tl"
                (fun hd tl ->
                  paren
-                 $ match_int_default_ (word_get_value_ hd)
+                 $ match_ctor_tag_default_ (word_get_value_ hd)
                      (List.init (Dynarray.length ctx.conts) (fun i ->
                           let name, action = Dynarray.get ctx.conts i in
-                          (Hashtbl.find_exn ctx.ctag name, action w tl)))
+                          (Hashtbl.find_exn ctx.ctag_name name, action w tl)))
                      unreachable_))))
+
+let ctor_tag_decls ctx =
+  let xs = List.sort (fun (_, x) (_, y) -> x - y) (Hashtbl.to_alist ctx.ctag) in
+  separate_map (break 1)
+    (fun (name, tag) ->
+      let tag_name = get_ctor_tag_name name in
+      string "let " ^^ string tag_name ^^ string " = " ^^ string (string_of_int tag))
+    xs
 
 let pp_cek_ant x =
   let ctx = new_ctx () in
   let generated_stmt = separate_map (break 1) (compile_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
-  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ string "let memo = Array.init "
+  ^^ break 1 ^^ ctor_tag_decls ctx ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ string "let memo = Array.init "
   ^^ uncode (int_ (Dynarray.length codes))
   ^^ string "(fun _ -> ref State.BlackHole)" ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
