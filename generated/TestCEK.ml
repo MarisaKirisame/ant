@@ -12,8 +12,8 @@ let memo = Array.init 4 (fun _ -> ref State.BlackHole)
 
 type ocaml_int_list = Nil | Cons of Value.seq * Value.seq
 
-let int_list_Nil : Value.seq = Memo.appends [ Memo.from_constructor 1 ]
-let int_list_Cons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor 2; x0; x1 ]
+let int_list_Nil : Value.seq = Memo.appends [ Memo.from_constructor tag_Nil ]
+let int_list_Cons x0 x1 : Value.seq = Memo.appends [ Memo.from_constructor tag_Cons; x0; x1 ]
 let from_ocaml_int_list x = match x with Nil -> int_list_Nil | Cons (x0, x1) -> int_list_Cons x0 x1
 
 let to_ocaml_int_list x =

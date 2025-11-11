@@ -117,9 +117,10 @@ let with_registered_constructor (ctx : ctx) con_name types k =
   Hashtbl.add_exn ~key:con_name ~data:arity ctx.arity;
   let constructor_index = Hashtbl.length ctx.ctag in
   Hashtbl.add_exn ~key:con_name ~data:constructor_index ctx.ctag;
-  Hashtbl.add_exn ~key:con_name ~data:(get_ctor_tag_name con_name) ctx.ctag_name;
+  let tag_name = get_ctor_tag_name con_name in
+  Hashtbl.add_exn ~key:con_name ~data:tag_name ctx.ctag_name;
   Dynarray.add_last ctx.constructor_degree (1 - arity);
-  k ~params ~arity ~constructor_index
+  k ~params ~arity ~constructor_index ~tag_name
 
 let with_splits count splits k =
   let_in_ "splits" splits (fun parts ->
@@ -136,12 +137,12 @@ let with_splits count splits k =
 let compile_adt_constructors (e : ctx) adt_name ctors =
   separate_map (break 1)
     (fun (con_name, types) ->
-      with_registered_constructor e con_name types (fun ~params ~arity:_ ~constructor_index ->
+      with_registered_constructor e con_name types (fun ~params ~arity:_ ~constructor_index ~tag_name ->
           let param_names = List.map snd params in
           let param_docs = List.map string param_names in
           let param_codes : Value.seq code list = List.map (fun name -> code (string name)) param_names in
-          let ctor_tag = int_ constructor_index in
-          let body = memo_appends_ (from_constructor_ ctor_tag :: param_codes) in
+          (* let ctor_tag = int_ constructor_index in *)
+          let body = memo_appends_ (from_constructor_ (raw tag_name) :: param_codes) in
           string "let "
           ^^ string (adt_name ^ "_" ^ con_name)
           ^^ (if param_docs = [] then empty else space ^^ separate space param_docs)
