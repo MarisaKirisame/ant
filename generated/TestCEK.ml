@@ -2,14 +2,12 @@ open Ant
 open Word
 open Memo
 open Value
+open Common
 
 let tag_cont_done = 0
 let tag_Nil = 1
 let tag_Cons = 2
 let tag_cont_1 = 3
-
-open Common
-
 let memo = Array.init 4 (fun _ -> ref State.BlackHole)
 
 type ocaml_int_list = Nil | Cons of Value.seq * Value.seq
