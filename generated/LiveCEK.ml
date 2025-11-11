@@ -2,6 +2,7 @@ open Ant
 open Word
 open Memo
 open Value
+open Common
 
 let tag_cont_done = 0
 let tag_Z = 1
@@ -63,9 +64,6 @@ let tag_cont_16 = 56
 let tag_cont_17 = 57
 let tag_cont_18 = 58
 let tag_cont_19 = 59
-
-open Common
-
 let memo = Array.init 13 (fun _ -> ref State.BlackHole)
 
 type ocaml_nat = Z | S of Value.seq
