@@ -29,7 +29,7 @@ type env = { arity : (string, int) Hashtbl.t; ctag : (string, int) Hashtbl.t }
 let new_env () : env = { arity = Hashtbl.create (module Core.String); ctag = Hashtbl.create (module Core.String) }
 
 let compile_seq_ty ty =
-  match ty with TNamed "int" -> string "int" | TNamed _ -> string "Seq.seq" | _ -> failwith (show_ty ty)
+  match ty with TApply ("int", []) -> string "int" | TApply _ -> string "Seq.seq" | _ -> failwith (show_ty ty)
 
 let with_registered_constructor (e : env) con_name types k =
   let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
@@ -70,8 +70,8 @@ let compile_adt_constructors (e : env) adt_name ctors =
               (fun (ty, name) ->
                 let name_code = var name in
                 match ty with
-                | TNamed "int" -> app_ seq_from_int name_code
-                | TNamed _ -> name_code
+                | TApply ("int", []) -> app_ seq_from_int name_code
+                | TApply _ -> name_code
                 | _ -> failwith (show_ty ty))
               params
           in
@@ -122,8 +122,8 @@ let compile_adt_ffi e adt_name ctors =
               (List.map
                  (fun (ty, name) ->
                    match ty with
-                   | TNamed "int" -> doc_of_code (app_ seq_to_int (var name))
-                   | TNamed _ -> string name
+                   | TApply ("int", []) -> doc_of_code (app_ seq_to_int (var name))
+                   | TApply _ -> string name
                    | _ -> failwith (show_ty ty))
                  params)
           in
@@ -153,7 +153,7 @@ let rec compile_pp_expr (e : expr) : document =
   match e with
   | Lam (xs, e) -> string "fun " ^^ separate_map space pp_pattern' xs ^^ string " -> " ^^ compile_pp_expr e
   | Match (value, MatchPattern cases) ->
-      string "match (" ^^ string "to_ocaml_int_list" ^^ string " " ^^ compile_pp_expr value ^^ string ") with | "
+      string "match (" ^^ string "to_ocaml_int_list" ^^ space ^^ compile_pp_expr value ^^ string ") with | "
       ^^ separate_map
            (break 1 ^^ string "|")
            (fun (pat, expr) -> pp_pattern pat ^^ string " -> " ^^ compile_pp_expr expr)
@@ -164,7 +164,7 @@ let rec compile_pp_expr (e : expr) : document =
   | App (Ctor cname, []) -> string "int_list_" ^^ string cname
   | App (Ctor cname, es) ->
       string "int_list_" ^^ string cname ^^ string "(" ^^ separate_map (string ",") compile_pp_expr es ^^ string ")"
-  | App (f, xs) -> string "(" ^^ separate_map (string " ") compile_pp_expr (f :: xs) ^^ string ")"
+  | App (f, xs) -> string "(" ^^ separate_map space compile_pp_expr (f :: xs) ^^ string ")"
   | Op (op, l, r) -> string "(" ^^ compile_pp_expr l ^^ string op ^^ compile_pp_expr r ^^ string ")"
   | Int i -> string "(" ^^ string (string_of_int i) ^^ string ")"
   | _ -> failwith (show_expr e)

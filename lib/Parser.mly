@@ -188,22 +188,18 @@ function_type:
   | tuple_type "->" function_type { TArrow ($1, $3) }
 
 tuple_type:
-  | applied_type { $1 }
-  | sep_llist2("*", applied_type) { TTuple $1 }
+  | sep_llist2("*", atomic_type) { TTuple $1 }
 
 delimited_type:
   | "(" core_type ")" { $2 }
 
-applied_type:
-  | atomic_type type_args { if $2 = [] then $1 else TApply ($1, $2)  }
-
 atomic_type:
   | delimited_type { $1 }
   | "'" "<id>" { TNamedVar $2 }
-  | "<id>" { TNamed $1 }
+  | "<id>" type_args { TApply ($1, $2)  }
 
 ctor_args:
-  | inline_sep_llist1("*", applied_type) %prec below_HASH { $1 }
+  | inline_sep_llist1("*", atomic_type) %prec below_HASH { $1 }
   // TODO: add support for record types
 
 ctor_decl:
