@@ -716,7 +716,7 @@ let pp_cek_ant x =
   ^^ string "(fun _ -> ref State.BlackHole)" ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
-            string "let () = add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ string " " ^^ uncode (int_ i)))
+            string "let () = add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i)))
   ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length ctx.constructor_degree) (fun i ->

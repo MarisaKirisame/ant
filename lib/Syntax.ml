@@ -48,11 +48,10 @@ type ty =
   | TInt
   | TFloat
   | TBool
-  | TApply of ty * ty list
+  | TApply of string * ty list
   | TArrow of ty * ty
   | TTuple of ty list
   | TVar of ty ref
-  | TNamed of string
   | TNamedVar of string
 [@@deriving show]
 
@@ -161,14 +160,13 @@ let pp_ty =
     | TInt -> string "int"
     | TFloat -> string "float"
     | TBool -> string "bool"
-    | TApply (ty, []) -> f c ty
-    | TApply (ty, [ ty2 ]) -> f c ty2 ^^ space ^^ f c ty
-    | TApply (ty, tys) -> (parens @@ separate_map (string ",") (f true) tys) ^^ space ^^ f c ty |> pp
+    | TApply (ty, []) -> string ty
+    | TApply (ty, [ ty2 ]) -> f c ty2 ^^ space ^^ string ty
+    | TApply (ty, tys) -> (parens @@ separate_map (string ",") (f true) tys) ^^ space ^^ string ty |> pp
     | TArrow (ty1, ty2) -> f true ty1 ^^ space ^^ string "->" ^^ space ^^ f true ty2 |> pp
     | TTuple tys -> separate_map (string "*") (f true) tys |> parens
     | TVar { contents = ty } -> f c ty (* TODO: cycle *)
     | TNamedVar name -> string ("'" ^ name)
-    | TNamed name -> string name
   in
   f false
 

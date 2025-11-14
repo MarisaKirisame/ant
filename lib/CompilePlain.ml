@@ -11,11 +11,11 @@ let rec compile_ty (x : ty) : document =
   | TInt -> string "int"
   | TFloat -> string "float"
   | TBool -> string "bool"
-  | TApply (f, xs) -> parens (separate_map (string ", ") compile_ty xs) ^^ string " " ^^ compile_ty f
+  | TApply (f, []) -> string f
+  | TApply (f, xs) -> parens (separate_map (string ", ") compile_ty xs) ^^ space ^^ string f
   | TArrow (con, cov) -> compile_ty con ^^ string " -> " ^^ compile_ty cov
   | TTuple xs -> string "(" ^^ separate_map (string ", ") compile_ty xs ^^ string ")"
   | TVar tyref -> compile_ty !tyref
-  | TNamed name -> string name
   | TNamedVar name -> string name
 
 let compile_ctor (name, tys) =
@@ -23,9 +23,7 @@ let compile_ctor (name, tys) =
   else string name ^^ string " of " ^^ separate_map (string " * ") (fun x -> parens (compile_ty x)) tys
 
 let comple_type_decl name (Enum { params; ctors }) =
-  string name ^^ string " "
-  ^^ separate_map (string " ") string params
-  ^^ string " = "
+  string name ^^ space ^^ separate_map space string params ^^ string " = "
   ^^ separate_map (string "| ") compile_ctor ctors
 
 let compile_type_binding x =
@@ -44,7 +42,7 @@ let rec compile_pat (p : pattern) : document =
   | PUnit -> string "()"
   | PTup xs -> string "(" ^^ separate_map (string ", ") compile_pat xs ^^ string ")"
   | PApp (name, None) -> string name
-  | PApp (name, Some p') -> string name ^^ string " " ^^ compile_pat p'
+  | PApp (name, Some p') -> string name ^^ space ^^ compile_pat p'
 
 and parens_compile_pat p = parens (compile_pat p)
 
@@ -59,13 +57,13 @@ let rec compile_expr (e : expr) : document =
   | Var name -> string name
   | GVar name -> string name
   | Ctor name -> string name
-  | App (Ctor name, args) -> string name ^^ string " " ^^ parens (separate_map (string ", ") parens_compile_expr args)
-  | App (fn, args) -> parens_compile_expr fn ^^ string " " ^^ separate_map (string " ") parens_compile_expr args
+  | App (Ctor name, args) -> string name ^^ space ^^ parens (separate_map (string ", ") parens_compile_expr args)
+  | App (fn, args) -> parens_compile_expr fn ^^ space ^^ separate_map space parens_compile_expr args
   | Op (op, lhs, rhs) -> parens (parens_compile_expr lhs ^^ string op ^^ parens_compile_expr rhs)
   | Tup xs -> string "(" ^^ separate_map (string ", ") compile_expr xs ^^ string ")"
   | Arr xs -> string "[]" ^^ separate_map (string "; ") compile_expr xs ^^ string "]"
   | Lam (ps, value) ->
-      string "fun " ^^ separate_map (string " ") parens_compile_pat ps ^^ string " -> " ^^ parens_compile_expr value
+      string "fun " ^^ separate_map space parens_compile_pat ps ^^ string " -> " ^^ parens_compile_expr value
   | Let (binding, value) -> compile_binding binding (parens_compile_expr value)
   | Sel (expr, prop) -> parens_compile_expr expr ^^ string "." ^^ string prop
   | If (c, p, n) ->

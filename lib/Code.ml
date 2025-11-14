@@ -34,7 +34,7 @@ let lam_ (a : string) (f : 'a code -> 'b code) : ('a -> 'b) code =
 let lam2_ (a : string) (b : string) (f : 'a code -> 'b code -> 'c code) : ('a -> 'b -> 'c) code =
   let a_doc = string (gensym a) in
   let b_doc = string (gensym b) in
-  from_ir (Paren (Lam (Raw (a_doc ^^ string " " ^^ b_doc), to_ir (f (code a_doc) (code b_doc)))))
+  from_ir (Paren (Lam (Raw (a_doc ^^ space ^^ b_doc), to_ir (f (code a_doc) (code b_doc)))))
 
 let lam3_ (a : string) (b : string) (c : string) (f : 'a code -> 'b code -> 'c code -> 'd code) :
     ('a -> 'b -> 'c -> 'd) code =
@@ -42,8 +42,7 @@ let lam3_ (a : string) (b : string) (c : string) (f : 'a code -> 'b code -> 'c c
   let b_doc = string (gensym b) in
   let c_doc = string (gensym c) in
   from_ir
-    (Paren
-       (Lam (Raw (a_doc ^^ string " " ^^ b_doc ^^ string " " ^^ c_doc), to_ir (f (code a_doc) (code b_doc) (code c_doc)))))
+    (Paren (Lam (Raw (a_doc ^^ space ^^ b_doc ^^ space ^^ c_doc), to_ir (f (code a_doc) (code b_doc) (code c_doc)))))
 
 let lam4_ (a : string) (b : string) (c : string) (d : string) (f : 'a code -> 'b code -> 'c code -> 'd code -> 'e code)
     : ('a -> 'b -> 'c -> 'd -> 'e) code =
@@ -54,7 +53,7 @@ let lam4_ (a : string) (b : string) (c : string) (d : string) (f : 'a code -> 'b
   from_ir
     (Paren
        (Lam
-          ( Raw (a_doc ^^ string " " ^^ b_doc ^^ string " " ^^ c_doc ^^ string " " ^^ d_doc),
+          ( Raw (a_doc ^^ space ^^ b_doc ^^ space ^^ c_doc ^^ space ^^ d_doc),
             to_ir (f (code a_doc) (code b_doc) (code c_doc) (code d_doc)) )))
 
 let app_ (f : ('a -> 'b) code) (a : 'a code) : 'b code = from_ir (Paren (App (to_ir f, [ to_ir a ])))

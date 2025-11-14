@@ -20,7 +20,7 @@ let rec ir_to_doc ir =
   | Unit -> string "()"
   | Function str -> string str
   | Paren inner -> string "(" ^^ ir_to_doc inner ^^ string ")"
-  | App (fn, args) -> List.fold_left (fun acc x -> acc ^^ string " " ^^ ir_to_doc x) (ir_to_doc fn) args
+  | App (fn, args) -> List.fold_left (fun acc x -> acc ^^ space ^^ ir_to_doc x) (ir_to_doc fn) args
   | Lam (args, body) -> string "fun " ^^ ir_to_doc args ^^ string " -> " ^^ ir_to_doc body
   | Match (x, y :: ys) ->
       let mk (p, b) = string "| " ^^ ir_to_doc p ^^ string " -> " ^^ ir_to_doc b in
