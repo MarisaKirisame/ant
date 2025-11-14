@@ -11,7 +11,7 @@ let rec compile_ty (x : ty) : document =
   | TInt -> string "int"
   | TFloat -> string "float"
   | TBool -> string "bool"
-  | TApply (f, xs) -> compile_ty f ^^ string " " ^^ separate_map (string " ") compile_ty xs
+  | TApply (f, xs) -> parens (separate_map (string ", ") compile_ty xs) ^^ string " " ^^ compile_ty f
   | TArrow (con, cov) -> compile_ty con ^^ string " -> " ^^ compile_ty cov
   | TTuple xs -> string "(" ^^ separate_map (string ", ") compile_ty xs ^^ string ")"
   | TVar tyref -> compile_ty !tyref
