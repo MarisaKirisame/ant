@@ -79,7 +79,7 @@ let eval = fun expr env ->
       | VInt yi -> VInt (xi + yi)
       | VStuck ys -> VStuck (SAdd1 xv ys)
       | _ -> VStuck (STypeError yv VInt))
-    | VStuck xs -> VStuck (SAdd0 xv y)
+    | VStuck xs -> VStuck (SAdd0 xs y)
     | _ -> VStuck (STypeError xv VTInt))
   | EVar idx -> 
     (match index env idx with

@@ -823,7 +823,7 @@ let () =
               let split0_13 = List.nth splits_13 0 in
               push_env w_6 split0_13;
               assert_env_length w_6 4;
-              push_env w_6 (Dynarray.get w_6.state.e 2);
+              push_env w_6 (Dynarray.get w_6.state.e 3);
               assert_env_length w_6 5;
               push_env w_6 (Dynarray.get w_6.state.e 1);
               assert_env_length w_6 6;
