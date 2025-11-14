@@ -93,7 +93,9 @@ let empty : words = Generic.empty
 let append (x : words) (y : words) : words = Generic.append ~monoid ~measure x y
 let appends (x : words list) : words = List.fold_right append x empty
 let cons (x : Word.t) (y : words) : words = Generic.cons ~monoid ~measure y x
-let list_match (x : words) : (Word.t * words) option = Option.map (fun (x, y) -> (y, x)) (Generic.front ~monoid ~measure x)
+
+let list_match (x : words) : (Word.t * words) option =
+  Option.map (fun (x, y) -> (y, x)) (Generic.front ~monoid ~measure x)
 
 let pop_n (s : words) (n : int) : words * words =
   let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in

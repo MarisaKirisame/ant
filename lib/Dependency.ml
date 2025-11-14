@@ -32,62 +32,119 @@ open BatFingerTree
  *   - 1: Build up A'[X] = A[F[X]], D'[X] = D[G[X]]
  *   - 2: The composed step is then A'[X] -> D'[X], which we add to the memo trie.
  *)
+type measure = { val_count : int }
 
-type ('a, 'measure) gap_seq = { head : 'a option; slices : ('a, 'measure) slices; val_count : int }
-and ('a, 'measure) slices = ('a slice, measure) Generic.fg
-and 'a slice = { offset : int; a : 'a }
+(*Invariant: no consecutive pat of the same constructor*)
+type pattern = (pat, measure) Generic.fg
 
-type pattern = (match_words, measure) gap_seq
-and match_words = { words : words; children : pattern; val_count : int }
-and measure = { degree : int; max_degree : int }
+(*Note that val_count stand for the number of values in input, not the number of values in output(children).*)
+and pat = PVar of int | PCon of { words : words; children : pattern; val_count : int }
 
 let monoid : measure monoid =
-  {
-    zero = { degree = 0; max_degree = 0 };
-    combine = (fun x y -> { degree = x.degree + y.degree; max_degree = max x.max_degree (x.degree + y.max_degree) });
-  }
+  { zero = { val_count = 0 }; combine = (fun x y -> { val_count = x.val_count + y.val_count }) }
 
-let match_words_measure (slice : match_words slice) : measure =
-  { degree = slice.offset + slice.a.val_count; max_degree = slice.offset + slice.a.val_count }
+let pat_measure (p : pat) : measure = match p with PVar n -> { val_count = n } | PCon c -> { val_count = c.val_count }
+let pattern_measure (p : pattern) : measure = Generic.measure ~monoid ~measure:pat_measure p
 
-type reads = (read, measure) gap_seq
-and read = { length : int;  children : reads; val_count : int }
+(*Invariant: no consecutive read of the same constructor*)
+type reads = (read, measure) Generic.fg
+and read = RVar of int | RCon of { length : int; children : reads; val_count : int }
 
-let pattern_to_reads (p : pattern) : reads list = failwith "unimplemented"
+let read_measure (r : read) : measure =
+  match r with RVar n -> { val_count = n } | RCon c -> { val_count = c.val_count }
 
-(*lets ignore CEK stuff for now, those codes should be trivial.*)
+let rec pattern_to_reads (p : pattern) : reads =
+  Generic.map ~monoid ~measure:read_measure
+    (fun x ->
+      match x with
+      | PVar n -> RVar n
+      | PCon c ->
+          RCon { length = Words.length c.words; val_count = c.val_count; children = pattern_to_reads c.children })
+    p
+
+(*lets ignore CEK stuff for now, those codes should be straightforward.*)
 type memo =
   (*Note how we are storing two pattern: the outer one is partial (consumed by the trie), and the inner one is complete*)
   | Leaf of { pattern : pattern; step : step }
   | Branch of { reads : reads; children : (fetch_hash, memo) Hashtbl.t; step : step }
-and fetch_hash = int
-and step = {
-  src : pattern;
-  dst : value;
-  sc : int;
-}
 
-let seq_to_pattern (s : seq) (r : reads) : pattern = failwith "unimplemented"
+and fetch_hash = int
+and step = { src : pattern; dst : value; sc : int }
+
+let pat_append x y = Generic.append ~monoid ~measure:pat_measure x y
+let pattern_rear_exn (p : pattern) : pattern * pat = Generic.rear_exn ~monoid ~measure:pat_measure p
+
+let pattern_front_exn (p : pattern) : pat * pattern =
+  let rest_p, first_p = Generic.front_exn ~monoid ~measure:pat_measure p in
+  (first_p, rest_p)
+
+let rec pattern_append (x : pattern) (y : pattern) : pattern =
+  if Generic.is_empty x then y
+  else if Generic.is_empty y then x
+  else
+    let rest_x, last_x = pattern_rear_exn x in
+    let first_y, rest_y = pattern_front_exn y in
+    let with_middle middle = pat_append (Generic.cons ~monoid ~measure:pat_measure rest_x middle) rest_y in
+    match (last_x, first_y) with
+    | PVar n1, PVar n2 -> with_middle (PVar (n1 + n2))
+    | PCon c1, PCon c2 ->
+        with_middle
+          (PCon
+             {
+               words = Words.append c1.words c2.words;
+               children = pattern_append c1.children c2.children;
+               val_count = c1.val_count + c2.val_count;
+             })
+    | _ -> pat_append x y
+
+let pattern_cons (x : pat) (y : pattern) : pattern = pattern_append (Generic.singleton x) y
+
+let pattern_option_cons (x : pat) (y : pattern option) : pattern option =
+  match y with None -> None | Some y -> Some (pattern_append (Generic.singleton x) y)
+
+(* TODO: redo this function. we have to start by implementing chop/split/length, to take the same slice,
+ * given that, use it to refactor the code.
+ * pcon also need to take degree/max_degree, as its 'value count' can be <0.
+ *)
 (*match x with y z -> z*)
-let subtract (x : pattern) (y : pattern) : pattern option = failwith "unimplemented"
+let rec subtract (x : pattern) (y : pattern) : pattern option =
+  (*We might try to be more lenient with val_count, but that is hard and unnecessary.*)
+  if (pattern_measure x).val_count != (pattern_measure y).val_count then None
+  else if Generic.is_empty x then (
+    assert (Generic.is_empty y);
+    Some Generic.empty)
+  else (
+    assert (not (Generic.is_empty x));
+    assert (not (Generic.is_empty y));
+    let xh, xt = pattern_front_exn x in
+    let yh, yt = pattern_front_exn y in
+    match (xh, yh) with
+    | PVar xh, PVar yh ->
+        if xh < yh then pattern_option_cons (PVar xh) (subtract xt (pattern_cons (PVar (yh - xh)) yt))
+        else if xh > yh then pattern_option_cons (PVar yh) (subtract (pattern_cons (PVar (xh - yh)) xt) yt)
+        else pattern_option_cons (PVar xh) (subtract xt yt)
+    | PCon xh, PCon yh -> failwith "unimplemented"
+    | PVar _, PCon _ -> None
+    | PCon xh, PVar yh ->
+        let xl = Words.length xh.words in
+        if xl < yh then pattern_option_cons (PCon xh) (subtract xt (pattern_cons (PVar (yh - xl)) yt))
+        else if xl > yh then 
+          failwith "unimplemented"
+        else pattern_option_cons (PCon xh) (subtract xt yt))
 
 let seq_match (x : seq) (y : pattern) : seq option = failwith "unimplemented"
-
-let walk_seq (m : memo) (s : seq) : (memo * seq) = failwith "unimplemented"
-
-let walk_pattern (m : memo) (p : pattern) : (memo * pattern) = failwith "unimplemented"
-
+let walk_seq (m : memo) (s : seq) : memo * seq = failwith "unimplemented"
+let walk_pattern (m : memo) (p : pattern) : memo * pattern = failwith "unimplemented"
 let to_seq (x : pattern) (y : seq) : seq = failwith "unimplemented"
 
 (*find_step have to walk down, and call to_seq on the holes*)
-let find_step (m : memo) (s : seq) : (seq * step) = failwith "unimplemented"
-
+let find_step (m : memo) (s : seq) : seq * step = failwith "unimplemented"
 let raw_step (s : seq) : step = failwith "unimplemented"
 
 (*antiunification. symmetric*)
 let antiunify (x : pattern) (y : pattern) : pattern = failwith "unimplemented"
-
 let reads_intersect (x : reads) (y : reads) : reads = failwith "unimplemented"
+
 (* Walk down and insert the step there.
  * One might have failed on a Branch.
  * In that case call antiunify on branch and the remaining pattern and insert new Branch nodes.
