@@ -7,6 +7,7 @@ let free, free_p =
   let rec do_expr s = function
     | Unit | Int _ | Float _ | Bool _ | Str _ | Builtin _ -> s
     | Var x -> SSet.add x s
+    | GVar x -> SSet.add x s
     | Ctor _ -> s
     | Lam (ps, e) -> SSet.diff (do_expr s e) (List.fold_left do_pattern SSet.empty ps)
     | App (f, xs) -> List.fold_left do_expr s (f :: xs)
@@ -209,6 +210,7 @@ let defunc ctx expr =
     | Str s -> (Str s, [])
     | Builtin b -> (Builtin b, [])
     | Var x -> ( match Ctx.find_opt x ctx with Some c -> (Ctor c, []) | None -> (Var x, []))
+    | GVar x -> (GVar x, [])
     | Ctor x -> (Ctor x, [])
     | Op (op, e1, e2) ->
         let e1, l1 = aux ctx e1 in
