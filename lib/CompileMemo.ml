@@ -33,21 +33,15 @@ open Code
  *   only using K whenever we do a non-tail function call.
  *)
 
-module OrdStr = struct
-  type t = string
-
-  let compare (x : string) (y : string) : int = if x < y then -1 else if x > y then 1 else 0
-end
-
 exception DupKey
 
 module MakeMap (Ord : Stdlib.Map.OrderedType) = struct
   include Stdlib.Map.Make (Ord)
 
-  let add_exn x data t = if exists (fun y _ -> y == x) t then raise DupKey else add x data t
+  let add_exn x data t = if mem x t then raise DupKey else add x data t
 end
 
-module MapStr = MakeMap (OrdStr)
+module MapStr = MakeMap String
 
 type ctx = {
   arity : (string, int) Hashtbl.t;
