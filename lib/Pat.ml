@@ -1,32 +1,6 @@
 open Syntax
 
-let compile ast = ast
-
-type occurrence = int list [@@deriving show]
-
-let rec pp_occ = function
-  | [] -> PPrint.string "\\"
-  | x :: xs -> PPrint.(pp_occ xs ^^ string "." ^^ string (string_of_int x))
-
-module OccurrenceMap = Map.Make (struct
-  type t = occurrence
-
-  let compare = compare
-end)
-
-module StringMap = Map.Make (struct
-  type t = string
-
-  let compare = String.compare
-end)
-
-type pattern_matrix = {
-  arity : int;
-  occs : occurrence list;
-  bnds : string OccurrenceMap.t list;
-  pats : pattern list list;
-  acts : int list;
-}
+(* NOTE: the current backend is ocaml. We don't need to compile it so far? *)
 
 let[@tail_mod_cons] rec map3 f l1 l2 l3 =
   match (l1, l2, l3) with
@@ -52,6 +26,36 @@ let rec unzip_map3 f l1 l2 l3 =
       let rl1, rl2, rl3 = unzip_map3 f l1 l2 l3 in
       (ra1 :: ra2 :: rl1, rb1 :: rb2 :: rl2, rc1 :: rc2 :: rl3)
   | _, _, _ -> invalid_arg "unzip_map3"
+
+let compile ast = ast
+
+type occurrence = int list [@@deriving show]
+
+let rec pp_occ = function
+  | [] -> PPrint.string "\\"
+  | x :: xs -> PPrint.(pp_occ xs ^^ string "." ^^ string (string_of_int x))
+
+module OccurrenceMap = Map.Make (struct
+  type t = occurrence
+
+  let compare = compare
+end)
+
+module StringMap = Map.Make (struct
+  type t = string
+
+  let compare = String.compare
+end)
+
+(* TODO: define action *)
+
+type pattern_matrix = {
+  arity : int;
+  occs : occurrence list;
+  bnds : string OccurrenceMap.t list;
+  pats : pattern list list;
+  acts : int list;
+}
 
 (*
   output format:
@@ -87,6 +91,8 @@ let pp_pattern_matrix { arity; occs; bnds; pats; acts } =
                     List.map (fun (k, v) -> pp_occ k ^^ string "->" ^^ string v) bnd ))
          pats bnds acts)
 
+type bounders = occurrence * string list
+type decision = Succeed of bounders * expr | Switch of occurrence * decision list | Fail
 type patdesc = PDInt of int | PDBool of bool | PDUnit | PDCtor of string * int | PDTuple of int [@@deriving show]
 
 let pat_desc pattern =
@@ -196,6 +202,10 @@ let assert_valid mat =
   List.iter (fun row -> if List.length row <> arity then failwith "row length mismatch") pats;
   mat
 
+let is_mat_empty mat =
+  assert_valid mat |> ignore;
+  List.is_empty mat.pats
+
 let spec_mat ctor col mat =
   let { arity; occs; bnds; pats; acts } = mat in
   let arity_map = List.fold_left (fun map pats -> check_arity map @@ List.nth pats col) StringMap.empty pats in
@@ -219,6 +229,20 @@ let spec_mat ctor col mat =
 
 let is_trivial = function PAny | PVar _ -> true | _ -> false
 let pat_identifier = function PVar x -> Some x | _ -> None
+
+let action_of_trivial_first_row mat =
+  match mat.pats with
+  | [] -> None
+  | row :: _ ->
+      if List.for_all is_trivial row then
+        let bnds = List.hd mat.bnds in
+        let new_bnds =
+          List.fold_left2
+            (fun acc pat occ -> match pat_identifier pat with Some name -> OccurrenceMap.add occ name acc | _ -> acc)
+            bnds row mat.occs
+        in
+        Some (new_bnds, List.hd mat.acts)
+      else None
 
 let default_cell pat occ =
   if is_trivial pat then
@@ -318,9 +342,51 @@ let make_mat pats acts =
   let pats = List.map (fun pat -> [ pat ]) pats in
   { arity; occs; bnds; pats; acts }
 
+let make_single_mat pat = make_mat [ pat ] [ 0 ]
+let compile_mat mat = if is_mat_empty mat then Fail else (* TODO *) Fail
+
+let lower_pat_mat expr =
+  let rec aux = function
+    | Unit | Bool _ | Int _ | Float _ | Str _ | Builtin _ | Var _ | GVar _ | Ctor _ -> expr
+    | App (f, args) ->
+        let f = aux f in
+        let args = List.map aux args in
+        App (f, args)
+    | Op (op, e1, e2) ->
+        let e1 = aux e1 in
+        let e2 = aux e2 in
+        Op (op, e1, e2)
+    | Tup args -> Tup (List.map aux args)
+    | Arr args -> Arr (List.map aux args)
+    | Lam (pats, e) ->
+        let _mats = List.map make_single_mat pats in
+        Lam (pats, aux e)
+    | Let (BSeq e1, e2) ->
+        let e1 = aux e1 in
+        Let (BSeq e1, aux e2)
+    | Let (BOne (pat, e1), e2) ->
+        let _mat = make_single_mat pat in
+        let e1 = aux e1 in
+        let e2 = aux e2 in
+        Let (BOne (pat, e1), e2)
+    | Let (BRec bindings, e2) ->
+        (* TODO *)
+        Let (BRec (List.map (fun (pat, e1) -> (pat, aux e1)) bindings), aux e2)
+    | Let (_, e2) -> (* Skip the continuation binding since they are produced by later passes *) aux e2
+    | Sel (e, _) -> aux e
+    | If (c, e1, e2) -> If (aux c, aux e1, aux e2)
+    | Match (e, MatchPattern cases) ->
+        let e = aux e in
+        let pats = List.map (fun (pat, _) -> pat) cases in
+        let acts = List.mapi (fun i (_, _) -> i) cases in
+        let _mat = make_mat pats acts in
+        Match (e, MatchPattern (List.map (fun (pat, arm) -> (pat, aux arm)) cases))
+  in
+  aux expr
+
 let collect_pat_mat expr =
   let rec aux acc = function
-    | Unit | Bool _ | Int _ | Float _ | Str _ | Builtin _ | Var _ | Ctor _ -> List.rev acc
+    | Unit | Bool _ | Int _ | Float _ | Str _ | Builtin _ | Var _ | GVar _ | Ctor _ -> List.rev acc
     | App (f, args) ->
         let acc = aux acc f in
         List.fold_left aux acc args
