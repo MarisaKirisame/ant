@@ -21,7 +21,7 @@ let to_ocaml_int_list x =
   match Word.get_value h_0 with
   | c_0 when c_0 = tag_Nil -> Nil
   | c_0 when c_0 = tag_Cons ->
-      let [ x0_0; x1_0 ] = Memo.splits t_0 in
+      let x0_0, x1_0 = Memo.splits_2 t_0 in
       Cons (x0_0, x1_0)
   | _ -> failwith "unreachable"
 

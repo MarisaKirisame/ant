@@ -1,5 +1,5 @@
 let ( % ) f g x = f (g x)
-let ( $ ) f x = f x
+let ( $ ) = ( @@ )
 let todo msg = failwith ("todo: " ^ msg)
 
 let debug str f =
