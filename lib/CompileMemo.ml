@@ -41,7 +41,7 @@ module MakeMap (Ord : Stdlib.Map.OrderedType) = struct
   let add_exn x data t = if mem x t then raise DupKey else add x data t
 end
 
-module MapStr = MakeMap String
+module MapStr = MakeMap (String)
 
 type ctx = {
   arity : (string, int) Hashtbl.t;
