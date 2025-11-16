@@ -136,6 +136,13 @@ let memo_from_int_ (i : int code) : Value.seq code = app_ (from_ir $ Function "M
 let int_from_word_ (w : Word.t code) : int code = app_ (from_ir $ Function "Word.get_value") w
 let memo_splits_ (seq : Value.seq code) : Value.seq list code = app_ (from_ir $ Function "Memo.splits") seq
 
+(* NOTE: this number should be modified w.r.t the definition of Memo.splits_* in Memo.ml *)
+let n_max_specialized_arity = 4
+
+let memo_splits_specialized_ (seq : Value.seq code) (n : int) =
+  if n > n_max_specialized_arity then memo_splits_ seq
+  else app_ (from_ir $ Function ("Memo.splits_" ^ string_of_int n)) seq
+
 let memo_list_match_ (seq : Value.seq code) : (Word.t * Value.seq) option code =
   app_ (from_ir $ Function "Memo.list_match") seq
 
@@ -159,6 +166,8 @@ let list_literal_ (xs : 'a code list) : 'a list code =
 
 let list_literal_of_ (f : 'a -> 'b code) (xs : 'a list) : 'b list code = list_literal_ (Stdlib.List.map f xs)
 let list_nth_ (xs : 'a list code) (i : int code) : 'a code = app2_ (from_ir $ Function "List.nth") xs i
+let tuple_ (xs : 'a code list) : 'a list code = code (parens (separate_map (string ", ") (fun x -> uncode x) xs))
+let memo_splits_pat_ (xs : 'a code list) = if List.length xs > n_max_specialized_arity then list_ xs else tuple_ xs
 
 let match_option_ (x : 'a option code) (none : unit -> 'b code) (a : string) (some : 'a code -> 'b code) : 'b code =
   let name_doc = string (gensym a) in

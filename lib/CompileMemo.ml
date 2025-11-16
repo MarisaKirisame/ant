@@ -169,8 +169,8 @@ let compile_adt_ffi e adt_name ctors =
              else
                let names = List.mapi (fun i _ -> gensym ("x" ^ string_of_int i)) types in
                let_pat_in_
-                 (list_ (List.map raw names))
-                 (memo_splits_ t)
+                 (memo_splits_pat_ (List.map raw names))
+                 (memo_splits_specialized_ t (List.length types))
                  (app_ (raw con_name) (raw ("(" ^ String.concat "," names ^ ")")))
            in
            (tag_name, body))

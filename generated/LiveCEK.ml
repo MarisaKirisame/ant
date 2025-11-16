@@ -77,7 +77,7 @@ let to_ocaml_nat x =
   match Word.get_value h_0 with
   | c_0 when c_0 = tag_Z -> Z
   | c_0 when c_0 = tag_S ->
-      let [ x0_0 ] = Memo.splits t_0 in
+      let x0_0 = Memo.splits_1 t_0 in
       S x0_0
   | _ -> failwith "unreachable"
 
@@ -92,7 +92,7 @@ let to_ocaml_list x =
   match Word.get_value h_1 with
   | c_1 when c_1 = tag_Nil -> Nil
   | c_1 when c_1 = tag_Cons ->
-      let [ x0_1; x1_0 ] = Memo.splits t_1 in
+      let x0_1, x1_0 = Memo.splits_2 t_1 in
       Cons (x0_1, x1_0)
   | _ -> failwith "unreachable"
 
@@ -107,7 +107,7 @@ let to_ocaml_option x =
   match Word.get_value h_2 with
   | c_2 when c_2 = tag_None -> None
   | c_2 when c_2 = tag_Some ->
-      let [ x0_2 ] = Memo.splits t_2 in
+      let x0_2 = Memo.splits_1 t_2 in
       Some x0_2
   | _ -> failwith "unreachable"
 
@@ -163,37 +163,37 @@ let to_ocaml_expr x =
   let h_3, t_3 = Option.get (Memo.list_match x) in
   match Word.get_value h_3 with
   | c_3 when c_3 = tag_EInt ->
-      let [ x0_3 ] = Memo.splits t_3 in
+      let x0_3 = Memo.splits_1 t_3 in
       EInt x0_3
   | c_3 when c_3 = tag_EPlus ->
-      let [ x0_4; x1_1 ] = Memo.splits t_3 in
+      let x0_4, x1_1 = Memo.splits_2 t_3 in
       EPlus (x0_4, x1_1)
   | c_3 when c_3 = tag_EVar ->
-      let [ x0_5 ] = Memo.splits t_3 in
+      let x0_5 = Memo.splits_1 t_3 in
       EVar x0_5
   | c_3 when c_3 = tag_EAbs ->
-      let [ x0_6 ] = Memo.splits t_3 in
+      let x0_6 = Memo.splits_1 t_3 in
       EAbs x0_6
   | c_3 when c_3 = tag_EApp ->
-      let [ x0_7; x1_2 ] = Memo.splits t_3 in
+      let x0_7, x1_2 = Memo.splits_2 t_3 in
       EApp (x0_7, x1_2)
   | c_3 when c_3 = tag_ELet ->
-      let [ x0_8; x1_3 ] = Memo.splits t_3 in
+      let x0_8, x1_3 = Memo.splits_2 t_3 in
       ELet (x0_8, x1_3)
   | c_3 when c_3 = tag_ETrue -> ETrue
   | c_3 when c_3 = tag_EFalse -> EFalse
   | c_3 when c_3 = tag_EIf ->
-      let [ x0_9; x1_4; x2_0 ] = Memo.splits t_3 in
+      let x0_9, x1_4, x2_0 = Memo.splits_3 t_3 in
       EIf (x0_9, x1_4, x2_0)
   | c_3 when c_3 = tag_ENil -> ENil
   | c_3 when c_3 = tag_ECons ->
-      let [ x0_10; x1_5 ] = Memo.splits t_3 in
+      let x0_10, x1_5 = Memo.splits_2 t_3 in
       ECons (x0_10, x1_5)
   | c_3 when c_3 = tag_EMatchList ->
-      let [ x0_11; x1_6; x2_1 ] = Memo.splits t_3 in
+      let x0_11, x1_6, x2_1 = Memo.splits_3 t_3 in
       EMatchList (x0_11, x1_6, x2_1)
   | c_3 when c_3 = tag_EFix ->
-      let [ x0_12 ] = Memo.splits t_3 in
+      let x0_12 = Memo.splits_1 t_3 in
       EFix x0_12
   | c_3 when c_3 = tag_EHole -> EHole
   | _ -> failwith "unreachable"
@@ -232,22 +232,22 @@ let to_ocaml_value x =
   let h_4, t_4 = Option.get (Memo.list_match x) in
   match Word.get_value h_4 with
   | c_4 when c_4 = tag_VInt ->
-      let [ x0_13 ] = Memo.splits t_4 in
+      let x0_13 = Memo.splits_1 t_4 in
       VInt x0_13
   | c_4 when c_4 = tag_VAbs ->
-      let [ x0_14; x1_7 ] = Memo.splits t_4 in
+      let x0_14, x1_7 = Memo.splits_2 t_4 in
       VAbs (x0_14, x1_7)
   | c_4 when c_4 = tag_VTrue -> VTrue
   | c_4 when c_4 = tag_VFalse -> VFalse
   | c_4 when c_4 = tag_VNil -> VNil
   | c_4 when c_4 = tag_VCons ->
-      let [ x0_15; x1_8 ] = Memo.splits t_4 in
+      let x0_15, x1_8 = Memo.splits_2 t_4 in
       VCons (x0_15, x1_8)
   | c_4 when c_4 = tag_VFix ->
-      let [ x0_16; x1_9 ] = Memo.splits t_4 in
+      let x0_16, x1_9 = Memo.splits_2 t_4 in
       VFix (x0_16, x1_9)
   | c_4 when c_4 = tag_VStuck ->
-      let [ x0_17 ] = Memo.splits t_4 in
+      let x0_17 = Memo.splits_1 t_4 in
       VStuck x0_17
   | _ -> failwith "unreachable"
 
@@ -304,26 +304,26 @@ let to_ocaml_stuck x =
   let h_6, t_6 = Option.get (Memo.list_match x) in
   match Word.get_value h_6 with
   | c_6 when c_6 = tag_SHole ->
-      let [ x0_18 ] = Memo.splits t_6 in
+      let x0_18 = Memo.splits_1 t_6 in
       SHole x0_18
   | c_6 when c_6 = tag_STypeError ->
-      let [ x0_19; x1_10 ] = Memo.splits t_6 in
+      let x0_19, x1_10 = Memo.splits_2 t_6 in
       STypeError (x0_19, x1_10)
   | c_6 when c_6 = tag_SIndexError -> SIndexError
   | c_6 when c_6 = tag_SApp ->
-      let [ x0_20; x1_11 ] = Memo.splits t_6 in
+      let x0_20, x1_11 = Memo.splits_2 t_6 in
       SApp (x0_20, x1_11)
   | c_6 when c_6 = tag_SAdd0 ->
-      let [ x0_21; x1_12 ] = Memo.splits t_6 in
+      let x0_21, x1_12 = Memo.splits_2 t_6 in
       SAdd0 (x0_21, x1_12)
   | c_6 when c_6 = tag_SAdd1 ->
-      let [ x0_22; x1_13 ] = Memo.splits t_6 in
+      let x0_22, x1_13 = Memo.splits_2 t_6 in
       SAdd1 (x0_22, x1_13)
   | c_6 when c_6 = tag_SIf ->
-      let [ x0_23; x1_14; x2_2 ] = Memo.splits t_6 in
+      let x0_23, x1_14, x2_2 = Memo.splits_3 t_6 in
       SIf (x0_23, x1_14, x2_2)
   | c_6 when c_6 = tag_SMatchList ->
-      let [ x0_24; x1_15; x2_3 ] = Memo.splits t_6 in
+      let x0_24, x1_15, x2_3 = Memo.splits_3 t_6 in
       SMatchList (x0_24, x1_15, x2_3)
   | _ -> failwith "unreachable"
 
