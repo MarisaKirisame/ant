@@ -366,7 +366,7 @@ let run () : unit =
           | exn -> Printf.printf "Error: %s\n%!" (Printexc.to_string exn));
           repl ())
   in
-  repl ();
+  (*repl ();*)
   ()
 (*
 (fix f xs. match xs with [] -> xs | hd :: tl -> (hd + 1) :: (f tl))(0 :: 1 :: 2 :: [])
