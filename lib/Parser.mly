@@ -1,8 +1,9 @@
 %{
 open Syntax
+open SynInfo
 %}
 
-%start <prog> prog
+%start <'a prog> prog
 
 %nonassoc "in"
 %nonassoc below_SEMI
@@ -88,24 +89,24 @@ rev_preceded_or_sep_llist1(D, X):
 // Grammar of the ant language
 
 pattern:
-  | "<ctor>" delimited_pattern { PApp ($1, Some $2) }
+  | "<ctor>" delimited_pattern { PCtorApp ($1, Some $2, empty_info) }
   | delimited_pattern { $1 }
-  | pattern_comma_list %prec below_COMMA { PTup $1 }
+  | pattern_comma_list %prec below_COMMA { PTup ($1, empty_info) }
 
 delimited_pattern:
-  | "<ctor>" { PApp ($1, None) }
+  | "<ctor>" { PCtorApp ($1, None, empty_info) }
   | "<int>" { PInt $1 }
   | "<bool>" { PBool $1 }
-  | "<id>" { if $1 = "_" then PAny else PVar $1 }
+  | "<id>" { if $1 = "_" then PAny else PVar ($1, empty_info) }
   | "(" ")" { PUnit }
   | "(" pattern ")" { $2 }
 
 simple_pattern:
   | "_" { PAny }
-  | "<id>" { PVar $1 }
+  | "<id>" { PVar ($1, empty_info) }
   | "(" ")" { PUnit }
   | "(" simple_pattern ")" { $2 }
-  | simple_pattern_comma_list %prec below_COMMA { PTup $1 }
+  | simple_pattern_comma_list %prec below_COMMA { PTup ($1, empty_info) }
 
 %inline simple_pattern_comma_list:
   sep_llist2(",", simple_pattern) { $1 }
@@ -137,16 +138,17 @@ case : pattern "->" expr { ($1, $3) }
 
 simple_expr:
   | "(" ")" { Unit }
-  | "<id>" { Var $1 }
-  | "<raw_ctor>" { App (Ctor $1, []) }
-  | "<ctor>" { Ctor $1 }
+  | "<id>" { Var ($1, empty_info) }
+  | "<raw_ctor>" { App (Ctor ($1, empty_info), [], empty_info) }
+  | "<ctor>" { Ctor ($1, empty_info) }
   | "<int>" { Int $1 }
   | "<bool>" { Bool $1 }
   | "<str>" { Str $1 }
-  | "<builtin>" { Builtin (Builtin $1) }
+  | "<builtin>" { Builtin (Builtin $1, empty_info) }
   | "(" seq_expr ")" { $2 }
-  | "[" expr_semi_list "]" { Arr $2 }
-  | simple_expr "." "<id>" { Sel ($1, $3) }
+  | "[" expr_semi_list "]" { Arr ($2, empty_info) }
+  | simple_expr "." "<id>" { Sel ($1, FName $3, empty_info) }
+  | simple_expr "." "<int>" { Sel ($1, FIndex $3, empty_info) }
 
 %inline binding:
   | simple_pattern "=" expr { ($1, $3) }
@@ -156,26 +158,26 @@ simple_expr:
 
 expr:
   | simple_expr %prec below_HASH { $1 }
-  | expr_comma_list %prec below_COMMA { Tup $1 }
+  | expr_comma_list %prec below_COMMA { Tup ($1, empty_info) }
   | simple_expr llist1(simple_expr)
     {
       match $1 with
-      | App (Ctor _ as c, _) -> App (c, $2)
-      | _ -> App ($1, $2)
+      | App (Ctor _ as c, _, info) -> App (c, $2, info)
+      | _ -> App ($1, $2, empty_info)
     }
-  | expr infix_op0 expr { Op ($2, $1, $3) }
-  | expr infix_op2 expr { Op ($2, $1, $3) }
-  | expr infix_op3 expr { Op ($2, $1, $3) }
-  | "let" binding "in" expr { let (p, e) = $2 in Let (BOne (p, e), $4) }
-  | "let" "rec" binding and_binding* "in" expr { Let (BRec ($3 :: $4), $6) }
-  | "match" expr "with" cases { Match ($2, (MatchPattern $4)) }
-  | "fun" simple_pattern+ "->" expr { Lam ($2, $4) }
-  | "if" expr "then" expr "else" expr { If ($2, $4, $6) }
-  | "if" expr "then" expr { If ($2, $4, Unit) }
+  | expr infix_op0 expr { Op ($2, $1, $3, empty_info) }
+  | expr infix_op2 expr { Op ($2, $1, $3, empty_info) }
+  | expr infix_op3 expr { Op ($2, $1, $3, empty_info) }
+  | "let" binding "in" expr { let (p, e) = $2 in Let (BOne (p, e), $4, empty_info) }
+  | "let" "rec" binding and_binding* "in" expr { Let (BRec ($3 :: $4), $6, empty_info) }
+  | "match" expr "with" cases { Match ($2, (MatchPattern $4), empty_info) }
+  | "fun" simple_pattern+ "->" expr { Lam ($2, $4, empty_info) }
+  | "if" expr "then" expr "else" expr { If ($2, $4, $6, empty_info) }
+  | "if" expr "then" expr { If ($2, $4, Unit, empty_info) }
 
 seq_expr:
   | expr %prec below_SEMI { $1 }
-  | expr ";" seq_expr { Let (BSeq $1, $3) }
+  | expr ";" seq_expr { Let (BSeq $1, $3, empty_info) }
 
 type_args: { [] }
   | llist1(atomic_type) { $1 }
@@ -226,13 +228,13 @@ type_kind:
   | "and" "<id>" type_parameters "=" type_kind { ($2, $5 $3) }
 
 item:
-  | "let" simple_pattern "=" seq_expr { Term (Some $2, $4) }
+  | "let" simple_pattern "=" seq_expr { Term (Some $2, $4, empty_info) }
   | type_decl and_type_decl* { let (x, td) = $1 in if $2 = [] then Type (TBOne (x, td)) else Type (TBRec ($1 :: $2)) }
-  | seq_expr { Term (None, $1) }
+  | seq_expr { Term (None, $1, empty_info) }
 
 items: { [] }
   | item ";;" items { $1 :: $3 }
   | item { [$1] }
 
 prog:
-  | items "<eof>" { $1 }
+  | items "<eof>" { ($1, empty_info) }

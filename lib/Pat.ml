@@ -49,11 +49,11 @@ end)
 
 (* TODO: define action *)
 
-type pattern_matrix = {
+type 'a pattern_matrix = {
   arity : int;
   occs : occurrence list;
   bnds : string OccurrenceMap.t list;
-  pats : pattern list list;
+  pats : 'a pattern list list;
   acts : int list;
 }
 
@@ -92,7 +92,7 @@ let pp_pattern_matrix { arity; occs; bnds; pats; acts } =
          pats bnds acts)
 
 type bounders = occurrence * string list
-type decision = Succeed of bounders * expr | Switch of occurrence * decision list | Fail
+type 'a decision = Succeed of bounders * 'a expr | Switch of occurrence * 'a decision list | Fail
 type patdesc = PDInt of int | PDBool of bool | PDUnit | PDCtor of string * int | PDTuple of int [@@deriving show]
 
 let pat_desc pattern =
@@ -100,10 +100,10 @@ let pat_desc pattern =
   | PInt n -> PDInt n
   | PBool b -> PDBool b
   | PUnit -> PDUnit
-  | PApp (ctor, None) -> PDCtor (ctor, 0)
-  | PApp (ctor, Some (PTup args)) -> PDCtor (ctor, List.length args)
-  | PApp (ctor, Some _) -> PDCtor (ctor, 1)
-  | PTup args -> PDTuple (List.length args)
+  | PCtorApp (ctor, None, _) -> PDCtor (ctor, 0)
+  | PCtorApp (ctor, Some (PTup (args, _)), _) -> PDCtor (ctor, List.length args)
+  | PCtorApp (ctor, Some _, _) -> PDCtor (ctor, 1)
+  | PTup (args, _) -> PDTuple (List.length args)
   | _ -> failwith "Invalid pattern"
 
 let is_compatible desc pat =
@@ -111,10 +111,10 @@ let is_compatible desc pat =
   | PDInt x, PInt y -> x = y
   | PDBool x, PBool y -> x = y
   | PDUnit, PUnit -> true
-  | PDCtor (ctor, n), PApp (ctor', Some (PTup args)) when ctor = ctor' -> List.length args = n
-  | PDCtor (ctor, n), PApp (ctor', None) when ctor = ctor' -> n = 0
-  | PDCtor (ctor, n), PApp (ctor', Some _) when ctor = ctor' -> n = 1
-  | PDTuple n, PTup args -> List.length args = n
+  | PDCtor (ctor, n), PCtorApp (ctor', Some (PTup (args, _)), _) when ctor = ctor' -> List.length args = n
+  | PDCtor (ctor, n), PCtorApp (ctor', None, _) when ctor = ctor' -> n = 0
+  | PDCtor (ctor, n), PCtorApp (ctor', Some _, _) when ctor = ctor' -> n = 1
+  | PDTuple n, PTup (args, _) -> List.length args = n
   | _ -> false
 
 let spec_cell ctor pat n occ =
@@ -125,20 +125,20 @@ let spec_cell ctor pat n occ =
   | (PInt _ | PBool _ | PUnit) when is_compatible ctor pat ->
       assert (n = 0);
       ([], Some OccurrenceMap.empty)
-  | PVar x ->
+  | PVar (x, _) ->
       let new_row = List.init n (fun _ -> PAny) in
       let new_bnd = OccurrenceMap.singleton occ x in
       (new_row, Some new_bnd)
-  | PTup xs when is_compatible ctor pat ->
+  | PTup (xs, _) when is_compatible ctor pat ->
       let new_row = xs in
       (new_row, Some OccurrenceMap.empty)
-  | PApp (_, Some (PTup args)) when is_compatible ctor pat ->
+  | PCtorApp (_, Some (PTup (args, _)), _) when is_compatible ctor pat ->
       let new_row = args in
       (new_row, Some OccurrenceMap.empty)
-  | PApp (_, Some arg) when is_compatible ctor pat ->
+  | PCtorApp (_, Some arg, _) when is_compatible ctor pat ->
       let new_row = [ arg ] in
       (new_row, Some OccurrenceMap.empty)
-  | PApp (_, None) when is_compatible ctor pat -> ([], Some OccurrenceMap.empty)
+  | PCtorApp (_, None, _) when is_compatible ctor pat -> ([], Some OccurrenceMap.empty)
   | _ -> ([], None)
 
 let spec_row ctor n col occs row bnd =
@@ -170,9 +170,9 @@ let check_arity arity_map pat =
     | None -> StringMap.add s nu arity_map
   in
   match pat with
-  | PApp (ctor, None) -> compare_old_and_new ctor 0
-  | PApp (ctor, Some (PTup args)) -> compare_old_and_new ctor (List.length args)
-  | PApp (ctor, Some _) -> compare_old_and_new ctor 1
+  | PCtorApp (ctor, None, _) -> compare_old_and_new ctor 0
+  | PCtorApp (ctor, Some (PTup (args, _)), _) -> compare_old_and_new ctor (List.length args)
+  | PCtorApp (ctor, Some _, _) -> compare_old_and_new ctor 1
   | _ -> arity_map
 
 let split_at n =
@@ -228,7 +228,7 @@ let spec_mat ctor col mat =
   assert_valid { arity; occs; bnds; pats; acts }
 
 let is_trivial = function PAny | PVar _ -> true | _ -> false
-let pat_identifier = function PVar x -> Some x | _ -> None
+let pat_identifier = function PVar (x, _) -> Some x | _ -> None
 
 let action_of_trivial_first_row mat =
   match mat.pats with
@@ -283,7 +283,7 @@ let column_ctor_prefix_score { pats; _ } col =
   List.iter
     (fun row ->
       let cell = List.nth row col in
-      match cell with PApp (_, _) -> score := !score + 1 | _ -> ())
+      match cell with PCtorApp (_, _, _) -> score := !score + 1 | _ -> ())
     pats;
   !score
 
@@ -348,63 +348,63 @@ let compile_mat mat = if is_mat_empty mat then Fail else (* TODO *) Fail
 let lower_pat_mat expr =
   let rec aux = function
     | Unit | Bool _ | Int _ | Float _ | Str _ | Builtin _ | Var _ | GVar _ | Ctor _ -> expr
-    | App (f, args) ->
+    | App (f, args, info) ->
         let f = aux f in
         let args = List.map aux args in
-        App (f, args)
-    | Op (op, e1, e2) ->
+        App (f, args, info)
+    | Op (op, e1, e2, info) ->
         let e1 = aux e1 in
         let e2 = aux e2 in
-        Op (op, e1, e2)
-    | Tup args -> Tup (List.map aux args)
-    | Arr args -> Arr (List.map aux args)
-    | Lam (pats, e) ->
+        Op (op, e1, e2, info)
+    | Tup (args, info) -> Tup (List.map aux args, info)
+    | Arr (args, info) -> Arr (List.map aux args, info)
+    | Lam (pats, e, info) ->
         let _mats = List.map make_single_mat pats in
-        Lam (pats, aux e)
-    | Let (BSeq e1, e2) ->
+        Lam (pats, aux e, info)
+    | Let (BSeq e1, e2, info) ->
         let e1 = aux e1 in
-        Let (BSeq e1, aux e2)
-    | Let (BOne (pat, e1), e2) ->
+        Let (BSeq e1, aux e2, info)
+    | Let (BOne (pat, e1), e2, info) ->
         let _mat = make_single_mat pat in
         let e1 = aux e1 in
         let e2 = aux e2 in
-        Let (BOne (pat, e1), e2)
-    | Let (BRec bindings, e2) ->
+        Let (BOne (pat, e1), e2, info)
+    | Let (BRec bindings, e2, info) ->
         (* TODO *)
-        Let (BRec (List.map (fun (pat, e1) -> (pat, aux e1)) bindings), aux e2)
-    | Let (_, e2) -> (* Skip the continuation binding since they are produced by later passes *) aux e2
-    | Sel (e, _) -> aux e
-    | If (c, e1, e2) -> If (aux c, aux e1, aux e2)
-    | Match (e, MatchPattern cases) ->
+        Let (BRec (List.map (fun (pat, e1) -> (pat, aux e1)) bindings), aux e2, info)
+    | Let _ -> assert false
+    | Sel (e, fld, info) -> Sel (e, fld, info)
+    | If (c, e1, e2, info) -> If (aux c, aux e1, aux e2, info)
+    | Match (e, MatchPattern cases, info) ->
         let e = aux e in
         let pats = List.map (fun (pat, _) -> pat) cases in
         let acts = List.mapi (fun i (_, _) -> i) cases in
         let _mat = make_mat pats acts in
-        Match (e, MatchPattern (List.map (fun (pat, arm) -> (pat, aux arm)) cases))
+        Match (e, MatchPattern (List.map (fun (pat, arm) -> (pat, aux arm)) cases), info)
   in
   aux expr
 
 let collect_pat_mat expr =
   let rec aux acc = function
     | Unit | Bool _ | Int _ | Float _ | Str _ | Builtin _ | Var _ | GVar _ | Ctor _ -> List.rev acc
-    | App (f, args) ->
+    | App (f, args, _) ->
         let acc = aux acc f in
         List.fold_left aux acc args
-    | Op (_, e1, e2) ->
+    | Op (_, e1, e2, _) ->
         let acc = aux acc e1 in
         aux acc e2
-    | Tup args -> List.fold_left aux acc args
-    | Arr args -> List.fold_left aux acc args
-    | Lam (_, e) -> aux acc e
-    | Let (BSeq e1, e2) ->
+    | Tup (args, _) -> List.fold_left aux acc args
+    | Arr (args, _) -> List.fold_left aux acc args
+    | Lam (_, e, _) -> aux acc e
+    | Let (BSeq e1, e2, _) ->
         let acc = aux acc e1 in
         aux acc e2
-    | Let (BOne (pat, e1), e2) ->
+    | Let (BOne (pat, e1), e2, _) ->
         let acc = aux acc e1 in
         let mat = make_mat [ pat ] [ 0 ] in
         let acc = mat :: acc in
         aux acc e2
-    | Let (BRec bindings, e2) ->
+    | Let (BRec bindings, e2, _) ->
         let acc =
           List.fold_left
             (fun acc (pat, e1) ->
@@ -414,13 +414,13 @@ let collect_pat_mat expr =
             acc bindings
         in
         aux acc e2
-    | Let (_, e2) -> aux acc e2
-    | Sel (e, _) -> aux acc e
-    | If (c, e1, e2) ->
+    | Let (_, e2, _) -> aux acc e2
+    | Sel (e, _, _) -> aux acc e
+    | If (c, e1, e2, _) ->
         let acc = aux acc c in
         let acc = aux acc e1 in
         aux acc e2
-    | Match (e, MatchPattern cases) ->
+    | Match (e, MatchPattern cases, _) ->
         let acc = aux acc e in
         let pats = List.map (fun (pat, _) -> pat) cases in
         let acts = List.mapi (fun i (_, _) -> i) cases in
@@ -436,14 +436,14 @@ let show_all_pattern_matrixes prog =
       (fun acc stmt ->
         match stmt with
         | Type _ -> acc
-        | Fun (_, args_pats, e) ->
+        | Fun (_, args_pats, e, _) ->
             let pats = List.map (fun pat -> make_mat [ pat ] [ 0 ]) args_pats in
             pats @ collect_pat_mat e @ acc
-        | Term (None, e) -> collect_pat_mat e @ acc
-        | Term (Some pat, e) ->
+        | Term (None, e, _) -> collect_pat_mat e @ acc
+        | Term (Some pat, e, _) ->
             let mat = make_mat [ pat ] [ 0 ] in
             collect_pat_mat e @ (mat :: acc))
-      [] prog
+      [] (fst prog)
   in
   PPrint.(
     separate (break 1)

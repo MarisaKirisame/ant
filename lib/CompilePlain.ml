@@ -5,7 +5,7 @@ open Memo
 open State
 open Code
 
-let rec compile_ty (x : ty) : document =
+let rec compile_ty (x : 'a ty) : document =
   match x with
   | TUnit -> string "unit"
   | TInt -> string "int"
@@ -15,7 +15,6 @@ let rec compile_ty (x : ty) : document =
   | TApply (f, xs) -> parens (separate_map (string ", ") compile_ty xs) ^^ space ^^ string f
   | TArrow (con, cov) -> compile_ty con ^^ string " -> " ^^ compile_ty cov
   | TTuple xs -> string "(" ^^ separate_map (string ", ") compile_ty xs ^^ string ")"
-  | TVar tyref -> compile_ty !tyref
   | TNamedVar name -> string name
 
 let compile_ctor (name, tys) =
@@ -33,49 +32,50 @@ let compile_type_binding x =
       string "type "
       ^^ separate_map (hardline ^^ string "and ") (fun (name, ty_kind) -> comple_type_decl name ty_kind) decls
 
-let rec compile_pat (p : pattern) : document =
+let rec compile_pat (p : 'a pattern) : document =
   match p with
   | PAny -> string "_"
   | PInt v -> string (string_of_int v)
   | PBool v -> string (string_of_bool v)
-  | PVar name -> string name
+  | PVar (name, _) -> string name
   | PUnit -> string "()"
-  | PTup xs -> string "(" ^^ separate_map (string ", ") compile_pat xs ^^ string ")"
-  | PApp (name, None) -> string name
-  | PApp (name, Some p') -> string name ^^ space ^^ compile_pat p'
+  | PTup (xs, _) -> string "(" ^^ separate_map (string ", ") compile_pat xs ^^ string ")"
+  | PCtorApp (name, None, _) -> string name
+  | PCtorApp (name, Some p', _) -> string name ^^ space ^^ compile_pat p'
 
 and parens_compile_pat p = parens (compile_pat p)
 
-let rec compile_expr (e : expr) : document =
+let rec compile_expr (e : 'a expr) : document =
   match e with
   | Unit -> string "()"
   | Int v -> string (string_of_int v)
   | Float v -> string (string_of_float v)
   | Bool v -> string (string_of_bool v)
   | Str v -> string v
-  | Builtin (Builtin b) -> string b
-  | Var name -> string name
-  | GVar name -> string name
-  | Ctor name -> string name
-  | App (Ctor name, args) -> string name ^^ space ^^ parens (separate_map (string ", ") parens_compile_expr args)
-  | App (fn, args) -> parens_compile_expr fn ^^ space ^^ separate_map space parens_compile_expr args
-  | Op (op, lhs, rhs) -> parens (parens_compile_expr lhs ^^ string op ^^ parens_compile_expr rhs)
-  | Tup xs -> string "(" ^^ separate_map (string ", ") compile_expr xs ^^ string ")"
-  | Arr xs -> string "[]" ^^ separate_map (string "; ") compile_expr xs ^^ string "]"
-  | Lam (ps, value) ->
+  | Builtin (Builtin b, _) -> string b
+  | Var (name, _) -> string name
+  | GVar (name, _) -> string name
+  | Ctor (name, _) -> string name
+  | App (Ctor (name, _), args, _) ->
+      string name ^^ space ^^ parens (separate_map (string ", ") parens_compile_expr args)
+  | App (fn, args, _) -> parens_compile_expr fn ^^ space ^^ separate_map space parens_compile_expr args
+  | Op (op, lhs, rhs, _) -> parens (parens_compile_expr lhs ^^ string op ^^ parens_compile_expr rhs)
+  | Tup (xs, _) -> string "(" ^^ separate_map (string ", ") compile_expr xs ^^ string ")"
+  | Arr (xs, _) -> string "[]" ^^ separate_map (string "; ") compile_expr xs ^^ string "]"
+  | Lam (ps, value, _) ->
       string "fun " ^^ separate_map space parens_compile_pat ps ^^ string " -> " ^^ parens_compile_expr value
-  | Let (binding, value) -> compile_binding binding (parens_compile_expr value)
-  | Sel (expr, prop) -> parens_compile_expr expr ^^ string "." ^^ string prop
-  | If (c, p, n) ->
+  | Let (binding, value, _) -> compile_binding binding (parens_compile_expr value)
+  | Sel (expr, prop, _) -> parens_compile_expr expr ^^ string "." ^^ pp_field prop
+  | If (c, p, n, _) ->
       string "if " ^^ compile_expr c ^^ string " then " ^^ parens_compile_expr p ^^ string " else "
       ^^ parens_compile_expr n
-  | Match (tgt, MatchPattern cases) ->
+  | Match (tgt, MatchPattern cases, _) ->
       string "match " ^^ compile_expr tgt ^^ string " with "
       ^^ separate_map (string "| ") (fun (p, e) -> parens_compile_pat p ^^ string " -> " ^^ parens_compile_expr e) cases
 
 and parens_compile_expr e = parens (compile_expr e)
 
-and compile_binding (b : binding) (cont : document) : document =
+and compile_binding (b : 'a binding) (cont : document) : document =
   match b with
   | BSeq e -> compile_expr e ^^ string ";" ^^ cont
   | BOne (p, e) | BCont (p, e) -> string "let " ^^ compile_let (p, e) ^^ string " in " ^^ cont
@@ -83,19 +83,19 @@ and compile_binding (b : binding) (cont : document) : document =
 
 and compile_let (p, e) = parens_compile_pat p ^^ string " = " ^^ parens (compile_expr e)
 
-let compile_stmt (x : stmt) : document =
+let compile_stmt (x : 'a stmt) : document =
   match x with
   | Type tb -> compile_type_binding tb
-  | Fun (_name, _args, _body) -> failwith "Not implemented (TODO)"
-  | Term (pat, e) -> (
+  | Fun (_name, _args, _body, _) -> failwith "Not implemented (TODO)"
+  | Term (pat, e, _) -> (
       match pat with
       | None -> compile_expr e
       | Some pat -> string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e)
 
-let compile_plain (xs : stmt list) : document =
+let compile_plain (xs : 'a stmt list) : document =
   let ys = List.map compile_stmt xs in
   separate (string ";;" ^^ hardline ^^ hardline) ys
 
 module Backend = struct
-  let compile = compile_plain
+  let compile (stmts, _) = compile_plain stmts
 end

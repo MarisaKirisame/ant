@@ -9,7 +9,8 @@
   Syntax
   Pat
   Reference
-  Tyck
+  Type
+  Typing
   Resolve
   Seq
   Transform
@@ -23,6 +24,7 @@
   Common
   batFingerTree
   Ir
+  SynInfo
   Code
   Compile
   CompileSeq
