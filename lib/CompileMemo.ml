@@ -272,28 +272,28 @@ let return (s : scope) (w : world code) : unit code =
 let add_fv (v : string) (fv : unit MapStr.t) : unit MapStr.t = MapStr.add v () fv
 let remove_fv (v : string) (fv : unit MapStr.t) : unit MapStr.t = MapStr.remove v fv
 
-let rec fv_expr (e : expr) (fv : unit MapStr.t) : unit MapStr.t =
+let rec fv_expr (e : 'a expr) (fv : unit MapStr.t) : unit MapStr.t =
   match e with
   | Ctor _ | Int _ | GVar _ -> fv
-  | App (f, xs) -> fv_exprs xs (fv_expr f fv)
-  | Op (_, x, y) -> fv_expr y (fv_expr x fv)
-  | Var name -> add_fv name fv
-  | Match (value, cases) -> fv_expr value (fv_cases cases fv)
-  | If (i, t, e) -> fv_expr i (fv_expr t (fv_expr e fv))
-  | Let (BOne (l, v), r) -> fv_expr v (fv_pat l (fv_expr r fv))
-  | _ -> failwith ("fv_expr: " ^ show_expr e)
+  | App (f, xs, _) -> fv_exprs xs (fv_expr f fv)
+  | Op (_, x, y, _) -> fv_expr y (fv_expr x fv)
+  | Var (name, _) -> add_fv name fv
+  | Match (value, cases, _) -> fv_expr value (fv_cases cases fv)
+  | If (i, t, e, _) -> fv_expr i (fv_expr t (fv_expr e fv))
+  | Let (BOne (l, v), r, _) -> fv_expr v (fv_pat l (fv_expr r fv))
+  | _ -> failwith ("fv_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr e)
 
-and fv_exprs (es : expr list) (fv : unit MapStr.t) : unit MapStr.t = List.fold_left (fun fv e -> fv_expr e fv) fv es
+and fv_exprs (es : 'a expr list) (fv : unit MapStr.t) : unit MapStr.t = List.fold_left (fun fv e -> fv_expr e fv) fv es
 
-and fv_pat (pat : pattern) (fv : unit MapStr.t) : unit MapStr.t =
+and fv_pat (pat : 'a pattern) (fv : unit MapStr.t) : unit MapStr.t =
   match pat with
-  | PApp (_, None) | PAny -> fv
-  | PApp (_, Some x) -> fv_pat x fv
-  | PTup xs -> List.fold_left (fun fv x -> fv_pat x fv) fv xs
-  | PVar name -> remove_fv name fv
-  | _ -> failwith (show_pattern pat)
+  | PCtorApp (_, None, _) | PAny -> fv
+  | PCtorApp (_, Some x, _) -> fv_pat x fv
+  | PTup (xs, _) -> List.fold_left (fun fv x -> fv_pat x fv) fv xs
+  | PVar (name, _) -> remove_fv name fv
+  | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat)
 
-and fv_cases (MatchPattern c : cases) (fv : unit MapStr.t) : unit MapStr.t =
+and fv_cases (MatchPattern c : 'a cases) (fv : unit MapStr.t) : unit MapStr.t =
   List.fold_left (fun fv (pat, e) -> fv_pat pat (fv_expr e fv)) fv c
 
 type keep_t = { mutable keep : bool; mutable source : string option }
@@ -336,9 +336,9 @@ let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) 
   let make_code w = f { s with progressed = false } w in
   if s.progressed then goto_ w (add_code $ Some (lam_ "w" make_code)) else make_code w
 
-let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world code -> unit code =
+let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world code -> unit code =
   match c with
-  | Var name ->
+  | Var (name, _) ->
       let loc =
         match MapStr.find name s.meta_env with
         | Some loc -> loc
@@ -351,10 +351,10 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
             (fun _ -> push_env_ w (get_env_ w (int_ loc)));
             (fun _ -> k.k (push_s s) w);
           ]
-  | Match (value, cases) ->
+  | Match (value, cases, _) ->
       compile_pp_expr ctx s value
         { k = (fun s -> reading s $ fun s w -> compile_pp_cases ctx s cases k w); fv = fv_cases cases (dup_fv k.fv) }
-  | Ctor cname ->
+  | Ctor (cname, _) ->
       fun w ->
         seqs_
           [
@@ -362,7 +362,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
             (fun _ -> push_env_ w (from_constructor_ (ctor_tag_name ctx cname)));
             (fun _ -> k.k (push_s s) w);
           ]
-  | App (Ctor cname, [ x0 ]) ->
+  | App (Ctor (cname, _), [ x0 ], _) ->
       compile_pp_expr ctx s x0
         {
           k =
@@ -377,7 +377,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                 ]);
           fv = k.fv;
         }
-  | App (Ctor cname, [ x0; x1 ]) ->
+  | App (Ctor (cname, _), [ x0; x1 ], _) ->
       compile_pp_expr ctx s x0
         {
           k =
@@ -400,7 +400,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                 w);
           fv = fv_expr x1 (dup_fv k.fv);
         }
-  | App (Ctor cname, [ x0; x1; x2 ]) ->
+  | App (Ctor (cname, _), [ x0; x1; x2 ], _) ->
       compile_pp_expr ctx s x0
         {
           k =
@@ -433,7 +433,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                 w);
           fv = fv_expr x2 (fv_expr x1 (dup_fv k.fv));
         }
-  | App (GVar f, xs) ->
+  | App (GVar (f, _), xs, _) ->
       check_scope s;
       let cont_name = "cont_" ^ string_of_int ctx.conts_count in
       let keep, keep_s = keep_only s k.fv in
@@ -467,7 +467,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                 ]);
           fv = k.fv;
         }
-  | Op ("+", x0, x1) ->
+  | Op ("+", x0, x1, _) ->
       compile_pp_expr ctx s x0
         {
           k =
@@ -515,7 +515,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
             (fun _ -> push_env_ w (memo_from_int_ (int_ i)));
             (fun _ -> k.k (push_s s) w);
           ]
-  | Let (BOne (PVar l, v), r) ->
+  | Let (BOne (PVar (l, info), v), r, _) ->
       check_scope s;
       compile_pp_expr ctx s v
         {
@@ -527,17 +527,17 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : expr) (k : kont) : world co
                 r
                 { k = (fun s w -> drop s [ l ] w k); fv = add_fv l (dup_fv k.fv) }
                 w);
-          fv = fv_pat (PVar l) (fv_expr r (dup_fv k.fv));
+          fv = fv_pat (PVar (l, info)) (fv_expr r (dup_fv k.fv));
         }
-  | _ -> failwith ("compile_pp_expr: " ^ show_expr c)
+  | _ -> failwith ("compile_pp_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr c)
 
-and compile_pp_exprs (ctx : ctx) (s : scope) (cs : expr list) (k : kont) : world code -> unit code =
+and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (k : kont) : world code -> unit code =
   match cs with
   | [] -> fun w -> k.k s w
   | c :: cs ->
       compile_pp_expr ctx s c { k = (fun s w -> compile_pp_exprs ctx s cs k w); fv = fv_exprs cs (dup_fv k.fv) }
 
-and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont) : world code -> unit code =
+and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : kont) : world code -> unit code =
  fun w ->
   seq_
     (assert_env_length_ w (int_ s.env_length))
@@ -564,8 +564,8 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                       (fun (pat, expr) ->
                         (*todo: special casing for now, as pat design need changes. *)
                         match pat with
-                        | PApp (cname, None) -> (g cname, compile_pp_expr ctx s expr k w)
-                        | PApp (cname, Some (PVar x0)) ->
+                        | PCtorApp (cname, None, _) -> (g cname, compile_pp_expr ctx s expr k w)
+                        | PCtorApp (cname, Some (PVar (x0, _)), _) ->
                             ( g cname,
                               with_splits 1
                                 (memo_splits_ (pair_value_ x))
@@ -576,7 +576,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                                             { k = (fun s w -> drop s [ x0 ] w k); fv = k.fv }
                                             w)
                                   | _ -> failwith "with_splits: unexpected arity") )
-                        | PApp (cname, Some (PTup [ PVar x0; PVar x1 ])) ->
+                        | PCtorApp (cname, Some (PTup ([ PVar (x0, _); PVar (x1, _) ], _)), _) ->
                             ( g cname,
                               with_splits 2
                                 (memo_splits_ (pair_value_ x))
@@ -594,7 +594,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                                               w);
                                         ]
                                   | _ -> failwith "with_splits: unexpected arity") )
-                        | PApp (cname, Some (PTup [ PVar x0; PVar x1; PVar x2 ])) ->
+                        | PCtorApp (cname, Some (PTup ([ PVar (x0, _); PVar (x1, _); PVar (x2, _) ], _)), _) ->
                             ( g cname,
                               with_splits 3
                                 (memo_splits_ (pair_value_ x))
@@ -614,24 +614,27 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : cases) (k : kont)
                                         ]
                                   | _ -> failwith "with_splits: unexpected arity") )
                         | PAny -> (string "_", compile_pp_expr ctx s expr k w)
-                        | _ -> failwith (show_pattern pat))
+                        | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
                       c
                   in
                   let default_case = (string "_", unreachable_) in
                   paren $ match_raw_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])))))
 
-let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
+let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with
   | Type (TBOne (name, Enum { params = _; ctors })) -> compile_adt ctx name ctors
   | Type (TBRec _) -> failwith "Not implemented (TODO)"
-  | Term (x, Lam (ps, term)) ->
+  | Term (x, Lam (ps, term, _), _) ->
       let s =
         List.fold_left
-          (fun s p -> match p with PVar n -> extend_s s n | _ -> failwith (show_pattern p))
+          (fun s p ->
+            match p with
+            | PVar (n, _) -> extend_s s n
+            | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern p))
           (new_scope ()) ps
       in
       let arg_num = s.env_length in
-      let name = match x with Some (PVar x) -> x | _ -> failwith "bad match" in
+      let name = match x with Some (PVar (x, _)) -> x | _ -> failwith "bad match" in
       let cont_done_tag = ctor_tag_name ctx "cont_done" in
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
@@ -645,8 +648,8 @@ let compile_pp_stmt (ctx : ctx) (s : stmt) : document =
             ^^ string "]" ^^ string ")" ^^ string "("
             ^^ uncode (from_constructor_ cont_done_tag)
             ^^ string ")" ^^ string " memo" ))
-  | Fun (_name, _args, _body) -> failwith "Not implemented (TODO)"
-  | _ -> failwith (show_stmt s)
+  | Fun (_name, _args, _body, _) -> failwith "Not implemented (TODO)"
+  | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
 
 let generate_apply_cont ctx =
   set_code apply_cont
@@ -721,5 +724,5 @@ let pp_cek_ant x =
             ^^ string ")"))
 
 module Backend = struct
-  let compile = pp_cek_ant
+  let compile (stmts, _) = pp_cek_ant stmts
 end

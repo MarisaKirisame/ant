@@ -2,52 +2,53 @@ open Syntax
 open Fresh
 module Ctx = Map.Make (String)
 module SSet = Set.Make (String)
+module Fresh = Fresh.Make ()
 
 let free, free_p =
   let rec do_expr s = function
     | Unit | Int _ | Float _ | Bool _ | Str _ | Builtin _ -> s
-    | Var x -> SSet.add x s
-    | GVar x -> SSet.add x s
+    | Var (x, _) -> SSet.add x s
+    | GVar (x, _) -> SSet.add x s
     | Ctor _ -> s
-    | Lam (ps, e) -> SSet.diff (do_expr s e) (List.fold_left do_pattern SSet.empty ps)
-    | App (f, xs) -> List.fold_left do_expr s (f :: xs)
-    | Op (_, e1, e2) -> do_expr (do_expr s e1) e2
-    | Tup es | Arr es -> List.fold_left do_expr s es
-    | Let ((BOne (x, e1) | BCont (x, e1)), e2) ->
+    | Lam (ps, e, _) -> SSet.diff (do_expr s e) (List.fold_left do_pattern SSet.empty ps)
+    | App (f, xs, _) -> List.fold_left do_expr s (f :: xs)
+    | Op (_, e1, e2, _) -> do_expr (do_expr s e1) e2
+    | Tup (es, _) | Arr (es, _) -> List.fold_left do_expr s es
+    | Let ((BOne (x, e1) | BCont (x, e1)), e2, _) ->
         SSet.union (do_expr s e1) (SSet.diff (do_expr SSet.empty e2) (do_pattern SSet.empty x))
-    | Let ((BRec xs | BRecC xs), e2) ->
+    | Let ((BRec xs | BRecC xs), e2, _) ->
         SSet.union
           (List.fold_left do_expr s (List.map snd xs))
           (SSet.diff (do_expr SSet.empty e2) (List.fold_left do_pattern SSet.empty (List.map fst xs)))
-    | Let (BSeq e1, e2) -> do_expr (do_expr s e1) e2
-    | Sel (e, _) -> do_expr s e
-    | If (e1, e2, e3) -> do_expr (do_expr (do_expr s e1) e2) e3
-    | Match (cond, MatchPattern cases) ->
+    | Let (BSeq e1, e2, _) -> do_expr (do_expr s e1) e2
+    | Sel (e, _, _) -> do_expr s e
+    | If (e1, e2, e3, _) -> do_expr (do_expr (do_expr s e1) e2) e3
+    | Match (cond, MatchPattern cases, _) ->
         List.fold_left
           (fun s (p, e) -> SSet.union s @@ SSet.diff (do_expr SSet.empty e) (do_pattern SSet.empty p))
           (do_expr s cond) cases
   and do_pattern s = function
     | PAny | PInt _ | PBool _ -> s
-    | PVar x -> SSet.add x s
+    | PVar (x, _) -> SSet.add x s
     | PUnit -> s
-    | PTup ps -> List.fold_left do_pattern s ps
-    | PApp (_, None) -> s
-    | PApp (_, Some p) -> do_pattern s p
+    | PTup (ps, _) -> List.fold_left do_pattern s ps
+    | PCtorApp (_, None, _) -> s
+    | PCtorApp (_, Some p, _) -> do_pattern s p
   in
-  (do_expr SSet.empty, do_pattern SSet.empty)
-
+  (fun e -> do_expr SSet.empty e), (fun p -> do_pattern SSet.empty p)
+(* Commented out because we cannot confirm the 'a of expr now
 type cps_ctx = int Ctx.t
 
 let cps ctx expr =
   let mk_fresh prefix =
-    let k = next_fresh prefix in
+    let k = Fresh.next_fresh prefix in
     (PVar k, Var k)
   in
   let mk_fresh_params n prefix =
     let rec aux acc acc2 n =
       if n = 0 then (acc, acc2)
       else
-        let x = next_fresh prefix in
+        let x = Fresh.next_fresh prefix in
         aux (PVar x :: acc) (Var x :: acc2) (n - 1)
     in
     let l1, l2 = aux [] [] n in
@@ -257,7 +258,7 @@ let defunc ctx expr =
         in
         (Match (cond, MatchPattern cases), l @ List.concat ls)
     | App _ -> de_app ctx expr
-    | Lam _ -> de_lam ctx (next_fresh "`C_'lam") expr
+    | Lam _ -> de_lam ctx (Fresh.next_fresh "`C_'lam") expr
   and de_lam ctx ct (expr : expr) =
     match expr with
     | Lam (ps, x) ->
@@ -269,8 +270,8 @@ let defunc ctx expr =
         let sorted_p_fvl = List.map (fun x -> PVar x) @@ SSet.elements fvs in
         let body, l = aux ctx x in
         let abs, case =
-          if SSet.is_empty fvs then (Ctor ct, PApp (ct, None))
-          else (App (Ctor ct, sorted_fvl), PApp (ct, Some (PTup sorted_p_fvl)))
+          if SSet.is_empty fvs then (Ctor ct, PCtorApp (ct, None))
+          else (App (Ctor ct, sorted_fvl), PCtorApp (ct, Some (PTup sorted_p_fvl)))
         in
         (abs, (PTup (case :: ps), body) :: l)
     | _ -> aux ctx expr
@@ -286,7 +287,7 @@ let defunc ctx expr =
     | _ -> aux ctx expr
   and gen_symbol binding =
     match binding with
-    | PVar x, Lam (_, _) -> (x, next_fresh "`C_'lam")
+    | PVar x, Lam (_, _) -> (x, Fresh.next_fresh "`C_'lam")
     | _, Lam _ -> failwith "Pattern must be a variable in the left-hand side of a let binding when defunctionalizing"
     | _ -> failwith "Not a lambda in the right-hand side of a let binding"
   and de_single_binding x e1 e2 =
@@ -339,4 +340,4 @@ let defunc_prog (prog : prog) =
               ],
             Var "_'defunc_apply" ) )
   in
-  defunc_apply :: prog
+  defunc_apply :: prog *)
