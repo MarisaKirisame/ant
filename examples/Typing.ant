@@ -1,8 +1,12 @@
-let _ = fun x -> x;;
+fun x -> x;;
+
+let id = fun x -> x;;
 
 let _ = fun x -> fun y -> x y;;
 
 let _ = let x = fun x -> x in x;;
+
+let _ = let x = id in x;;
 
 let _ = let y = fun z -> z in y;;
 
@@ -13,6 +17,8 @@ let _ = fun x -> let y = fun z -> z in y x;;
 let _ = fun x -> x (fun y -> y);;
 
 let _ = (fun x -> x, fun x -> x);;
+
+let _ = fun x -> x + 1;;
 
 let _ = 1 + 1;;
 

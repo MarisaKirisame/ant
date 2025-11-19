@@ -157,7 +157,7 @@ let generalize ty =
     | (TApp (_, tys, ls) | TTup (tys, ls) | TArr (tys, ls)) when TyLevel.(current_level () < ls.level_new) ->
         let tys = List.map ~f:repr tys in
         List.iter ~f:loop tys;
-        let l = List.fold_left ~init:(get_level ty) ~f:(fun ml ty -> TyLevel.max ml (get_level ty)) tys in
+        let l = List.fold_left ~init:TyLevel.ground_level ~f:(fun ml ty -> TyLevel.max ml (get_level ty)) tys in
         ls.level_old <- l;
         ls.level_new <- l (* set the exact level upper bound *)
     | _ -> ()
@@ -319,9 +319,10 @@ let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
       unify tyop (new_arrow [ tyl; tyr ] ty);
       (Op (op, l, r, { info with ty = Some ty }), ty)
   | Let (BOne (p, e1), e2, info) ->
-      let p, ty_p = type_of_pattern ctx p in
       TyLevel.enter ();
       let e1, ty1 = type_of ctx e1 in
+      cycle_free ty1;
+      let p, ty_p = type_of_pattern ctx p in
       unify ty_p ty1;
       TyLevel.leave ();
       generalize ty1;
@@ -403,6 +404,9 @@ let top_type_of_prog (p : info prog) : info prog =
         let ty_ctors =
           List.map
             ~f:(fun (ctor_name, tys, info) ->
+
+              TyLevel.enter ();
+
               let ty_params = List.map ~f:(fun _ -> new_tvar ()) params in
               let tyr = new_app name ty_params in
               let ctx =
@@ -410,11 +414,16 @@ let top_type_of_prog (p : info prog) : info prog =
                   ~f:(fun ctx param ty_param -> update_ctx_nodup ctx ~key:param ~value:ty_param)
                   params ty_params
               in
-              match tys with
-              | [] -> (ctor_name, tyr, { info with ty = Some tyr })
-              | _ ->
-                  let tyr = new_arrow (List.map ~f:(convert_ty ctx arity) tys) tyr in
-                  (ctor_name, tyr, { info with ty = Some tyr }))
+              let ty_args = List.map ~f:(convert_ty ctx arity) tys in
+              let ctor_ty = match ty_args with
+                | [] -> tyr
+                | _ -> new_arrow ty_args tyr
+              in
+
+              TyLevel.leave ();
+
+              generalize ctor_ty;
+              (ctor_name, ctor_ty, { info with ty = Some ctor_ty }))
             ctors
         in
         let ctx, infos =
@@ -431,15 +440,14 @@ let top_type_of_prog (p : info prog) : info prog =
         let tb, ctx, arity = decl_type ctx arity tb in
         (Type tb, ctx, arity)
     | Term (None, e, info) ->
-        TyLevel.enter ();
         let e, ty = type_of ctx e in
-        TyLevel.leave ();
-        generalize ty;
+        cycle_free ty;
         (Term (None, e, { info with ty = Some ty }), ctx, arity)
     | Term (Some p, e, info) ->
-        let p, ty_p = type_of_pattern ctx p in
         TyLevel.enter ();
         let e, ty_e = type_of ctx e in
+        cycle_free ty_e;
+        let p, ty_p = type_of_pattern ctx p in
         unify ty_p ty_e;
         TyLevel.leave ();
         generalize ty_e;
@@ -463,7 +471,8 @@ let top_type_of_prog (p : info prog) : info prog =
 
 open PPrint
 
-let pp_top_type_of_prog (p : info prog) : PPrint.document =
+let pp_top_type_of_prog ?(print_level = false) (p : info prog) : PPrint.document =
+  let pp_ty = Type.pp_ty ~print_level in
   let f stmt =
     match stmt with
     | Type (TBOne (_, Enum { params = _; ctors })) ->
@@ -471,19 +480,19 @@ let pp_top_type_of_prog (p : info prog) : PPrint.document =
           (fun (name, _, info) ->
             parens
               (star ^^ space ^^ string name ^^ colon ^^ space
-              ^^ Option.value_map ~f:Type.pp_ty ~default:empty info.ty
+              ^^ Option.value_map ~f:pp_ty ~default:empty info.ty
               ^^ space ^^ star))
           ctors
         ^^ break 1 ^^ Syntax.pp_stmt stmt
     | Type (TBRec _) -> Syntax.pp_stmt stmt
     | Term (None, _, info) ->
-        parens (star ^^ space ^^ Option.value_map ~f:Type.pp_ty ~default:empty info.ty ^^ space ^^ star)
+        parens (star ^^ space ^^ Option.value_map ~f:pp_ty ~default:empty info.ty ^^ space ^^ star)
         ^^ break 1 ^^ Syntax.pp_stmt stmt
     | Term (Some _, _, info) ->
-        parens (star ^^ space ^^ Option.value_map ~f:Type.pp_ty ~default:empty info.ty ^^ space ^^ star)
+        parens (star ^^ space ^^ Option.value_map ~f:pp_ty ~default:empty info.ty ^^ space ^^ star)
         ^^ break 1 ^^ Syntax.pp_stmt stmt
     | Fun (_, _, _, info) ->
-        parens (star ^^ space ^^ Option.value_map ~f:Type.pp_ty ~default:empty info.ty ^^ space ^^ star)
+        parens (star ^^ space ^^ Option.value_map ~f:pp_ty ~default:empty info.ty ^^ space ^^ star)
         ^^ break 1 ^^ Syntax.pp_stmt stmt
   in
   separate_map (break 1) f (fst p)

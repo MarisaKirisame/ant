@@ -20,7 +20,7 @@ let parse content =
       Printf.eprintf "Lexing error at line %d, character %d: %s\n" line cnum @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input output print_ast compile_pat compile_ant (module Backend : Compile.Backend) typing _print_cps_transformed
+let driver input output print_ast compile_pat compile_ant (module Backend : Compile.Backend) typing print_level _print_cps_transformed
     _print_de _print_cps_de =
   let src = read_all input in
   let syn = parse src in
@@ -33,7 +33,7 @@ let driver input output print_ast compile_pat compile_ant (module Backend : Comp
     if print_ast then output_pp (Syntax.pp_prog ast);
     if compile_pat then output_pp (Pat.show_all_pattern_matrixes ast);
     if compile_ant then output_pp (Backend.compile ast);
-    if typing then output_pp (Typing.pp_top_type_of_prog ast)
+    if typing then output_pp (Typing.pp_top_type_of_prog ~print_level ast)
     (* if print_cps_transformed then output_pp (Syntax.pp_prog (Transform.cps_prog ast))
     else if print_de then output_pp (Syntax.pp_prog (Transform.defunc_prog ast))
     else if print_cps_de then output_pp (Syntax.pp_prog (Transform.defunc_prog (Transform.cps_prog ast))) *)
@@ -77,6 +77,10 @@ let typing =
   let doc = "Typing" in
   Arg.(value & flag & info [ "t"; "typing" ] ~doc)
 
+let print_level =
+  let doc = "Print the type with level information" in
+  Arg.(value & flag & info [ "L"; "print-level" ] ~doc)
+
 let print_cps_transformed =
   let doc = "Print the AST after CPS transformation" in
   Arg.(value & flag & info [ "c"; "print-cps" ] ~doc)
@@ -95,7 +99,7 @@ let cmd =
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
   Cmd.v info
     Term.(
-      const driver $ input $ output $ print_ast $ compile_pat $ compile_ant $ backend $ typing $ print_cps_transformed $ print_de
+      const driver $ input $ output $ print_ast $ compile_pat $ compile_ant $ backend $ typing $ print_level $ print_cps_transformed $ print_de
       $ print_cps_de)
 
 let i = Cmd.eval cmd
