@@ -29,7 +29,10 @@ type env = { arity : (string, int) Hashtbl.t; ctag : (string, int) Hashtbl.t }
 let new_env () : env = { arity = Hashtbl.create (module Core.String); ctag = Hashtbl.create (module Core.String) }
 
 let compile_seq_ty ty =
-  match ty with TApply ("int", []) -> string "int" | TApply _ -> string "Seq.seq" | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_ty ty)
+  match ty with
+  | TApply (TInt, []) -> string "int"
+  | TApply _ -> string "Seq.seq"
+  | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_ty ty)
 
 let with_registered_constructor (e : env) con_name types k =
   let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
@@ -40,7 +43,7 @@ let with_registered_constructor (e : env) con_name types k =
   k ~params ~arity ~constructor_index
 
 let compile_ocaml_adt adt_name ctors =
-  let ctor_doc (con_name, types) =
+  let ctor_doc (con_name, types, _) =
     let head = string con_name in
     match types with
     | [] -> head
@@ -56,7 +59,7 @@ let compile_ocaml_adt adt_name ctors =
 
 let compile_adt_constructors (e : env) adt_name ctors =
   separate_map (break 1)
-    (fun (con_name, types) ->
+    (fun (con_name, types, _) ->
       with_registered_constructor e con_name types (fun ~params ~arity ~constructor_index ->
           let degree = 1 - arity in
           let degree_code = paren_if_negative (int_ degree) degree in
@@ -70,7 +73,7 @@ let compile_adt_constructors (e : env) adt_name ctors =
               (fun (ty, name) ->
                 let name_code = var name in
                 match ty with
-                | TApply ("int", []) -> app_ seq_from_int name_code
+                | TInt -> app_ seq_from_int name_code
                 | TApply _ -> name_code
                 | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_ty ty))
               params
@@ -84,7 +87,7 @@ let compile_adt_constructors (e : env) adt_name ctors =
     ctors
 
 let compile_adt_ffi e adt_name ctors =
-  let from_case (con_name, types) =
+  let from_case (con_name, types, _) =
     let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
     let pattern =
       match params with
@@ -103,7 +106,7 @@ let compile_adt_ffi e adt_name ctors =
          (break 1 ^^ string "match" ^^ space ^^ string "x" ^^ space ^^ string "with"
          ^^ concat_map (fun case -> break 1 ^^ case) (List.map from_case ctors))
   in
-  let to_case (con_name, types) =
+  let to_case (con_name, types, _) =
     let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
     let tag = string (string_of_int (Hashtbl.find_exn e.ctag con_name)) in
     let value_doc =
@@ -122,7 +125,7 @@ let compile_adt_ffi e adt_name ctors =
               (List.map
                  (fun (ty, name) ->
                    match ty with
-                   | TApply ("int", []) -> doc_of_code (app_ seq_to_int (var name))
+                   | TInt -> doc_of_code (app_ seq_to_int (var name))
                    | TApply _ -> string name
                    | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_ty ty))
                  params)
