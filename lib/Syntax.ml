@@ -47,12 +47,13 @@ type 'a ty =
   | TInt
   | TFloat
   | TBool
-  | TApply of string * 'a ty list
+  | TApply of 'a ty * 'a ty list
   | TArrow of 'a ty * 'a ty
   | TTuple of 'a ty list
+  | TNamed of string
   | TNamedVar of string
 
-type 'a ty_kind = Enum of { params : string list; ctors : (string * 'a ty list) list }
+type 'a ty_kind = Enum of { params : string list; ctors : (string * 'a ty list * 'a) list }
 type 'a ty_binding = TBOne of string * 'a ty_kind | TBRec of (string * 'a ty_kind) list
 
 type 'a stmt =
@@ -162,18 +163,20 @@ let pp_ty =
     | TInt -> string "int"
     | TFloat -> string "float"
     | TBool -> string "bool"
-    | TApply (ty, []) -> string ty
-    | TApply (ty, [ ty2 ]) -> f c ty2 ^^ space ^^ string ty
-    | TApply (ty, tys) -> (parens @@ separate_map (string ",") (f true) tys) ^^ space ^^ string ty |> pp
+    | TApply (ty, []) -> f c ty
+    | TApply (ty, tys) ->
+        if List.length tys > 1 then (parens @@ separate_map (string ",") (f true) tys) ^^ space ^^ f c ty |> pp
+        else separate_map (string ",") (f true) tys ^^ space ^^ f c ty |> pp
     | TArrow (ty1, ty2) -> f true ty1 ^^ space ^^ string "->" ^^ space ^^ f true ty2 |> pp
     | TTuple tys -> separate_map (string "*") (f true) tys |> parens
+    | TNamed name -> string name
     | TNamedVar name -> string ("'" ^ name)
   in
   fun ty -> f false ty
 
 let pp_stmt =
   let inner (s : 'a stmt) =
-    let pp_ctor (ctor, tys) =
+    let pp_ctor (ctor, tys, _) =
       string ctor
       ^^
       match tys with

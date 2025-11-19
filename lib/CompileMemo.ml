@@ -100,7 +100,7 @@ let compile_ocaml_adt adt_name ctors =
     ("type ocaml_" ^ adt_name ^ " = "
     ^ String.concat " | "
         (List.map
-           (fun (con_name, types) ->
+           (fun (con_name, types, _) ->
              if List.length types = 0 then con_name
              else con_name ^ " of " ^ String.concat " * " (List.map (fun _ -> "Value.seq") types))
            ctors))
@@ -130,7 +130,7 @@ let with_splits count splits k =
 
 let compile_adt_constructors (e : ctx) adt_name ctors =
   separate_map (break 1)
-    (fun (con_name, types) ->
+    (fun (con_name, types, _) ->
       with_registered_constructor e con_name types (fun ~params ~arity:_ ~constructor_index ~tag_name ->
           let param_names = List.map snd params in
           let param_docs = List.map string param_names in
@@ -149,7 +149,7 @@ let compile_adt_ffi e adt_name ctors =
     ("let from_ocaml_" ^ adt_name ^ " x = match x with | "
     ^ String.concat " | "
         (List.map
-           (fun (con_name, types) ->
+           (fun (con_name, types, _) ->
              let args = List.mapi (fun i _ -> "x" ^ string_of_int i) types in
              (if List.length types = 0 then con_name else con_name ^ "(" ^ String.concat ", " args ^ ")")
              ^ " -> " ^ adt_name ^ "_" ^ con_name ^ " " ^ String.concat " " args)
@@ -162,7 +162,7 @@ let compile_adt_ffi e adt_name ctors =
   let discr =
     match_ctor_tag_default_ (word_get_value_ h)
       (Stdlib.List.map
-         (fun (con_name, types) ->
+         (fun (con_name, types, _) ->
            let tag_name = Hashtbl.find_exn e.ctag_name con_name in
            let body =
              if List.length types = 0 then raw con_name

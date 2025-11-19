@@ -13,7 +13,7 @@ let update_ctx_shadow ctx ~(key : string) ~value = Map.update ctx key ~f:(fun _ 
 let rec cycle_free = function
   | TVar { contents = Unbound _ } -> ()
   | TVar { contents = Link ty } -> cycle_free ty
-  | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls)) when TyLevel.(ls.level_new = marker_level) ->
+  | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls) | TApp (_, _, ls)) when TyLevel.(ls.level_new = marker_level) ->
       failwith "cycle_free: cycle detected"
   | TArrow (t1, t2, ls) ->
       let level = ls.level_new in
@@ -21,8 +21,8 @@ let rec cycle_free = function
       List.iter ~f:cycle_free t1;
       cycle_free t2;
       ls.level_new <- level
-  | TPrim _ | TNamed _ -> ()
-  | TTup (ts, ls) | TArr (ts, ls) ->
+  | TPrim _ -> ()
+  | TTup (ts, ls) | TArr (ts, ls) | TApp (_, ts, ls) ->
       let level = ls.level_new in
       ls.level_new <- TyLevel.marker_level;
       List.iter ~f:cycle_free ts;
@@ -36,7 +36,7 @@ let update_level l = function
       assert (not TyLevel.(l' = generic_level));
       if TyLevel.(l < l') then tvr := Unbound (n, l)
   | TVar _ -> assert false
-  | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls)) as ty ->
+  | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls) | TApp (_, _, ls)) as ty ->
       if TyLevel.(ls.level_new = generic_level) then
         let s = Syntax.string_of_document @@ Type.pp_ty ty in
         failwith [%string "failed: %{s}"]
@@ -64,7 +64,7 @@ let rec unify ty1 ty2 =
         update_level l t';
         tv := Link t'
     | TArrow (tyl1, tyl2, ll), TArrow (tyr1, tyr2, lr) ->
-        if TyLevel.(ll.level_new = marker_level || lr.level_new = marker_level) then failwith "unify: occurs check";
+        if TyLevel.(ll.level_new = marker_level || lr.level_new = marker_level) then failwith "unify: cycle detected";
         let min_level = TyLevel.min ll.level_new lr.level_new in
         ll.level_new <- TyLevel.marker_level;
         lr.level_new <- TyLevel.marker_level;
@@ -74,17 +74,28 @@ let rec unify ty1 ty2 =
         lr.level_new <- min_level
     | TPrim t1, TPrim t2 when equal_pty t1 t2 -> ()
     | TTup (tys1, l1), TTup (tys2, l2) | TArr (tys1, l1), TArr (tys2, l2) ->
-        if TyLevel.(l1.level_new = marker_level || l2.level_new = marker_level) then failwith "unify: occurs check";
+        if TyLevel.(l1.level_new = marker_level || l2.level_new = marker_level) then failwith "unify: cycle detected";
         let min_level = TyLevel.min l1.level_new l2.level_new in
         l1.level_new <- TyLevel.marker_level;
         l2.level_new <- TyLevel.marker_level;
-        if List.length tys1 <> List.length tys2 then failwith "unify: the arity of tuples must be the same";
+        if List.length tys1 <> List.length tys2 then failwith "unify: the arity of tuples or arrays must be the same";
         List.iter2_exn ~f:(unify_lev min_level) tys1 tys2;
         l1.level_new <- min_level;
         l2.level_new <- min_level
-    | TNamed s1, TNamed s2 ->
-        if String.equal s1 s2 then () else failwith [%string "unify: type mismatch: %{s1} and %{s2}"]
-    | _ -> failwith "unify: type mismatch"
+    | TApp (name1, args1, l1), TApp (name2, args2, l2) ->
+        if TyLevel.(l1.level_new = marker_level || l2.level_new = marker_level) then failwith "unify: cycle detected";
+        let min_level = TyLevel.min l1.level_new l2.level_new in
+        l1.level_new <- TyLevel.marker_level;
+        l2.level_new <- TyLevel.marker_level;
+        if String.equal name1 name2 then () else failwith [%string "unify: type mismatch: %{name1} and %{name2}"];
+        if List.length args1 <> List.length args2 then failwith "unify: the arity of type applications must be the same";
+        List.iter2_exn ~f:(unify_lev min_level) args1 args2;
+        l1.level_new <- min_level;
+        l2.level_new <- min_level
+    | _ ->
+        let s1 = Syntax.string_of_document @@ Type.pp_ty ty1 in
+        let s2 = Syntax.string_of_document @@ Type.pp_ty ty2 in
+        failwith [%string "unify: type mismatch: %{s1} and %{s2}"]
 
 and unify_lev l ty1 ty2 =
   let ty1 = repr ty1 in
@@ -97,17 +108,18 @@ let force_delayed_adjustments () =
     | TVar ({ contents = Unbound (name, l) } as tvr) when TyLevel.(level < l) ->
         tvr := Unbound (name, level);
         acc
-    | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls)) when TyLevel.(ls.level_new = marker_level) ->
-        failwith "occurs check"
-    | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls)) as ty ->
+    | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls) | TApp (_, _, ls)) when TyLevel.(ls.level_new = marker_level) ->
+        failwith "force_delayed_adjustments: cycle detected"
+    | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls) | TApp (_, _, ls)) as ty ->
         if TyLevel.(level < ls.level_new) then ls.level_new <- level;
         adjust_one acc ty
     | _ -> acc
   (* only deals with composite types *)
   and adjust_one acc = function
-    | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls)) as ty when TyLevel.(ls.level_old <= TyLevel.current_level ()) ->
+    | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls) | TApp (_, _, ls)) as ty
+      when TyLevel.(ls.level_old <= TyLevel.current_level ()) ->
         ty :: acc (* update later *)
-    | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls)) when TyLevel.(ls.level_old = ls.level_new) ->
+    | (TArrow (_, _, ls) | TTup (_, ls) | TArr (_, ls) | TApp (_, _, ls)) when TyLevel.(ls.level_old = ls.level_new) ->
         acc (* already updated *)
     | TArrow (ty1, ty2, ls) ->
         let level = ls.level_new in
@@ -117,7 +129,7 @@ let force_delayed_adjustments () =
         ls.level_new <- level;
         ls.level_old <- level;
         acc
-    | TTup (tys1, ls) | TArr (tys1, ls) ->
+    | TTup (tys1, ls) | TArr (tys1, ls) | TApp (_, tys1, ls) ->
         let level = ls.level_new in
         ls.level_new <- TyLevel.marker_level;
         let acc = List.fold_left ~init:acc ~f:(fun acc ty -> loop acc level ty @ acc) tys1 in
@@ -132,9 +144,9 @@ let generalize ty =
   force_delayed_adjustments ();
   let rec loop ty =
     match repr ty with
-    | TVar ({ contents = Unbound (name, l) } as tvr) when TyLevel.(TyLevel.current_level () < l) ->
+    | TVar ({ contents = Unbound (name, l) } as tvr) when TyLevel.(current_level () < l) ->
         tvr := Unbound (name, TyLevel.generic_level)
-    | TArrow (ty1, ty2, ls) when TyLevel.(TyLevel.current_level () < ls.level_new) ->
+    | TArrow (ty1, ty2, ls) when TyLevel.(current_level () < ls.level_new) ->
         let ty1 = List.map ~f:repr ty1 in
         let ty2 = repr ty2 in
         List.iter ~f:loop ty1;
@@ -142,11 +154,27 @@ let generalize ty =
         let l = List.fold_left ~init:(get_level ty2) ~f:(fun ml ty -> TyLevel.max ml (get_level ty)) ty1 in
         ls.level_old <- l;
         ls.level_new <- l (* set the exact level upper bound *)
+    | (TApp (_, tys, ls) | TTup (tys, ls) | TArr (tys, ls)) when TyLevel.(current_level () < ls.level_new) ->
+        let tys = List.map ~f:repr tys in
+        List.iter ~f:loop tys;
+        let l = List.fold_left ~init:(get_level ty) ~f:(fun ml ty -> TyLevel.max ml (get_level ty)) tys in
+        ls.level_old <- l;
+        ls.level_new <- l (* set the exact level upper bound *)
     | _ -> ()
   in
   loop ty
 
 let instantiate ty =
+  let fold_aux loop subst args =
+    let args_rev, subst' =
+      List.fold_left
+        ~f:(fun (tys, subst) ty ->
+          let ty, subst = loop subst ty in
+          (ty :: tys, subst))
+        ~init:([], subst) args
+    in
+    (List.rev args_rev, subst')
+  in
   let rec loop subst = function
     | TVar { contents = Unbound (name, l) } when TyLevel.(l = generic_level) -> (
         match List.Assoc.find ~equal:String.equal subst name with
@@ -156,15 +184,18 @@ let instantiate ty =
             (tv, (name, tv) :: subst))
     | TVar { contents = Link ty } -> loop subst ty
     | TArrow (ty1, ty2, ls) when TyLevel.(ls.level_new = generic_level) ->
-        let ty1, subst =
-          List.fold_left ~init:([], subst)
-            ~f:(fun (tys, subst) ty ->
-              let ty, subst = loop subst ty in
-              (ty :: tys, subst))
-            ty1
-        in
+        let ty1, subst = fold_aux loop subst ty1 in
         let ty2, subst = loop subst ty2 in
-        (new_arrow (List.rev ty1) ty2, subst)
+        (new_arrow ty1 ty2, subst)
+    | TApp (name, tys, ls) when TyLevel.(ls.level_new = generic_level) ->
+        let tys, subst = fold_aux loop subst tys in
+        (new_app name tys, subst)
+    | TTup (tys, ls) when TyLevel.(ls.level_new = generic_level) ->
+        let tys, subst = fold_aux loop subst tys in
+        (new_tup tys, subst)
+    | TArr (tys, ls) when TyLevel.(ls.level_new = generic_level) ->
+        let tys, subst = fold_aux loop subst tys in
+        (new_arr tys, subst)
     | ty -> (ty, subst)
   in
   fst (loop [] ty)
@@ -224,6 +255,8 @@ let rec type_of_pattern (ctx : Type.ty StrMap.t) (p : 'a pattern) : 'a pattern *
           unify ty (new_arrow [ ty ] tyr);
           (PCtorApp (c, Some p, { info with ty = Some tyr }), tyr)
       | None -> failwith [%string "Constructor not found: %{c}"])
+
+type binder_kind = Nothing | Trivial | NonTrivial
 
 let rec bind_pattern_variables ctx p =
   match p with
@@ -327,20 +360,36 @@ let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
       (Match (e, MatchPattern cases, { info with ty = Some tyr }), tyr)
 
 let top_type_of_prog (p : info prog) : info prog =
-  let rec convert_ty (ty : 'a Syntax.ty) : Type.ty =
+  let rec convert_ty (ctx : Type.ty StrMap.t) (arity : int StrMap.t) (ty : 'a Syntax.ty) : Type.ty =
     match ty with
     | TUnit -> Type.(TPrim Unit)
     | TInt -> Type.(TPrim Int)
     | TFloat -> Type.(TPrim Float)
     | TBool -> Type.(TPrim Bool)
-    | TApply (f, []) -> Type.(TNamed f)
-    | TApply (_, _) -> failwith "not implemented"
+    | TNamed f -> (
+        match Map.find arity f with
+        | Some 0 -> Type.new_app f []
+        | Some x -> failwith [%string "Type %{f} requires %{string_of_int x} arguments, but you provided 0"]
+        | None -> failwith [%string "Type %{f} not defined"])
+    | TApply (TNamed f, xs) -> (
+        match Map.find arity f with
+        | Some x when x = List.length xs -> Type.new_app f (List.map ~f:(convert_ty ctx arity) xs)
+        | Some x ->
+            failwith
+              [%string
+                "Type %{f} requires %{string_of_int x} arguments, but you provided %{string_of_int (List.length xs)}"]
+        | None -> failwith [%string "Type %{f} not defined"])
+    | TApply (_, _) ->
+        let s = Syntax.string_of_document @@ Syntax.pp_ty ty in
+        failwith [%string "Type application has invalid syntax: %{s}"]
     | TArrow (ty1, ty2) ->
         let rec flatten acc ty = match ty with TArrow (t1, t2) -> flatten (t1 :: acc) t2 | _ -> (List.rev acc, ty) in
         let args, ret = flatten [ ty1 ] ty2 in
-        Type.new_arrow (List.map ~f:convert_ty args) (convert_ty ret)
-    | TTuple tys -> Type.(new_tup (List.map ~f:convert_ty tys))
-    | TNamedVar _ -> failwith "not implemented"
+        Type.new_arrow (List.map ~f:(convert_ty ctx arity) args) (convert_ty ctx arity ret)
+    | TTuple tys -> Type.(new_tup (List.map ~f:(convert_ty ctx arity) tys))
+    | TNamedVar x ->
+        if Map.mem ctx x then Map.find_exn ctx x
+        else failwith [%string "Type variable not found: %{x}. Ensure it is defined in the type declaration"]
   in
   let open Type in
   let reset () =
@@ -348,22 +397,45 @@ let top_type_of_prog (p : info prog) : info prog =
     TyLevel.reset ();
     TyFresh.reset ()
   in
-  let bind_type ctx = function
-    | TBOne (name, Enum { params = _; ctors }) ->
-        let tyr = TNamed name in
-        List.fold_left ~init:ctx
-          ~f:(fun ctx (name, tys) -> update_ctx_nodup ctx ~key:name ~value:(new_arrow (List.map ~f:convert_ty tys) tyr))
-          ctors
-    | TBRec _ -> ctx
+  let decl_type ctx arity = function
+    | TBOne (name, Enum { params; ctors }) ->
+        let arity = update_ctx_nodup arity ~key:name ~value:(List.length params) in
+        let ty_ctors =
+          List.map
+            ~f:(fun (ctor_name, tys, info) ->
+              let ty_params = List.map ~f:(fun _ -> new_tvar ()) params in
+              let tyr = new_app name ty_params in
+              let ctx =
+                List.fold2_exn ~init:ctx
+                  ~f:(fun ctx param ty_param -> update_ctx_nodup ctx ~key:param ~value:ty_param)
+                  params ty_params
+              in
+              match tys with
+              | [] -> (ctor_name, tyr, { info with ty = Some tyr })
+              | _ ->
+                  let tyr = new_arrow (List.map ~f:(convert_ty ctx arity) tys) tyr in
+                  (ctor_name, tyr, { info with ty = Some tyr }))
+            ctors
+        in
+        let ctx, infos =
+          List.fold_map ~init:ctx
+            ~f:(fun ctx (name, ty, info) -> (update_ctx_nodup ctx ~key:name ~value:ty, info))
+            ty_ctors
+        in
+        let ctors = List.map2_exn ~f:(fun (name, sty, _) info -> (name, sty, info)) ctors infos in
+        (TBOne (name, Enum { params; ctors }), ctx, arity)
+    | TBRec _ -> failwith "todo recursive type bindings"
   in
-  let rec infer_top_level (ctx : ty StrMap.t) = function
-    | Type tb -> (Type tb, bind_type ctx tb)
+  let infer_top_level (ctx : ty StrMap.t) (arity : int StrMap.t) = function
+    | Type tb ->
+        let tb, ctx, arity = decl_type ctx arity tb in
+        (Type tb, ctx, arity)
     | Term (None, e, info) ->
         TyLevel.enter ();
         let e, ty = type_of ctx e in
         TyLevel.leave ();
         generalize ty;
-        (Term (None, e, { info with ty = Some ty }), ctx)
+        (Term (None, e, { info with ty = Some ty }), ctx, arity)
     | Term (Some p, e, info) ->
         let p, ty_p = type_of_pattern ctx p in
         TyLevel.enter ();
@@ -371,20 +443,20 @@ let top_type_of_prog (p : info prog) : info prog =
         unify ty_p ty_e;
         TyLevel.leave ();
         generalize ty_e;
-        (Term (Some p, e, { info with ty = Some ty_e }), bind_pattern_variables ctx p)
+        (Term (Some p, e, { info with ty = Some ty_e }), bind_pattern_variables ctx p, arity)
     | Fun (f, ps, e, info) ->
         let ps, ty_ps = List.unzip @@ List.map ~f:(type_of_pattern ctx) ps in
         let ctx' = List.fold_left ~init:ctx ~f:(fun ctx p -> bind_pattern_variables ctx p) ps in
         let e, ty_e = type_of ctx' e in
         let ty_fun = new_arrow ty_ps ty_e in
-        (Fun (f, ps, e, { info with ty = Some ty_fun }), update_ctx_nodup ctx ~key:f ~value:ty_fun)
+        (Fun (f, ps, e, { info with ty = Some ty_fun }), update_ctx_nodup ctx ~key:f ~value:ty_fun, arity)
   in
-  let _ctx, stmts =
-    List.fold_left ~init:(StrMap.empty, [])
-      ~f:(fun (ctx, stmts) stmt ->
+  let _ctx, _arity, stmts =
+    List.fold_left ~init:(StrMap.empty, StrMap.empty, [])
+      ~f:(fun (ctx, arity, stmts) stmt ->
         reset ();
-        let stmt, _ty = infer_top_level ctx stmt in
-        (ctx, stmt :: stmts))
+        let stmt, ctx, arity = infer_top_level ctx arity stmt in
+        (ctx, arity, stmt :: stmts))
       (fst p)
   in
   (List.rev stmts, { (snd p) with ty = Some (TPrim Unit) })
@@ -394,7 +466,16 @@ open PPrint
 let pp_top_type_of_prog (p : info prog) : PPrint.document =
   let f stmt =
     match stmt with
-    | Type _ -> empty
+    | Type (TBOne (_, Enum { params = _; ctors })) ->
+        separate_map (break 1)
+          (fun (name, _, info) ->
+            parens
+              (star ^^ space ^^ string name ^^ colon ^^ space
+              ^^ Option.value_map ~f:Type.pp_ty ~default:empty info.ty
+              ^^ space ^^ star))
+          ctors
+        ^^ break 1 ^^ Syntax.pp_stmt stmt
+    | Type (TBRec _) -> Syntax.pp_stmt stmt
     | Term (None, _, info) ->
         parens (star ^^ space ^^ Option.value_map ~f:Type.pp_ty ~default:empty info.ty ^^ space ^^ star)
         ^^ break 1 ^^ Syntax.pp_stmt stmt

@@ -48,7 +48,7 @@ type ty =
   | TArr of ty list * levels
   | TArrow of ty list * ty * levels
   | TVar of tv ref
-  | TNamed of string
+  | TApp of string * ty list * levels
 
 and tv = Link of ty | Unbound of string * TyLevel.t (* This string is not necessary, but it's helpful for debugging *)
 and levels = { mutable level_old : TyLevel.t; mutable level_new : TyLevel.t }
@@ -59,51 +59,37 @@ let rec pp_ty = function
   | TPrim Float -> string "float"
   | TPrim Bool -> string "bool"
   | TPrim Str -> string "str"
-  | (TTup (_, ls) | TArr (_, ls) | TArrow (_, _, ls)) when TyLevel.(ls.level_new = marker_level) ->
-      string "<back-reference>"
+  | (TTup (_, ls) | TArr (_, ls) | TArrow (_, _, ls)) when TyLevel.(ls.level_new = marker_level) -> string "<!back-ref>"
   | TTup (ts, ls) ->
       let level = ls.level_new in
       ls.level_new <- TyLevel.marker_level;
-      let doc =
-        string "("
-        ^^ separate_map (string ", ") pp_ty ts
-        ^^ string ")" ^^ colon
-        ^^ string (TyLevel.to_string level)
-        ^^ tilde
-        ^^ string (TyLevel.to_string ls.level_old)
-      in
+      let doc = string "(" ^^ separate_map (string ", ") pp_ty ts ^^ string ")" in
       ls.level_new <- level;
       doc
   | TArr (ts, ls) ->
       let level = ls.level_new in
       ls.level_new <- TyLevel.marker_level;
-      let doc =
-        string "["
-        ^^ separate_map (string ", ") pp_ty ts
-        ^^ string "]" ^^ colon
-        ^^ string (TyLevel.to_string level)
-        ^^ tilde
-        ^^ string (TyLevel.to_string ls.level_old)
-      in
+      let doc = string "[" ^^ separate_map (string ", ") pp_ty ts ^^ string "]" in
       ls.level_new <- level;
       doc
   | TArrow (ts, ty, ls) ->
       let level = ls.level_new in
       ls.level_new <- TyLevel.marker_level;
       let doc =
-        string "("
-        ^^ separate_map (string ", ") pp_ty ts
-        ^^ string " -> " ^^ pp_ty ty ^^ string ")" ^^ colon
-        ^^ string (TyLevel.to_string level)
-        ^^ tilde
-        ^^ string (TyLevel.to_string ls.level_old)
+        (if List.length ts >= 1 then parens (separate_map (string ", ") pp_ty ts)
+         else separate_map (string ", ") pp_ty ts)
+        ^^ string " -> " ^^ pp_ty ty
       in
       ls.level_new <- level;
       doc
-  | TVar { contents = Unbound (name, l) } -> string "'" ^^ string name ^^ colon ^^ string (TyLevel.to_string l)
+  | TVar { contents = Unbound (name, _) } -> string "'" ^^ string name
   | TVar { contents = Link ty } -> pp_ty ty
-  | TNamed name -> string name
-
+  | TApp (name, args, ls) ->
+      let level = ls.level_new in
+      ls.level_new <- TyLevel.marker_level;
+      let doc = string name ^^ if List.length args >= 1 then space ^^ separate_map space pp_ty args else empty in
+      ls.level_new <- level;
+      doc
 let rec repr = function
   | TVar ({ contents = Link t } as tvr) ->
       let t = repr t in
@@ -113,11 +99,11 @@ let rec repr = function
 
 let get_level = function
   | TVar { contents = Unbound (_, l) } -> l
-  | TArrow (_, _, levels) -> levels.level_new
+  | TArrow (_, _, levels) | TApp (_, _, levels) | TTup (_, levels) | TArr (_, levels) -> levels.level_new
   | _ -> failwith "get_level: type without level assigned"
 
-let new_tvar () = TVar (ref (Unbound (TyFresh.next_sym (), TyLevel.current_level ())))
-let new_generic_tvar () = TVar (ref (Unbound (TyFresh.next_sym (), TyLevel.generic_level)))
+let new_tvar () = TVar (ref (Unbound (TyFresh.to_string @@ TyFresh.next_sym (), TyLevel.current_level ())))
+let new_generic_tvar () = TVar (ref (Unbound (TyFresh.to_string @@ TyFresh.next_sym (), TyLevel.generic_level)))
 
 let new_arrow t1 t2 =
   let level = TyLevel.current_level () in
@@ -130,3 +116,7 @@ let new_tup ts =
 let new_arr ts =
   let level = TyLevel.current_level () in
   TArr (ts, { level_new = level; level_old = level })
+
+let new_app name xs =
+  let level = TyLevel.current_level () in
+  TApp (name, xs, { level_new = level; level_old = level })

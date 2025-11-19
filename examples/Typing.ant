@@ -17,3 +17,16 @@ let _ = (fun x -> x, fun x -> x);;
 let _ = 1 + 1;;
 
 let _ = (1, 1);;
+
+type list 'a =
+  | Nil
+  | Cons of 'a * list 'a;;
+
+type pair 'a 'b = P of 'a * 'b;;
+
+type enum1 =
+  | A of list int
+  | B of pair int unit;;
+
+type enum2 =
+  | C of list int;;

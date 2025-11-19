@@ -11,13 +11,14 @@ let rec compile_ty (x : 'a ty) : document =
   | TInt -> string "int"
   | TFloat -> string "float"
   | TBool -> string "bool"
-  | TApply (f, []) -> string f
-  | TApply (f, xs) -> parens (separate_map (string ", ") compile_ty xs) ^^ space ^^ string f
+  | TApply (f, []) -> compile_ty f
+  | TApply (f, xs) -> parens (separate_map (string ", ") compile_ty xs) ^^ space ^^ compile_ty f
   | TArrow (con, cov) -> compile_ty con ^^ string " -> " ^^ compile_ty cov
   | TTuple xs -> string "(" ^^ separate_map (string ", ") compile_ty xs ^^ string ")"
+  | TNamed name -> string name
   | TNamedVar name -> string name
 
-let compile_ctor (name, tys) =
+let compile_ctor (name, tys, _) =
   if List.is_empty tys then string name
   else string name ^^ string " of " ^^ separate_map (string " * ") (fun x -> parens (compile_ty x)) tys
 
