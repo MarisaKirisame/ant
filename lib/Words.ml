@@ -103,6 +103,7 @@ let pop_n (s : words) (n : int) : words * words =
   let l = Generic.snoc ~monoid ~measure x w in
   (l, r)
 
+let slice (s : words) (n : int) : words * words = pop_n s n
 let pop (s : words) = pop_n s 1
 let split (s : words) (l : int) : words * words = Generic.split ~monoid ~measure (fun m -> m.length > l) s
 

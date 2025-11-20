@@ -32,37 +32,90 @@ open BatFingerTree
  *   - 1: Build up A'[X] = A[F[X]], D'[X] = D[G[X]]
  *   - 2: The composed step is then A'[X] -> D'[X], which we add to the memo trie.
  *)
-type measure = { val_count : int }
+type measure = { degree : int; max_degree : int }
 
-(*Invariant: no consecutive pat of the same constructor*)
+(*Invariant: consecutive constructors should be fused*)
 type pattern = (pat, measure) Generic.fg
-
-(*Note that val_count stand for the number of values in input, not the number of values in output(children).*)
-and pat = PVar of int | PCon of { words : words; children : pattern; val_count : int }
+and pat = PVar of int | PCon of words
 
 let monoid : measure monoid =
-  { zero = { val_count = 0 }; combine = (fun x y -> { val_count = x.val_count + y.val_count }) }
+  {
+    zero = { degree = 0; max_degree = 0 };
+    combine = (fun x y -> { degree = x.degree + y.degree; max_degree = max x.max_degree (x.degree + y.max_degree) });
+  }
 
-let pat_measure (p : pat) : measure = match p with PVar n -> { val_count = n } | PCon c -> { val_count = c.val_count }
+let pat_measure (p : pat) : measure =
+  match p with
+  | PVar n -> { degree = n; max_degree = n }
+  | PCon c -> { degree = (Words.summary c).degree; max_degree = (Words.summary c).max_degree }
+
 let pattern_measure (p : pattern) : measure = Generic.measure ~monoid ~measure:pat_measure p
+let pattern_is_empty (x : pattern) : bool = Generic.is_empty x
+let pattern_rear_exn (p : pattern) : pattern * pat = Generic.rear_exn ~monoid ~measure:pat_measure p
 
-(*Invariant: no consecutive read of the same constructor*)
-type reads = (read, measure) Generic.fg
-and read = RVar of int | RCon of { length : int; children : reads; val_count : int }
+let pattern_front_exn (p : pattern) : pat * pattern =
+  let rest_p, first_p = Generic.front_exn ~monoid ~measure:pat_measure p in
+  (first_p, rest_p)
 
-let read_measure (r : read) : measure =
-  match r with RVar n -> { val_count = n } | RCon c -> { val_count = c.val_count }
+let pattern_cons (p : pat) (q : pattern) : pattern =
+  if Generic.is_empty q then Generic.singleton p
+  else
+    let qh, qt = pattern_front_exn q in
+    match (p, qh) with
+    | PVar p, PVar qh -> Generic.cons ~monoid ~measure:pat_measure qt (PVar (p + qh))
+    | PCon p, PCon qh -> Generic.cons ~monoid ~measure:pat_measure qt (PCon (Words.append p qh))
+    | PCon _, PVar _ | PVar _, PCon _ -> Generic.cons ~monoid ~measure:pat_measure q p
 
-let rec pattern_to_reads (p : pattern) : reads =
-  Generic.map ~monoid ~measure:read_measure
-    (fun x ->
-      match x with
-      | PVar n -> RVar n
-      | PCon c ->
-          RCon { length = Words.length c.words; val_count = c.val_count; children = pattern_to_reads c.children })
-    p
+let pattern_slice (p : pattern) (offset : int) : pattern * pattern =
+  if offset = 0 then (Generic.empty, p)
+  else
+    let x, y = Generic.split ~monoid ~measure:pat_measure (fun m -> m.max_degree >= offset) p in
+    let md = (pattern_measure x).max_degree in
+    assert (md < offset);
+    let yh, yt = pattern_front_exn y in
+    match yh with
+    | PVar n ->
+        assert (md + n >= offset);
+        let needed = offset - md in
+        assert (needed > 0 && needed <= n);
+        let left = pattern_cons (PVar needed) yt in
+        let right = if n - needed > 0 then pattern_cons (PVar (n - needed)) yt else yt in
+        (Generic.append ~monoid ~measure:pat_measure x left, right)
+    | PCon c ->
+        let cd = (Words.summary c).max_degree in
+        assert (md + cd >= offset);
+        let needed = offset - md in
+        assert (needed > 0 && needed <= cd);
+        let c_words, c_children = Words.slice c needed in
+        let left = pattern_cons (PCon c_words) yt in
+        let right = if cd - needed > 0 then pattern_cons (PCon c_children) yt else yt in
+        (Generic.append ~monoid ~measure:pat_measure x left, right)
 
-(*lets ignore CEK stuff for now, those codes should be straightforward.*)
+let rec antiunify (x : pattern) (y : pattern) : pattern =
+  let xm = pattern_measure x in
+  let ym = pattern_measure y in
+  assert (xm.degree = ym.degree);
+  assert (xm.max_degree = ym.max_degree);
+  assert (xm.degree = xm.max_degree);
+  if pattern_is_empty x then x
+  else
+    let xh, xt = pattern_front_exn x in
+    let yh, yt = pattern_front_exn y in
+    match (xh, yh) with
+    | PVar xh, PVar yh ->
+        let h = max xh yh in
+        pattern_cons (PVar h) (antiunify (snd (pattern_slice x h)) (snd (pattern_slice y h)))
+        (* binary search for the longest common prefix, 
+         * for the rest (if exist), find max of max_degree, turn into PVar and slice 
+         *)
+    | PCon xh, PCon yh -> failwith "unimplemented"
+    | PVar xh, PCon _ -> pattern_cons (PVar xh) (antiunify xt (snd (pattern_slice y xh)))
+    | PCon _, PVar yh -> pattern_cons (PVar yh) (antiunify (snd (pattern_slice x yh)) yt)
+
+type reads = read list
+and read = { offset : int }
+
+(*(*lets ignore CEK stuff for now, those codes should be straightforward.*)
 type memo =
   (*Note how we are storing two pattern: the outer one is partial (consumed by the trie), and the inner one is complete*)
   | Leaf of { pattern : pattern; step : step }
@@ -72,11 +125,6 @@ and fetch_hash = int
 and step = { src : pattern; dst : value; sc : int }
 
 let pat_append x y = Generic.append ~monoid ~measure:pat_measure x y
-let pattern_rear_exn (p : pattern) : pattern * pat = Generic.rear_exn ~monoid ~measure:pat_measure p
-
-let pattern_front_exn (p : pattern) : pat * pattern =
-  let rest_p, first_p = Generic.front_exn ~monoid ~measure:pat_measure p in
-  (first_p, rest_p)
 
 let rec pattern_append (x : pattern) (y : pattern) : pattern =
   if Generic.is_empty x then y
@@ -128,8 +176,7 @@ let rec subtract (x : pattern) (y : pattern) : pattern option =
     | PCon xh, PVar yh ->
         let xl = Words.length xh.words in
         if xl < yh then pattern_option_cons (PCon xh) (subtract xt (pattern_cons (PVar (yh - xl)) yt))
-        else if xl > yh then 
-          failwith "unimplemented"
+        else if xl > yh then failwith "unimplemented"
         else pattern_option_cons (PCon xh) (subtract xt yt))
 
 let seq_match (x : seq) (y : pattern) : seq option = failwith "unimplemented"
@@ -163,3 +210,4 @@ let subst (x : seq) (s : seq subst_map) : seq = failwith "unimplemented"
 
 (*build up the subst_map, and use add to get F', subst to get G'.*)
 let compose_step (x : step) (y : step) : step = failwith "unimplemented"
+*)
