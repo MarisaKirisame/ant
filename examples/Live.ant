@@ -39,16 +39,14 @@ type value =
   | VCons of value * value
   | VFix of expr * list value
   | VStuck of stuck
-;;
 
-type vtype =
+and vtype =
   | VTInt
   | VTFunc
   | VTBool
   | VTList
-;;
 
-type stuck =
+and stuck =
   | SHole of list value
   | STypeError of value * vtype
   | SIndexError
@@ -59,7 +57,7 @@ type stuck =
   | SMatchList of value * expr * expr
 ;;
 
-let index = fun x n ->
+let rec index = fun x n ->
   match x with
   | Cons (xh, xt) -> 
     (match n with
@@ -67,7 +65,7 @@ let index = fun x n ->
     | S m -> index xt m)
   | _ -> None;;
 
-let eval = fun expr env ->
+let rec eval = fun expr env ->
   match expr with
   | EInt i -> VInt i
   | EPlus (x, y) ->
@@ -78,7 +76,7 @@ let eval = fun expr env ->
       (match yv with
       | VInt yi -> VInt (xi + yi)
       | VStuck ys -> VStuck (SAdd1 xv ys)
-      | _ -> VStuck (STypeError yv VInt))
+      | _ -> VStuck (STypeError yv VTInt))
     | VStuck xs -> VStuck (SAdd0 xs y)
     | _ -> VStuck (STypeError xv VTInt))
   | EVar idx -> 

@@ -1,7 +1,7 @@
 module Make () : sig
   type t
   val reset : unit -> unit
-  val next_fresh : string -> t
+  val next_fresh : string -> string
   val next_sym : unit -> t
   val to_string : t -> string
 end = struct

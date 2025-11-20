@@ -176,10 +176,18 @@ let compile_pp_stmt (e : env) (s : 'a stmt) : document =
   match s with
   | Type (TBOne (name, Enum { params = _; ctors })) -> (* TODO *) compile_adt e name ctors
   | Type (TBRec _) -> failwith "Not implemented (TODO)"
-  | Term (x, tm, _) ->
-      let name = match x with Some x -> pp_pattern x | None -> underscore in
-      string "let rec" ^^ space ^^ name ^^ space ^^ string "=" ^^ space ^^ group @@ compile_pp_expr tm ^^ string ";;"
-  | Fun (_name, _args, _body, _) -> failwith "Not implemented (TODO)"
+  | Term (BSeq (tm, _)) -> compile_pp_expr tm
+  | Term (BOne (x, tm, _)) ->
+      string "let rec" ^^ space ^^ pp_pattern x ^^ space ^^ string "=" ^^ space ^^ group @@ compile_pp_expr tm
+      ^^ string ";;"
+  | Term (BRec bindings) ->
+      string "let rec" ^^ space
+      ^^ separate_map
+           (space ^^ string "and" ^^ space)
+           (fun (x, tm, _) -> pp_pattern x ^^ space ^^ string "=" ^^ space ^^ group @@ compile_pp_expr tm)
+           bindings
+      ^^ string ";;"
+  | _ -> failwith "Not implemented (TODO)"
 
 let compile_ant x =
   string "open Ant" ^^ break 1 ^^ string "module Word = Seq.Word" ^^ break 1

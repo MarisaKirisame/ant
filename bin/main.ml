@@ -11,7 +11,7 @@ let parse content =
       let line = cur.Lexing.pos_lnum in
       let cnum = cur.Lexing.pos_cnum - cur.Lexing.pos_bol + 1 in
       let tok = Lexing.lexeme lexbuf in
-      Printf.eprintf "Syntax error at line %d, character %d, after token `%s`\n" line cnum tok;
+      Printf.eprintf "Syntax error at line %d, character %d, at token `%s`\n" line cnum tok;
       Printf.eprintf "Error state: %d\n" i;
       failwith "Failed due to syntax error"
   | Lexer.Error (e, p) ->
@@ -20,8 +20,8 @@ let parse content =
       Printf.eprintf "Lexing error at line %d, character %d: %s\n" line cnum @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input output print_ast compile_pat compile_ant (module Backend : Compile.Backend) typing print_level _print_cps_transformed
-    _print_de _print_cps_de =
+let driver input output print_ast compile_pat compile_ant (module Backend : Compile.Backend) typing print_level print_cps_transformed
+    print_de print_cps_de =
   let src = read_all input in
   let syn = parse src in
   let ast = Typing.top_type_of_prog syn in
@@ -33,10 +33,10 @@ let driver input output print_ast compile_pat compile_ant (module Backend : Comp
     if print_ast then output_pp (Syntax.pp_prog ast);
     if compile_pat then output_pp (Pat.show_all_pattern_matrixes ast);
     if compile_ant then output_pp (Backend.compile ast);
-    if typing then output_pp (Typing.pp_top_type_of_prog ~print_level ast)
-    (* if print_cps_transformed then output_pp (Syntax.pp_prog (Transform.cps_prog ast))
+    if typing then output_pp (Typing.pp_top_type_of_prog ~print_level ast);
+    if print_cps_transformed then output_pp (Syntax.pp_prog (Transform.cps_prog ast))
     else if print_de then output_pp (Syntax.pp_prog (Transform.defunc_prog ast))
-    else if print_cps_de then output_pp (Syntax.pp_prog (Transform.defunc_prog (Transform.cps_prog ast))) *)
+    else if print_cps_de then output_pp (Syntax.pp_prog (Transform.defunc_prog (Transform.cps_prog ast)))
   in
   ()
 

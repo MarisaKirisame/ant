@@ -361,17 +361,17 @@ let lower_pat_mat expr =
     | Lam (pats, e, info) ->
         let _mats = List.map make_single_mat pats in
         Lam (pats, aux e, info)
-    | Let (BSeq e1, e2, info) ->
+    | Let (BSeq (e1, info), e2, info') ->
         let e1 = aux e1 in
-        Let (BSeq e1, aux e2, info)
-    | Let (BOne (pat, e1), e2, info) ->
+        Let (BSeq (e1, info), aux e2, info')
+    | Let (BOne (pat, e1, info), e2, info') ->
         let _mat = make_single_mat pat in
         let e1 = aux e1 in
         let e2 = aux e2 in
-        Let (BOne (pat, e1), e2, info)
+        Let (BOne (pat, e1, info), e2, info')
     | Let (BRec bindings, e2, info) ->
         (* TODO *)
-        Let (BRec (List.map (fun (pat, e1) -> (pat, aux e1)) bindings), aux e2, info)
+        Let (BRec (List.map (fun (pat, e1, info) -> (pat, aux e1, info)) bindings), aux e2, info)
     | Let _ -> assert false
     | Sel (e, fld, info) -> Sel (e, fld, info)
     | If (c, e1, e2, info) -> If (aux c, aux e1, aux e2, info)
@@ -396,10 +396,10 @@ let collect_pat_mat expr =
     | Tup (args, _) -> List.fold_left aux acc args
     | Arr (args, _) -> List.fold_left aux acc args
     | Lam (_, e, _) -> aux acc e
-    | Let (BSeq e1, e2, _) ->
+    | Let (BSeq (e1, _), e2, _) ->
         let acc = aux acc e1 in
         aux acc e2
-    | Let (BOne (pat, e1), e2, _) ->
+    | Let (BOne (pat, e1, _), e2, _) ->
         let acc = aux acc e1 in
         let mat = make_mat [ pat ] [ 0 ] in
         let acc = mat :: acc in
@@ -407,7 +407,7 @@ let collect_pat_mat expr =
     | Let (BRec bindings, e2, _) ->
         let acc =
           List.fold_left
-            (fun acc (pat, e1) ->
+            (fun acc (pat, e1, _) ->
               let mat = make_mat [ pat ] [ 0 ] in
               let acc = mat :: acc in
               aux acc e1)
@@ -436,13 +436,17 @@ let show_all_pattern_matrixes prog =
       (fun acc stmt ->
         match stmt with
         | Type _ -> acc
-        | Fun (_, args_pats, e, _) ->
-            let pats = List.map (fun pat -> make_mat [ pat ] [ 0 ]) args_pats in
-            pats @ collect_pat_mat e @ acc
-        | Term (None, e, _) -> collect_pat_mat e @ acc
-        | Term (Some pat, e, _) ->
+        | Term (BSeq (e, _)) -> collect_pat_mat e @ acc
+        | Term (BOne (pat, e, _)) ->
             let mat = make_mat [ pat ] [ 0 ] in
-            collect_pat_mat e @ (mat :: acc))
+            collect_pat_mat e @ (mat :: acc)
+        | Term (BRec bindings) ->
+            List.fold_left
+              (fun acc (pat, e, _) ->
+                let mat = make_mat [ pat ] [ 0 ] in
+                collect_pat_mat e @ (mat :: acc))
+              acc bindings
+        | _ -> acc)
       [] (fst prog)
   in
   PPrint.(

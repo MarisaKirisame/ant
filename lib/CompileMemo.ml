@@ -280,7 +280,7 @@ let rec fv_expr (e : 'a expr) (fv : unit MapStr.t) : unit MapStr.t =
   | Var (name, _) -> add_fv name fv
   | Match (value, cases, _) -> fv_expr value (fv_cases cases fv)
   | If (i, t, e, _) -> fv_expr i (fv_expr t (fv_expr e fv))
-  | Let (BOne (l, v), r, _) -> fv_expr v (fv_pat l (fv_expr r fv))
+  | Let (BOne (l, v, _), r, _) -> fv_expr v (fv_pat l (fv_expr r fv))
   | _ -> failwith ("fv_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr e)
 
 and fv_exprs (es : 'a expr list) (fv : unit MapStr.t) : unit MapStr.t = List.fold_left (fun fv e -> fv_expr e fv) fv es
@@ -515,7 +515,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
             (fun _ -> push_env_ w (memo_from_int_ (int_ i)));
             (fun _ -> k.k (push_s s) w);
           ]
-  | Let (BOne (PVar (l, info), v), r, _) ->
+  | Let (BOne (PVar (l, info), v, _), r, _) ->
       check_scope s;
       compile_pp_expr ctx s v
         {
@@ -624,7 +624,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with
   | Type (TBOne (name, Enum { params = _; ctors })) -> compile_adt ctx name ctors
   | Type (TBRec _) -> failwith "Not implemented (TODO)"
-  | Term (x, Lam (ps, term, _), _) ->
+  | Term (BOne (x, Lam (ps, term, _), _)) ->
       let s =
         List.fold_left
           (fun s p ->
@@ -634,7 +634,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
           (new_scope ()) ps
       in
       let arg_num = s.env_length in
-      let name = match x with Some (PVar (x, _)) -> x | _ -> failwith "bad match" in
+      let name = match x with PVar (x, _) -> x | _ -> failwith "bad match" in
       let cont_done_tag = ctor_tag_name ctx "cont_done" in
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
@@ -648,7 +648,6 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
             ^^ string "]" ^^ string ")" ^^ string "("
             ^^ uncode (from_constructor_ cont_done_tag)
             ^^ string ")" ^^ string " memo" ))
-  | Fun (_name, _args, _body, _) -> failwith "Not implemented (TODO)"
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
 
 let generate_apply_cont ctx =
