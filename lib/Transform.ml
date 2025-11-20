@@ -102,14 +102,13 @@ let cps ctx expr =
         k (Arr es)
     | Let (BOne (x, e1), e2) ->
         let* e1 = cps' e1 in
-        let* e2 = cps' e2 in
-        k (Let (BOne (x, e1), e2))
+        let e2 = cps' e2 k in
+        Let (BOne (x, e1), e2)
     | Let (BRec xs, e2) ->
         let rhs = List.map snd xs in
         let* rhs = cps_l' rhs in
-        let* e2 = cps' e2 in
-        let r = Let (BRec (List.combine (List.map fst xs) rhs), e2) in
-        k r
+        let e2 = cps' e2 k in
+        Let (BRec (List.combine (List.map fst xs) rhs), e2)
     | Sel (e, x) ->
         let* e = cps' e in
         k (Sel (e, x))
@@ -146,14 +145,13 @@ let cps ctx expr =
         App (cont, [ Arr es ])
     | Let (BOne (x, e1), e2) ->
         let* e1 = cps' e1 in
-        let* e2 = cps' e2 in
-        App (cont, [ Let (BOne (x, e1), e2) ])
+        let e2 = cps' e2 (fun x -> App (cont, [ x ])) in
+        Let (BOne (x, e1), e2)
     | Let (BRec xs, e2) ->
         let rhs = List.map snd xs in
         let* rhs = cps_l' rhs in
-        let* e2 = cps' e2 in
-        let r = Let (BRec (List.combine (List.map fst xs) rhs), e2) in
-        App (cont, [ r ])
+        let e2 = cps' e2 (fun x -> App (cont, [ x ])) in
+        Let (BRec (List.combine (List.map fst xs) rhs), e2)
     | Sel (e, x) ->
         let* e = cps' e in
         App (cont, [ Sel (e, x) ])
