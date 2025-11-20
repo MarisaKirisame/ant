@@ -151,10 +151,10 @@ simple_expr:
   | simple_expr "." "<int>" { Sel ($1, FIndex $3, empty_info) }
 
 %inline binding:
-  | simple_pattern "=" expr { ($1, $3) }
+  | simple_pattern "=" seq_expr { ($1, $3) }
 
 %inline and_binding:
-  | "and" simple_pattern "=" expr { ($2, $4) }
+  | "and" simple_pattern "=" seq_expr { ($2, $4) }
 
 expr:
   | simple_expr %prec below_HASH { $1 }
@@ -168,8 +168,8 @@ expr:
   | expr infix_op0 expr { Op ($2, $1, $3, empty_info) }
   | expr infix_op2 expr { Op ($2, $1, $3, empty_info) }
   | expr infix_op3 expr { Op ($2, $1, $3, empty_info) }
-  | "let" binding "in" expr { let (p, e) = $2 in Let (BOne (p, e), $4, empty_info) }
-  | "let" "rec" binding and_binding* "in" expr { Let (BRec ($3 :: $4), $6, empty_info) }
+  | "let" binding "in" expr { let (p, e) = $2 in Let (BOne (p, e, empty_info), $4, empty_info) }
+  | "let" "rec" binding and_binding* "in" expr { Let (BRec (List.map (fun (p, e) -> (p, e, empty_info)) ($3 :: $4)), $6, empty_info) }
   | "match" expr "with" cases { Match ($2, (MatchPattern $4), empty_info) }
   | "fun" simple_pattern+ "->" expr { Lam ($2, $4, empty_info) }
   | "if" expr "then" expr "else" expr { If ($2, $4, $6, empty_info) }
@@ -177,7 +177,7 @@ expr:
 
 seq_expr:
   | expr %prec below_SEMI { $1 }
-  | expr ";" seq_expr { Let (BSeq $1, $3, empty_info) }
+  | expr ";" seq_expr { Let (BSeq ($1, empty_info), $3, empty_info) }
 
 type_args: { [] }
   | llist1(atomic_type) { $1 }
@@ -232,6 +232,12 @@ type_parameters:
 type_kind:
   | ctor_decls { fun params -> Enum { params; ctors = $1 } }
 
+%inline let_decl:
+  | "let" binding { $2 }
+
+%inline let_rec_decl:
+  | "let" "rec" binding and_binding* { ($3 :: $4) }
+
 %inline type_decl:
   | "type" "<id>" type_parameters "=" type_kind { ($2, $5 $3) }
 
@@ -239,9 +245,14 @@ type_kind:
   | "and" "<id>" type_parameters "=" type_kind { ($2, $5 $3) }
 
 item:
-  | "let" simple_pattern "=" seq_expr { Term (Some $2, $4, empty_info) }
-  | type_decl and_type_decl* { let (x, td) = $1 in if $2 = [] then Type (TBOne (x, td)) else Type (TBRec ($1 :: $2)) }
-  | seq_expr { Term (None, $1, empty_info) }
+  | let_decl { let (p, e) = $1 in Term (BOne (p, e, empty_info)) }
+  | let_rec_decl { Term (BRec (List.map (fun (p, e) -> (p, e, empty_info)) $1)) }
+  | type_decl and_type_decl* {
+      let (x, td) = $1 in
+      if $2 = [] then Type (TBOne (x, td))
+      else Type (TBRec ($1 :: $2))
+    }
+  | seq_expr { Term (BSeq ($1, empty_info)) }
 
 items: { [] }
   | item ";;" items { $1 :: $3 }

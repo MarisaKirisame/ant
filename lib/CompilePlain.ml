@@ -78,20 +78,18 @@ and parens_compile_expr e = parens (compile_expr e)
 
 and compile_binding (b : 'a binding) (cont : document) : document =
   match b with
-  | BSeq e -> compile_expr e ^^ string ";" ^^ cont
-  | BOne (p, e) | BCont (p, e) -> string "let " ^^ compile_let (p, e) ^^ string " in " ^^ cont
+  | BSeq (e, _) -> compile_expr e ^^ string ";" ^^ cont
+  | BOne (p, e, info) | BCont (p, e, info) -> string "let " ^^ compile_let (p, e, info) ^^ string " in " ^^ cont
   | BRec xs | BRecC xs -> string "let rec " ^^ separate_map (string " and ") compile_let xs ^^ string " in " ^^ cont
 
-and compile_let (p, e) = parens_compile_pat p ^^ string " = " ^^ parens (compile_expr e)
+and compile_let (p, e, _) = parens_compile_pat p ^^ string " = " ^^ parens (compile_expr e)
 
 let compile_stmt (x : 'a stmt) : document =
   match x with
   | Type tb -> compile_type_binding tb
-  | Fun (_name, _args, _body, _) -> failwith "Not implemented (TODO)"
-  | Term (pat, e, _) -> (
-      match pat with
-      | None -> compile_expr e
-      | Some pat -> string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e)
+  | Term (BSeq (e, _)) -> compile_expr e
+  | Term (BOne (pat, e, _)) -> string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
+  | _ -> failwith "Not implemented (TODO)"
 
 let compile_plain (xs : 'a stmt list) : document =
   let ys = List.map compile_stmt xs in

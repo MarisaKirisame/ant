@@ -14,11 +14,12 @@ type 'a pattern =
 type field = FName of string | FIndex of int
 
 type 'a binding =
-  | BSeq of 'a expr
-  | BOne of 'a pattern * 'a expr
-  | BRec of ('a pattern * 'a expr) list
-  | BCont of 'a pattern * 'a expr
-  | BRecC of ('a pattern * 'a expr) list
+  | BSeq of 'a expr * 'a
+  | BOne of 'a pattern * 'a expr * 'a
+  | BRec of ('a pattern * 'a expr * 'a) list
+  (* the following definitions are not used yet *)
+  | BCont of 'a pattern * 'a expr * 'a
+  | BRecC of ('a pattern * 'a expr * 'a) list
 
 and 'a expr =
   | Unit
@@ -55,12 +56,7 @@ type 'a ty =
 
 type 'a ty_kind = Enum of { params : string list; ctors : (string * 'a ty list * 'a) list }
 type 'a ty_binding = TBOne of string * 'a ty_kind | TBRec of (string * 'a ty_kind) list
-
-type 'a stmt =
-  | Type of 'a ty_binding
-  | Term of 'a pattern option * 'a expr * 'a
-  | Fun of string * 'a pattern list * 'a expr * 'a
-
+type 'a stmt = Type of 'a ty_binding | Term of 'a binding
 type 'a prog = 'a stmt list * 'a
 
 (* Pretty-printing for source syntax *)
@@ -126,17 +122,17 @@ let pp_expr =
         @@ break 1 ^^ f true e
         |> pp
     | Arr (xs, _) -> separate_map (semi ^^ space) (f true) xs |> brackets
-    | Let ((BOne (x, e1) | BCont (x, e1)), e2, _) -> fl (pp_pattern x) (f false e1) (f false e2)
-    | Let (BSeq e1, e2, _) -> align @@ f false e1 ^^ semi ^^ break 1 ^^ f false e2
+    | Let ((BOne (x, e1, _) | BCont (x, e1, _)), e2, _) -> fl (pp_pattern x) (f false e1) (f false e2)
+    | Let (BSeq (e1, _), e2, _) -> align @@ f false e1 ^^ semi ^^ break 1 ^^ f false e2
     | Let ((BRec [] | BRecC []), _, _) -> failwith "Empty recursive group"
     | Let ((BRec xs | BRecC xs), e2, _) ->
-        let lhs, rhs = List.hd xs in
+        let lhs, rhs, _ = List.hd xs in
         let tail_lhs_rhs = List.tl xs in
         let lhs = pp_pattern lhs in
         let rhs = f false rhs in
         let others =
           List.map
-            (fun (lhs, rhs) ->
+            (fun (lhs, rhs, _) ->
               let lhs = pp_pattern lhs in
               let rhs = f false rhs in
               (lhs, rhs))
@@ -201,12 +197,19 @@ let pp_stmt =
           (fun (name, Enum { params; ctors }, i) -> pp_enum (i <> 0) name params ctors)
           (List.mapi (fun i (name, ty) -> (name, ty, i)) tbs)
         ^^ string ";;"
-    | Term (x, tm, _) ->
-        let name = match x with Some x -> pp_pattern x | None -> underscore in
-        string "let" ^^ space ^^ name ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm ^^ string ";;"
-    | Fun (name, args, body, _) ->
-        string "let rec" ^^ space ^^ string name ^^ space ^^ separate_map space pp_pattern args ^^ space ^^ string "="
-        ^^ nest 2 @@ break 1 ^^ group @@ pp_expr body ^^ string ";;"
+    | Term (BSeq (tm, _)) ->
+        string "let" ^^ space ^^ underscore ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm
+        ^^ string ";;"
+    | Term (BOne (x, tm, _) | BCont (x, tm, _)) ->
+        string "let" ^^ space ^^ pp_pattern x ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm
+        ^^ string ";;"
+    | Term (BRec xs | BRecC xs) ->
+        string "let rec" ^^ space
+        ^^ separate_map
+             (space ^^ string "and" ^^ space)
+             (fun (x, tm, _) -> pp_pattern x ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm)
+             xs
+        ^^ string ";;"
   in
   inner
 
