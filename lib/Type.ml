@@ -34,11 +34,7 @@ module Level = struct
     let ( <= ) x y = Int.(x <= y)
     let max x y = Int.max x y
     let min x y = Int.min x y
-
-    let to_string = function
-      | x when x = generic_level -> "@"
-      | x when x = marker_level -> "!"
-      | x -> string_of_int x
+    let to_string = function x when x = generic_level -> "@" | x when x = marker_level -> "!" | x -> string_of_int x
   end
 end
 
@@ -129,8 +125,7 @@ let new_arrow t1 t2 =
   let level = TyLevel.current_level () in
   TArrow (t1, t2, { level_new = level; level_old = level })
 
-let new_generic_arrow t1 t2 =
-  TArrow (t1, t2, { level_new = TyLevel.generic_level; level_old = TyLevel.generic_level })
+let new_generic_arrow t1 t2 = TArrow (t1, t2, { level_new = TyLevel.generic_level; level_old = TyLevel.generic_level })
 
 let new_tup ts =
   let level = TyLevel.current_level () in
@@ -144,5 +139,4 @@ let new_app name xs =
   let level = TyLevel.current_level () in
   TApp (name, xs, { level_new = level; level_old = level })
 
-let new_generic_app name xs =
-  TApp (name, xs, { level_new = TyLevel.generic_level; level_old = TyLevel.generic_level })
+let new_generic_app name xs = TApp (name, xs, { level_new = TyLevel.generic_level; level_old = TyLevel.generic_level })
