@@ -21,7 +21,7 @@ let to_ocaml_int_list x =
       Cons (x0, x1)
   | _ -> failwith "unreachable"
 
-let rec list_incr (x0 : Value.seq) : Value.seq =
+let rec list_incr (x0 : Value.seq) : exec_result =
   exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor 0) memo
 
 let () =
