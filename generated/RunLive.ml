@@ -153,7 +153,23 @@ let rec pp_value fmt value =
       | `Improper (elems, tail) -> Format.fprintf fmt "[%a | %a]" render_list elems pp_value tail)
 
 let value_to_string value = Format.asprintf "%a" pp_value value
-let eval_expression x = value_to_ocaml (eval (expr_from_ocaml x) list_Nil)
+let steps_output_path = "eval_steps.json"
+
+let steps_out : out_channel Lazy.t =
+  lazy (open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_output_path)
+
+let () = at_exit (fun () -> if Lazy.is_val steps_out then close_out_noerr (Lazy.force steps_out))
+
+let write_steps_json (r : Memo.exec_result) : unit =
+  let oc = Lazy.force steps_out in
+  Printf.fprintf oc "{\"step\":%d,\"without_memo_step\":%d}\n" r.step r.without_memo_step;
+  flush oc
+
+let eval_expression x =
+  let exec_res = eval (expr_from_ocaml x) list_Nil in
+  write_steps_json exec_res;
+  value_to_ocaml exec_res.words
+
 let mapinc = OEFix (OEMatchList (OEVar 0, OEVar 0, OECons (OEPlus (OEInt 1, OEVar 1), OEApp (OEVar 3, OEVar 0))))
 
 let run () : unit =
