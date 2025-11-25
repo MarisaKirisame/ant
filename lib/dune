@@ -26,6 +26,7 @@
   SynInfo
   Code
   Compile
+  CompileType
   CompileSeq
   CompileMemo
   CompilePlain)

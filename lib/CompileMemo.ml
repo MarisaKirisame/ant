@@ -622,9 +622,11 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
 
 let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with
-  | Type (TBOne (name, Enum { params = _; ctors })) -> compile_adt ctx name ctors
-  | Type (TBRec _) -> failwith "Not implemented (TODO)"
-  | Term (BOne (x, Lam (ps, term, _), _)) ->
+  | Type (TBOne (name, Enum { params = _; ctors }) as tb) ->
+      compile_adt ctx name ctors |> ignore;
+      CompileType.compile_ty_binding tb
+  | Type tb -> CompileType.compile_ty_binding tb (* TODO: register constructors *)
+  | Term (BOne (x, Lam (ps, term, _), _) | BRec [ (x, Lam (ps, term, _), _) ]) ->
       let s =
         List.fold_left
           (fun s p ->
