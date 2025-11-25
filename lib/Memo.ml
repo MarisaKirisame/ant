@@ -222,7 +222,7 @@ type history = slice bin ref
 (* we dont really need state for composition, but it is good for bug catching. *)
 and slice = { state : state; step : step }
 
-let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : words =
+let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
   let raw_step s =
     let w = make_world (copy_state s) m in
     s.c.step w;
@@ -275,6 +275,6 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : words =
   assert (Dynarray.length state.e = 1);
   ignore (fold_bin compose_slice None !hist);
   print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int state.sc ^ " step.");
-  Dynarray.get_last state.e
+  { words = Dynarray.get_last state.e; step = !i; without_memo_step = state.sc }
 
 let exec_done _ = failwith "exec is done, should not call step anymore"

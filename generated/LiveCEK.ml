@@ -331,11 +331,19 @@ let to_ocaml_stuck x =
       SMatchList (x0_24, x1_15, x2_3)
   | _ -> failwith "unreachable"
 
+<<<<<<< HEAD
 let rec index (x0 : Value.seq) (x1 : Value.seq) : Value.seq =
   (exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo).words
 
 let rec eval (x0 : Value.seq) (x1 : Value.seq) : Value.seq =
   (exec_cek (pc_to_exp (int_to_pc 4)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo).words
+=======
+let rec index (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor 0) memo
+
+let rec eval (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek (pc_to_exp (int_to_pc 4)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor 0) memo
+>>>>>>> 6f6e55a (save)
 
 let () =
   add_exp
