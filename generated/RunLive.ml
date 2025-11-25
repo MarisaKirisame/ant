@@ -330,6 +330,7 @@ let write_steps_json (r : Memo.exec_result) : unit =
   flush oc
 
 let eval_expression x =
+<<<<<<< HEAD
   let exec_res =
     Memo.exec_cek
       (Memo.pc_to_exp (int_to_pc 4))
@@ -344,6 +345,13 @@ let parse_expr x = expr_of_nexpr (parse_nexpr x)
 let mapinc =
   let source = "fix f xs. match xs with [] -> xs | hd :: tl -> (hd + 1) :: (f tl)" in
   parse_expr source
+=======
+  let exec_res = eval (expr_from_ocaml x) list_Nil in
+  write_steps_json exec_res;
+  value_to_ocaml exec_res.words
+
+let mapinc = OEFix (OEMatchList (OEVar 0, OEVar 0, OECons (OEPlus (OEInt 1, OEVar 1), OEApp (OEVar 3, OEVar 0))))
+>>>>>>> 6f6e55a (save)
 
 let run () : unit =
   print_endline "mapinc:";
