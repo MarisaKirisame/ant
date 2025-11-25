@@ -643,13 +643,13 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
           ( lam_ "w" (fun w -> compile_pp_expr ctx s term { k = (fun s w -> return s w); fv = empty_fv () } w),
             string "let rec" ^^ space ^^ string name ^^ space
             ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
-            ^^ string ": Value.seq " ^^ string "=" ^^ space ^^ group @@ string "exec_cek "
+            ^^ string ": Value.seq " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
             ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
             ^^ string "(Dynarray.of_list" ^^ string "["
             ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
             ^^ string "]" ^^ string ")" ^^ string "("
             ^^ uncode (from_constructor_ cont_done_tag)
-            ^^ string ")" ^^ string " memo" ))
+            ^^ string ")" ^^ string " memo).words" ))
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
 
 let generate_apply_cont ctx =

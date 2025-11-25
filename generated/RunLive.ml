@@ -317,7 +317,28 @@ and pp_vtype fmt = function
   | VTList -> Format.pp_print_string fmt "list"
 
 let value_to_string value = Format.asprintf "%a" pp_value value
-let eval_expression x = value_to_ocaml (eval (expr_from_ocaml x) list_Nil)
+let steps_output_path = "eval_steps.json"
+
+let steps_out : out_channel Lazy.t =
+  lazy (open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_output_path)
+
+let () = at_exit (fun () -> if Lazy.is_val steps_out then close_out_noerr (Lazy.force steps_out))
+
+let write_steps_json (r : Memo.exec_result) : unit =
+  let oc = Lazy.force steps_out in
+  Printf.fprintf oc "{\"step\":%d,\"without_memo_step\":%d}\n" r.step r.without_memo_step;
+  flush oc
+
+let eval_expression x =
+  let exec_res =
+    Memo.exec_cek
+      (Memo.pc_to_exp (int_to_pc 4))
+      (Dynarray.of_list [ expr_from_ocaml x; list_Nil ])
+      (Memo.from_constructor tag_cont_done) memo
+  in
+  write_steps_json exec_res;
+  value_to_ocaml exec_res.words
+
 let parse_expr x = expr_of_nexpr (parse_nexpr x)
 
 let mapinc =
