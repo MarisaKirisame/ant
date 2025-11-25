@@ -26,7 +26,7 @@ let to_ocaml_int_list x =
   | _ -> failwith "unreachable"
 
 let rec list_incr (x0 : Value.seq) : Value.seq =
-  exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+  (exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo).words
 
 let () =
   add_exp

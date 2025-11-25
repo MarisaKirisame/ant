@@ -26,7 +26,9 @@ let log x = ignore x
 (* todo: when the full suffix is fetched, try to extend at front. *)
 type fetch_result = { fetched : words; prefix : reference option; suffix : reference option }
 and words = seq
+
 (* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
+type exec_result = { words : words; step : int; without_memo_step : int }
 
 let source_to_string (src : source) =
   match src with E i -> "E" ^ string_of_int i | S i -> "S" ^ string_of_int i | K -> "K"
@@ -419,7 +421,7 @@ let exec_done (w : world) : unit =
   improve w.update (Done (Shared w.state));
   raise (DoneExec w.state)
 
-let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
+let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : exec_result =
   let state = { c; e; k; sc = 0 } in
   let i = ref 0 in
   let rec exec state =
@@ -430,5 +432,4 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo_t) : words =
   try exec state
   with DoneExec state ->
     assert (Dynarray.length state.e = 1);
-    print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int state.sc ^ " step.");
-    Dynarray.get_last state.e
+    { words = Dynarray.get_last state.e; step = !i; without_memo_step = state.sc }
