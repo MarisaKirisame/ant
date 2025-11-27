@@ -53,8 +53,8 @@ and stuck =
   | SApp of stuck * expr
   | SAdd0 of stuck * expr
   | SAdd1 of value * stuck
-  | SIf of value * expr * expr
-  | SMatchList of value * expr * expr
+  | SIf of stuck * expr * expr
+  | SMatchList of stuck * expr * expr
 ;;
 
 let rec index = fun x n ->
@@ -101,7 +101,7 @@ let rec eval = fun expr env ->
     | VTrue -> eval t env
     | VFalse -> eval e env
     | VStuck is -> VStuck (SIf is t e)
-    | _ -> VStuck (STypeError i VTBool))
+    | iv -> VStuck (STypeError iv VTBool))
   | ENil -> VNil
   | ECons (x, xs) -> VCons (eval x env) (eval xs env)
   | EMatchList (v, n, c) ->
@@ -109,5 +109,5 @@ let rec eval = fun expr env ->
     | VNil -> eval n env
     | VCons (x, xs) -> eval c (Cons xs (Cons x env))
     | VStuck vs -> VStuck (SMatchList vs n c)
-    | _ -> VStuck (STypeError VTList))
+    | vv -> VStuck (STypeError vv VTList))
 ;;

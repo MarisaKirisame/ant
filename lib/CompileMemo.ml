@@ -63,7 +63,9 @@ let add_cont (ctx : ctx) (name : string) (arity : int) (app : world code -> word
   Dynarray.add_last ctx.conts (name, app);
   ctx.conts_count <- ctx.conts_count + 1
 
-let ctor_tag_name (ctx : ctx) (cname : string) : int code = raw (Hashtbl.find_exn ctx.ctag_name cname)
+let ctor_tag_name (ctx : ctx) (cname : string) : int code = 
+  print_endline ("ctor_tag_name: " ^ cname);
+  raw (Hashtbl.find_exn ctx.ctag_name cname)
 
 let new_ctx () : ctx =
   let ctx =

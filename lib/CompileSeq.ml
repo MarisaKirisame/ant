@@ -32,6 +32,7 @@ let compile_seq_ty ty =
   match ty with
   | TApply (TInt, []) | TInt -> string "int"
   | TApply _ -> string "Seq.seq"
+  | TNamed _ -> string "Seq.seq"
   | _ -> failwith ("compile_seq_ty: " ^ Syntax.string_of_document @@ Syntax.pp_ty ty)
 
 let with_registered_constructor (e : env) con_name types k =
