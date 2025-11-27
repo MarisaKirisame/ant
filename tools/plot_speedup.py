@@ -69,7 +69,7 @@ def plot_speedup(ratios: Iterable[float], output: Path):
     xs = list(range(1, len(ratios) + 1))
     plt.figure(figsize=(8, 4.5))
     plt.plot(xs, ratios, marker="o", linewidth=1.5)
-    plt.xlabel("Sample")
+    plt.xlabel("Execution number (nth run)")
     plt.ylabel("Speedup (baseline / memoized)")
     plt.title("Memoization Speedup per Execution")
     plt.grid(True, linestyle="--", alpha=0.5)
