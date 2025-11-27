@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := all
 
-.PHONY: dependency build run compile-generated nightly all
+.PHONY: dependency build run compile-generated nightly all report
 
 dependency:
 	chmod +x ./nightly.py
@@ -18,4 +18,8 @@ run:
 	chmod +x ./nightly.py
 	./nightly.py run
 
-nightly all: dependency build run
+# Run the full pipeline and produce the HTML speedup report into output/.
+report: run
+	python3 tools/generate_speedup_index.py --input eval_steps.json --plot output/speedup.png --output output/index.html
+
+nightly all: dependency build run report
