@@ -38,13 +38,13 @@ let compile_ty_binding (binding : 'a ty_binding) : document =
         if is_to then string "(Word.get_value (Memo.to_word " ^^ v ^^ string ") <> 0)"
         else string "(Memo.from_int (if " ^^ v ^^ string " then 1 else 0))"
     | TNamed n ->
-        let fname = if is_to then "to_" ^ n else "from_" ^ n in
+        let fname = if is_to then "to_ocaml_" ^ n else "from_ocaml_" ^ n in
         string fname ^^ space ^^ v
     | TNamedVar n ->
-        let fname = if is_to then "to_" ^ n else "from_" ^ n in
+        let fname = if is_to then "to_generic_" ^ n else "from_generic_" ^ n in
         string fname ^^ space ^^ v
     | TApply (TNamed n, args) ->
-        let fname = if is_to then "to_" ^ n else "from_" ^ n in
+        let fname = if is_to then "to_ocaml_" ^ n else "from_ocaml_" ^ n in
         let args_conv =
           separate_map space (fun arg -> parens (string "fun x -> " ^^ compile_conv is_to arg (string "x"))) args
         in
@@ -56,7 +56,9 @@ let compile_ty_binding (binding : 'a ty_binding) : document =
   let compile_from_ctor (cname, args, _) =
     let pat_args =
       if args = [] then empty
-      else space ^^ parens @@ separate_map (comma ^^ space) (fun i -> string ("x" ^ string_of_int i)) (List.mapi (fun i _ -> i) args)
+      else
+        space ^^ parens
+        @@ separate_map (comma ^^ space) (fun i -> string ("x" ^ string_of_int i)) (List.mapi (fun i _ -> i) args)
     in
     let pattern = string cname ^^ pat_args in
     let body_list =
@@ -111,23 +113,23 @@ let compile_ty_binding (binding : 'a ty_binding) : document =
 
   let compile_funcs (name, Enum { params; ctors }) is_first =
     let params_pat =
-      match params with [] -> empty | _ -> separate_map space (fun p -> string ("from_" ^ p)) params ^^ space
+      match params with [] -> empty | _ -> separate_map space (fun p -> string ("from_generic_" ^ p)) params ^^ space
     in
     let header_from =
       (if is_first then string "let rec" else string "and")
       ^^ space
-      ^^ string ("from_" ^ name)
+      ^^ string ("from_ocaml_" ^ name)
       ^^ space ^^ params_pat ^^ string "x ="
       ^^ nest 2 (break 1 ^^ string "match x with" ^^ concat_map compile_from_ctor ctors)
     in
 
     let params_pat_to =
-      match params with [] -> empty | _ -> separate_map space (fun p -> string ("to_" ^ p)) params ^^ space
+      match params with [] -> empty | _ -> separate_map space (fun p -> string ("to_generic_" ^ p)) params ^^ space
     in
     let header_to =
       (if is_first then string "let rec" else string "and")
       ^^ space
-      ^^ string ("to_" ^ name)
+      ^^ string ("to_ocaml_" ^ name)
       ^^ space ^^ params_pat_to ^^ string "x ="
       ^^ nest 2
            (break 1

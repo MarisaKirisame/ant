@@ -1,11 +1,13 @@
 module Make () : sig
   type t
+
   val reset : unit -> unit
   val next_fresh : string -> string
   val next_sym : unit -> t
   val to_string : t -> string
 end = struct
   type t = string
+
   let to_string = fun x -> x
   let c1 = ref 0
 

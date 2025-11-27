@@ -63,7 +63,7 @@ let add_cont (ctx : ctx) (name : string) (arity : int) (app : world code -> word
   Dynarray.add_last ctx.conts (name, app);
   ctx.conts_count <- ctx.conts_count + 1
 
-let ctor_tag_name (ctx : ctx) (cname : string) : int code = 
+let ctor_tag_name (ctx : ctx) (cname : string) : int code =
   print_endline ("ctor_tag_name: " ^ cname);
   raw (Hashtbl.find_exn ctx.ctag_name cname)
 
@@ -616,6 +616,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                                         ]
                                   | _ -> failwith "with_splits: unexpected arity") )
                         | PAny -> (string "_", compile_pp_expr ctx s expr k w)
+                        | PVar (x, _) -> (string x, compile_pp_expr ctx (extend_s s x) expr k w)
                         | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
                       c
                   in
@@ -625,9 +626,16 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
 let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with
   | Type (TBOne (name, Enum { params = _; ctors }) as tb) ->
-      compile_adt ctx name ctors |> ignore;
+      let cd = compile_adt ctx name ctors in
+      cd |> ignore;
       CompileType.compile_ty_binding tb
-  | Type tb -> CompileType.compile_ty_binding tb (* TODO: register constructors *)
+  | Type (TBRec trs as tb) ->
+      List.iter
+        (fun (name, Enum { params = _; ctors }) ->
+          let cd = compile_adt ctx name ctors in
+          cd |> ignore)
+        trs;
+      CompileType.compile_ty_binding tb
   | Term (BOne (x, Lam (ps, term, _), _) | BRec [ (x, Lam (ps, term, _), _) ]) ->
       let s =
         List.fold_left
@@ -653,6 +661,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
             ^^ uncode (from_constructor_ cont_done_tag)
             ^^ string ")" ^^ string " memo)" ))
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
+
 let generate_apply_cont ctx =
   set_code apply_cont
     (lam_ "w" (fun w ->

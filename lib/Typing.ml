@@ -3,7 +3,6 @@ open Type
 open Syntax
 open SynInfo
 
-
 module ResolveGlobal = struct
   open Syntax
   open Core
@@ -21,9 +20,7 @@ module ResolveGlobal = struct
     let recurse = resolve_expr env in
     match e with
     | Var (n, info) -> (
-        if
-          Set.mem env.locals n
-        then e
+        if Set.mem env.locals n then e
         else
           match Hashtbl.find env.globals n with
           | Some _ -> GVar (n, info) (* It is a global variable *)
@@ -38,8 +35,7 @@ module ResolveGlobal = struct
     | If (c, t, e, info) -> If (recurse c, recurse t, recurse e, info)
     | Tup (es, info) -> Tup (List.map ~f:recurse es, info)
     | Arr (es, info) -> Arr (List.map ~f:recurse es, info)
-    | Let (BSeq (l, b_info), r, info) ->
-        Let (BSeq (recurse l, b_info), recurse r, info)
+    | Let (BSeq (l, b_info), r, info) -> Let (BSeq (recurse l, b_info), recurse r, info)
     | Let (BOne (p, def, b_info), body, info) ->
         let resolved_def = recurse def in
         let new_locals = collect_pattern_vars env.locals p in
@@ -598,32 +594,29 @@ let top_type_of_prog (p : info prog) : info prog =
   in
   let resolve_ctx = Hashtbl.create (module String) in
   let infer_top_level (ctx : ty StrMap.t) (arity : int StrMap.t) stmt =
-    let stmt_resolved = 
+    let stmt_resolved =
       match stmt with
       | Term (BOne (p, e, info)) ->
           let env = { ResolveGlobal.globals = resolve_ctx; ResolveGlobal.locals = String.Set.empty } in
           let e_resolved = ResolveGlobal.resolve_expr env e in
-          
+
           let vars = ResolveGlobal.collect_pattern_vars String.Set.empty p in
           Set.iter vars ~f:(fun v -> Hashtbl.set resolve_ctx ~key:v ~data:());
-          
+
           Term (BOne (p, e_resolved, info))
       | Term (BRec bindings) ->
-          List.iter bindings ~f:(fun (p, _, _) -> 
-             let vars = ResolveGlobal.collect_pattern_vars String.Set.empty p in
-             Set.iter vars ~f:(fun v -> Hashtbl.set resolve_ctx ~key:v ~data:())
-          );
-          
+          List.iter bindings ~f:(fun (p, _, _) ->
+              let vars = ResolveGlobal.collect_pattern_vars String.Set.empty p in
+              Set.iter vars ~f:(fun v -> Hashtbl.set resolve_ctx ~key:v ~data:()));
+
           let env = { ResolveGlobal.globals = resolve_ctx; ResolveGlobal.locals = String.Set.empty } in
-          let bindings_resolved = 
+          let bindings_resolved =
             List.map bindings ~f:(fun (p, e, info) -> (p, ResolveGlobal.resolve_expr env e, info))
           in
           Term (BRec bindings_resolved)
-          
       | Term (BSeq (e, info)) ->
           let env = { ResolveGlobal.globals = resolve_ctx; ResolveGlobal.locals = String.Set.empty } in
           Term (BSeq (ResolveGlobal.resolve_expr env e, info))
-          
       | Type _ -> stmt
       | _ -> failwith "Unknown top term binding in resolve"
     in

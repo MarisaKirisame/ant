@@ -30,10 +30,9 @@ let new_env () : env = { arity = Hashtbl.create (module Core.String); ctag = Has
 
 let compile_seq_ty ty =
   match ty with
-  | TApply (TInt, []) | TInt -> string "int"
-  | TApply _ -> string "Seq.seq"
+  | TInt -> string "int"
   | TNamed _ -> string "Seq.seq"
-  | _ -> failwith ("compile_seq_ty: " ^ Syntax.string_of_document @@ Syntax.pp_ty ty)
+  | _ -> failwith (Printf.sprintf "Unsupported type: %s" (Syntax.string_of_document @@ Syntax.pp_ty ty))
 
 let with_registered_constructor (e : env) con_name types k =
   let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
@@ -75,7 +74,7 @@ let compile_adt_constructors (e : env) adt_name ctors =
                 let name_code = var name in
                 match ty with
                 | TInt -> app_ seq_from_int name_code
-                | TApply _ -> name_code
+                | TNamed _ -> name_code
                 | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_ty ty))
               params
           in
@@ -127,7 +126,7 @@ let compile_adt_ffi e adt_name ctors =
                  (fun (ty, name) ->
                    match ty with
                    | TInt -> doc_of_code (app_ seq_to_int (var name))
-                   | TApply _ -> string name
+                   | TNamed _ -> string name
                    | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_ty ty))
                  params)
           in
