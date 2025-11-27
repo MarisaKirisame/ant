@@ -88,7 +88,8 @@ let compile_stmt (x : 'a stmt) : document =
   match x with
   | Type tb -> compile_type_binding tb
   | Term (BSeq (e, _)) -> compile_expr e
-  | Term (BOne (pat, e, _)) -> string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
+  | Term (BOne (pat, e, _) | BRec [ (pat, e, _) ]) ->
+      string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
   | _ -> failwith "Not implemented (TODO)"
 
 let compile_plain (xs : 'a stmt list) : document =
