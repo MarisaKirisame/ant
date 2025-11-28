@@ -12,7 +12,7 @@ type any =
   | D of any * any * any * any * any * any
 ;;
 
-let _ = let rec f = fun x ->
+let rec f = fun x ->
   match x with
   | (A (a, b)) -> a + b
   | A (a, b) -> a + b
@@ -23,5 +23,4 @@ let _ = let rec f = fun x ->
   | D (_, _, _, B, _, _) -> 4
   | D (_, _, _, _, B, _) -> 5
   | D (_, _, _, _, _, B) -> 5
-  | _ -> 6
-  in f;;
+  | _ -> 6;;

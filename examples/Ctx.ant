@@ -1,0 +1,24 @@
+type nat = 
+  | Z 
+  | S of nat
+;;
+
+type list 'a =
+  | Nil
+  | Cons of 'a * list 'a
+;;
+
+type option 'a =
+  | None
+  | Some of 'a
+;;
+
+let rec index = fun x n ->
+  match x with
+  | Cons (xh, xt) -> 
+    (match n with
+    | Z -> Some xh
+    | S m -> index xt m)
+  | _ -> None;;
+
+let _ = index Nil Z;;

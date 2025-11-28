@@ -123,6 +123,20 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         ],
         env=env,
     )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Test.ant",
+            "generated/TestPlain.ml",
+            "--compile",
+            "--backend",
+            "plain",
+        ],
+        env=env,
+    )
     #opam_exec(
     #    [
     #        "dune",

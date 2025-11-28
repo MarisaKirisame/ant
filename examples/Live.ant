@@ -39,27 +39,25 @@ type value =
   | VCons of value * value
   | VFix of expr * list value
   | VStuck of stuck
-;;
 
-type vtype =
+and vtype =
   | VTInt
   | VTFunc
   | VTBool
   | VTList
-;;
 
-type stuck =
+and stuck =
   | SHole of list value
   | STypeError of value * vtype
   | SIndexError
   | SApp of stuck * expr
   | SAdd0 of stuck * expr
   | SAdd1 of value * stuck
-  | SIf of value * expr * expr
-  | SMatchList of value * expr * expr
+  | SIf of stuck * expr * expr
+  | SMatchList of stuck * expr * expr
 ;;
 
-let index = fun x n ->
+let rec index = fun x n ->
   match x with
   | Cons (xh, xt) -> 
     (match n with
@@ -67,7 +65,7 @@ let index = fun x n ->
     | S m -> index xt m)
   | _ -> None;;
 
-let eval = fun expr env ->
+let rec eval = fun expr env ->
   match expr with
   | EInt i -> VInt i
   | EPlus (x, y) ->
@@ -78,8 +76,8 @@ let eval = fun expr env ->
       (match yv with
       | VInt yi -> VInt (xi + yi)
       | VStuck ys -> VStuck (SAdd1 xv ys)
-      | _ -> VStuck (STypeError yv VInt))
-    | VStuck xs -> VStuck (SAdd0 xv y)
+      | _ -> VStuck (STypeError yv VTInt))
+    | VStuck xs -> VStuck (SAdd0 xs y)
     | _ -> VStuck (STypeError xv VTInt))
   | EVar idx -> 
     (match index env idx with
@@ -103,7 +101,7 @@ let eval = fun expr env ->
     | VTrue -> eval t env
     | VFalse -> eval e env
     | VStuck is -> VStuck (SIf is t e)
-    | _ -> VStuck (STypeError i VTBool))
+    | iv -> VStuck (STypeError iv VTBool))
   | ENil -> VNil
   | ECons (x, xs) -> VCons (eval x env) (eval xs env)
   | EMatchList (v, n, c) ->
@@ -111,5 +109,5 @@ let eval = fun expr env ->
     | VNil -> eval n env
     | VCons (x, xs) -> eval c (Cons xs (Cons x env))
     | VStuck vs -> VStuck (SMatchList vs n c)
-    | _ -> VStuck (STypeError VTList))
+    | vv -> VStuck (STypeError vv VTList))
 ;;
