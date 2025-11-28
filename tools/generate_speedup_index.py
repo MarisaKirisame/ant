@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Generate an index.html summarizing memoization speedups."""
+
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+
+from plot_speedup import SpeedupStats, generate_plot
+
+
+def _image_src(plot_path: Path, output_dir: Path) -> str:
+    """Return a relative path for the plot image."""
+    return os.path.relpath(plot_path, output_dir)
+
+
+def _render_html(stats: SpeedupStats, img_src: str, data_label: str) -> str:
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Memoization Speedup</title>
+  <style>
+    :root {{
+      --bg: #0f172a;
+      --card: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Helvetica, sans-serif;
+      background: radial-gradient(circle at 20% 20%, #1f2937, #0f172a 55%);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+    }}
+    .panel {{
+      width: min(960px, 100%);
+      background: var(--card);
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      padding: 28px 32px 32px;
+      box-shadow: 0 10px 50px rgba(0, 0, 0, 0.35);
+    }}
+    h1 {{
+      margin: 0 0 12px;
+      font-size: 26px;
+      letter-spacing: 0.2px;
+    }}
+    .meta {{
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 14px;
+    }}
+    .stats {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }}
+    .stat {{
+      padding: 14px 12px;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      background: #0b1324;
+    }}
+    .label {{
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }}
+    .value {{
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--accent);
+    }}
+    .plot {{
+      width: 100%;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      background: #0b1324;
+      padding: 12px;
+    }}
+    .plot img {{
+      width: 100%;
+      display: block;
+      border-radius: 8px;
+    }}
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <h1>Memoization Speedup</h1>
+    <p class="meta">Data source: {data_label}</p>
+    <section class="stats">
+      <div class="stat">
+        <span class="label">Samples</span>
+        <span class="value">{stats.samples}</span>
+      </div>
+      <div class="stat">
+        <span class="label">Mean speedup</span>
+        <span class="value">{stats.mean:.2f}x</span>
+      </div>
+      <div class="stat">
+        <span class="label">Best speedup</span>
+        <span class="value">{stats.maximum:.2f}x</span>
+      </div>
+      <div class="stat">
+        <span class="label">Lowest speedup</span>
+        <span class="value">{stats.minimum:.2f}x</span>
+      </div>
+    </section>
+    <section class="plot">
+      <img src="{img_src}" alt="Speedup plot">
+    </section>
+  </main>
+</body>
+</html>
+"""
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=Path("eval_steps.json"),
+        help="path to the JSONL stats file (default: eval_steps.json)",
+    )
+    parser.add_argument(
+        "--plot",
+        type=Path,
+        default=Path("speedup.png"),
+        help="where to write the plot image (default: speedup.png)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("index.html"),
+        help="where to write the HTML report (default: index.html)",
+    )
+    args = parser.parse_args()
+
+    args.plot.parent.mkdir(parents=True, exist_ok=True)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+
+    _, stats = generate_plot(args.input, args.plot)
+    img_src = _image_src(args.plot, args.output.parent)
+    data_label = os.path.relpath(args.input, args.output.parent)
+    args.output.write_text(_render_html(stats, img_src, data_label), encoding="utf-8")
+    print(
+        f"wrote {args.output} (plot: {args.plot}, mean: {stats.mean:.2f}x, "
+        f"max: {stats.maximum:.2f}x, min: {stats.minimum:.2f}x)"
+    )
+
+
+if __name__ == "__main__":
+    main()
