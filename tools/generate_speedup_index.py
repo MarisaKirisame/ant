@@ -4,18 +4,14 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import os
 from pathlib import Path
 
 from plot_speedup import SpeedupStats, generate_plot
 
 
-def _image_src(plot_path: Path, output_dir: Path, embed: bool) -> str:
-    """Return either a data URI or a relative path for the plot image."""
-    if embed:
-        encoded = base64.b64encode(plot_path.read_bytes()).decode("ascii")
-        return f"data:image/png;base64,{encoded}"
+def _image_src(plot_path: Path, output_dir: Path) -> str:
+    """Return a relative path for the plot image."""
     return os.path.relpath(plot_path, output_dir)
 
 
@@ -153,26 +149,13 @@ def main() -> None:
         default=Path("index.html"),
         help="where to write the HTML report (default: index.html)",
     )
-    parser.add_argument(
-        "--embed-plot",
-        dest="embed_plot",
-        action="store_true",
-        help="embed the plot image as a base64 data URI (default)",
-    )
-    parser.add_argument(
-        "--no-embed-plot",
-        dest="embed_plot",
-        action="store_false",
-        help="link to the plot image instead of embedding",
-    )
-    parser.set_defaults(embed_plot=True)
     args = parser.parse_args()
 
     args.plot.parent.mkdir(parents=True, exist_ok=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     _, stats = generate_plot(args.input, args.plot)
-    img_src = _image_src(args.plot, args.output.parent, args.embed_plot)
+    img_src = _image_src(args.plot, args.output.parent)
     data_label = os.path.relpath(args.input, args.output.parent)
     args.output.write_text(_render_html(stats, img_src, data_label), encoding="utf-8")
     print(
