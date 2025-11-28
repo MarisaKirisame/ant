@@ -5,8 +5,10 @@ open Value
 open Common
 
 let memo = init_memo ()
+let tag_cont_done = 0
 let tag_Nil = 1
 let tag_Cons = 2
+let tag_cont_1 = 3
 
 type int_list = Nil | Cons of int * int_list
 

@@ -63,9 +63,7 @@ let add_cont (ctx : ctx) (name : string) (arity : int) (app : world code -> word
   Dynarray.add_last ctx.conts (name, app);
   ctx.conts_count <- ctx.conts_count + 1
 
-let ctor_tag_name (ctx : ctx) (cname : string) : int code =
-  print_endline ("ctor_tag_name: " ^ cname);
-  raw (Hashtbl.find_exn ctx.ctag_name cname)
+let ctor_tag_name (ctx : ctx) (cname : string) : int code = raw (Hashtbl.find_exn ctx.ctag_name cname)
 
 let new_ctx () : ctx =
   let ctx =
@@ -719,8 +717,8 @@ let pp_cek_ant x =
   let generated_stmt = separate_map (break 1) (compile_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
-  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ string "let memo = init_memo () " ^^ break 1 ^^ generated_stmt
-  ^^ break 1
+  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ string "let memo = init_memo () " ^^ break 1 ^^ ctor_tag_decls ctx
+  ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string "let () = add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i)))
