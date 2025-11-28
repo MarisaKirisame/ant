@@ -330,28 +330,11 @@ let write_steps_json (r : Memo.exec_result) : unit =
   flush oc
 
 let eval_expression x =
-<<<<<<< HEAD
-  let exec_res =
-    Memo.exec_cek
-      (Memo.pc_to_exp (int_to_pc 4))
-      (Dynarray.of_list [ expr_from_ocaml x; list_Nil ])
-      (Memo.from_constructor tag_cont_done) memo
-  in
-  write_steps_json exec_res;
-  value_to_ocaml exec_res.words
-
-let parse_expr x = expr_of_nexpr (parse_nexpr x)
-
-let mapinc =
-  let source = "fix f xs. match xs with [] -> xs | hd :: tl -> (hd + 1) :: (f tl)" in
-  parse_expr source
-=======
   let exec_res = eval (expr_from_ocaml x) list_Nil in
   write_steps_json exec_res;
   value_to_ocaml exec_res.words
 
 let mapinc = OEFix (OEMatchList (OEVar 0, OEVar 0, OECons (OEPlus (OEInt 1, OEVar 1), OEApp (OEVar 3, OEVar 0))))
->>>>>>> 6f6e55a (save)
 
 let run () : unit =
   print_endline "mapinc:";
@@ -368,43 +351,11 @@ let run () : unit =
   print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 2))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 40))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 45))));
-<<<<<<< HEAD
-  let rec loop n =
-    if n > 0 then (
-      ignore (eval_expression (OEApp (mapinc, nats 40)));
-      loop (n - 1))
-  in
-  (*loop 50;*)
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 40))));
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45))));
-  ignore (eval_expression (OELet (mapinc, OEApp (OEVar 0, nats 45))));
-  let rec repl () =
-    print_string ">>> ";
-    flush stdout;
-    match read_line () with
-    | exception End_of_file -> print_endline "bye!"
-    | line ->
-        let line = String.trim line in
-        if String.equal line "" || String.equal line "#" then repl ()
-        else if String.equal line ":quit" || String.equal line ":q" then print_endline "bye!"
-        else (
-          (try
-             let expr = expr_of_nexpr (parse_nexpr line) in
-             let value = eval_expression expr in
-             print_endline (value_to_string value)
-           with
-          | Invalid_argument msg -> Printf.printf "Error: %s\n%!" msg
-          | exn -> Printf.printf "Error: %s\n%!" (Printexc.to_string exn));
-          repl ())
-  in
-  (*repl ();*)
-=======
   print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 40 OENil))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45 OENil))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 46 OENil))));
   print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45 (nats 45 OENil)))));
   print_endline (value_to_string (eval_expression (OELet (mapinc, OEApp (OEVar 0, nats 45 OENil)))));
->>>>>>> 71db6e1 (save)
   ()
 (*
 (fix f xs. match xs with [] -> xs | hd :: tl -> (hd + 1) :: (f tl))(0 :: 1 :: 2 :: [])
