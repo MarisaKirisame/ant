@@ -1,4 +1,3 @@
-open LiveCEK
 open Ant
 open Common
 open Word
@@ -40,8 +39,8 @@ and stuck =
   | SApp of stuck * expr
   | SAdd0 of stuck * expr
   | SAdd1 of value * stuck
-  | SIf of value * expr * expr
-  | SMatchList of value * expr * expr
+  | SIf of stuck * expr * expr
+  | SMatchList of stuck * expr * expr
 
 and vtype = VTInt | VTFunc | VTBool | VTList [@@deriving show]
 
@@ -204,26 +203,26 @@ let rec nat_from_int i =
   assert (i >= 0);
   if i == 0 then OZ else OS (nat_from_int (i - 1))
 
-let rec int_from_ocaml n = match n with OZ -> nat_Z | OS n_ -> nat_S (int_from_ocaml n_)
+let rec int_from_ocaml n = match n with OZ -> LiveCEK.Z | OS n_ -> LiveCEK.S (int_from_ocaml n_)
 
 let rec expr_from_ocaml e =
   match e with
-  | OEInt i -> expr_EInt (Memo.from_int i)
-  | OEPlus (x, y) -> expr_EPlus (expr_from_ocaml x) (expr_from_ocaml y)
-  | OEVar i -> expr_EVar (int_from_ocaml (nat_from_int i))
-  | OELet (l, r) -> expr_ELet (expr_from_ocaml l) (expr_from_ocaml r)
-  | OETrue -> expr_ETrue
-  | OEFalse -> expr_EFalse
-  | OENil -> expr_ENil
-  | OECons (x, y) -> expr_ECons (expr_from_ocaml x) (expr_from_ocaml y)
-  | OEAbs x -> expr_EAbs (expr_from_ocaml x)
-  | OEApp (x, y) -> expr_EApp (expr_from_ocaml x) (expr_from_ocaml y)
-  | OEIf (i, t, e) -> expr_EIf (expr_from_ocaml i) (expr_from_ocaml t) (expr_from_ocaml e)
-  | OEMatchList (l, n, c) -> expr_EMatchList (expr_from_ocaml l) (expr_from_ocaml n) (expr_from_ocaml c)
-  | OEFix x -> expr_EFix (expr_from_ocaml x)
-  | OEHole -> expr_EHole
+  | OEInt i -> LiveCEK.EInt i
+  | OEPlus (x, y) -> LiveCEK.EPlus (expr_from_ocaml x, expr_from_ocaml y)
+  | OEVar i -> LiveCEK.EVar (int_from_ocaml (nat_from_int i))
+  | OELet (l, r) -> LiveCEK.ELet (expr_from_ocaml l, expr_from_ocaml r)
+  | OETrue -> LiveCEK.ETrue
+  | OEFalse -> LiveCEK.EFalse
+  | OENil -> LiveCEK.ENil
+  | OECons (x, y) -> LiveCEK.ECons (expr_from_ocaml x, expr_from_ocaml y)
+  | OEAbs x -> LiveCEK.EAbs (expr_from_ocaml x)
+  | OEApp (x, y) -> LiveCEK.EApp (expr_from_ocaml x, expr_from_ocaml y)
+  | OEIf (i, t, e) -> LiveCEK.EIf (expr_from_ocaml i, expr_from_ocaml t, expr_from_ocaml e)
+  | OEMatchList (l, n, c) -> LiveCEK.EMatchList (expr_from_ocaml l, expr_from_ocaml n, expr_from_ocaml c)
+  | OEFix x -> LiveCEK.EFix (expr_from_ocaml x)
+  | OEHole -> LiveCEK.EHole
 
-let rec nat_seq_to_int seq = match to_ocaml_nat seq with Z -> 0 | S rest -> 1 + nat_seq_to_int rest
+let rec nat_seq_to_int seq = match seq with LiveCEK.Z -> 0 | LiveCEK.S rest -> 1 + nat_seq_to_int rest
 
 let int_of_word_seq seq =
   match Memo.to_word seq with
@@ -231,12 +230,12 @@ let int_of_word_seq seq =
   | Word.ConstructorTag tag -> invalid_arg (Printf.sprintf "expected int word, found constructor %d" tag)
 
 let rec expr_of_value_seq seq =
-  match to_ocaml_expr seq with
-  | EInt data -> OEInt (int_of_word_seq data)
-  | EPlus (lhs, rhs) -> OEPlus (expr_of_value_seq lhs, expr_of_value_seq rhs)
-  | EVar idx -> OEVar (nat_seq_to_int idx)
-  | EAbs body -> OEAbs (expr_of_value_seq body)
-  | EApp (fn, arg) -> OEApp (expr_of_value_seq fn, expr_of_value_seq arg)
+  match seq with
+  | LiveCEK.EInt data -> OEInt data
+  | LiveCEK.EPlus (lhs, rhs) -> OEPlus (expr_of_value_seq lhs, expr_of_value_seq rhs)
+  | LiveCEK.EVar idx -> OEVar (nat_seq_to_int idx)
+  | LiveCEK.EAbs body -> OEAbs (expr_of_value_seq body)
+  | LiveCEK.EApp (fn, arg) -> OEApp (expr_of_value_seq fn, expr_of_value_seq arg)
   | ELet (lhs, rhs) -> OELet (expr_of_value_seq lhs, expr_of_value_seq rhs)
   | ETrue -> OETrue
   | EFalse -> OEFalse
@@ -249,33 +248,37 @@ let rec expr_of_value_seq seq =
   | EHole -> OEHole
 
 let vtype_of_seq seq =
-  match to_ocaml_vtype seq with VTInt -> VTInt | VTFunc -> VTFunc | VTBool -> VTBool | VTList -> VTList
+  match seq with
+  | LiveCEK.VTInt -> VTInt
+  | LiveCEK.VTFunc -> VTFunc
+  | LiveCEK.VTBool -> VTBool
+  | LiveCEK.VTList -> VTList
 
 let rec value_to_ocaml v =
-  match to_ocaml_value v with
-  | VInt i -> OVInt (Word.get_value (Memo.to_word i))
-  | VTrue -> OVTrue
-  | VFalse -> OVFalse
-  | VNil -> OVNil
-  | VCons (x, y) -> OVCons (value_to_ocaml x, value_to_ocaml y)
-  | VAbs (body, env) -> OVAbs (expr_of_value_seq body, value_list_of_seq env)
+  match v with
+  | LiveCEK.VInt i -> OVInt i
+  | LiveCEK.VTrue -> OVTrue
+  | LiveCEK.VFalse -> OVFalse
+  | LiveCEK.VNil -> OVNil
+  | LiveCEK.VCons (x, y) -> OVCons (value_to_ocaml x, value_to_ocaml y)
+  | LiveCEK.VAbs (body, env) -> OVAbs (expr_of_value_seq body, value_list_of_seq env)
   | VFix (body, env) -> OVFix (expr_of_value_seq body, value_list_of_seq env)
   | VStuck stuck -> OVStuck (stuck_of_seq stuck)
 
 and value_list_of_seq seq =
-  match to_ocaml_list seq with Nil -> [] | Cons (hd, tl) -> value_to_ocaml hd :: value_list_of_seq tl
+  match seq with LiveCEK.Nil -> [] | LiveCEK.Cons (hd, tl) -> value_to_ocaml hd :: value_list_of_seq tl
 
 and stuck_of_seq seq =
-  match to_ocaml_stuck seq with
-  | SHole env -> SHole (value_list_of_seq env)
-  | STypeError (value, ty) -> STypeError (value_to_ocaml value, vtype_of_seq ty)
-  | SIndexError -> SIndexError
-  | SApp (stuck, expr) -> SApp (stuck_of_seq stuck, expr_of_value_seq expr)
-  | SAdd0 (stuck, expr) -> SAdd0 (stuck_of_seq stuck, expr_of_value_seq expr)
-  | SAdd1 (value, stuck) -> SAdd1 (value_to_ocaml value, stuck_of_seq stuck)
-  | SIf (value, thn, els) -> SIf (value_to_ocaml value, expr_of_value_seq thn, expr_of_value_seq els)
-  | SMatchList (value, nil_case, cons_case) ->
-      SMatchList (value_to_ocaml value, expr_of_value_seq nil_case, expr_of_value_seq cons_case)
+  match seq with
+  | LiveCEK.SHole env -> SHole (value_list_of_seq env)
+  | LiveCEK.STypeError (value, ty) -> STypeError (value_to_ocaml value, vtype_of_seq ty)
+  | LiveCEK.SIndexError -> SIndexError
+  | LiveCEK.SApp (stuck, expr) -> SApp (stuck_of_seq stuck, expr_of_value_seq expr)
+  | LiveCEK.SAdd0 (stuck, expr) -> SAdd0 (stuck_of_seq stuck, expr_of_value_seq expr)
+  | LiveCEK.SAdd1 (value, stuck) -> SAdd1 (value_to_ocaml value, stuck_of_seq stuck)
+  | LiveCEK.SIf (stuck, thn, els) -> SIf (stuck_of_seq stuck, expr_of_value_seq thn, expr_of_value_seq els)
+  | LiveCEK.SMatchList (stuck, nil_case, cons_case) ->
+      SMatchList (stuck_of_seq stuck, expr_of_value_seq nil_case, expr_of_value_seq cons_case)
 
 let rec pp_value fmt value =
   match value with
@@ -306,9 +309,9 @@ and pp_stuck fmt = function
   | SApp (stuck, expr) -> Format.fprintf fmt "<stuck app %a %a>" pp_stuck stuck pp_expr expr
   | SAdd0 (stuck, expr) -> Format.fprintf fmt "<stuck add0 %a %a>" pp_stuck stuck pp_expr expr
   | SAdd1 (value, stuck) -> Format.fprintf fmt "<stuck add1 %a %a>" pp_value value pp_stuck stuck
-  | SIf (value, thn, els) -> Format.fprintf fmt "<stuck if %a %a %a>" pp_value value pp_expr thn pp_expr els
-  | SMatchList (value, nil_case, cons_case) ->
-      Format.fprintf fmt "<stuck match %a %a %a>" pp_value value pp_expr nil_case pp_expr cons_case
+  | SIf (stuck, thn, els) -> Format.fprintf fmt "<stuck if %a %a %a>" pp_stuck stuck pp_expr thn pp_expr els
+  | SMatchList (stuck, nil_case, cons_case) ->
+      Format.fprintf fmt "<stuck match %a %a %a>" pp_stuck stuck pp_expr nil_case pp_expr cons_case
 
 and pp_vtype fmt = function
   | VTInt -> Format.pp_print_string fmt "int"
@@ -330,9 +333,13 @@ let write_steps_json (r : Memo.exec_result) : unit =
   flush oc
 
 let eval_expression x =
-  let exec_res = eval (expr_from_ocaml x) list_Nil in
+  let exec_res =
+    LiveCEK.eval
+      (LiveCEK.from_ocaml_expr (expr_from_ocaml x))
+      (LiveCEK.from_ocaml_list LiveCEK.from_ocaml_value LiveCEK.Nil)
+  in
   write_steps_json exec_res;
-  value_to_ocaml exec_res.words
+  value_to_ocaml (LiveCEK.to_ocaml_value exec_res.words)
 
 let mapinc = OEFix (OEMatchList (OEVar 0, OEVar 0, OECons (OEPlus (OEInt 1, OEVar 1), OEApp (OEVar 3, OEVar 0))))
 

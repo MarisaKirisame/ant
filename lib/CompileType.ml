@@ -21,11 +21,6 @@ let compile_ty_binding (binding : 'a ty_binding) : document =
   in
   collect_ctors binding;
 
-  let compile_tags =
-    let sorted_tags = List.sort (fun (_, t1) (_, t2) -> compare t1 t2) (List.of_seq (Hashtbl.to_seq ctor_tag_map)) in
-    concat_map (fun (c, t) -> string ("let tag_" ^ c ^ " = " ^ string_of_int t) ^^ hardline) sorted_tags
-  in
-
   let rec compile_conv is_to ty v =
     match ty with
     | TUnit ->
@@ -144,7 +139,4 @@ let compile_ty_binding (binding : 'a ty_binding) : document =
 
   let from_docs, to_docs = List.split (List.mapi (fun i d -> compile_funcs d (i = 0)) decls) in
 
-  compile_tags ^^ pp_stmt (Type binding) ^^ hardline
-  ^^ separate (break 1) from_docs
-  ^^ hardline
-  ^^ separate (break 1) to_docs
+  pp_stmt (Type binding) ^^ hardline ^^ separate (break 1) from_docs ^^ hardline ^^ separate (break 1) to_docs

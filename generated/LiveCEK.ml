@@ -5,8 +5,66 @@ open Value
 open Common
 
 let memo = init_memo ()
+let tag_cont_done = 0
 let tag_Z = 1
 let tag_S = 2
+let tag_Nil = 3
+let tag_Cons = 4
+let tag_None = 5
+let tag_Some = 6
+let tag_EInt = 7
+let tag_EPlus = 8
+let tag_EVar = 9
+let tag_EAbs = 10
+let tag_EApp = 11
+let tag_ELet = 12
+let tag_ETrue = 13
+let tag_EFalse = 14
+let tag_EIf = 15
+let tag_ENil = 16
+let tag_ECons = 17
+let tag_EMatchList = 18
+let tag_EFix = 19
+let tag_EHole = 20
+let tag_VInt = 21
+let tag_VAbs = 22
+let tag_VTrue = 23
+let tag_VFalse = 24
+let tag_VNil = 25
+let tag_VCons = 26
+let tag_VFix = 27
+let tag_VStuck = 28
+let tag_VTInt = 29
+let tag_VTFunc = 30
+let tag_VTBool = 31
+let tag_VTList = 32
+let tag_SHole = 33
+let tag_STypeError = 34
+let tag_SIndexError = 35
+let tag_SApp = 36
+let tag_SAdd0 = 37
+let tag_SAdd1 = 38
+let tag_SIf = 39
+let tag_SMatchList = 40
+let tag_cont_1 = 41
+let tag_cont_2 = 42
+let tag_cont_3 = 43
+let tag_cont_4 = 44
+let tag_cont_5 = 45
+let tag_cont_6 = 46
+let tag_cont_7 = 47
+let tag_cont_8 = 48
+let tag_cont_9 = 49
+let tag_cont_10 = 50
+let tag_cont_11 = 51
+let tag_cont_12 = 52
+let tag_cont_13 = 53
+let tag_cont_14 = 54
+let tag_cont_15 = 55
+let tag_cont_16 = 56
+let tag_cont_17 = 57
+let tag_cont_18 = 58
+let tag_cont_19 = 59
 
 type nat = Z | S of nat
 
@@ -23,9 +81,6 @@ let rec to_ocaml_nat x =
       let x0 = Memo.splits_1 t in
       S (to_ocaml_nat x0)
   | _ -> failwith "unreachable"
-
-let tag_Nil = 1
-let tag_Cons = 2
 
 type 'a list = Nil | Cons of 'a * 'a list
 
@@ -44,9 +99,6 @@ let rec to_ocaml_list to_generic_a x =
       Cons (to_generic_a x0, to_ocaml_list (fun x -> to_generic_a x) x1)
   | _ -> failwith "unreachable"
 
-let tag_None = 1
-let tag_Some = 2
-
 type 'a option = None | Some of 'a
 
 let rec from_ocaml_option from_generic_a x =
@@ -62,21 +114,6 @@ let rec to_ocaml_option to_generic_a x =
       let x0 = Memo.splits_1 t in
       Some (to_generic_a x0)
   | _ -> failwith "unreachable"
-
-let tag_EInt = 1
-let tag_EPlus = 2
-let tag_EVar = 3
-let tag_EAbs = 4
-let tag_EApp = 5
-let tag_ELet = 6
-let tag_ETrue = 7
-let tag_EFalse = 8
-let tag_EIf = 9
-let tag_ENil = 10
-let tag_ECons = 11
-let tag_EMatchList = 12
-let tag_EFix = 13
-let tag_EHole = 14
 
 type expr =
   | EInt of int
@@ -151,27 +188,6 @@ let rec to_ocaml_expr x =
       EFix (to_ocaml_expr x0)
   | c when c = tag_EHole -> EHole
   | _ -> failwith "unreachable"
-
-let tag_VInt = 1
-let tag_VAbs = 2
-let tag_VTrue = 3
-let tag_VFalse = 4
-let tag_VNil = 5
-let tag_VCons = 6
-let tag_VFix = 7
-let tag_VStuck = 8
-let tag_VTInt = 9
-let tag_VTFunc = 10
-let tag_VTBool = 11
-let tag_VTList = 12
-let tag_SHole = 13
-let tag_STypeError = 14
-let tag_SIndexError = 15
-let tag_SApp = 16
-let tag_SAdd0 = 17
-let tag_SAdd1 = 18
-let tag_SIf = 19
-let tag_SMatchList = 20
 
 type value =
   | VInt of int
