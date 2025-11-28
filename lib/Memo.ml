@@ -15,11 +15,8 @@ open Core
 let log x = print_endline x
 let log x = ignore x
 
-(* todo: when the full suffix is fetched, try to extend at front. *)
-type fetch_result = { fetched : words; prefix : reference option; suffix : reference option }
-and words = seq
-
 (* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
+type words = seq
 type exec_result = { words : words; step : int; without_memo_step : int }
 
 let source_to_string (src : source) = match src with E i -> "E" ^ string_of_int i | K -> "K"
@@ -111,6 +108,28 @@ let rec splits (x : seq) : seq list =
   else
     let h, t = pop x in
     h :: splits t
+
+let rec splits_1 x =
+  let h, _ = pop x in
+  h
+
+let rec splits_2 x =
+  let h, t = pop x in
+  let h2, _ = pop t in
+  (h, h2)
+
+let rec splits_3 x =
+  let h, t = pop x in
+  let h2, t2 = pop t in
+  let h3, _ = pop t2 in
+  (h, h2, h3)
+
+let rec splits_4 x =
+  let h, t = pop x in
+  let h2, t2 = pop t in
+  let h3, t3 = pop t2 in
+  let h4, _ = pop t3 in
+  (h, h2, h3, h4)
 
 let list_match (x : seq) : (Word.t * seq) option =
   Option.map (Generic.front ~monoid ~measure x) (fun (x, Word y) -> (y, x))

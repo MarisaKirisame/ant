@@ -113,7 +113,7 @@ rule tokenize = parse
   | "\""            { string (Buffer.create 16) lexbuf }
   | int_lit   as x  { TK_INT_LITERAL (int_of_string x) }
   | bool_lit  as x  { TK_BOOL_LITERAL (bool_of_string x) }
-  | '`' (ctor as x)  { TK_RAW_CTOR x }
+  | '`' (ctor as x) { TK_RAW_CTOR x }
   | ctor      as x  { TK_CTOR x }
   | identifier as x { 
                       match Hashtbl.find_opt keywords_table x with

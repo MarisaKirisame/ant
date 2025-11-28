@@ -1,6 +1,6 @@
 (library
  (name runmodes)
- (modules LiveCEK RunLive RunTest)
+ (modules LiveCEK LiveLexer LiveParser NamedExpr RunLive RunTest)
  (libraries ant)
  (wrapped false)
  (preprocess
@@ -13,6 +13,11 @@
  (libraries runmodes)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))
+
+(ocamllex LiveLexer)
+
+(menhir
+ (modules LiveParser))
 
 (env
  (dev

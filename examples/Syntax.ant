@@ -16,6 +16,35 @@ let _ =
   let x = 10 in
   x;;
 
+
+(* enum *)
+type bin =
+  | Zero
+  | One;;
+type nat =
+  | S of nat
+  | Z;;
+
+(* type application *)
+type list 'a =
+  | Nil
+  | Cons of 'a * list 'a;;
+type pair 'a 'b = P of 'a * 'b;;
+type test =
+  | CA of list int
+  | CB of pair int unit;;
+type option 'a =
+  | None
+  | Some of 'a;;
+
+type a =
+  | KA of a
+and b =
+  | KB of b;;
+
+type wrap_int = A of int;;
+
+
 (* constructor application *)
 let _ = A 10;;
 
@@ -38,33 +67,35 @@ let _ =
   let y = 2 + 4 in
   x + y;;
 
+(* seq *)
+let ignore = fun x -> ();;
 let _ =
   ignore 10;
   ignore 20;
   30;;
 
-let _ =
-  let rec f =
-    fun x -> f x
-  in
-  f;;
-
 (* let rec *)
-let (even, odd) = 
-  let rec even = fun x y ->
-    match x with
-    | S x -> odd x y
-    | Z -> true
-  and odd = fun x y ->
-    match x with
-    | S x -> even x y
-    | Z -> false
-  in (even, odd);;
+let rec f =
+  fun x -> f x;;
+
+let rec even = fun x y ->
+  match x with
+  | S x -> odd x y
+  | Z -> true
+and odd = fun x y ->
+  match x with
+  | S x -> even x y
+  | Z -> false;;
 
 (* selection *)
-let _ = x.m;;
+(* let _ = x.m;; *)
 
 (* match *)
+let x = 10;;
+let y = Some 10;;
+let z = (1, 2);;
+let w = true;;
+let m = ();;
 let _ = match x with
   | 1 -> 2
   | 2 -> 4
@@ -92,26 +123,5 @@ let _ = match m with
 (* if *)
 let _ = if true then 1 + 2 else if false then 3 + 4 else 5 + 6;;
 
-(* enum *)
-type bin =
-  | Zero
-  | One;;
-type nat =
-  | S of nat
-  | Z;;
-
-(* type application *)
-type list 'a =
-  | Nil
-  | Cons of 'a * list 'a;;
-type pair 'a 'b = P of 'a * 'b;;
-type test =
-  | A of list int
-  | B of pair int unit;;
-
-type a =
-  | KA of a
-and b =
-  | KB of b;;
 
 let _ = ()

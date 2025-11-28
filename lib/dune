@@ -10,8 +10,8 @@
   Pat
   Pattern
   Reference
-  Tyck
-  Resolve
+  Type
+  Typing
   Transform
   Fresh
   Memo
@@ -25,10 +25,13 @@
   Common
   batFingerTree
   Ir
+  SynInfo
   Code
+  Compile
+  CompileType
   CompileSeq
   CompileMemo
-  Compile)
+  CompilePlain)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq))
  (foreign_stubs
