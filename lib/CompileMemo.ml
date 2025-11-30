@@ -243,10 +243,9 @@ let pop_n s n =
 
 let pop_s s = pop_n s 1
 
-(*todo: we actually need to dup a bunch. lets switch to a functional data structure. *)
-(* let dup_s s = { s with meta_env = s.meta_env; env_length = s.env_length } *)
+(* type kont = { k : scope -> world code -> unit code; fv : unit MapStr.t } *)
 
-type kont = { k : scope -> world code -> unit code; fv : unit MapStr.t }
+type kont = scope -> world code -> unit code
 
 let dup_fv (fv : unit MapStr.t) : unit MapStr.t = fv
 let empty_fv () : unit MapStr.t = MapStr.empty
@@ -261,7 +260,7 @@ let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit cod
     [
       (fun _ -> assert_env_length_ w (int_ s.env_length));
       (fun _ -> drop_n_ w (int_ s.env_length) (int_ n));
-      (fun _ -> k.k new_s w);
+      (fun _ -> k new_s w);
     ]
 
 let return (s : scope) (w : world code) : unit code =
@@ -336,7 +335,10 @@ let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) 
   let make_code w = f { s with progressed = false } w in
   if s.progressed then goto_ w (add_code $ Some (lam_ "w" make_code)) else make_code w
 
-let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world code -> unit code =
+let ( let* ) e f = e f
+
+let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.t) (k : kont) : world code -> unit code
+    =
   match c with
   | Var (name, _) ->
       let loc =
@@ -349,94 +351,62 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
           [
             (fun _ -> assert_env_length_ w (int_ s.env_length));
             (fun _ -> push_env_ w (get_env_ w (int_ loc)));
-            (fun _ -> k.k (push_s s) w);
+            (fun _ -> k (push_s s) w);
           ]
   | Match (value, cases, _) ->
-      compile_pp_expr ctx s value
-        { k = (fun s -> reading s $ fun s w -> compile_pp_cases ctx s cases k w); fv = fv_cases cases (dup_fv k.fv) }
+      let* s = compile_pp_expr ctx s value (fv_cases cases (dup_fv fv)) in
+      reading s $ fun s w -> compile_pp_cases ctx s cases fv k w
   | Ctor (cname, _) ->
       fun w ->
         seqs_
           [
             (fun _ -> assert_env_length_ w (int_ s.env_length));
             (fun _ -> push_env_ w (from_constructor_ (ctor_tag_name ctx cname)));
-            (fun _ -> k.k (push_s s) w);
+            (fun _ -> k (push_s s) w);
           ]
   | App (Ctor (cname, _), [ x0 ], _) ->
-      compile_pp_expr ctx s x0
-        {
-          k =
-            (fun s w ->
-              seqs_
-                [
-                  (fun _ -> assert_env_length_ w (int_ s.env_length));
-                  (fun _ ->
-                    let_in_ "x0" (pop_env_ w) (fun x0 ->
-                        push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0 ])));
-                  (fun _ -> k.k (push_s (pop_s s)) w);
-                ]);
-          fv = k.fv;
-        }
+      let* s = compile_pp_expr ctx s x0 fv in
+      fun w ->
+        seqs_
+          [
+            (fun _ -> assert_env_length_ w (int_ s.env_length));
+            (fun _ ->
+              let_in_ "x0" (pop_env_ w) (fun x0 ->
+                  push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0 ])));
+            (fun _ -> k (push_s (pop_s s)) w);
+          ]
   | App (Ctor (cname, _), [ x0; x1 ], _) ->
-      compile_pp_expr ctx s x0
-        {
-          k =
-            (fun s w ->
-              compile_pp_expr ctx s x1
-                {
-                  k =
-                    (fun s w ->
-                      seqs_
-                        [
-                          (fun _ -> assert_env_length_ w (int_ s.env_length));
-                          (fun _ ->
-                            let_in_ "x1" (pop_env_ w) (fun x1 ->
-                                let_in_ "x0" (pop_env_ w) (fun x0 ->
-                                    push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0; x1 ]))));
-                          (fun _ -> k.k (push_s (pop_s (pop_s s))) w);
-                        ]);
-                  fv = k.fv;
-                }
-                w);
-          fv = fv_expr x1 (dup_fv k.fv);
-        }
+      let* s = compile_pp_expr ctx s x0 (fv_expr x1 (dup_fv fv)) in
+      let* s = compile_pp_expr ctx s x1 fv in
+      fun w ->
+        seqs_
+          [
+            (fun _ -> assert_env_length_ w (int_ s.env_length));
+            (fun _ ->
+              let_in_ "x1" (pop_env_ w) (fun x1 ->
+                  let_in_ "x0" (pop_env_ w) (fun x0 ->
+                      push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0; x1 ]))));
+            (fun _ -> k (push_s (pop_s (pop_s s))) w);
+          ]
   | App (Ctor (cname, _), [ x0; x1; x2 ], _) ->
-      compile_pp_expr ctx s x0
-        {
-          k =
-            (fun s w ->
-              compile_pp_expr ctx s x1
-                {
-                  k =
-                    (fun s w ->
-                      compile_pp_expr ctx s x2
-                        {
-                          k =
-                            (fun s w ->
-                              seqs_
-                                [
-                                  (fun _ -> assert_env_length_ w (int_ s.env_length));
-                                  (fun _ ->
-                                    let_in_ "x2" (pop_env_ w) (fun x2 ->
-                                        let_in_ "x1" (pop_env_ w) (fun x1 ->
-                                            let_in_ "x0" (pop_env_ w) (fun x0 ->
-                                                push_env_ w
-                                                  (memo_appends_
-                                                     [ from_constructor_ (ctor_tag_name ctx cname); x0; x1; x2 ])))));
-                                  (fun _ -> k.k (push_s (pop_s (pop_s (pop_s s)))) w);
-                                ]);
-                          fv = k.fv;
-                        }
-                        w);
-                  fv = fv_expr x1 (dup_fv k.fv);
-                }
-                w);
-          fv = fv_expr x2 (fv_expr x1 (dup_fv k.fv));
-        }
+      let* s = compile_pp_expr ctx s x0 (fv_expr x2 (fv_expr x1 (dup_fv fv))) in
+      let* s = compile_pp_expr ctx s x1 (fv_expr x1 (dup_fv fv)) in
+      let* s = compile_pp_expr ctx s x2 fv in
+      fun w ->
+        seqs_
+          [
+            (fun _ -> assert_env_length_ w (int_ s.env_length));
+            (fun _ ->
+              let_in_ "x2" (pop_env_ w) (fun x2 ->
+                  let_in_ "x1" (pop_env_ w) (fun x1 ->
+                      let_in_ "x0" (pop_env_ w) (fun x0 ->
+                          push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0; x1; x2 ])))));
+            (fun _ -> k (push_s (pop_s (pop_s (pop_s s)))) w);
+          ]
   | App (GVar (f, _), xs, _) ->
       check_scope s;
       let cont_name = "cont_" ^ string_of_int ctx.conts_count in
-      let keep, keep_s = keep_only s k.fv in
+      let keep, keep_s = keep_only s fv in
       (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
       let keep_length = keep_s.env_length in
       add_cont ctx cont_name (keep_length + 1) (fun w tl ->
@@ -445,95 +415,69 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
               [
                 (fun _ -> set_k_ w (get_next_cont_ tl));
                 (fun _ -> restore_env_ w (int_ keep_length) tl);
-                (fun _ -> k.k (push_s keep_s) w);
+                (fun _ -> k (push_s keep_s) w);
               ]
           in
           code);
       let xs_length = List.length xs in
-      compile_pp_exprs ctx s xs
-        {
-          k =
-            (fun s w ->
-              seqs_
-                [
-                  (fun _ -> assert_env_length_ w (int_ s.env_length));
-                  (fun _ ->
-                    let_in_ "keep"
-                      (env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ xs_length))
-                      (fun keep ->
-                        set_k_ w
-                          (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ w ])));
-                  (fun _ -> goto_ w (Hashtbl.find_exn ctx.func_pc f));
-                ]);
-          fv = k.fv;
-        }
+      compile_pp_exprs ctx s xs fv (fun s w ->
+          seqs_
+            [
+              (fun _ -> assert_env_length_ w (int_ s.env_length));
+              (fun _ ->
+                let_in_ "keep"
+                  (env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ xs_length))
+                  (fun keep ->
+                    set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ w ])));
+              (fun _ -> goto_ w (Hashtbl.find_exn ctx.func_pc f));
+            ])
   | Op ("+", x0, x1, _) ->
-      compile_pp_expr ctx s x0
-        {
-          k =
-            (fun s w ->
-              compile_pp_expr ctx s x1
-                {
-                  k =
-                    (fun s ->
-                      reading s $ fun s w ->
-                      seqs_
-                        [
-                          (fun _ -> assert_env_length_ w (int_ s.env_length));
-                          (fun _ ->
-                            let_in_ "x0"
-                              (resolve_ w (src_E_ (s.env_length - 2)))
-                              (fun x0 ->
-                                let_in_ "x1"
-                                  (resolve_ w (src_E_ (s.env_length - 1)))
-                                  (fun x1 ->
-                                    seqs_
-                                      [
-                                        (fun _ -> to_unit_ $ pop_env_ w);
-                                        (fun _ -> to_unit_ $ pop_env_ w);
-                                        (fun _ ->
-                                          push_env_ w
-                                            (memo_from_int_
-                                               (add_ (int_from_word_ (zro_ x0)) (int_from_word_ (zro_ x1)))));
-                                        (fun _ -> k.k (push_s (pop_s (pop_s s))) w);
-                                      ])));
-                        ]);
-                  fv = fv_expr x1 (dup_fv k.fv);
-                }
-                w);
-          fv = k.fv;
-        }
+      let* s = compile_pp_expr ctx s x0 fv in
+      let* s = compile_pp_expr ctx s x1 (fv_expr x1 (dup_fv fv)) in
+      reading s $ fun s w ->
+      seqs_
+        [
+          (fun _ -> assert_env_length_ w (int_ s.env_length));
+          (fun _ ->
+            let_in_ "x0"
+              (resolve_ w (src_E_ (s.env_length - 2)))
+              (fun x0 ->
+                let_in_ "x1"
+                  (resolve_ w (src_E_ (s.env_length - 1)))
+                  (fun x1 ->
+                    seqs_
+                      [
+                        (fun _ -> to_unit_ $ pop_env_ w);
+                        (fun _ -> to_unit_ $ pop_env_ w);
+                        (fun _ ->
+                          push_env_ w (memo_from_int_ (add_ (int_from_word_ (zro_ x0)) (int_from_word_ (zro_ x1)))));
+                        (fun _ -> k (push_s (pop_s (pop_s s))) w);
+                      ])));
+        ]
   | Int i ->
       fun w ->
         seqs_
           [
             (fun _ -> assert_env_length_ w (int_ s.env_length));
             (fun _ -> push_env_ w (memo_from_int_ (int_ i)));
-            (fun _ -> k.k (push_s s) w);
+            (fun _ -> k (push_s s) w);
           ]
   | Let (BOne (PVar (l, info), v, _), r, _) ->
       check_scope s;
-      compile_pp_expr ctx s v
-        {
-          k =
-            (fun s w ->
-              check_scope s;
-              compile_pp_expr ctx
-                (extend_s (pop_s s) l)
-                r
-                { k = (fun s w -> drop s [ l ] w k); fv = add_fv l (dup_fv k.fv) }
-                w);
-          fv = fv_pat (PVar (l, info)) (fv_expr r (dup_fv k.fv));
-        }
+      let* s = compile_pp_expr ctx s v (fv_pat (PVar (l, info)) (fv_expr r (dup_fv fv))) in
+      check_scope s;
+      let* s = compile_pp_expr ctx (extend_s (pop_s s) l) r (add_fv l (dup_fv fv)) in
+      fun w -> drop s [ l ] w k
   | _ -> failwith ("compile_pp_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr c)
 
-and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (k : kont) : world code -> unit code =
+and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (fv : unit MapStr.t) (k : kont) :
+    world code -> unit code =
   match cs with
-  | [] -> fun w -> k.k s w
-  | c :: cs ->
-      compile_pp_expr ctx s c { k = (fun s w -> compile_pp_exprs ctx s cs k w); fv = fv_exprs cs (dup_fv k.fv) }
+  | [] -> fun w -> k s w
+  | c :: cs -> compile_pp_expr ctx s c (fv_exprs cs (dup_fv fv)) (fun s w -> compile_pp_exprs ctx s cs fv k w)
 
-and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : kont) : world code -> unit code =
+and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (fv : unit MapStr.t) (k : kont) :
+    world code -> unit code =
  fun w ->
   seq_
     (assert_env_length_ w (int_ s.env_length))
@@ -556,7 +500,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                       (fun (pat, expr) ->
                         (*todo: special casing for now, as pat design need changes. *)
                         match pat with
-                        | PCtorApp (cname, None, _) -> (g cname, compile_pp_expr ctx s expr k w)
+                        | PCtorApp (cname, None, _) -> (g cname, compile_pp_expr ctx s expr fv k w)
                         | PCtorApp (cname, Some (PVar (x0, _)), _) ->
                             ( g cname,
                               with_splits 1
@@ -564,9 +508,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                                 (function
                                   | [ x0_v ] ->
                                       seq_ (push_env_ w x0_v) (fun _ ->
-                                          compile_pp_expr ctx (extend_s s x0) expr
-                                            { k = (fun s w -> drop s [ x0 ] w k); fv = k.fv }
-                                            w)
+                                          compile_pp_expr ctx (extend_s s x0) expr fv (fun s w -> drop s [ x0 ] w k) w)
                                   | _ -> failwith "with_splits: unexpected arity") )
                         | PCtorApp (cname, Some (PTup ([ PVar (x0, _); PVar (x1, _) ], _)), _) ->
                             ( g cname,
@@ -581,8 +523,8 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                                           (fun _ ->
                                             compile_pp_expr ctx
                                               (extend_s (extend_s s x0) x1)
-                                              expr
-                                              { k = (fun s w -> drop s [ x1; x0 ] w k); fv = k.fv }
+                                              expr fv
+                                              (fun s w -> drop s [ x1; x0 ] w k)
                                               w);
                                         ]
                                   | _ -> failwith "with_splits: unexpected arity") )
@@ -600,13 +542,13 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                                           (fun _ ->
                                             compile_pp_expr ctx
                                               (extend_s (extend_s (extend_s s x0) x1) x2)
-                                              expr
-                                              { k = (fun s w -> drop s [ x2; x1; x0 ] w k); fv = k.fv }
+                                              expr fv
+                                              (fun s w -> drop s [ x2; x1; x0 ] w k)
                                               w);
                                         ]
                                   | _ -> failwith "with_splits: unexpected arity") )
-                        | PAny -> (string "_", compile_pp_expr ctx s expr k w)
-                        | PVar (x, _) -> (string x, compile_pp_expr ctx (extend_s s x) expr k w)
+                        | PAny -> (string "_", compile_pp_expr ctx s expr fv k w)
+                        | PVar (x, _) -> (string x, compile_pp_expr ctx (extend_s s x) expr fv k w)
                         | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
                       c
                   in
@@ -640,7 +582,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
       let cont_done_tag = ctor_tag_name ctx "cont_done" in
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
-          ( lam_ "w" (fun w -> compile_pp_expr ctx s term { k = (fun s w -> return s w); fv = empty_fv () } w),
+          ( lam_ "w" (fun w -> compile_pp_expr ctx s term MapStr.empty (fun s w -> return s w) w),
             string "let rec" ^^ space ^^ string name ^^ space
             ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
             ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
