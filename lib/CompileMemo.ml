@@ -247,9 +247,6 @@ let pop_s s = pop_n s 1
 
 type kont = scope -> world code -> unit code
 
-let dup_fv (fv : unit MapStr.t) : unit MapStr.t = fv
-let empty_fv () : unit MapStr.t = MapStr.empty
-
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
   let new_s, n =
     List.fold_left
@@ -354,7 +351,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
             (fun _ -> k (push_s s) w);
           ]
   | Match (value, cases, _) ->
-      let* s = compile_pp_expr ctx s value (fv_cases cases (dup_fv fv)) in
+      let* s = compile_pp_expr ctx s value (fv_cases cases fv) in
       reading s $ fun s w -> compile_pp_cases ctx s cases fv k w
   | Ctor (cname, _) ->
       fun w ->
@@ -376,7 +373,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
             (fun _ -> k (push_s (pop_s s)) w);
           ]
   | App (Ctor (cname, _), [ x0; x1 ], _) ->
-      let* s = compile_pp_expr ctx s x0 (fv_expr x1 (dup_fv fv)) in
+      let* s = compile_pp_expr ctx s x0 (fv_expr x1 fv) in
       let* s = compile_pp_expr ctx s x1 fv in
       fun w ->
         seqs_
@@ -389,8 +386,8 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
             (fun _ -> k (push_s (pop_s (pop_s s))) w);
           ]
   | App (Ctor (cname, _), [ x0; x1; x2 ], _) ->
-      let* s = compile_pp_expr ctx s x0 (fv_expr x2 (fv_expr x1 (dup_fv fv))) in
-      let* s = compile_pp_expr ctx s x1 (fv_expr x1 (dup_fv fv)) in
+      let* s = compile_pp_expr ctx s x0 (fv_expr x2 (fv_expr x1 fv)) in
+      let* s = compile_pp_expr ctx s x1 (fv_expr x1 fv) in
       let* s = compile_pp_expr ctx s x2 fv in
       fun w ->
         seqs_
@@ -433,7 +430,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
             ])
   | Op ("+", x0, x1, _) ->
       let* s = compile_pp_expr ctx s x0 fv in
-      let* s = compile_pp_expr ctx s x1 (fv_expr x1 (dup_fv fv)) in
+      let* s = compile_pp_expr ctx s x1 (fv_expr x1 fv) in
       reading s $ fun s w ->
       seqs_
         [
@@ -464,9 +461,9 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
           ]
   | Let (BOne (PVar (l, info), v, _), r, _) ->
       check_scope s;
-      let* s = compile_pp_expr ctx s v (fv_pat (PVar (l, info)) (fv_expr r (dup_fv fv))) in
+      let* s = compile_pp_expr ctx s v (fv_pat (PVar (l, info)) (fv_expr r fv)) in
       check_scope s;
-      let* s = compile_pp_expr ctx (extend_s (pop_s s) l) r (add_fv l (dup_fv fv)) in
+      let* s = compile_pp_expr ctx (extend_s (pop_s s) l) r (add_fv l fv) in
       fun w -> drop s [ l ] w k
   | _ -> failwith ("compile_pp_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr c)
 
@@ -474,7 +471,7 @@ and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (fv : unit MapS
     world code -> unit code =
   match cs with
   | [] -> fun w -> k s w
-  | c :: cs -> compile_pp_expr ctx s c (fv_exprs cs (dup_fv fv)) (fun s w -> compile_pp_exprs ctx s cs fv k w)
+  | c :: cs -> compile_pp_expr ctx s c (fv_exprs cs fv) (fun s w -> compile_pp_exprs ctx s cs fv k w)
 
 and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (fv : unit MapStr.t) (k : kont) :
     world code -> unit code =
