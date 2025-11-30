@@ -49,7 +49,7 @@ let () =
               drop_n w_3 1 0;
               assert_env_length w_3 1;
               return_n w_3 1 (pc_to_exp (int_to_pc 0))
-          | _ -> failwith "unreachable"))
+          | _ -> failwith "unreachable (0)"))
     0
 
 let () =
@@ -110,7 +110,7 @@ let () =
               push_env w_1 (Memo.from_int 1);
               w_1.state.c <- pc_to_exp (int_to_pc 2);
               stepped w_1
-          | _ -> failwith "unreachable"))
+          | _ -> failwith "unreachable (3)"))
     3
 
 let () = Words.set_constructor_degree 0 1

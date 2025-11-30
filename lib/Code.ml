@@ -210,7 +210,7 @@ let match_int_default_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a cod
   let alts = Stdlib.List.map (fun (c, body) -> (int_ c, body)) fs in
   match_int_ x (alts @ [ (raw "_", dflt) ])
 
-let unreachable_ : 'a code = code $ string "failwith \"unreachable\""
+let unreachable_ : int -> 'a code = fun pc -> code $ string ("failwith \"unreachable (" ^ string_of_int pc ^ ")\"")
 
 let match_ctor_tag_default_ (x : int code) (fs : (string * 'a code) list) (dflt : 'a code) : 'a code =
   let dummy_name = string (gensym "c") in

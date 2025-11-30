@@ -175,7 +175,7 @@ let compile_adt_ffi e adt_name ctors =
            in
            (tag_name, body))
          ctors)
-      unreachable_
+      (unreachable_ (Dynarray.length codes))
   in
   head ^^ uncode (let_pat_in_ (pair_ h t) (option_get_ (memo_list_match_ (raw "x"))) discr)
 
@@ -618,7 +618,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                         | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
                       c
                   in
-                  let default_case = (string "_", unreachable_) in
+                  let default_case = (string "_", unreachable_ (Dynarray.length codes)) in
                   paren $ match_raw_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])))))
 
 let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
@@ -684,7 +684,10 @@ let generate_apply_cont ctx =
                (fun _ -> unit_)
                "hd" "tl"
                (fun hd tl ->
-                 paren $ match_ctor_tag_default_ (word_get_value_ hd) (Dynarray.to_list (loop tl 0)) unreachable_))))
+                 paren
+                 $ match_ctor_tag_default_ (word_get_value_ hd)
+                     (Dynarray.to_list (loop tl 0))
+                     (unreachable_ (pc_to_int apply_cont))))))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
@@ -702,7 +705,7 @@ let generate_apply_cont_ ctx =
                      (List.init (Dynarray.length ctx.conts) (fun i ->
                           let name, action = Dynarray.get ctx.conts i in
                           (Hashtbl.find_exn ctx.ctag_name name, action w tl)))
-                     unreachable_))))
+                     (unreachable_ (pc_to_int apply_cont))))))
 
 let ctor_tag_decls ctx =
   let xs = List.sort (fun (_, x) (_, y) -> x - y) (Hashtbl.to_alist ctx.ctag) in
