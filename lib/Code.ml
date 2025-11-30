@@ -94,9 +94,6 @@ let pc_ (Pc i : pc) : pc code = int_to_pc_ (int_ i)
 let seq_ (x : unit code) (y : unit -> 'a code) : 'a code = from_ir (Seqs [ to_ir x; to_ir (y ()) ])
 let seqs_ (xs : (unit -> unit code) list) : unit code = Stdlib.List.fold_left seq_ unit_ xs
 
-let seq_b1_ (x : unit code) (y : unit -> unit code) : unit code =
-  code $ parens (group (uncode x ^^ string ";" ^^ break 1 ^^ uncode (y ())))
-
 (*Indexing should start at 0*)
 let zro_ (x : ('a * 'b) code) : 'a code = app_ (from_ir $ Function "fst") x
 let pair_value_ (x : (Word.t * Value.seq) code) : Value.seq code = app_ (from_ir $ Function "snd") x

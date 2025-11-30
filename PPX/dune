@@ -1,0 +1,6 @@
+(library
+ (name ppx_codegen)
+ (kind ppx_rewriter)
+ (libraries ppxlib)
+ (preprocess
+  (pps ppxlib.metaquot)))
