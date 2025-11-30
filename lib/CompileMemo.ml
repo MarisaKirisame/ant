@@ -51,6 +51,7 @@ type ctx = {
   conts : (string * (world code -> words code -> unit code)) Dynarray.t;
   mutable conts_count : int;
   func_pc : (string, pc) Hashtbl.t;
+  mutable current_function : string option;
 }
 
 let get_ctor_tag_name (name : string) : string = "tag_" ^ name
@@ -75,6 +76,7 @@ let new_ctx () : ctx =
       conts = Dynarray.create ();
       conts_count = 0;
       func_pc = Hashtbl.create (module Core.String);
+      current_function = None;
     }
   in
   add_cont ctx "cont_done" 0 (fun w _ -> exec_done_ w);
@@ -387,23 +389,36 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
            push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0; x1; x2 ]));
           k (push_s (pop_s (pop_s (pop_s s)))) w]
   | App (GVar (f, _), xs, _) ->
+      let at_tail_pos = Option.value (Tail.expr_tail_tag c) ~default:false in
+      let is_self_tail_call = at_tail_pos && ctx.current_function = Some f in
       check_scope s;
-      let cont_name = "cont_" ^ string_of_int ctx.conts_count in
       let keep, keep_s = keep_only s fv in
-      (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
       let keep_length = keep_s.env_length in
-      add_cont ctx cont_name (keep_length + 1) (fun w tl ->
-          [%seqs
-            set_k_ w (get_next_cont_ tl);
-            restore_env_ w (int_ keep_length) tl;
-            k (push_s keep_s) w]);
       let xs_length = List.length xs in
-      compile_pp_exprs ctx s xs fv (fun s w ->
+      if is_self_tail_call then (
+        assert (keep_length = 0);
+        (* a tail call cannot keep anything *)
+        let* s = compile_pp_exprs ctx s xs fv in
+        fun w ->
+          [%seqs
+            assert_env_length_ w (int_ s.env_length);
+            to_unit_ $ env_call_ w (list_literal_of_ int_ []) (int_ xs_length);
+            goto_ w (Hashtbl.find_exn ctx.func_pc f)])
+      else
+        let cont_name = "cont_" ^ string_of_int ctx.conts_count in
+        (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
+        add_cont ctx cont_name (keep_length + 1) (fun w tl ->
+            [%seqs
+              set_k_ w (get_next_cont_ tl);
+              restore_env_ w (int_ keep_length) tl;
+              k (push_s keep_s) w]);
+        let* s = compile_pp_exprs ctx s xs fv in
+        fun w ->
           [%seqs
             assert_env_length_ w (int_ s.env_length);
             (let$ keep = env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ xs_length) in
              set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ w ]));
-            goto_ w (Hashtbl.find_exn ctx.func_pc f)])
+            goto_ w (Hashtbl.find_exn ctx.func_pc f)]
   | Op ("+", x0, x1, _) ->
       let* s = compile_pp_expr ctx s x0 fv in
       let* s = compile_pp_expr ctx s x1 (fv_expr x1 fv) in
@@ -527,16 +542,22 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
       let cont_done_tag = ctor_tag_name ctx "cont_done" in
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
-          ( lam_ "w" (fun w -> compile_pp_expr ctx s term MapStr.empty (fun s w -> return s w) w),
-            string "let rec" ^^ space ^^ string name ^^ space
-            ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
-            ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
-            ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
-            ^^ string "(Dynarray.of_list" ^^ string "["
-            ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
-            ^^ string "]" ^^ string ")" ^^ string "("
-            ^^ uncode (from_constructor_ cont_done_tag)
-            ^^ string ")" ^^ string " memo)" ))
+          let old_name = ctx.current_function in
+          ctx.current_function <- Some name;
+          let r =
+            ( lam_ "w" (fun w -> compile_pp_expr ctx s term MapStr.empty (fun s w -> return s w) w),
+              string "let rec" ^^ space ^^ string name ^^ space
+              ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
+              ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
+              ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
+              ^^ string "(Dynarray.of_list" ^^ string "["
+              ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
+              ^^ string "]" ^^ string ")" ^^ string "("
+              ^^ uncode (from_constructor_ cont_done_tag)
+              ^^ string ")" ^^ string " memo)" )
+          in
+          ctx.current_function <- old_name;
+          r)
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
 
 let generate_apply_cont ctx =
@@ -612,5 +633,5 @@ let pp_cek_ant x =
             ^^ string ")"))
 
 module Backend = struct
-  let compile (stmts, _) = pp_cek_ant stmts
+  let compile (stmts, _) = pp_cek_ant (List.map Tail.mark_tail_stmt stmts)
 end
