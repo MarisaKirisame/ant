@@ -1,0 +1,8 @@
+type int_list =
+  | Nil
+  | Cons of int * int_list;;
+
+let rec sum = fun x s ->
+  match x with
+  | Nil -> s
+  | Cons (xh, xt) -> sum xt (xh + s);;

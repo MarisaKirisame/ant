@@ -27,6 +27,7 @@
   Ir
   SynInfo
   Code
+  Tail
   Compile
   CompileType
   CompileSeq

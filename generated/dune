@@ -1,6 +1,6 @@
 (library
  (name runmodes)
- (modules LiveCEK LiveLexer LiveParser NamedExpr RunLive RunTest TestCEK)
+ (modules LiveCEK LiveLexer LiveParser NamedExpr RunLive RunTailRec RunTest)
  (libraries ant)
  (wrapped false)
  (preprocess
