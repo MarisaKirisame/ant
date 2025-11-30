@@ -76,11 +76,11 @@ let state_refs (state : state) : reference list =
   let k = val_refs_aux state.k e in
   k
 
-let rec resolve (w : world) (src : source) : (Word.t * seq) option =
+let rec resolve (w : world) (src : source) : Word.t * seq =
   set_value w.resolved src true;
   let v = get_value w.state src in
   let vt, vh = Generic.front_exn ~monoid ~measure v in
-  match vh with Word vh -> Some (vh, vt) | _ -> failwith "cannot resolve reference"
+  match vh with Word vh -> (vh, vt) | _ -> failwith "cannot resolve reference"
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
 

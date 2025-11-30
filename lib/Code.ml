@@ -5,17 +5,28 @@ open State
 open Word
 open Common
 
-type 'a code = Code of ir
+type 'a code = Code of ir | Pat of pat
 
 let code (doc : document) = Code (Raw doc)
 let to_ir (Code ir) = ir
+let to_pat (Pat pat) = pat
 let from_ir ir = Code ir
 let raw (s : string) = code $ string s
+let raw_pat (s : string) = Pat (Raw (string s))
 let paren : 'a code -> 'a code = fun c -> from_ir (Paren (to_ir c))
+let var_ (name : string) : 'a code = Code (Var name)
+let pair_ (x : 'a code) (y : 'b code) : ('a * 'b) code = Code (Pair (to_ir x, to_ir y))
+let ctor_ (name : string) (x : 'a code) : 'b code = Code (App (Raw (string name), [ to_ir x ]))
+let ctor'_ (name : string) : 'a code = Code (App (Raw (string name), []))
+let tuple_ (xs : 'a code list) : 'b code = Code (Tuple (Stdlib.List.map to_ir xs))
+let var_pat_ (name : string) : 'a code = Pat (Var name)
+let pair_pat_ (x : 'a code) (y : 'b code) : ('a * 'b) code = Pat (Pair (to_pat x, to_pat y))
+let any_pat_ : 'a code = Pat Any
+let ctor_pat_ (name : string) (x : 'a code) : 'b code = Pat (Ctor (name, Some (to_pat x)))
+let ctor_pat'_ (name : string) : 'a code = Pat (Ctor (name, None))
 
-let uncode (Code ir) : document =
-  (*print_endline (show_ir ir);*)
-  ir_to_doc (optimize_ir ir)
+let uncode c : document =
+  match c with Code ir -> ir_to_doc (optimize_ir ir) | Pat pat -> pat_to_doc (optimize_pat pat)
 
 let fresh_name : (string, int) Hashtbl.t = Hashtbl.create (module String)
 
@@ -24,37 +35,36 @@ let gensym (base : string) : string =
   Hashtbl.set fresh_name ~key:base ~data:(n + 1);
   base ^ "_" ^ Int.to_string n
 
+let genvar (base : string) : 'a code * 'a code =
+  let s = gensym base in
+  (var_ s, var_pat_ s)
+
 let int_ (i : int) : int code = code $ string (Int.to_string i)
 let unit_ : unit code = Code Unit
 
 let lam_ (a : string) (f : 'a code -> 'b code) : ('a -> 'b) code =
-  let a_doc = string (gensym a) in
-  from_ir (Paren (Lam (Raw a_doc, to_ir (f (code a_doc)))))
+  let a = gensym a in
+  from_ir (Paren (Lam ([ Var a ], to_ir (f (var_ a)))))
 
 let lam2_ (a : string) (b : string) (f : 'a code -> 'b code -> 'c code) : ('a -> 'b -> 'c) code =
-  let a_doc = string (gensym a) in
-  let b_doc = string (gensym b) in
-  from_ir (Paren (Lam (Raw (a_doc ^^ space ^^ b_doc), to_ir (f (code a_doc) (code b_doc)))))
+  let a = gensym a in
+  let b = gensym b in
+  from_ir (Paren (Lam ([ Var a; Var b ], to_ir (f (var_ a) (var_ b)))))
 
 let lam3_ (a : string) (b : string) (c : string) (f : 'a code -> 'b code -> 'c code -> 'd code) :
     ('a -> 'b -> 'c -> 'd) code =
-  let a_doc = string (gensym a) in
-  let b_doc = string (gensym b) in
-  let c_doc = string (gensym c) in
-  from_ir
-    (Paren (Lam (Raw (a_doc ^^ space ^^ b_doc ^^ space ^^ c_doc), to_ir (f (code a_doc) (code b_doc) (code c_doc)))))
+  let a = gensym a in
+  let b = gensym b in
+  let c = gensym c in
+  from_ir (Paren (Lam ([ Var a; Var b; Var c ], to_ir (f (var_ a) (var_ b) (var_ c)))))
 
 let lam4_ (a : string) (b : string) (c : string) (d : string) (f : 'a code -> 'b code -> 'c code -> 'd code -> 'e code)
     : ('a -> 'b -> 'c -> 'd -> 'e) code =
-  let a_doc = string (gensym a) in
-  let b_doc = string (gensym b) in
-  let c_doc = string (gensym c) in
-  let d_doc = string (gensym d) in
-  from_ir
-    (Paren
-       (Lam
-          ( Raw (a_doc ^^ space ^^ b_doc ^^ space ^^ c_doc ^^ space ^^ d_doc),
-            to_ir (f (code a_doc) (code b_doc) (code c_doc) (code d_doc)) )))
+  let a = gensym a in
+  let b = gensym b in
+  let c = gensym c in
+  let d = gensym d in
+  from_ir (Paren (Lam ([ Var a; Var b; Var c; Var d ], to_ir (f (var_ a) (var_ b) (var_ c) (var_ d)))))
 
 let app_ (f : ('a -> 'b) code) (a : 'a code) : 'b code = from_ir (Paren (App (to_ir f, [ to_ir a ])))
 
@@ -125,7 +135,7 @@ let restore_env_ (w : world code) (n : int code) (seqs : Value.seq code) : unit 
 
 let get_next_cont_ (seqs : Value.seq code) : Value.seq code = app_ (from_ir $ Function "get_next_cont") seqs
 
-let resolve_ (w : world code) (src : Reference.source code) : (Word.t * Value.seq) option code =
+let resolve_ (w : world code) (src : Reference.source code) : (Word.t * Value.seq) code =
   app2_ (from_ir $ Function "resolve") w src
 
 let memo_appends_ (xs : Value.seq code list) : Value.seq code =
@@ -153,37 +163,37 @@ let let_in_ (a : string) (value : 'a code) (body : 'a code -> 'b code) : 'b code
   let name_doc = string (gensym a) in
   Code (LetIn (Raw name_doc, to_ir value, to_ir (body (code name_doc))))
 
-let tuple2_ (a : 'a code) (b : 'b code) : ('a * 'b) code = code (parens (uncode a ^^ string ", " ^^ uncode b))
-let pair_ (a : 'a code) (b : 'b code) : ('a * 'b) code = tuple2_ a b
+let tuple2_pat_ (a : 'a code) (b : 'b code) : ('a * 'b) code = Pat (Pair (to_pat a, to_pat b))
+let pair_pat_ (a : 'a code) (b : 'b code) : ('a * 'b) code = tuple2_pat_ a b
 
 let let_pat_in_ (pat : 'a code) (value : 'a code) (body : 'b code) : 'b code =
-  Code (LetIn (to_ir pat, to_ir value, to_ir body))
-
-let list_ (xs : 'a code list) : 'a list code = code (brackets (separate_map (string "; ") (fun x -> uncode x) xs))
+  Code (LetIn (to_pat pat, to_ir value, to_ir body))
 
 let list_literal_ (xs : 'a code list) : 'a list code =
   code $ string "[" ^^ separate (string ";") (Stdlib.List.map uncode xs) ^^ string "]"
 
 let list_literal_of_ (f : 'a -> 'b code) (xs : 'a list) : 'b list code = list_literal_ (Stdlib.List.map f xs)
 let list_nth_ (xs : 'a list code) (i : int code) : 'a code = app2_ (from_ir $ Function "List.nth") xs i
-let tuple_ (xs : 'a code list) : 'a list code = code (parens (separate_map (string ", ") (fun x -> uncode x) xs))
-let memo_splits_pat_ (xs : 'a code list) = if List.length xs > n_max_specialized_arity then list_ xs else tuple_ xs
+let list_pat_ (xs : 'a code list) : 'a list code = Pat (List (Stdlib.List.map to_pat xs))
+let tuple_pat_ (xs : 'a code list) : 'a list code = Pat (Tuple (Stdlib.List.map to_pat xs))
+
+let memo_splits_pat_ (xs : 'a code list) =
+  if List.length xs > n_max_specialized_arity then list_pat_ xs else tuple_pat_ xs
 
 let match_option_ (x : 'a option code) (none : unit -> 'b code) (a : string) (some : 'a code -> 'b code) : 'b code =
-  let name_doc = string (gensym a) in
+  let name = gensym a in
   from_ir
     (Match
-       ( to_ir x,
-         [ (Raw (string "None"), to_ir (none ())); (Raw (string "Some " ^^ name_doc), to_ir (some (code name_doc))) ] ))
+       (to_ir x, [ (Ctor ("None", None), to_ir (none ())); (Ctor ("Some", Some (Var name)), to_ir (some (var_ name))) ]))
 
 let src_E_ (i : int) : Reference.source code = code $ parens (string "Source.E " ^^ string (Int.to_string i))
 
 let match_resolve_ (x : (Word.t * Value.seq) option code) (none : unit -> 'a code) (a : string)
     (some : (Word.t * Value.seq) code -> 'a code) : 'a code =
-  let name = string (gensym a) in
+  let name = gensym a in
   from_ir
     (Match
-       (to_ir x, [ (Raw (string "None"), to_ir (none ())); (Raw (string "Some " ^^ name), to_ir (some (code name))) ]))
+       (to_ir x, [ (Ctor ("None", None), to_ir (none ())); (Ctor ("Some", Some (Var name)), to_ir (some (raw name))) ]))
 
 let match_resolve_destruct_ (x : (Word.t * Value.seq) option code) (none : unit -> 'a code) (hd : string) (tl : string)
     (some : Word.t code -> Value.seq code -> 'a code) : 'a code =
@@ -203,12 +213,12 @@ let match_raw_ (x : int code) (fs : (document * 'a code) list) : 'a code =
   from_ir (Match (to_ir x, alts))
 
 let match_int_ (x : int code) (fs : (int code * 'a code) list) : 'a code =
-  let alts = Stdlib.List.map (fun (c, body) -> (to_ir c, to_ir body)) fs in
+  let alts = Stdlib.List.map (fun (c, body) -> (to_pat c, to_ir body)) fs in
   from_ir (Match (to_ir x, alts))
 
 let match_int_default_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a code) : 'a code =
   let alts = Stdlib.List.map (fun (c, body) -> (int_ c, body)) fs in
-  match_int_ x (alts @ [ (raw "_", dflt) ])
+  match_int_ x (alts @ [ (Pat Any, dflt) ])
 
 let unreachable_ : int -> 'a code = fun pc -> code $ string ("failwith \"unreachable (" ^ string_of_int pc ^ ")\"")
 
