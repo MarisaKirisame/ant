@@ -157,8 +157,8 @@ let compile_adt_ffi e adt_name ctors =
   ^^ break 1
   ^^
   let head = string ("let to_ocaml_" ^ adt_name ^ " x = ") in
-  let h = raw (gensym "h") in
-  let t = raw (gensym "t") in
+  let h, h' = genvar "h" in
+  let t, t' = genvar "t" in
   let discr =
     match_ctor_tag_default_ (word_get_value_ h)
       (Stdlib.List.map
@@ -167,17 +167,17 @@ let compile_adt_ffi e adt_name ctors =
            let body =
              if List.length types = 0 then raw con_name
              else
-               let names = List.mapi (fun i _ -> gensym ("x" ^ string_of_int i)) types in
+               let names = List.mapi (fun i _ -> genvar ("x" ^ string_of_int i)) types in
                let_pat_in_
-                 (memo_splits_pat_ (List.map raw names))
+                 (memo_splits_pat_ (Stdlib.List.map snd names))
                  (memo_splits_specialized_ t (List.length types))
-                 (app_ (raw con_name) (raw ("(" ^ String.concat "," names ^ ")")))
+                 (app_ (raw con_name) (tuple_ (Stdlib.List.map fst names)))
            in
            (tag_name, body))
          ctors)
       (unreachable_ (Dynarray.length codes))
   in
-  head ^^ uncode (let_pat_in_ (pair_ h t) (option_get_ (memo_list_match_ (raw "x"))) discr)
+  head ^^ uncode (let_pat_in_ (pair_pat_ h' t') (option_get_ (memo_list_match_ (raw "x"))) discr)
 
 let compile_adt (e : ctx) adt_name ctors =
   let generate_ocaml_adt = compile_ocaml_adt adt_name ctors in
@@ -481,15 +481,11 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
                         [
                           (fun _ -> assert_env_length_ w (int_ s.env_length));
                           (fun _ ->
-                            match_option_
+                            let_in_ "x0"
                               (resolve_ w (src_E_ (s.env_length - 2)))
-                              (fun _ -> unit_)
-                              "x0"
                               (fun x0 ->
-                                match_option_
+                                let_in_ "x1"
                                   (resolve_ w (src_E_ (s.env_length - 1)))
-                                  (fun _ -> unit_)
-                                  "x1"
                                   (fun x1 ->
                                     seqs_
                                       [
@@ -545,11 +541,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
       let_in_ "last"
         (src_E_ (s.env_length - 1))
         (fun last ->
-          let m = resolve_ w last in
-          match_option_ m
-            (fun _ -> unit_)
-            "x"
-            (fun x ->
+          let_in_ "x" (resolve_ w last) (fun x ->
               seq_b1_
                 (to_unit_ $ pop_env_ w)
                 (fun _ ->
@@ -679,15 +671,15 @@ let generate_apply_cont ctx =
          seq_
            (assert_env_length_ w (int_ 1))
            (fun _ ->
-             match_resolve_destruct_
-               (resolve_ w (code $ string "K"))
-               (fun _ -> unit_)
-               "hd" "tl"
-               (fun hd tl ->
-                 paren
-                 $ match_ctor_tag_default_ (word_get_value_ hd)
-                     (Dynarray.to_list (loop tl 0))
-                     (unreachable_ (pc_to_int apply_cont))))))
+             let hd, hd_pat = genvar "hd" in
+             let tl, tl_pat = genvar "tl" in
+             let pat = pair_pat_ hd_pat tl_pat in
+             let_pat_in_ pat
+               (resolve_ w (raw "K"))
+               (paren
+               $ match_ctor_tag_default_ (word_get_value_ hd)
+                   (Dynarray.to_list (loop tl 0))
+                   (unreachable_ (pc_to_int apply_cont))))))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
@@ -695,17 +687,17 @@ let generate_apply_cont_ ctx =
          seq_
            (assert_env_length_ w (int_ 1))
            (fun _ ->
-             match_resolve_destruct_
-               (resolve_ w (code $ string "K"))
-               (fun _ -> unit_)
-               "hd" "tl"
-               (fun hd tl ->
-                 paren
-                 $ match_ctor_tag_default_ (word_get_value_ hd)
-                     (List.init (Dynarray.length ctx.conts) (fun i ->
-                          let name, action = Dynarray.get ctx.conts i in
-                          (Hashtbl.find_exn ctx.ctag_name name, action w tl)))
-                     (unreachable_ (pc_to_int apply_cont))))))
+             let hd, hd_pat = genvar "hd" in
+             let tl, tl_pat = genvar "tl" in
+             let pat = pair_pat_ hd_pat tl_pat in
+             let_pat_in_ pat
+               (resolve_ w (raw "K"))
+               (paren
+               $ match_ctor_tag_default_ (word_get_value_ hd)
+                   (List.init (Dynarray.length ctx.conts) (fun i ->
+                        let name, action = Dynarray.get ctx.conts i in
+                        (Hashtbl.find_exn ctx.ctag_name name, action w tl)))
+                   (unreachable_ (pc_to_int apply_cont))))))
 
 let ctor_tag_decls ctx =
   let xs = List.sort (fun (_, x) (_, y) -> x - y) (Hashtbl.to_alist ctx.ctag) in

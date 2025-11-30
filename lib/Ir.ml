@@ -3,17 +3,45 @@ open PPrint
 type ir =
   | Raw of document
   | Unit
+  | Var of string
+  | Pair of ir * ir
+  | Tuple of ir list
   | Seqs of ir list
   | Function of string
   | Paren of ir
   | App of ir * ir list
-  | Lam of ir * ir
-  | Match of ir * (ir * ir) list
-  | LetIn of ir * ir * ir
+  | Lam of pat list * ir
+  | Match of ir * (pat * ir) list
+  | LetIn of pat * ir * ir
 
-let rec ir_to_doc ir =
+and pat =
+  | Raw of document
+  | Any
+  | Paren of pat
+  | Var of string
+  | Pair of pat * pat
+  | Tuple of pat list
+  | Ctor of string * pat option
+  | List of pat list
+
+let rec pat_to_doc (pat : pat) =
+  match pat with
+  | Raw x -> x
+  | Any -> string "_"
+  | Var x -> string x
+  | Pair (x, y) -> parens (pat_to_doc x ^^ comma ^^ space ^^ pat_to_doc y)
+  | Tuple xs -> parens (separate_map (comma ^^ space) pat_to_doc xs)
+  | Ctor (c, None) -> parens (string c)
+  | Ctor (c, Some y) -> parens (string c ^^ space ^^ pat_to_doc y)
+  | Paren p -> parens (pat_to_doc p)
+  | List xs -> parens (separate_map (semi ^^ space) pat_to_doc xs)
+
+and ir_to_doc ir =
   match ir with
   | Raw doc -> doc
+  | Var x -> string x
+  | Pair (x, y) -> parens (ir_to_doc x ^^ comma ^^ space ^^ ir_to_doc y)
+  | Tuple xs -> parens (separate_map (comma ^^ space) ir_to_doc xs)
   | Seqs [] -> string "()"
   | Seqs [ x ] -> ir_to_doc x
   | Seqs (x :: xs) -> parens (List.fold_left (fun acc x -> acc ^^ string ";" ^^ ir_to_doc x) (ir_to_doc x) xs)
@@ -21,14 +49,14 @@ let rec ir_to_doc ir =
   | Function str -> string str
   | Paren inner -> string "(" ^^ ir_to_doc inner ^^ string ")"
   | App (fn, args) -> List.fold_left (fun acc x -> acc ^^ space ^^ ir_to_doc x) (ir_to_doc fn) args
-  | Lam (args, body) -> string "fun " ^^ ir_to_doc args ^^ string " -> " ^^ ir_to_doc body
+  | Lam (args, body) -> string "fun " ^^ separate_map space pat_to_doc args ^^ string " -> " ^^ ir_to_doc body
   | Match (x, y :: ys) ->
-      let mk (p, b) = string "| " ^^ ir_to_doc p ^^ string " -> " ^^ ir_to_doc b in
+      let mk (p, b) = string "| " ^^ pat_to_doc p ^^ string " -> " ^^ ir_to_doc b in
       let zs = List.fold_left (fun acc y -> acc ^^ mk y) (mk y) ys in
       string "match " ^^ ir_to_doc x ^^ string " with " ^^ zs
   | Match (_, []) -> failwith "match expression must have at least one alternative"
   | LetIn (pat, value, cont) ->
-      string "let " ^^ ir_to_doc pat ^^ string " = " ^^ ir_to_doc value ^^ string " in " ^^ ir_to_doc cont
+      string "let " ^^ pat_to_doc pat ^^ string " = " ^^ ir_to_doc value ^^ string " in " ^^ ir_to_doc cont
 
 let show_ir ir =
   let doc = ir_to_doc ir in
@@ -36,9 +64,14 @@ let show_ir ir =
   PPrint.ToBuffer.pretty 0.8 80 buf doc;
   Buffer.contents buf
 
+let rec optimize_pat pat = pat
+
 let rec optimize_ir ir =
   match ir with
   | Raw d -> Raw d
+  | Var x -> Var x
+  | Pair (x, y) -> Pair (x, y)
+  | Tuple xs -> Tuple xs
   | Seqs xs ->
       let xs = List.map optimize_ir xs in
       Seqs (List.flatten (List.map (fun ir -> match ir with Unit -> [] | Seqs xs -> xs | x -> [ x ]) xs))
@@ -53,4 +86,4 @@ let rec optimize_ir ir =
       let x = optimize_ir x in
       let ys = List.map (fun (p, b) -> (p, optimize_ir b)) ys in
       Match (x, ys)
-  | LetIn (pat, value, cont) -> LetIn (optimize_ir pat, optimize_ir value, optimize_ir cont)
+  | LetIn (pat, value, cont) -> LetIn (optimize_pat pat, optimize_ir value, optimize_ir cont)
