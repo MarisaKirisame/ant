@@ -218,7 +218,6 @@ let rec fold_bin (f : 'a -> 'a -> 'a) (acc : 'a option) (x : 'a bin) : 'a option
   | One x :: xs -> ( match acc with Some acc -> fold_bin f (Some (f acc x)) xs | None -> fold_bin f (Some x) xs)
 
 type history = slice bin ref
-
 (* we dont really need state for composition, but it is good for bug catching. *)
 and slice = { state : state; step : step }
 
