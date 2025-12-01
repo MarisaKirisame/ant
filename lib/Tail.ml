@@ -88,35 +88,3 @@ let mark_tail_stmt (stmt : 'a stmt) : bool stmt =
 let mark_tail_prog (prog : 'a prog) : bool prog =
   let stmts, _ = prog in
   (List.map mark_tail_stmt stmts, false)
-
-let expr_tail_tag (expr : bool expr) : bool option =
-  match expr with
-  | Builtin (_, tag)
-  | Var (_, tag)
-  | GVar (_, tag)
-  | Ctor (_, tag)
-  | App (_, _, tag)
-  | Op (_, _, _, tag)
-  | Tup (_, tag)
-  | Arr (_, tag)
-  | Lam (_, _, tag)
-  | Let (_, _, tag)
-  | Sel (_, _, tag)
-  | If (_, _, _, tag)
-  | Match (_, _, tag) ->
-      Some tag
-  | Unit | Int _ | Float _ | Bool _ | Str _ -> None
-
-let binding_tail_tag (binding : bool binding) : bool option =
-  match binding with
-  | BSeq (_, tag) -> Some tag
-  | BOne (_, _, tag) -> Some tag
-  | BCont (_, _, tag) -> Some tag
-  | BRecC _ | BRec _ -> None
-
-let pattern_tail_tag (pattern : bool pattern) : bool option =
-  match pattern with
-  | PVar (_, tag) -> Some tag
-  | PTup (_, tag) -> Some tag
-  | PCtorApp (_, _, tag) -> Some tag
-  | PAny | PInt _ | PBool _ | PUnit -> None

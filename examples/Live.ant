@@ -111,3 +111,11 @@ let rec eval = fun expr env ->
     | VStuck vs -> VStuck (SMatchList vs n c)
     | vv -> VStuck (STypeError vv VTList))
 ;;
+
+let f = fun x -> Cons (x + 1) Nil;;
+
+let rec g = fun x s ->
+  let r = x + 1 in
+  match f x with
+  | Nil -> x + s
+  | Cons (y, t) -> g y s
