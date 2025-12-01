@@ -219,3 +219,107 @@ let string_of_document doc =
   let buf = Buffer.create 512 in
   PPrint.ToBuffer.pretty 0.8 80 buf doc;
   Buffer.contents buf
+
+let expr_tag (expr : 'a expr) : 'a option =
+  match expr with
+  | Builtin (_, tag)
+  | Var (_, tag)
+  | GVar (_, tag)
+  | Ctor (_, tag)
+  | App (_, _, tag)
+  | Op (_, _, _, tag)
+  | Tup (_, tag)
+  | Arr (_, tag)
+  | Lam (_, _, tag)
+  | Let (_, _, tag)
+  | Sel (_, _, tag)
+  | If (_, _, _, tag)
+  | Match (_, _, tag) ->
+      Some tag
+  | Unit | Int _ | Float _ | Bool _ | Str _ -> None
+
+let binding_tag (binding : 'a binding) : 'a option =
+  match binding with
+  | BSeq (_, tag) -> Some tag
+  | BOne (_, _, tag) -> Some tag
+  | BCont (_, _, tag) -> Some tag
+  | BRecC _ | BRec _ -> None
+
+let pattern_tag (pattern : 'a pattern) : 'a option =
+  match pattern with
+  | PVar (_, tag) -> Some tag
+  | PTup (_, tag) -> Some tag
+  | PCtorApp (_, _, tag) -> Some tag
+  | PAny | PInt _ | PBool _ | PUnit -> None
+
+let rec pattern_tag_map (f : 'a -> 'b) (pattern : 'a pattern) : 'b pattern =
+  match pattern with
+  | PAny -> PAny
+  | PInt n -> PInt n
+  | PBool b -> PBool b
+  | PUnit -> PUnit
+  | PVar (name, tag) -> PVar (name, f tag)
+  | PTup (patterns, tag) -> PTup (List.map (pattern_tag_map f) patterns, f tag)
+  | PCtorApp (ctor, payload, tag) -> PCtorApp (ctor, Option.map (pattern_tag_map f) payload, f tag)
+
+let rec expr_tag_map (f : 'a -> 'b) (expr : 'a expr) : 'b expr =
+  match expr with
+  | Unit -> Unit
+  | Int n -> Int n
+  | Float fl -> Float fl
+  | Bool b -> Bool b
+  | Str s -> Str s
+  | Builtin (Builtin name, tag) -> Builtin (Builtin name, f tag)
+  | Var (name, tag) -> Var (name, f tag)
+  | GVar (name, tag) -> GVar (name, f tag)
+  | Ctor (ctor, tag) -> Ctor (ctor, f tag)
+  | App (fn, args, tag) -> App (expr_tag_map f fn, List.map (expr_tag_map f) args, f tag)
+  | Op (op, lhs, rhs, tag) -> Op (op, expr_tag_map f lhs, expr_tag_map f rhs, f tag)
+  | Tup (values, tag) -> Tup (List.map (expr_tag_map f) values, f tag)
+  | Arr (values, tag) -> Arr (List.map (expr_tag_map f) values, f tag)
+  | Lam (params, body, tag) -> Lam (List.map (pattern_tag_map f) params, expr_tag_map f body, f tag)
+  | Let (binding, body, tag) -> Let (binding_tag_map f binding, expr_tag_map f body, f tag)
+  | Sel (target, field, tag) -> Sel (expr_tag_map f target, field, f tag)
+  | If (cond, if_true, if_false, tag) -> If (expr_tag_map f cond, expr_tag_map f if_true, expr_tag_map f if_false, f tag)
+  | Match (expr, cases, tag) -> Match (expr_tag_map f expr, cases_tag_map f cases, f tag)
+
+and binding_tag_map (f : 'a -> 'b) (binding : 'a binding) : 'b binding =
+  match binding with
+  | BSeq (expr, tag) -> BSeq (expr_tag_map f expr, f tag)
+  | BOne (pattern, expr, tag) -> BOne (pattern_tag_map f pattern, expr_tag_map f expr, f tag)
+  | BRec entries ->
+      BRec (List.map (fun (pattern, expr, tag) -> (pattern_tag_map f pattern, expr_tag_map f expr, f tag)) entries)
+  | BCont (pattern, expr, tag) -> BCont (pattern_tag_map f pattern, expr_tag_map f expr, f tag)
+  | BRecC entries ->
+      BRecC (List.map (fun (pattern, expr, tag) -> (pattern_tag_map f pattern, expr_tag_map f expr, f tag)) entries)
+
+and cases_tag_map (f : 'a -> 'b) (MatchPattern cases : 'a cases) : 'b cases =
+  MatchPattern (List.map (fun (pattern, expr) -> (pattern_tag_map f pattern, expr_tag_map f expr)) cases)
+
+let rec ty_tag_map (f : 'a -> 'b) (ty : 'a ty) : 'b ty =
+  match ty with
+  | TUnit -> TUnit
+  | TInt -> TInt
+  | TFloat -> TFloat
+  | TBool -> TBool
+  | TApply (base, args) -> TApply (ty_tag_map f base, List.map (ty_tag_map f) args)
+  | TArrow (lhs, rhs) -> TArrow (ty_tag_map f lhs, ty_tag_map f rhs)
+  | TTuple tys -> TTuple (List.map (ty_tag_map f) tys)
+  | TNamed name -> TNamed name
+  | TNamedVar name -> TNamedVar name
+
+let ty_binding_tag_map f binding =
+  let map_kind = function
+    | Enum { params; ctors } ->
+        Enum { params; ctors = List.map (fun (name, tys, tag) -> (name, List.map (ty_tag_map f) tys, f tag)) ctors }
+  in
+  match binding with
+  | TBOne (name, kind) -> TBOne (name, map_kind kind)
+  | TBRec defs -> TBRec (List.map (fun (name, kind) -> (name, map_kind kind)) defs)
+
+let stmt_tag_map f stmt =
+  match stmt with
+  | Type binding -> Type (ty_binding_tag_map f binding)
+  | Term binding -> Term (binding_tag_map f binding)
+
+let prog_tag_map f (stmts, tag) = (List.map (stmt_tag_map f) stmts, f tag)

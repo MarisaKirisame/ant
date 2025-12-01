@@ -41,7 +41,181 @@ module MakeMap (Ord : Stdlib.Map.OrderedType) = struct
   let add_exn x data t = if mem x t then raise DupKey else add x data t
 end
 
-module MapStr = MakeMap (String)
+module StrMap = MakeMap (String)
+
+module Liveness = struct
+  type stx_info = { fv : unit StrMap.t; tail : bool }
+
+  let add_fv (v : string) (fv : unit StrMap.t) : unit StrMap.t = StrMap.add v () fv
+  let remove_fv (v : string) (fv : unit StrMap.t) : unit StrMap.t = StrMap.remove v fv
+  let fv_union (l : unit StrMap.t) (r : unit StrMap.t) : unit StrMap.t = StrMap.union (fun _ _ _ -> Some ()) l r
+  let fv_unions (sets : unit StrMap.t list) : unit StrMap.t = List.fold_left fv_union StrMap.empty sets
+  let stx_info_of_tag tail fv = { tail; fv }
+
+  let rec annotate_pattern (pat : bool pattern) (fv_after : unit StrMap.t) : stx_info pattern * unit StrMap.t =
+    match pat with
+    | PVar (name, tag) ->
+        let info = stx_info_of_tag tag fv_after in
+        (PVar (name, info), remove_fv name fv_after)
+    | PTup (patterns, tag) ->
+        let patterns', fv_before = annotate_pattern_list patterns fv_after in
+        (PTup (patterns', stx_info_of_tag tag fv_after), fv_before)
+    | PCtorApp (ctor, payload, tag) -> (
+        match payload with
+        | None -> (PCtorApp (ctor, None, stx_info_of_tag tag fv_after), fv_after)
+        | Some payload ->
+            let payload', fv_before = annotate_pattern payload fv_after in
+            (PCtorApp (ctor, Some payload', stx_info_of_tag tag fv_after), fv_before))
+    | PAny | PInt _ | PBool _ | PUnit -> (pattern_tag_map (fun _ -> failwith "impossible") pat, fv_after)
+
+  and annotate_pattern_list (patterns : bool pattern list) (fv_after : unit StrMap.t) :
+      stx_info pattern list * unit StrMap.t =
+    List.fold_right
+      (fun pat (acc, fv_tail) ->
+        let pat', fv_before = annotate_pattern pat fv_tail in
+        (pat' :: acc, fv_before))
+      patterns ([], fv_after)
+
+  and annotate_expr_list (exprs : bool expr list) (fv_after : unit StrMap.t) : stx_info expr list * unit StrMap.t =
+    List.fold_right
+      (fun expr (acc, fv_tail) ->
+        let expr', fv_before = annotate_expr expr fv_tail in
+        (expr' :: acc, fv_before))
+      exprs ([], fv_after)
+
+  and annotate_cases (cases : bool cases) (fv_after : unit StrMap.t) : stx_info cases * unit StrMap.t =
+    let (MatchPattern cs) = cases in
+    let annotated, branch_reqs =
+      List.fold_right
+        (fun (pat, expr) (acc, reqs) ->
+          let expr', fv_before_expr = annotate_expr expr fv_after in
+          let pat', fv_before_pat = annotate_pattern pat fv_before_expr in
+          ((pat', expr') :: acc, fv_before_pat :: reqs))
+        cs ([], [])
+    in
+    (MatchPattern annotated, fv_unions branch_reqs)
+
+  and annotate_binding_list (entries : (bool pattern * bool expr * bool) list) (fv_after : unit StrMap.t) :
+      (stx_info pattern * stx_info expr * stx_info) list * unit StrMap.t =
+    List.fold_right
+      (fun (pat, expr, tag) (acc, fv_tail) ->
+        let pat', fv_for_expr = annotate_pattern pat fv_tail in
+        let expr', fv_before = annotate_expr expr fv_for_expr in
+        let info = stx_info_of_tag tag fv_tail in
+        ((pat', expr', info) :: acc, fv_before))
+      entries ([], fv_after)
+
+  and annotate_binding (binding : bool binding) (fv_after : unit StrMap.t) : stx_info binding * unit StrMap.t =
+    match binding with
+    | BSeq (expr, tag) ->
+        let expr', fv_before = annotate_expr expr fv_after in
+        (BSeq (expr', stx_info_of_tag tag fv_after), fv_before)
+    | BOne (pat, expr, tag) ->
+        let pat', fv_for_expr = annotate_pattern pat fv_after in
+        let expr', fv_before = annotate_expr expr fv_for_expr in
+        (BOne (pat', expr', stx_info_of_tag tag fv_after), fv_before)
+    | BCont (pat, expr, tag) ->
+        let pat', fv_for_expr = annotate_pattern pat fv_after in
+        let expr', fv_before = annotate_expr expr fv_for_expr in
+        (BCont (pat', expr', stx_info_of_tag tag fv_after), fv_before)
+    | BRec entries ->
+        let entries', fv_before = annotate_binding_list entries fv_after in
+        (BRec entries', fv_before)
+    | BRecC entries ->
+        let entries', fv_before = annotate_binding_list entries fv_after in
+        (BRecC entries', fv_before)
+
+  and annotate_expr (expr : bool expr) (fv_after : unit StrMap.t) : stx_info expr * unit StrMap.t =
+    match expr with
+    | Unit | Int _ | Float _ | Bool _ | Str _ -> (expr_tag_map (fun _ -> failwith "impossible") expr, fv_after)
+    | Builtin (b, tag) -> (Builtin (b, stx_info_of_tag tag fv_after), fv_after)
+    | Var (name, tag) ->
+        let info = stx_info_of_tag tag fv_after in
+        (Var (name, info), add_fv name fv_after)
+    | GVar (name, tag) -> (GVar (name, stx_info_of_tag tag fv_after), fv_after)
+    | Ctor (name, tag) -> (Ctor (name, stx_info_of_tag tag fv_after), fv_after)
+    | App (fn, args, tag) ->
+        let args', fv_for_fn = annotate_expr_list args fv_after in
+        let fn', fv_before = annotate_expr fn fv_for_fn in
+        (App (fn', args', stx_info_of_tag tag fv_after), fv_before)
+    | Op (op, lhs, rhs, tag) ->
+        let rhs', fv_for_lhs = annotate_expr rhs fv_after in
+        let lhs', fv_before = annotate_expr lhs fv_for_lhs in
+        (Op (op, lhs', rhs', stx_info_of_tag tag fv_after), fv_before)
+    | Tup (values, tag) ->
+        let values', fv_before = annotate_expr_list values fv_after in
+        (Tup (values', stx_info_of_tag tag fv_after), fv_before)
+    | Arr (values, tag) ->
+        let values', fv_before = annotate_expr_list values fv_after in
+        (Arr (values', stx_info_of_tag tag fv_after), fv_before)
+    | Lam (params, body, tag) ->
+        let body', fv_body_entry = annotate_expr body StrMap.empty in
+        let params', fv_closure = annotate_pattern_list params fv_body_entry in
+        let fv_total = fv_union fv_after fv_closure in
+        (Lam (params', body', stx_info_of_tag tag fv_total), fv_total)
+    | Let (binding, body, tag) ->
+        let body', fv_after_binding = annotate_expr body fv_after in
+        let binding', fv_before = annotate_binding binding fv_after_binding in
+        (Let (binding', body', stx_info_of_tag tag fv_after), fv_before)
+    | Sel (target, field, tag) ->
+        let target', fv_before = annotate_expr target fv_after in
+        (Sel (target', field, stx_info_of_tag tag fv_after), fv_before)
+    | If (cond, if_true, if_false, tag) ->
+        let if_true', fv_true = annotate_expr if_true fv_after in
+        let if_false', fv_false = annotate_expr if_false fv_after in
+        let cond_req = fv_union fv_true fv_false in
+        let cond', fv_before = annotate_expr cond cond_req in
+        (If (cond', if_true', if_false', stx_info_of_tag tag fv_after), fv_before)
+    | Match (cond, cases, tag) ->
+        let cases', fv_cases = annotate_cases cases fv_after in
+        let cond', fv_before = annotate_expr cond fv_cases in
+        (Match (cond', cases', stx_info_of_tag tag fv_after), fv_before)
+
+  let rec annotate_ty (ty : bool ty) : stx_info ty =
+    match ty with
+    | TUnit -> TUnit
+    | TInt -> TInt
+    | TFloat -> TFloat
+    | TBool -> TBool
+    | TApply (a, b) -> TApply (annotate_ty a, List.map annotate_ty b)
+    | TArrow (a, b) -> TArrow (annotate_ty a, annotate_ty b)
+    | TTuple tys -> TTuple (List.map annotate_ty tys)
+    | TNamed name -> TNamed name
+    | TNamedVar name -> TNamedVar name
+
+  let annotate_ty_kind = function
+    | Enum { params; ctors } ->
+        let ctors =
+          List.map (fun (name, tys, tag) -> (name, List.map annotate_ty tys, stx_info_of_tag tag StrMap.empty)) ctors
+        in
+        Enum { params; ctors }
+
+  let annotate_ty_binding (binding : bool ty_binding) : stx_info ty_binding =
+    match binding with
+    | TBOne (name, kind) -> TBOne (name, annotate_ty_kind kind)
+    | TBRec defs -> TBRec (List.map (fun (name, kind) -> (name, annotate_ty_kind kind)) defs)
+
+  let rec annotate_stmt (stmt : bool stmt) (fv_after : unit StrMap.t) : stx_info stmt * unit StrMap.t =
+    match stmt with
+    | Type binding -> (Type (annotate_ty_binding binding), fv_after)
+    | Term binding ->
+        let binding', fv_before = annotate_binding binding fv_after in
+        (Term binding', fv_before)
+
+  let rec annotate_stmt_list (stmts : bool stmt list) (fv_after : unit StrMap.t) : stx_info stmt list * unit StrMap.t =
+    match stmts with
+    | [] -> ([], fv_after)
+    | stmt :: rest ->
+        let rest', fv_for_stmt = annotate_stmt_list rest fv_after in
+        let stmt', fv_before = annotate_stmt stmt fv_for_stmt in
+        (stmt' :: rest', fv_before)
+
+  let annotate_prog_with_liveness ((stmts, prog_tag) : bool prog) : stx_info prog =
+    let stmts', _ = annotate_stmt_list stmts StrMap.empty in
+    (stmts', stx_info_of_tag prog_tag StrMap.empty)
+end
+
+open Liveness
 
 type ctx = {
   arity : (string, int) Hashtbl.t;
@@ -187,12 +361,12 @@ let compile_adt (e : ctx) adt_name ctors =
 
 let apply_cont : pc = add_code None
 
-type env = int MapStr.t
+type env = int StrMap.t
 
-let new_env () : env = MapStr.empty
+let new_env () : env = StrMap.empty
 
 type scope = {
-  meta_env : int option MapStr.t;
+  meta_env : int option StrMap.t;
   (*Note: env_length is not the amount of entries in meta_env above! It is the length of the environment when executing the cek machine.*)
   env_length : int;
   progressed : bool;
@@ -200,7 +374,7 @@ type scope = {
 
 let check_scope s =
   let seen : bool Array.t = Array.init s.env_length (fun _ -> false) in
-  MapStr.iter
+  StrMap.iter
     (fun key data ->
       match data with
       | None -> ()
@@ -214,7 +388,7 @@ let check_scope s =
           else Array.set seen i true)
     s.meta_env
 
-let new_scope () = { meta_env = MapStr.empty; env_length = 0; progressed = false }
+let new_scope () = { meta_env = StrMap.empty; env_length = 0; progressed = false }
 let push_s s = { s with env_length = s.env_length + 1; progressed = true }
 
 let extend_s s name =
@@ -222,17 +396,17 @@ let extend_s s name =
   let meta_env = s.meta_env in
 
   (* Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length); *)
-  let meta_env = MapStr.add_exn name (Some s.env_length) meta_env in
+  let meta_env = StrMap.add_exn name (Some s.env_length) meta_env in
 
   let ret = { s with meta_env; env_length = s.env_length + 1 } in
   check_scope ret;
   ret
 
 let drop_s s name =
-  assert (Option.is_some (MapStr.find name s.meta_env));
+  assert (Option.is_some (StrMap.find name s.meta_env));
   let meta_env = s.meta_env in
   (* Hashtbl.remove meta_env name; *)
-  let meta_env = MapStr.remove name meta_env in
+  let meta_env = StrMap.remove name meta_env in
   { s with meta_env; env_length = s.env_length - 1 }
 
 let pop_n s n =
@@ -244,14 +418,14 @@ let pop_n s n =
 
 let pop_s s = pop_n s 1
 
-(* type kont = { k : scope -> world code -> unit code; fv : unit MapStr.t } *)
+(* type kont = { k : scope -> world code -> unit code; fv : unit StrMap.t } *)
 
 type kont = scope -> world code -> unit code
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
   let new_s, n =
     List.fold_left
-      (fun (s, n) var -> match MapStr.find var s.meta_env with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
+      (fun (s, n) var -> match StrMap.find var s.meta_env with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
       (s, 0) vars
   in
   [%seqs
@@ -264,45 +438,18 @@ let return (s : scope) (w : world code) : unit code =
     assert_env_length_ w (int_ s.env_length);
     return_n_ w (int_ s.env_length) (pc_to_exp_ (pc_ apply_cont))]
 
-let add_fv (v : string) (fv : unit MapStr.t) : unit MapStr.t = MapStr.add v () fv
-let remove_fv (v : string) (fv : unit MapStr.t) : unit MapStr.t = MapStr.remove v fv
-
-let rec fv_expr (e : 'a expr) (fv : unit MapStr.t) : unit MapStr.t =
-  match e with
-  | Ctor _ | Int _ | GVar _ -> fv
-  | App (f, xs, _) -> fv_exprs xs (fv_expr f fv)
-  | Op (_, x, y, _) -> fv_expr y (fv_expr x fv)
-  | Var (name, _) -> add_fv name fv
-  | Match (value, cases, _) -> fv_expr value (fv_cases cases fv)
-  | If (i, t, e, _) -> fv_expr i (fv_expr t (fv_expr e fv))
-  | Let (BOne (l, v, _), r, _) -> fv_expr v (fv_pat l (fv_expr r fv))
-  | _ -> failwith ("fv_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr e)
-
-and fv_exprs (es : 'a expr list) (fv : unit MapStr.t) : unit MapStr.t = List.fold_left (fun fv e -> fv_expr e fv) fv es
-
-and fv_pat (pat : 'a pattern) (fv : unit MapStr.t) : unit MapStr.t =
-  match pat with
-  | PCtorApp (_, None, _) | PAny -> fv
-  | PCtorApp (_, Some x, _) -> fv_pat x fv
-  | PTup (xs, _) -> List.fold_left (fun fv x -> fv_pat x fv) fv xs
-  | PVar (name, _) -> remove_fv name fv
-  | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat)
-
-and fv_cases (MatchPattern c : 'a cases) (fv : unit MapStr.t) : unit MapStr.t =
-  List.fold_left (fun fv (pat, e) -> fv_pat pat (fv_expr e fv)) fv c
-
 type keep_t = { mutable keep : bool; mutable source : string option }
 
-let keep_only (s : scope) (fv : unit MapStr.t) : int Dynarray.t * scope =
+let keep_only (s : scope) (fv : unit StrMap.t) : int Dynarray.t * scope =
   check_scope s;
   let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
-  MapStr.iter
+  StrMap.iter
     (fun key data -> match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key })
     s.meta_env;
-  MapStr.iter
+  StrMap.iter
     (fun v _ ->
       let i =
-        match MapStr.find_opt v s.meta_env with Some (Some i) -> i | _ -> failwith ("keep_only not found:" ^ v)
+        match StrMap.find_opt v s.meta_env with Some (Some i) -> i | _ -> failwith ("keep_only not found:" ^ v)
       in
       (Dynarray.get keep i).keep <- true)
     fv;
@@ -314,15 +461,15 @@ let keep_only (s : scope) (fv : unit MapStr.t) : int Dynarray.t * scope =
           let ret =
             match k.source with
             | None -> (i + 1, acc)
-            | Some v -> (i + 1, MapStr.add_exn v (Some (Dynarray.length keep_idx)) acc)
+            | Some v -> (i + 1, StrMap.add_exn v (Some (Dynarray.length keep_idx)) acc)
           in
           Dynarray.add_last keep_idx i;
           ret)
         else (i + 1, acc))
-      (0, MapStr.empty) keep
+      (0, StrMap.empty) keep
   in
-  let others = MapStr.map (fun _ -> None) s.meta_env in
-  let meta_env = MapStr.union (fun _ x _ -> Some x) meta_env others in
+  let others = StrMap.map (fun _ -> None) s.meta_env in
+  let meta_env = StrMap.union (fun _ x _ -> Some x) meta_env others in
   let s = { s with meta_env; env_length = Dynarray.length keep_idx } in
   check_scope s;
   (keep_idx, s)
@@ -333,12 +480,11 @@ let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) 
 
 let ( let* ) e f = e f
 
-let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.t) (k : kont) : world code -> unit code
-    =
+let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world code -> unit code =
   match c with
   | Var (name, _) ->
       let loc =
-        match MapStr.find name s.meta_env with
+        match StrMap.find name s.meta_env with
         | Some loc -> loc
         | None -> failwith ("compile_pp_expr cannot find var: " ^ name)
       in
@@ -348,8 +494,8 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
           push_env_ w (get_env_ w (int_ loc));
           k (push_s s) w]
   | Match (value, cases, _) ->
-      let* s = compile_pp_expr ctx s value (fv_cases cases fv) in
-      reading s $ fun s w -> compile_pp_cases ctx s cases fv k w
+      let* s = compile_pp_expr ctx s value in
+      reading s $ fun s w -> compile_pp_cases ctx s cases k w
   | Ctor (cname, _) ->
       fun w ->
         [%seqs
@@ -357,7 +503,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
           push_env_ w (from_constructor_ (ctor_tag_name ctx cname));
           k (push_s s) w]
   | App (Ctor (cname, _), [ x0 ], _) ->
-      let* s = compile_pp_expr ctx s x0 fv in
+      let* s = compile_pp_expr ctx s x0 in
       fun w ->
         [%seqs
           assert_env_length_ w (int_ s.env_length);
@@ -365,8 +511,8 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
            push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0 ]));
           k (push_s (pop_s s)) w]
   | App (Ctor (cname, _), [ x0; x1 ], _) ->
-      let* s = compile_pp_expr ctx s x0 (fv_expr x1 fv) in
-      let* s = compile_pp_expr ctx s x1 fv in
+      let* s = compile_pp_expr ctx s x0 in
+      let* s = compile_pp_expr ctx s x1 in
       fun w ->
         [%seqs
           assert_env_length_ w (int_ s.env_length);
@@ -375,9 +521,9 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
            push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0; x1 ]));
           k (push_s (pop_s (pop_s s))) w]
   | App (Ctor (cname, _), [ x0; x1; x2 ], _) ->
-      let* s = compile_pp_expr ctx s x0 (fv_expr x2 (fv_expr x1 fv)) in
-      let* s = compile_pp_expr ctx s x1 (fv_expr x1 fv) in
-      let* s = compile_pp_expr ctx s x2 fv in
+      let* s = compile_pp_expr ctx s x0 in
+      let* s = compile_pp_expr ctx s x1 in
+      let* s = compile_pp_expr ctx s x2 in
       fun w ->
         [%seqs
           assert_env_length_ w (int_ s.env_length);
@@ -386,15 +532,15 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
            let$ x0 = pop_env_ w in
            push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0; x1; x2 ]));
           k (push_s (pop_s (pop_s (pop_s s)))) w]
-  | App (GVar (f, _), xs, _) ->
-      let at_tail_pos = Option.value (Tail.expr_tail_tag c) ~default:false in
+  | App (GVar (f, _), xs, info) ->
+      let at_tail_pos = info.tail in
       check_scope s;
-      let keep, keep_s = keep_only s fv in
+      let keep, keep_s = keep_only s info.fv in
       let keep_length = keep_s.env_length in
       let xs_length = List.length xs in
       if at_tail_pos && keep_length = 0 then
         (* a tail call cannot keep anything *)
-        let* s = compile_pp_exprs ctx s xs fv in
+        let* s = compile_pp_exprs ctx s xs in
         fun w ->
           [%seqs
             assert_env_length_ w (int_ s.env_length);
@@ -408,7 +554,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
               set_k_ w (get_next_cont_ tl);
               restore_env_ w (int_ keep_length) tl;
               k (push_s keep_s) w]);
-        let* s = compile_pp_exprs ctx s xs fv in
+        let* s = compile_pp_exprs ctx s xs in
         fun w ->
           [%seqs
             assert_env_length_ w (int_ s.env_length);
@@ -416,8 +562,8 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
              set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ w ]));
             goto_ w (Hashtbl.find_exn ctx.func_pc f)]
   | Op ("+", x0, x1, _) ->
-      let* s = compile_pp_expr ctx s x0 fv in
-      let* s = compile_pp_expr ctx s x1 (fv_expr x1 fv) in
+      let* s = compile_pp_expr ctx s x0 in
+      let* s = compile_pp_expr ctx s x1 in
       reading s $ fun s w ->
       [%seqs
         assert_env_length_ w (int_ s.env_length);
@@ -433,22 +579,18 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
           assert_env_length_ w (int_ s.env_length);
           push_env_ w (memo_from_int_ (int_ i));
           k (push_s s) w]
-  | Let (BOne (PVar (l, info), v, _), r, _) ->
+  | Let (BOne (PVar (l, _), v, _), r, _) ->
       check_scope s;
-      let* s = compile_pp_expr ctx s v (fv_pat (PVar (l, info)) (fv_expr r fv)) in
+      let* s = compile_pp_expr ctx s v in
       check_scope s;
-      let* s = compile_pp_expr ctx (extend_s (pop_s s) l) r (add_fv l fv) in
+      let* s = compile_pp_expr ctx (extend_s (pop_s s) l) r in
       fun w -> drop s [ l ] w k
   | _ -> failwith ("compile_pp_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr c)
 
-and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (fv : unit MapStr.t) (k : kont) :
-    world code -> unit code =
-  match cs with
-  | [] -> fun w -> k s w
-  | c :: cs -> compile_pp_expr ctx s c (fv_exprs cs fv) (fun s w -> compile_pp_exprs ctx s cs fv k w)
+and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (k : kont) : world code -> unit code =
+  match cs with [] -> fun w -> k s w | c :: cs -> compile_pp_expr ctx s c (fun s w -> compile_pp_exprs ctx s cs k w)
 
-and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (fv : unit MapStr.t) (k : kont) :
-    world code -> unit code =
+and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : kont) : world code -> unit code =
  fun w ->
   [%seqs
     assert_env_length_ w (int_ s.env_length);
@@ -465,7 +607,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (fv : u
         (fun (pat, expr) ->
           (*todo: special casing for now, as pat design need changes. *)
           match pat with
-          | PCtorApp (cname, None, _) -> (g cname, compile_pp_expr ctx s expr fv k w)
+          | PCtorApp (cname, None, _) -> (g cname, compile_pp_expr ctx s expr k w)
           | PCtorApp (cname, Some (PVar (x0, _)), _) ->
               ( g cname,
                 with_splits 1
@@ -474,7 +616,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (fv : u
                     | [ x0_v ] ->
                         [%seqs
                           push_env_ w x0_v;
-                          compile_pp_expr ctx (extend_s s x0) expr fv (fun s w -> drop s [ x0 ] w k) w]
+                          compile_pp_expr ctx (extend_s s x0) expr (fun s w -> drop s [ x0 ] w k) w]
                     | _ -> failwith "with_splits: unexpected arity") )
           | PCtorApp (cname, Some (PTup ([ PVar (x0, _); PVar (x1, _) ], _)), _) ->
               ( g cname,
@@ -485,7 +627,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (fv : u
                         [%seqs
                           push_env_ w x0_v;
                           push_env_ w x1_v;
-                          compile_pp_expr ctx (extend_s (extend_s s x0) x1) expr fv (fun s w -> drop s [ x1; x0 ] w k) w]
+                          compile_pp_expr ctx (extend_s (extend_s s x0) x1) expr (fun s w -> drop s [ x1; x0 ] w k) w]
                     | _ -> failwith "with_splits: unexpected arity") )
           | PCtorApp (cname, Some (PTup ([ PVar (x0, _); PVar (x1, _); PVar (x2, _) ], _)), _) ->
               ( g cname,
@@ -499,12 +641,12 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (fv : u
                           push_env_ w x2_v;
                           compile_pp_expr ctx
                             (extend_s (extend_s (extend_s s x0) x1) x2)
-                            expr fv
+                            expr
                             (fun s w -> drop s [ x2; x1; x0 ] w k)
                             w]
                     | _ -> failwith "with_splits: unexpected arity") )
-          | PAny -> (string "_", compile_pp_expr ctx s expr fv k w)
-          | PVar (x, _) -> (string x, compile_pp_expr ctx (extend_s s x) expr fv k w)
+          | PAny -> (string "_", compile_pp_expr ctx s expr k w)
+          | PVar (x, _) -> (string x, compile_pp_expr ctx (extend_s s x) expr k w)
           | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
         c
     in
@@ -539,7 +681,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
           let r =
-            ( lam_ "w" (fun w -> compile_pp_expr ctx s term MapStr.empty (fun s w -> return s w) w),
+            ( lam_ "w" (fun w -> compile_pp_expr ctx s term (fun s w -> return s w) w),
               string "let rec" ^^ space ^^ string name ^^ space
               ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
               ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
@@ -626,5 +768,8 @@ let pp_cek_ant x =
             ^^ string ")"))
 
 module Backend = struct
-  let compile (stmts, _) = pp_cek_ant (List.map Tail.mark_tail_stmt stmts)
+  let compile prog =
+    let prog = Tail.mark_tail_prog prog in
+    let stmts, _ = annotate_prog_with_liveness prog in
+    pp_cek_ant stmts
 end
