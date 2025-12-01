@@ -59,10 +59,6 @@ let tag_cont_10 = 50
 let tag_cont_11 = 51
 let tag_cont_12 = 52
 let tag_cont_13 = 53
-let tag_cont_14 = 54
-let tag_cont_15 = 55
-let tag_cont_16 = 56
-let tag_cont_17 = 57
 
 type nat = Z | S of nat
 
@@ -362,8 +358,8 @@ let () =
           assert_env_length w_5 4;
           push_env w_5 (Dynarray.get w_5.state.e 0);
           assert_env_length w_5 5;
-          let keep_12 = env_call w_5 [ 2 ] 2 in
-          w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; keep_12; w_5.state.k ];
+          let keep_10 = env_call w_5 [ 2 ] 2 in
+          w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; keep_10; w_5.state.k ];
           w_5.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_5
       | c_16 when c_16 = tag_cont_7 ->
@@ -399,8 +395,8 @@ let () =
           let x0_57 = pop_env w_5 in
           push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; x0_57; x1_32 ]);
           assert_env_length w_5 4;
-          let keep_15 = env_call w_5 [ 2 ] 2 in
-          w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_15; w_5.state.k ];
+          let keep_11 = env_call w_5 [ 2 ] 2 in
+          w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_11; w_5.state.k ];
           w_5.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_5
       | c_16 when c_16 = tag_cont_11 ->
@@ -430,47 +426,17 @@ let () =
           let x0_59 = pop_env w_5 in
           push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; x0_59; x1_34 ]);
           assert_env_length w_5 4;
-          let keep_16 = env_call w_5 [ 2 ] 2 in
-          w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_16; w_5.state.k ];
+          let keep_12 = env_call w_5 [ 2 ] 2 in
+          w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_12; w_5.state.k ];
           w_5.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_5
       | c_16 when c_16 = tag_cont_13 ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 0 tl_0;
-          assert_env_length w_5 1;
-          drop_n w_5 1 0;
-          assert_env_length w_5 1;
-          return_n w_5 1 (pc_to_exp (int_to_pc 0))
-      | c_16 when c_16 = tag_cont_14 ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 0 tl_0;
-          assert_env_length w_5 1;
-          drop_n w_5 1 0;
-          assert_env_length w_5 1;
-          return_n w_5 1 (pc_to_exp (int_to_pc 0))
-      | c_16 when c_16 = tag_cont_15 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 1 tl_0;
           assert_env_length w_5 2;
           let x1_35 = pop_env w_5 in
           let x0_60 = pop_env w_5 in
           push_env w_5 (Memo.appends [ Memo.from_constructor tag_VCons; x0_60; x1_35 ]);
-          assert_env_length w_5 1;
-          drop_n w_5 1 0;
-          assert_env_length w_5 1;
-          return_n w_5 1 (pc_to_exp (int_to_pc 0))
-      | c_16 when c_16 = tag_cont_16 ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 0 tl_0;
-          assert_env_length w_5 1;
-          drop_n w_5 1 0;
-          assert_env_length w_5 1;
-          return_n w_5 1 (pc_to_exp (int_to_pc 0))
-      | c_16 when c_16 = tag_cont_17 ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 0 tl_0;
-          assert_env_length w_5 1;
-          drop_n w_5 1 0;
           assert_env_length w_5 1;
           drop_n w_5 1 0;
           assert_env_length w_5 1;
@@ -944,8 +910,7 @@ let () =
           assert_env_length w_9 4;
           push_env w_9 (Dynarray.get w_9.state.e 0);
           assert_env_length w_9 5;
-          let keep_10 = env_call w_9 [] 2 in
-          w_9.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; keep_10; w_9.state.k ];
+          ignore (env_call w_9 [] 2);
           w_9.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_9
       | c_13 when c_13 = tag_VFalse ->
@@ -954,8 +919,7 @@ let () =
           assert_env_length w_9 4;
           push_env w_9 (Dynarray.get w_9.state.e 0);
           assert_env_length w_9 5;
-          let keep_11 = env_call w_9 [] 2 in
-          w_9.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_11; w_9.state.k ];
+          ignore (env_call w_9 [] 2);
           w_9.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_9
       | c_13 when c_13 = tag_VStuck ->
@@ -1015,8 +979,7 @@ let () =
           assert_env_length w_10 4;
           push_env w_10 (Dynarray.get w_10.state.e 0);
           assert_env_length w_10 5;
-          let keep_13 = env_call w_10 [] 2 in
-          w_10.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; keep_13; w_10.state.k ];
+          ignore (env_call w_10 [] 2);
           w_10.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_10
       | c_14 when c_14 = tag_VCons ->
@@ -1042,8 +1005,7 @@ let () =
           let x0_46 = pop_env w_10 in
           push_env w_10 (Memo.appends [ Memo.from_constructor tag_Cons; x0_46; x1_26 ]);
           assert_env_length w_10 7;
-          let keep_14 = env_call w_10 [] 2 in
-          w_10.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; keep_14; w_10.state.k ];
+          ignore (env_call w_10 [] 2);
           w_10.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_10
       | c_14 when c_14 = tag_VStuck ->
@@ -1238,8 +1200,4 @@ let () = Words.set_constructor_degree 49 (-1)
 let () = Words.set_constructor_degree 50 (-3)
 let () = Words.set_constructor_degree 51 (-1)
 let () = Words.set_constructor_degree 52 (-3)
-let () = Words.set_constructor_degree 53 0
-let () = Words.set_constructor_degree 54 0
-let () = Words.set_constructor_degree 55 (-1)
-let () = Words.set_constructor_degree 56 0
-let () = Words.set_constructor_degree 57 0
+let () = Words.set_constructor_degree 53 (-1)
