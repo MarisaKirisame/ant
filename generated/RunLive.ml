@@ -2,47 +2,7 @@ open Ant
 open Common
 open Word
 open NamedExpr
-
-type nat = OZ | OS of nat
-
-type expr =
-  | OEInt of int
-  | OEPlus of expr * expr
-  | OEVar of int
-  | OEAbs of expr
-  | OEApp of expr * expr
-  | OELet of expr * expr
-  | OETrue
-  | OEFalse
-  | OEIf of expr * expr * expr
-  | OENil
-  | OECons of expr * expr
-  | OEMatchList of expr * expr * expr
-  | OEFix of expr
-  | OEHole
-[@@deriving show]
-
-type value =
-  | OVInt of int
-  | OVTrue
-  | OVFalse
-  | OVNil
-  | OVCons of value * value
-  | OVAbs of expr * value list
-  | OVFix of expr * value list
-  | OVStuck of stuck
-
-and stuck =
-  | SHole of value list
-  | STypeError of value * vtype
-  | SIndexError
-  | SApp of stuck * expr
-  | SAdd0 of stuck * expr
-  | SAdd1 of value * stuck
-  | SIf of stuck * expr * expr
-  | SMatchList of stuck * expr * expr
-
-and vtype = VTInt | VTFunc | VTBool | VTList [@@deriving show]
+module LC = LiveCEK
 
 let base_names =
   [|
@@ -105,26 +65,32 @@ let rec index_of_name (ctx : string list) (target : string) (offset : int) : int
   | [] -> None
   | name :: rest -> if String.equal name target then Some offset else index_of_name rest target (offset + 1)
 
+let rec nat_from_int i =
+  assert (i >= 0);
+  if i == 0 then LC.Z else LC.S (nat_from_int (i - 1))
+
+let rec int_of_nat = function LC.Z -> 0 | LC.S n -> 1 + int_of_nat n
+
 let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
   let rec aux ctx = function
-    | NEInt i -> OEInt i
-    | NEPlus (lhs, rhs) -> OEPlus (aux ctx lhs, aux ctx rhs)
+    | NEInt i -> LC.EInt i
+    | NEPlus (lhs, rhs) -> LC.EPlus (aux ctx lhs, aux ctx rhs)
     | NEVar name -> (
         match index_of_name ctx name 0 with
-        | Some idx -> OEVar idx
+        | Some idx -> LC.EVar (nat_from_int idx)
         | None -> invalid_arg (Printf.sprintf "expr_of_nexpr: unbound variable %S" name))
-    | NEAbs (param, body) -> OEAbs (aux (param :: ctx) body)
-    | NEApp (fn, arg) -> OEApp (aux ctx fn, aux ctx arg)
-    | NELet (name, bound, body) -> OELet (aux ctx bound, aux (name :: ctx) body)
-    | NETrue -> OETrue
-    | NEFalse -> OEFalse
-    | NEIf (cond, thn, els) -> OEIf (aux ctx cond, aux ctx thn, aux ctx els)
-    | NENil -> OENil
-    | NECons (hd, tl) -> OECons (aux ctx hd, aux ctx tl)
+    | NEAbs (param, body) -> LC.EAbs (aux (param :: ctx) body)
+    | NEApp (fn, arg) -> LC.EApp (aux ctx fn, aux ctx arg)
+    | NELet (name, bound, body) -> LC.ELet (aux ctx bound, aux (name :: ctx) body)
+    | NETrue -> LC.ETrue
+    | NEFalse -> LC.EFalse
+    | NEIf (cond, thn, els) -> LC.EIf (aux ctx cond, aux ctx thn, aux ctx els)
+    | NENil -> LC.ENil
+    | NECons (hd, tl) -> LC.ECons (aux ctx hd, aux ctx tl)
     | NEMatchList (target, nil_case, head_name, tail_name, cons_case) ->
-        OEMatchList (aux ctx target, aux ctx nil_case, aux (tail_name :: head_name :: ctx) cons_case)
-    | NEFix (func_name, arg_name, body) -> OEFix (aux (arg_name :: func_name :: ctx) body)
-    | NEHole -> OEHole
+        LC.EMatchList (aux ctx target, aux ctx nil_case, aux (tail_name :: head_name :: ctx) cons_case)
+    | NEFix (func_name, arg_name, body) -> LC.EFix (aux (arg_name :: func_name :: ctx) body)
+    | NEHole -> LC.EHole
   in
   aux ctx nexpr
 
@@ -132,31 +98,31 @@ let nexpr_of_expr ?(ctx = []) expr =
   let fresh_name = make_name_generator () in
   let rec aux ctx expr =
     match expr with
-    | OEInt i -> NEInt i
-    | OEPlus (lhs, rhs) -> NEPlus (aux ctx lhs, aux ctx rhs)
-    | OEVar idx -> NEVar (lookup_name ctx idx)
-    | OEAbs body ->
+    | LC.EInt i -> NEInt i
+    | LC.EPlus (lhs, rhs) -> NEPlus (aux ctx lhs, aux ctx rhs)
+    | LC.EVar idx -> NEVar (lookup_name ctx (int_of_nat idx))
+    | LC.EAbs body ->
         let param = fresh_name ~hint:"x" () in
         NEAbs (param, aux (param :: ctx) body)
-    | OEApp (fn, arg) -> NEApp (aux ctx fn, aux ctx arg)
-    | OELet (bound, body) ->
+    | LC.EApp (fn, arg) -> NEApp (aux ctx fn, aux ctx arg)
+    | LC.ELet (bound, body) ->
         let name = fresh_name ~hint:"x" () in
         NELet (name, aux ctx bound, aux (name :: ctx) body)
-    | OETrue -> NETrue
-    | OEFalse -> NEFalse
-    | OEIf (cond, thn, els) -> NEIf (aux ctx cond, aux ctx thn, aux ctx els)
-    | OENil -> NENil
-    | OECons (hd, tl) -> NECons (aux ctx hd, aux ctx tl)
-    | OEMatchList (target, nil_case, cons_case) ->
+    | LC.ETrue -> NETrue
+    | LC.EFalse -> NEFalse
+    | LC.EIf (cond, thn, els) -> NEIf (aux ctx cond, aux ctx thn, aux ctx els)
+    | LC.ENil -> NENil
+    | LC.ECons (hd, tl) -> NECons (aux ctx hd, aux ctx tl)
+    | LC.EMatchList (target, nil_case, cons_case) ->
         let head_name = fresh_name ~hint:"hd" () in
         let tail_name = fresh_name ~hint:"tl" () in
         NEMatchList
           (aux ctx target, aux ctx nil_case, head_name, tail_name, aux (tail_name :: head_name :: ctx) cons_case)
-    | OEFix body ->
+    | LC.EFix body ->
         let func_name = fresh_name ~hint:"f" () in
         let arg_name = fresh_name ~hint:"xs" () in
         NEFix (func_name, arg_name, aux (arg_name :: func_name :: ctx) body)
-    | OEHole -> NEHole
+    | LC.EHole -> NEHole
   in
   aux ctx expr
 
@@ -199,97 +165,18 @@ let pp_nexpr fmt nexpr =
 let pp_expr fmt expr = pp_nexpr fmt (nexpr_of_expr expr)
 let expr_to_string expr = Format.asprintf "%a" pp_expr expr
 
-let rec nat_from_int i =
-  assert (i >= 0);
-  if i == 0 then OZ else OS (nat_from_int (i - 1))
-
-let rec int_from_ocaml n = match n with OZ -> LiveCEK.Z | OS n_ -> LiveCEK.S (int_from_ocaml n_)
-
-let rec expr_from_ocaml e =
-  match e with
-  | OEInt i -> LiveCEK.EInt i
-  | OEPlus (x, y) -> LiveCEK.EPlus (expr_from_ocaml x, expr_from_ocaml y)
-  | OEVar i -> LiveCEK.EVar (int_from_ocaml (nat_from_int i))
-  | OELet (l, r) -> LiveCEK.ELet (expr_from_ocaml l, expr_from_ocaml r)
-  | OETrue -> LiveCEK.ETrue
-  | OEFalse -> LiveCEK.EFalse
-  | OENil -> LiveCEK.ENil
-  | OECons (x, y) -> LiveCEK.ECons (expr_from_ocaml x, expr_from_ocaml y)
-  | OEAbs x -> LiveCEK.EAbs (expr_from_ocaml x)
-  | OEApp (x, y) -> LiveCEK.EApp (expr_from_ocaml x, expr_from_ocaml y)
-  | OEIf (i, t, e) -> LiveCEK.EIf (expr_from_ocaml i, expr_from_ocaml t, expr_from_ocaml e)
-  | OEMatchList (l, n, c) -> LiveCEK.EMatchList (expr_from_ocaml l, expr_from_ocaml n, expr_from_ocaml c)
-  | OEFix x -> LiveCEK.EFix (expr_from_ocaml x)
-  | OEHole -> LiveCEK.EHole
-
-let rec nat_seq_to_int seq = match seq with LiveCEK.Z -> 0 | LiveCEK.S rest -> 1 + nat_seq_to_int rest
-
-let int_of_word_seq seq =
-  match Memo.to_word seq with
-  | Word.Int i -> i
-  | Word.ConstructorTag tag -> invalid_arg (Printf.sprintf "expected int word, found constructor %d" tag)
-
-let rec expr_of_value_seq seq =
-  match seq with
-  | LiveCEK.EInt data -> OEInt data
-  | LiveCEK.EPlus (lhs, rhs) -> OEPlus (expr_of_value_seq lhs, expr_of_value_seq rhs)
-  | LiveCEK.EVar idx -> OEVar (nat_seq_to_int idx)
-  | LiveCEK.EAbs body -> OEAbs (expr_of_value_seq body)
-  | LiveCEK.EApp (fn, arg) -> OEApp (expr_of_value_seq fn, expr_of_value_seq arg)
-  | ELet (lhs, rhs) -> OELet (expr_of_value_seq lhs, expr_of_value_seq rhs)
-  | ETrue -> OETrue
-  | EFalse -> OEFalse
-  | EIf (cond, thn, els) -> OEIf (expr_of_value_seq cond, expr_of_value_seq thn, expr_of_value_seq els)
-  | ENil -> OENil
-  | ECons (hd, tl) -> OECons (expr_of_value_seq hd, expr_of_value_seq tl)
-  | EMatchList (target, nil_case, cons_case) ->
-      OEMatchList (expr_of_value_seq target, expr_of_value_seq nil_case, expr_of_value_seq cons_case)
-  | EFix body -> OEFix (expr_of_value_seq body)
-  | EHole -> OEHole
-
-let vtype_of_seq seq =
-  match seq with
-  | LiveCEK.VTInt -> VTInt
-  | LiveCEK.VTFunc -> VTFunc
-  | LiveCEK.VTBool -> VTBool
-  | LiveCEK.VTList -> VTList
-
-let rec value_to_ocaml v =
-  match v with
-  | LiveCEK.VInt i -> OVInt i
-  | LiveCEK.VTrue -> OVTrue
-  | LiveCEK.VFalse -> OVFalse
-  | LiveCEK.VNil -> OVNil
-  | LiveCEK.VCons (x, y) -> OVCons (value_to_ocaml x, value_to_ocaml y)
-  | LiveCEK.VAbs (body, env) -> OVAbs (expr_of_value_seq body, value_list_of_seq env)
-  | VFix (body, env) -> OVFix (expr_of_value_seq body, value_list_of_seq env)
-  | VStuck stuck -> OVStuck (stuck_of_seq stuck)
-
-and value_list_of_seq seq =
-  match seq with LiveCEK.Nil -> [] | LiveCEK.Cons (hd, tl) -> value_to_ocaml hd :: value_list_of_seq tl
-
-and stuck_of_seq seq =
-  match seq with
-  | LiveCEK.SHole env -> SHole (value_list_of_seq env)
-  | LiveCEK.STypeError (value, ty) -> STypeError (value_to_ocaml value, vtype_of_seq ty)
-  | LiveCEK.SIndexError -> SIndexError
-  | LiveCEK.SApp (stuck, expr) -> SApp (stuck_of_seq stuck, expr_of_value_seq expr)
-  | LiveCEK.SAdd0 (stuck, expr) -> SAdd0 (stuck_of_seq stuck, expr_of_value_seq expr)
-  | LiveCEK.SAdd1 (value, stuck) -> SAdd1 (value_to_ocaml value, stuck_of_seq stuck)
-  | LiveCEK.SIf (stuck, thn, els) -> SIf (stuck_of_seq stuck, expr_of_value_seq thn, expr_of_value_seq els)
-  | LiveCEK.SMatchList (stuck, nil_case, cons_case) ->
-      SMatchList (stuck_of_seq stuck, expr_of_value_seq nil_case, expr_of_value_seq cons_case)
+let rec len_live_list = function LC.Nil -> 0 | LC.Cons (_, tl) -> 1 + len_live_list tl
 
 let rec pp_value fmt value =
   match value with
-  | OVInt i -> Format.pp_print_int fmt i
-  | OVTrue -> Format.pp_print_string fmt "true"
-  | OVFalse -> Format.pp_print_string fmt "false"
-  | OVNil -> Format.pp_print_string fmt "[]"
-  | OVCons _ as cons -> (
+  | LC.VInt i -> Format.pp_print_int fmt i
+  | LC.VTrue -> Format.pp_print_string fmt "true"
+  | LC.VFalse -> Format.pp_print_string fmt "false"
+  | LC.VNil -> Format.pp_print_string fmt "[]"
+  | LC.VCons _ as cons -> (
       let rec gather acc = function
-        | OVCons (h, t) -> gather (h :: acc) t
-        | OVNil -> `List (List.rev acc)
+        | LC.VCons (h, t) -> gather (h :: acc) t
+        | LC.VNil -> `List (List.rev acc)
         | tail -> `Improper (List.rev acc, tail)
       in
       let render_list fmt elems =
@@ -298,26 +185,26 @@ let rec pp_value fmt value =
       match gather [] cons with
       | `List elems -> Format.fprintf fmt "[%a]" render_list elems
       | `Improper (elems, tail) -> Format.fprintf fmt "[%a | %a]" render_list elems pp_value tail)
-  | OVAbs (body, env) -> Format.fprintf fmt "<fun %a | env=%d>" pp_expr body (List.length env)
-  | OVFix (body, env) -> Format.fprintf fmt "<fix %a | env=%d>" pp_expr body (List.length env)
-  | OVStuck stuck -> pp_stuck fmt stuck
+  | LC.VAbs (body, env) -> Format.fprintf fmt "<fun %a | env=%d>" pp_expr body (len_live_list env)
+  | LC.VFix (body, env) -> Format.fprintf fmt "<fix %a | env=%d>" pp_expr body (len_live_list env)
+  | LC.VStuck stuck -> pp_stuck fmt stuck
 
 and pp_stuck fmt = function
-  | SHole env -> Format.fprintf fmt "<hole env=%d>" (List.length env)
-  | STypeError (value, ty) -> Format.fprintf fmt "<type-error %a : %a>" pp_value value pp_vtype ty
-  | SIndexError -> Format.pp_print_string fmt "<index-error>"
-  | SApp (stuck, expr) -> Format.fprintf fmt "<stuck app %a %a>" pp_stuck stuck pp_expr expr
-  | SAdd0 (stuck, expr) -> Format.fprintf fmt "<stuck add0 %a %a>" pp_stuck stuck pp_expr expr
-  | SAdd1 (value, stuck) -> Format.fprintf fmt "<stuck add1 %a %a>" pp_value value pp_stuck stuck
-  | SIf (stuck, thn, els) -> Format.fprintf fmt "<stuck if %a %a %a>" pp_stuck stuck pp_expr thn pp_expr els
-  | SMatchList (stuck, nil_case, cons_case) ->
+  | LC.SHole env -> Format.fprintf fmt "<hole env=%d>" (len_live_list env)
+  | LC.STypeError (value, ty) -> Format.fprintf fmt "<type-error %a : %a>" pp_value value pp_vtype ty
+  | LC.SIndexError -> Format.pp_print_string fmt "<index-error>"
+  | LC.SApp (stuck, expr) -> Format.fprintf fmt "<stuck app %a %a>" pp_stuck stuck pp_expr expr
+  | LC.SAdd0 (stuck, expr) -> Format.fprintf fmt "<stuck add0 %a %a>" pp_stuck stuck pp_expr expr
+  | LC.SAdd1 (value, stuck) -> Format.fprintf fmt "<stuck add1 %a %a>" pp_value value pp_stuck stuck
+  | LC.SIf (stuck, thn, els) -> Format.fprintf fmt "<stuck if %a %a %a>" pp_stuck stuck pp_expr thn pp_expr els
+  | LC.SMatchList (stuck, nil_case, cons_case) ->
       Format.fprintf fmt "<stuck match %a %a %a>" pp_stuck stuck pp_expr nil_case pp_expr cons_case
 
 and pp_vtype fmt = function
-  | VTInt -> Format.pp_print_string fmt "int"
-  | VTFunc -> Format.pp_print_string fmt "func"
-  | VTBool -> Format.pp_print_string fmt "bool"
-  | VTList -> Format.pp_print_string fmt "list"
+  | LC.VTInt -> Format.pp_print_string fmt "int"
+  | LC.VTFunc -> Format.pp_print_string fmt "func"
+  | LC.VTBool -> Format.pp_print_string fmt "bool"
+  | LC.VTList -> Format.pp_print_string fmt "list"
 
 let value_to_string value = Format.asprintf "%a" pp_value value
 let steps_output_path = "eval_steps.json"
@@ -332,41 +219,61 @@ let write_steps_json (r : Memo.exec_result) : unit =
   Printf.fprintf oc "{\"step\":%d,\"without_memo_step\":%d}\n" r.step r.without_memo_step;
   flush oc
 
+let quicksort_nexpr : nexpr =
+  parse_nexpr
+    "let append = fix append xs. fun ys ->\n\
+     \  match xs with [] -> ys | h :: t -> h :: (append t ys) in\n\
+     let filter = fun p -> fix filter xs.\n\
+     \  match xs with [] -> [] | h :: t -> if p h then h :: (filter p t) else (filter p t) in\n\
+     let lt = _ in\n\
+     let ge = _ in\n\
+     fix quicksort xs.\n\
+     \  match xs with\n\
+     \  | [] -> []\n\
+     \  | pivot :: rest ->\n\
+     \      let smaller = filter (fun x -> lt x pivot) rest in\n\
+     \      let greater = filter (fun x -> ge x pivot) rest in\n\
+     \      append (quicksort smaller) (pivot :: quicksort greater)"
+
 let eval_expression x =
   let exec_res =
-    LiveCEK.eval
-      (LiveCEK.from_ocaml_expr (expr_from_ocaml x))
-      (LiveCEK.from_ocaml_list LiveCEK.from_ocaml_value LiveCEK.Nil)
+    LC.eval
+      (LC.from_ocaml_expr x)
+      (LC.from_ocaml_list LC.from_ocaml_value LC.Nil)
   in
   write_steps_json exec_res;
-  value_to_ocaml (LiveCEK.to_ocaml_value exec_res.words)
+  LC.to_ocaml_value exec_res.words
 
-let mapinc = OEFix (OEMatchList (OEVar 0, OEVar 0, OECons (OEPlus (OEInt 1, OEVar 1), OEApp (OEVar 3, OEVar 0))))
+let mapinc =
+  LC.EFix
+    (LC.EMatchList
+       ( LC.EVar (nat_from_int 0),
+         LC.EVar (nat_from_int 0),
+         LC.ECons
+           ( LC.EPlus (LC.EInt 1, LC.EVar (nat_from_int 1)),
+             LC.EApp (LC.EVar (nat_from_int 3), LC.EVar (nat_from_int 0)) ) ))
 
 let run () : unit =
   print_endline "mapinc:";
   print_endline (expr_to_string mapinc);
-  print_endline (value_to_string (eval_expression (OEInt 42)));
+  print_endline (value_to_string (eval_expression (LC.EInt 42)));
   let repeat_list x =
-    let rec build n acc = if n == 0 then acc else build (n - 1) (OECons (OEInt 1, acc)) in
-    build x OENil
+    let rec build n acc = if n == 0 then acc else build (n - 1) (LC.ECons (LC.EInt 1, acc)) in
+    build x LC.ENil
   in
   let nats x acc =
-    let rec build n = if n == x then acc else OECons (OEInt n, build (n + 1)) in
+    let rec build n = if n == x then acc else LC.ECons (LC.EInt n, build (n + 1)) in
     build 0
   in
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 2))));
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 40))));
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, repeat_list 45))));
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 40 OENil))));
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45 OENil))));
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 46 OENil))));
-  print_endline (value_to_string (eval_expression (OEApp (mapinc, nats 45 (nats 45 OENil)))));
-  print_endline (value_to_string (eval_expression (OELet (mapinc, OEApp (OEVar 0, nats 45 OENil)))));
+  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 2))));
+  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 40))));
+  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 45))));
+  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 40 LC.ENil))));
+  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 45 LC.ENil))));
+  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 46 LC.ENil))));
+  print_endline
+    (value_to_string (eval_expression (LC.EApp (mapinc, nats 45 (nats 45 LC.ENil)))));
+  print_endline
+    (value_to_string
+       (eval_expression (LC.ELet (mapinc, LC.EApp (LC.EVar (nat_from_int 0), nats 45 LC.ENil)))));
   ()
-(*
-(fix f xs. match xs with [] -> xs | hd :: tl -> (hd + 1) :: (f tl))(0 :: 1 :: 2 :: [])
-(fix f xs. match xs with [] -> xs | hd :: tl -> (hd + 1) :: (f tl))(0 :: _ :: 2 :: [])
-(fix f xs. match xs with [] -> xs | hd :: tl -> (hd + _) :: (f tl))(0 :: 1 :: 2 :: [])
-(fix f xs. match xs with [] -> xs | hd :: tl -> (hd + 2) :: (f tl))(0 :: 1 :: 2 :: [])
-*)
