@@ -164,7 +164,6 @@ let pp_nexpr fmt nexpr =
 
 let pp_expr fmt expr = pp_nexpr fmt (nexpr_of_expr expr)
 let expr_to_string expr = Format.asprintf "%a" pp_expr expr
-
 let rec len_live_list = function LC.Nil -> 0 | LC.Cons (_, tl) -> 1 + len_live_list tl
 
 let rec pp_value fmt value =
@@ -221,26 +220,14 @@ let write_steps_json (r : Memo.exec_result) : unit =
 
 let quicksort_nexpr : nexpr =
   parse_nexpr
-    "let append = fix append xs. fun ys ->\n\
-     \  match xs with [] -> ys | h :: t -> h :: (append t ys) in\n\
-     let filter = fun p -> fix filter xs.\n\
-     \  match xs with [] -> [] | h :: t -> if p h then h :: (filter p t) else (filter p t) in\n\
-     let lt = _ in\n\
-     let ge = _ in\n\
-     fix quicksort xs.\n\
-     \  match xs with\n\
-     \  | [] -> []\n\
-     \  | pivot :: rest ->\n\
-     \      let smaller = filter (fun x -> lt x pivot) rest in\n\
-     \      let greater = filter (fun x -> ge x pivot) rest in\n\
-     \      append (quicksort smaller) (pivot :: quicksort greater)"
+    "let append = fix append xs. fun ys -> match xs with [] -> ys | h :: t -> h :: (append t ys) in let filter = fun p \
+     -> fix filter xs. match xs with [] -> [] | h :: t -> if p h then h :: (filter p t) else (filter p t) in let lt = \
+     _ in let ge = _ in fix quicksort xs. match xs with [] -> [] | pivot :: rest -> let smaller = filter (fun x -> lt \
+     x pivot) rest in let greater = filter (fun x -> ge x pivot) rest in append (quicksort smaller) (pivot :: \
+     quicksort greater)"
 
 let eval_expression x =
-  let exec_res =
-    LC.eval
-      (LC.from_ocaml_expr x)
-      (LC.from_ocaml_list LC.from_ocaml_value LC.Nil)
-  in
+  let exec_res = LC.eval (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
   write_steps_json exec_res;
   LC.to_ocaml_value exec_res.words
 
@@ -250,8 +237,8 @@ let mapinc =
        ( LC.EVar (nat_from_int 0),
          LC.EVar (nat_from_int 0),
          LC.ECons
-           ( LC.EPlus (LC.EInt 1, LC.EVar (nat_from_int 1)),
-             LC.EApp (LC.EVar (nat_from_int 3), LC.EVar (nat_from_int 0)) ) ))
+           (LC.EPlus (LC.EInt 1, LC.EVar (nat_from_int 1)), LC.EApp (LC.EVar (nat_from_int 3), LC.EVar (nat_from_int 0)))
+       ))
 
 let run () : unit =
   print_endline "mapinc:";
@@ -271,9 +258,7 @@ let run () : unit =
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 40 LC.ENil))));
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 45 LC.ENil))));
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 46 LC.ENil))));
+  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 45 (nats 45 LC.ENil)))));
   print_endline
-    (value_to_string (eval_expression (LC.EApp (mapinc, nats 45 (nats 45 LC.ENil)))));
-  print_endline
-    (value_to_string
-       (eval_expression (LC.ELet (mapinc, LC.EApp (LC.EVar (nat_from_int 0), nats 45 LC.ENil)))));
+    (value_to_string (eval_expression (LC.ELet (mapinc, LC.EApp (LC.EVar (nat_from_int 0), nats 45 LC.ENil)))));
   ()
