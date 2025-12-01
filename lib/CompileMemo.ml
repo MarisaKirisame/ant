@@ -51,7 +51,6 @@ type ctx = {
   conts : (string * (world code -> words code -> unit code)) Dynarray.t;
   mutable conts_count : int;
   func_pc : (string, pc) Hashtbl.t;
-  mutable current_function : string option;
 }
 
 let get_ctor_tag_name (name : string) : string = "tag_" ^ name
@@ -76,7 +75,6 @@ let new_ctx () : ctx =
       conts = Dynarray.create ();
       conts_count = 0;
       func_pc = Hashtbl.create (module Core.String);
-      current_function = None;
     }
   in
   add_cont ctx "cont_done" 0 (fun w _ -> exec_done_ w);
@@ -390,20 +388,18 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (fv : unit MapStr.
           k (push_s (pop_s (pop_s (pop_s s)))) w]
   | App (GVar (f, _), xs, _) ->
       let at_tail_pos = Option.value (Tail.expr_tail_tag c) ~default:false in
-      let is_self_tail_call = at_tail_pos && ctx.current_function = Some f in
       check_scope s;
       let keep, keep_s = keep_only s fv in
       let keep_length = keep_s.env_length in
       let xs_length = List.length xs in
-      if is_self_tail_call then (
-        assert (keep_length = 0);
+      if at_tail_pos && keep_length = 0 then
         (* a tail call cannot keep anything *)
         let* s = compile_pp_exprs ctx s xs fv in
         fun w ->
           [%seqs
             assert_env_length_ w (int_ s.env_length);
             to_unit_ $ env_call_ w (list_literal_of_ int_ []) (int_ xs_length);
-            goto_ w (Hashtbl.find_exn ctx.func_pc f)])
+            goto_ w (Hashtbl.find_exn ctx.func_pc f)]
       else
         let cont_name = "cont_" ^ string_of_int ctx.conts_count in
         (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
@@ -542,8 +538,6 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
       let cont_done_tag = ctor_tag_name ctx "cont_done" in
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
-          let old_name = ctx.current_function in
-          ctx.current_function <- Some name;
           let r =
             ( lam_ "w" (fun w -> compile_pp_expr ctx s term MapStr.empty (fun s w -> return s w) w),
               string "let rec" ^^ space ^^ string name ^^ space
@@ -556,7 +550,6 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
               ^^ uncode (from_constructor_ cont_done_tag)
               ^^ string ")" ^^ string " memo)" )
           in
-          ctx.current_function <- old_name;
           r)
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
 
