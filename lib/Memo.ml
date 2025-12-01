@@ -2,6 +2,7 @@ open BatFingerTree
 open Word
 module Hasher = Hash.MCRC32C
 open Base
+module Dynarray = Stdlib.Dynarray
 
 (*module Hasher = Hash.MCRC32*)
 (*module Hasher = Hash.SL2*)
@@ -86,7 +87,7 @@ let pc_map : exp Dynarray.t = Dynarray.create ()
 
 let add_exp (f : world -> unit) (pc_ : int) : unit =
   let pc = Dynarray.length pc_map in
-  assert (pc == pc_);
+  assert (Int.equal pc pc_);
   Dynarray.add_last pc_map { step = f; pc }
 
 let pc_to_exp (Pc pc) : exp = Dynarray.get pc_map pc
@@ -132,7 +133,7 @@ let rec splits_4 x =
   (h, h2, h3, h4)
 
 let list_match (x : seq) : (Word.t * seq) option =
-  Option.map (Generic.front ~monoid ~measure x) (fun (x, Word y) -> (y, x))
+  Option.map (Generic.front ~monoid ~measure x) ~f:(fun (x, Word y) -> (y, x))
 
 let push_env (w : world) (v : value) : unit =
   assert ((Generic.measure ~monoid ~measure v).degree = 1);
@@ -147,7 +148,7 @@ let pop_env (w : world) : value =
 
 let env_call (w : world) (keep : int list) (nargs : int) : seq =
   let l = Dynarray.length w.state.e in
-  let ret = appends (List.map keep (fun i -> Dynarray.get w.state.e i)) in
+  let ret = appends (List.map keep ~f:(fun i -> Dynarray.get w.state.e i)) in
   w.state.e <- Dynarray.init nargs (fun i -> Dynarray.get w.state.e (l - nargs + i));
   assert ((Generic.measure ~monoid ~measure ret).degree = List.length keep);
   assert ((Generic.measure ~monoid ~measure ret).max_degree = List.length keep);
