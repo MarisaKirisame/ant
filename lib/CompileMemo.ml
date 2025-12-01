@@ -607,31 +607,20 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                           push_env_ w x0_v;
                           compile_pp_expr ctx (extend_s s x0) expr (fun s w -> drop s [ x0 ] w k) w]
                     | _ -> failwith "with_splits: unexpected arity") )
-          | PCtorApp (cname, Some (PTup ([ PVar (x0, _); PVar (x1, _) ], _)), _) ->
+          | PCtorApp (cname, Some (PTup (xs, _)), _) when List.for_all (function PVar _ -> true | _ -> false) xs ->
+              let xs = List.map (function PVar (name, _) -> name | _ -> failwith "impossible") xs in
+              let n = List.length xs in
               ( g cname,
-                with_splits 2
+                with_splits n
                   (memo_splits_ (pair_value_ x))
                   (function
-                    | [ x0_v; x1_v ] ->
+                    | ys when List.length ys == n ->
                         [%seqs
-                          push_env_ w x0_v;
-                          push_env_ w x1_v;
-                          compile_pp_expr ctx (extend_s (extend_s s x0) x1) expr (fun s w -> drop s [ x1; x0 ] w k) w]
-                    | _ -> failwith "with_splits: unexpected arity") )
-          | PCtorApp (cname, Some (PTup ([ PVar (x0, _); PVar (x1, _); PVar (x2, _) ], _)), _) ->
-              ( g cname,
-                with_splits 3
-                  (memo_splits_ (pair_value_ x))
-                  (function
-                    | [ x0_v; x1_v; x2_v ] ->
-                        [%seqs
-                          push_env_ w x0_v;
-                          push_env_ w x1_v;
-                          push_env_ w x2_v;
+                          seqs_ (List.map (fun y -> fun _ -> [%seqs push_env_ w y]) ys);
                           compile_pp_expr ctx
-                            (extend_s (extend_s (extend_s s x0) x1) x2)
+                            (List.fold_left (fun s x -> extend_s s x) s xs)
                             expr
-                            (fun s w -> drop s [ x2; x1; x0 ] w k)
+                            (fun s w -> drop s (List.rev xs) w k)
                             w]
                     | _ -> failwith "with_splits: unexpected arity") )
           | PAny -> (string "_", compile_pp_expr ctx s expr k w)
