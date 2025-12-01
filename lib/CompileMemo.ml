@@ -501,50 +501,40 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
           assert_env_length_ w (int_ s.env_length);
           push_env_ w (from_constructor_ (ctor_tag_name ctx cname));
           k (push_s s) w]
-  | App (Ctor (cname, _), [ x0 ], _) ->
-      let* s = compile_pp_expr ctx s x0 in
+  | App (Ctor (cname, _), xs, _) ->
+      let* s = compile_pp_exprs ctx s xs in
       fun w ->
+        let length = List.length xs in
+        let rec aux =
+         fun n acc ->
+          match n with
+          | 0 ->
+              [%seqs
+                push_env_ w (memo_appends_ (from_constructor_ (ctor_tag_name ctx cname) :: acc));
+                k (push_s (List.fold_left (fun s _ -> pop_s s) s (List.init length (fun i -> i)))) w]
+          | n ->
+              [%seqs
+                let$ ctor_arg = pop_env_ w in
+                aux (n - 1) (ctor_arg :: acc)]
+        in
         [%seqs
           assert_env_length_ w (int_ s.env_length);
-          (let$ x0 = pop_env_ w in
-           push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0 ]));
-          k (push_s (pop_s s)) w]
-  | App (Ctor (cname, _), [ x0; x1 ], _) ->
-      let* s = compile_pp_expr ctx s x0 in
-      let* s = compile_pp_expr ctx s x1 in
-      fun w ->
-        [%seqs
-          assert_env_length_ w (int_ s.env_length);
-          (let$ x1 = pop_env_ w in
-           let$ x0 = pop_env_ w in
-           push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0; x1 ]));
-          k (push_s (pop_s (pop_s s))) w]
-  | App (Ctor (cname, _), [ x0; x1; x2 ], _) ->
-      let* s = compile_pp_expr ctx s x0 in
-      let* s = compile_pp_expr ctx s x1 in
-      let* s = compile_pp_expr ctx s x2 in
-      fun w ->
-        [%seqs
-          assert_env_length_ w (int_ s.env_length);
-          (let$ x2 = pop_env_ w in
-           let$ x1 = pop_env_ w in
-           let$ x0 = pop_env_ w in
-           push_env_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cname); x0; x1; x2 ]));
-          k (push_s (pop_s (pop_s (pop_s s)))) w]
+          aux (List.length xs) []]
   | App (GVar (f, _), xs, info) ->
       let at_tail_pos = info.tail in
       check_scope s;
       let keep, keep_s = keep_only s info.fv in
       let keep_length = keep_s.env_length in
       let xs_length = List.length xs in
-      if at_tail_pos && keep_length = 0 then
+      if at_tail_pos then (
+        assert (keep_length = 0);
         (* a tail call cannot keep anything *)
         let* s = compile_pp_exprs ctx s xs in
         fun w ->
           [%seqs
             assert_env_length_ w (int_ s.env_length);
             to_unit_ $ env_call_ w (list_literal_of_ int_ []) (int_ xs_length);
-            goto_ w (Hashtbl.find_exn ctx.func_pc f)]
+            goto_ w (Hashtbl.find_exn ctx.func_pc f)])
       else
         let cont_name = "cont_" ^ string_of_int ctx.conts_count in
         (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
