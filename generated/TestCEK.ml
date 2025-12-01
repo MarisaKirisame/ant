@@ -40,9 +40,9 @@ let () =
           w_3.state.k <- get_next_cont tl_0;
           restore_env w_3 1 tl_0;
           assert_env_length w_3 2;
-          let x1_2 = pop_env w_3 in
-          let x0_2 = pop_env w_3 in
-          push_env w_3 (Memo.appends [ Memo.from_constructor tag_Cons; x0_2; x1_2 ]);
+          let ctor_arg_0 = pop_env w_3 in
+          let ctor_arg_1 = pop_env w_3 in
+          push_env w_3 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_1; ctor_arg_0 ]);
           assert_env_length w_3 1;
           drop_n w_3 1 0;
           assert_env_length w_3 1;
