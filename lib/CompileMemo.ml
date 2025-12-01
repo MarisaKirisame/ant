@@ -24,7 +24,6 @@ open Code
  * stay centralised here.
  *)
 
-(*todo: implement tail call*)
 (*todo: do not do a stack machine*)
 
 (* As K come with interpretative overhead,
@@ -367,7 +366,9 @@ let new_env () : env = StrMap.empty
 
 type scope = {
   meta_env : int option StrMap.t;
-  (*Note: env_length is not the amount of entries in meta_env above! It is the length of the environment when executing the cek machine.*)
+  (* Note: env_length is not the amount of entries in meta_env above! 
+   * It is the length of the environment when executing the cek machine.
+   *)
   env_length : int;
   progressed : bool;
 }
@@ -417,8 +418,6 @@ let pop_n s n =
   ret
 
 let pop_s s = pop_n s 1
-
-(* type kont = { k : scope -> world code -> unit code; fv : unit StrMap.t } *)
 
 type kont = scope -> world code -> unit code
 
