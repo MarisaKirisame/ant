@@ -33,7 +33,7 @@ let () =
     (fun w_3 ->
       assert_env_length w_3 1;
       let hd_0, tl_0 = resolve w_3 K in
-      match Word.get_value hd_0 with c_2 when c_2 = tag_cont_done -> exec_done w_3 | _ -> failwith "unreachable (0)")
+      match Word.get_value hd_0 with c_1 when c_1 = tag_cont_done -> exec_done w_3 | _ -> failwith "unreachable (0)")
     0
 
 let () =
@@ -49,11 +49,11 @@ let () =
   add_exp
     (fun w_2 ->
       assert_env_length w_2 7;
-      let x0_1 = resolve w_2 (Source.E 5) in
-      let x1_1 = resolve w_2 (Source.E 6) in
+      let x0_0 = resolve w_2 (Source.E 5) in
+      let x1_0 = resolve w_2 (Source.E 6) in
       ignore (pop_env w_2);
       ignore (pop_env w_2);
-      push_env w_2 (Memo.from_int (Word.get_value (fst x0_1) + Word.get_value (fst x1_1)));
+      push_env w_2 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
       assert_env_length w_2 6;
       ignore (env_call w_2 [] 2);
       w_2.state.c <- pc_to_exp (int_to_pc 1);
@@ -68,12 +68,12 @@ let () =
       let x_0 = resolve w_1 last_0 in
       ignore (pop_env w_1);
       match Word.get_value (fst x_0) with
-      | c_1 when c_1 = tag_Nil ->
+      | c_0 when c_0 = tag_Nil ->
           assert_env_length w_1 2;
           push_env w_1 (Dynarray.get w_1.state.e 1);
           assert_env_length w_1 3;
           return_n w_1 3 (pc_to_exp (int_to_pc 0))
-      | c_1 when c_1 = tag_Cons ->
+      | c_0 when c_0 = tag_Cons ->
           let splits_0 = Memo.splits (snd x_0) in
           let split0_0 = List.nth splits_0 0 in
           let split1_0 = List.nth splits_0 1 in
