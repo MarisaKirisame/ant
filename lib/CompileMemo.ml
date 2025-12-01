@@ -268,27 +268,6 @@ let add_code_k (k : pc -> (world -> unit) code * 'a) : 'a =
   set_code pc code;
   ret
 
-let compile_ocaml_adt adt_name ctors =
-  string
-    ("type ocaml_" ^ adt_name ^ " = "
-    ^ String.concat " | "
-        (List.map
-           (fun (con_name, types, _) ->
-             if List.length types = 0 then con_name
-             else con_name ^ " of " ^ String.concat " * " (List.map (fun _ -> "Value.seq") types))
-           ctors))
-
-let with_registered_constructor (ctx : ctx) con_name types k =
-  let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
-  let arity = List.length params in
-  Hashtbl.add_exn ~key:con_name ~data:arity ctx.arity;
-  let constructor_index = Hashtbl.length ctx.ctag in
-  Hashtbl.add_exn ~key:con_name ~data:constructor_index ctx.ctag;
-  let tag_name = get_ctor_tag_name con_name in
-  Hashtbl.add_exn ~key:con_name ~data:tag_name ctx.ctag_name;
-  Dynarray.add_last ctx.constructor_degree (1 - arity);
-  k ~params ~arity ~constructor_index ~tag_name
-
 let with_splits count splits k =
   [%seqs
     let$ splits = splits in
@@ -302,61 +281,17 @@ let with_splits count splits k =
     in
     gather 0 []]
 
-let compile_adt_constructors (e : ctx) adt_name ctors =
-  separate_map (break 1)
-    (fun (con_name, types, _) ->
-      with_registered_constructor e con_name types (fun ~params ~arity:_ ~constructor_index ~tag_name ->
-          let param_names = List.map snd params in
-          let param_docs = List.map string param_names in
-          let param_codes : Value.seq code list = List.map (fun name -> code (string name)) param_names in
-          (* let ctor_tag = int_ constructor_index in *)
-          let body = memo_appends_ (from_constructor_ (raw tag_name) :: param_codes) in
-          string "let "
-          ^^ string (adt_name ^ "_" ^ con_name)
-          ^^ (if param_docs = [] then empty else space ^^ separate space param_docs)
-          ^^ string ": Value.seq = " ^^ uncode body))
-    ctors
+let register_constructor (ctx : ctx) con_name types =
+  let arity = List.length types in
+  Hashtbl.add_exn ~key:con_name ~data:arity ctx.arity;
+  let constructor_index = Hashtbl.length ctx.ctag in
+  Hashtbl.add_exn ~key:con_name ~data:constructor_index ctx.ctag;
+  let tag_name = get_ctor_tag_name con_name in
+  Hashtbl.add_exn ~key:con_name ~data:tag_name ctx.ctag_name;
+  Dynarray.add_last ctx.constructor_degree (1 - arity)
 
-(*todo: distinguish ffi inner type.*)
-let compile_adt_ffi e adt_name ctors =
-  string
-    ("let from_ocaml_" ^ adt_name ^ " x = match x with | "
-    ^ String.concat " | "
-        (List.map
-           (fun (con_name, types, _) ->
-             let args = List.mapi (fun i _ -> "x" ^ string_of_int i) types in
-             (if List.length types = 0 then con_name else con_name ^ "(" ^ String.concat ", " args ^ ")")
-             ^ " -> " ^ adt_name ^ "_" ^ con_name ^ " " ^ String.concat " " args)
-           ctors))
-  ^^ break 1
-  ^^
-  let head = string ("let to_ocaml_" ^ adt_name ^ " x = ") in
-  let h, h' = genvar "h" in
-  let t, t' = genvar "t" in
-  let discr =
-    match_ctor_tag_default_ (word_get_value_ h)
-      (Stdlib.List.map
-         (fun (con_name, types, _) ->
-           let tag_name = Hashtbl.find_exn e.ctag_name con_name in
-           let body =
-             if List.length types = 0 then raw con_name
-             else
-               let names = List.mapi (fun i _ -> genvar ("x" ^ string_of_int i)) types in
-               let_pat_in_
-                 (memo_splits_pat_ (Stdlib.List.map snd names))
-                 (memo_splits_specialized_ t (List.length types))
-                 (app_ (raw con_name) (tuple_ (Stdlib.List.map fst names)))
-           in
-           (tag_name, body))
-         ctors)
-      (unreachable_ (Dynarray.length codes))
-  in
-  head ^^ uncode (let_pat_in_ (pair_pat_ h' t') (option_get_ (memo_list_match_ (raw "x"))) discr)
-
-let compile_adt (e : ctx) adt_name ctors =
-  let generate_ocaml_adt = compile_ocaml_adt adt_name ctors in
-  let generate_adt_constructors = compile_adt_constructors e adt_name ctors in
-  generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1 ^^ compile_adt_ffi e adt_name ctors
+let register_constructors (e : ctx) ctors =
+  List.iter (fun (con_name, types, _) -> register_constructor e con_name types) ctors
 
 let apply_cont : pc = add_code None
 
@@ -633,16 +568,11 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
 
 let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with
-  | Type (TBOne (name, Enum { params = _; ctors }) as tb) ->
-      let cd = compile_adt ctx name ctors in
-      cd |> ignore;
+  | Type (TBOne (_, Enum { params = _; ctors }) as tb) ->
+      register_constructors ctx ctors;
       CompileType.compile_ty_binding tb
   | Type (TBRec trs as tb) ->
-      List.iter
-        (fun (name, Enum { params = _; ctors }) ->
-          let cd = compile_adt ctx name ctors in
-          cd |> ignore)
-        trs;
+      List.iter (fun (_, Enum { params = _; ctors }) -> register_constructors ctx ctors) trs;
       CompileType.compile_ty_binding tb
   | Term (BOne (x, Lam (ps, term, _), _) | BRec [ (x, Lam (ps, term, _), _) ]) ->
       let s =
