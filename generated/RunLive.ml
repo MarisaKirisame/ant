@@ -178,6 +178,81 @@ let pp_expr fmt expr = pp_nexpr fmt (nexpr_of_expr expr)
 let expr_to_string expr = Format.asprintf "%a" pp_expr expr
 let rec len_live_list = function LC.Nil -> 0 | LC.Cons (_, tl) -> 1 + len_live_list tl
 
+(* Produce a sequence of partial expressions that reveal subexpressions from left to right. The
+   list always starts with a single hole and ends with the fully constructed input expression. *)
+let left_to_right (expr : LC.expr) : LC.expr list =
+  let tail = function [] -> failwith "left_to_right: not expecting empty list" | _ :: t -> t in
+  let rec build e =
+    match e with
+    | LC.EHole -> [ LC.EHole ]
+    | LC.EInt _ | LC.EVar _ | LC.ETrue | LC.EFalse | LC.ENil -> [ LC.EHole; e ]
+    | LC.EAbs body ->
+        let steps_body = build body in
+        LC.EHole :: LC.EAbs LC.EHole :: List.map (fun s -> LC.EAbs s) (tail steps_body)
+    | LC.EFix body ->
+        let steps_body = build body in
+        LC.EHole :: LC.EFix LC.EHole :: List.map (fun s -> LC.EFix s) (tail steps_body)
+    | LC.EPlus (l, r) ->
+        let sl = build l in
+        let sr = build r in
+        (LC.EHole :: LC.EPlus (LC.EHole, LC.EHole) :: List.map (fun s -> LC.EPlus (s, LC.EHole)) (tail sl))
+        @ List.map (fun s -> LC.EPlus (l, s)) (tail sr)
+    | LC.ELt (l, r) ->
+        let sl = build l in
+        let sr = build r in
+        (LC.EHole :: LC.ELt (LC.EHole, LC.EHole) :: List.map (fun s -> LC.ELt (s, LC.EHole)) (tail sl))
+        @ List.map (fun s -> LC.ELt (l, s)) (tail sr)
+    | LC.ELe (l, r) ->
+        let sl = build l in
+        let sr = build r in
+        (LC.EHole :: LC.ELe (LC.EHole, LC.EHole) :: List.map (fun s -> LC.ELe (s, LC.EHole)) (tail sl))
+        @ List.map (fun s -> LC.ELe (l, s)) (tail sr)
+    | LC.EGt (l, r) ->
+        let sl = build l in
+        let sr = build r in
+        (LC.EHole :: LC.EGt (LC.EHole, LC.EHole) :: List.map (fun s -> LC.EGt (s, LC.EHole)) (tail sl))
+        @ List.map (fun s -> LC.EGt (l, s)) (tail sr)
+    | LC.EGe (l, r) ->
+        let sl = build l in
+        let sr = build r in
+        (LC.EHole :: LC.EGe (LC.EHole, LC.EHole) :: List.map (fun s -> LC.EGe (s, LC.EHole)) (tail sl))
+        @ List.map (fun s -> LC.EGe (l, s)) (tail sr)
+    | LC.EApp (fn, arg) ->
+        let sfn = build fn in
+        let sarg = build arg in
+        (LC.EHole :: LC.EApp (LC.EHole, LC.EHole) :: List.map (fun s -> LC.EApp (s, LC.EHole)) (tail sfn))
+        @ List.map (fun s -> LC.EApp (fn, s)) (tail sarg)
+    | LC.ELet (bound, body) ->
+        let sbound = build bound in
+        let sbody = build body in
+        (LC.EHole :: LC.ELet (LC.EHole, LC.EHole) :: List.map (fun s -> LC.ELet (s, LC.EHole)) (tail sbound))
+        @ List.map (fun s -> LC.ELet (bound, s)) (tail sbody)
+    | LC.EIf (cond, thn, els) ->
+        let scond = build cond in
+        let sthn = build thn in
+        let sels = build els in
+        LC.EHole
+        :: LC.EIf (LC.EHole, LC.EHole, LC.EHole)
+        :: List.map (fun s -> LC.EIf (s, LC.EHole, LC.EHole)) (tail scond)
+        @ List.map (fun s -> LC.EIf (cond, s, LC.EHole)) (tail sthn)
+        @ List.map (fun s -> LC.EIf (cond, thn, s)) (tail sels)
+    | LC.ECons (hd, tl) ->
+        let shd = build hd in
+        let stl = build tl in
+        (LC.EHole :: LC.ECons (LC.EHole, LC.EHole) :: List.map (fun s -> LC.ECons (s, LC.EHole)) (tail shd))
+        @ List.map (fun s -> LC.ECons (hd, s)) (tail stl)
+    | LC.EMatchList (target, nil_case, cons_case) ->
+        let starget = build target in
+        let snil = build nil_case in
+        let scons = build cons_case in
+        LC.EHole
+        :: LC.EMatchList (LC.EHole, LC.EHole, LC.EHole)
+        :: List.map (fun s -> LC.EMatchList (s, LC.EHole, LC.EHole)) (tail starget)
+        @ List.map (fun s -> LC.EMatchList (target, s, LC.EHole)) (tail snil)
+        @ List.map (fun s -> LC.EMatchList (target, nil_case, s)) (tail scons)
+  in
+  build expr
+
 let rec pp_value fmt value =
   match value with
   | LC.VInt i -> Format.pp_print_int fmt i
@@ -235,10 +310,9 @@ let write_steps_json (r : Memo.exec_result) : unit =
 let quicksort_nexpr : nexpr =
   parse_nexpr
     "let append = fix append xs. fun ys -> match xs with [] -> ys | h :: t -> h :: (append t ys) in let filter = fun p \
-     -> fix filter xs. match xs with [] -> [] | h :: t -> if p h then h :: (filter p t) else (filter p t) in let lt = \
-     _ in let ge = _ in fix quicksort xs. match xs with [] -> [] | pivot :: rest -> let smaller = filter (fun x -> lt \
-     x pivot) rest in let greater = filter (fun x -> ge x pivot) rest in append (quicksort smaller) (pivot :: \
-     quicksort greater)"
+     -> fix filter xs. match xs with [] -> [] | h :: t -> if p h then h :: (filter t) else (filter t) in fix quicksort \
+     xs. match xs with [] -> [] | pivot :: rest -> let smaller = filter (fun x -> x < pivot) rest in let greater = \
+     filter (fun x -> x >= pivot) rest in append (quicksort smaller) (pivot :: quicksort greater)"
 
 let eval_expression x =
   let exec_res = LC.eval (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
@@ -254,6 +328,60 @@ let mapinc =
            (LC.EPlus (LC.EInt 1, LC.EVar (nat_from_int 1)), LC.EApp (LC.EVar (nat_from_int 3), LC.EVar (nat_from_int 0)))
        ))
 
+let random_list =
+  [
+    17;
+    81;
+    91;
+    31;
+    90;
+    70;
+    14;
+    62;
+    9;
+    20;
+    70;
+    75;
+    23;
+    25;
+    8;
+    70;
+    88;
+    53;
+    95;
+    50;
+    36;
+    47;
+    94;
+    23;
+    18;
+    55;
+    57;
+    44;
+    22;
+    97;
+    96;
+    74;
+    48;
+    76;
+    17;
+    8;
+    31;
+    67;
+    69;
+    80;
+    29;
+    16;
+    75;
+    13;
+    54;
+    97;
+    65;
+    85;
+    45;
+    58;
+  ]
+
 let run () : unit =
   print_endline "mapinc:";
   print_endline (expr_to_string mapinc);
@@ -266,10 +394,6 @@ let run () : unit =
     let rec build n = if n == x then acc else LC.ECons (LC.EInt n, build (n + 1)) in
     build 0
   in
-  let lt_demo = LC.EIf (LC.ELt (LC.EInt 1, LC.EInt 2), LC.EInt 42, LC.EInt 0) in
-  print_endline "lt demo:";
-  print_endline (expr_to_string lt_demo);
-  print_endline (value_to_string (eval_expression lt_demo));
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 2))));
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 40))));
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 45))));
@@ -279,4 +403,11 @@ let run () : unit =
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 45 (nats 45 LC.ENil)))));
   print_endline
     (value_to_string (eval_expression (LC.ELet (mapinc, LC.EApp (LC.EVar (nat_from_int 0), nats 45 LC.ENil)))));
+  let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) random_list LC.ENil in
+  let quicksort_expr = expr_of_nexpr quicksort_nexpr in
+  print_endline "left_to_right quicksort (list fixed):";
+  left_to_right quicksort_expr
+  |> List.iteri (fun i e ->
+      let applied = LC.EApp (e, random_list_expr) in
+      Printf.printf "step %d value: %s\n" i (value_to_string (eval_expression applied)));
   ()

@@ -83,9 +83,9 @@ let () =
       assert_env_length w_1 2;
       let last_0 = Source.E 1 in
       let x_0 = resolve w_1 last_0 in
-      ignore (pop_env w_1);
       match Word.get_value (fst x_0) with
       | c_0 when c_0 = tag_Nil ->
+          ignore (pop_env w_1);
           assert_env_length w_1 1;
           push_env w_1 (Memo.from_constructor tag_Nil);
           assert_env_length w_1 2;
@@ -94,6 +94,7 @@ let () =
           let splits_0 = Memo.splits (snd x_0) in
           let split0_0 = List.nth splits_0 0 in
           let split1_0 = List.nth splits_0 1 in
+          ignore (pop_env w_1);
           push_env w_1 split0_0;
           push_env w_1 split1_0;
           assert_env_length w_1 3;
