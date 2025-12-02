@@ -7,7 +7,7 @@ open NamedExpr
 %token TRUE FALSE HOLE
 %token FUN LET IN IF THEN ELSE MATCH WITH FIX
 %token LPAREN RPAREN LBRACKET RBRACKET
-%token ARROW PLUS CONS EQUAL DOT BAR
+%token ARROW PLUS CONS EQUAL DOT BAR LT GT LE GE
 %token EOF
 
 %start <nexpr> nexpr
@@ -28,7 +28,15 @@ expr:
 ;
 
 cons_expr:
-  | plus_expr CONS cons_expr { NECons ($1, $3) }
+  | cmp_expr CONS cons_expr { NECons ($1, $3) }
+  | cmp_expr { $1 }
+;
+
+cmp_expr:
+  | plus_expr LT plus_expr { NELt ($1, $3) }
+  | plus_expr LE plus_expr { NELe ($1, $3) }
+  | plus_expr GT plus_expr { NEGt ($1, $3) }
+  | plus_expr GE plus_expr { NEGe ($1, $3) }
   | plus_expr { $1 }
 ;
 

@@ -485,7 +485,41 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
             (let$ keep = env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ xs_length) in
              set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ w ]));
             goto_ w (Hashtbl.find_exn ctx.func_pc f)]
-  | Op ("+", x0, x1, _) ->
+  | If (cond, thn, els, _) ->
+      let* s = compile_pp_expr ctx s cond in
+      let then_branch = compile_pp_expr ctx (pop_s s) thn k in
+      let else_branch = compile_pp_expr ctx (pop_s s) els k in
+      fun w ->
+        let cond_name = gensym "cond" in
+        seqs_
+          [
+            (fun () -> assert_env_length_ w (int_ s.env_length));
+            (fun () ->
+              from_ir
+                (LetIn
+                   ( to_pat (var_pat_ cond_name),
+                     to_ir (resolve_ w (src_E_ (s.env_length - 1))),
+                     to_ir
+                       (seqs_
+                          [
+                            (fun () -> to_unit_ $ pop_env_ w);
+                            (fun () ->
+                              let cond_bool =
+                                code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0")
+                              in
+                              if_ cond_bool (then_branch w) (else_branch w));
+                          ]) )));
+          ]
+  | Op (op, x0, x1, _) ->
+      let op_code =
+        match op with
+        | "+" -> add_
+        | "<" -> lt_
+        | "<=" -> le_
+        | ">" -> gt_
+        | ">=" -> ge_
+        | _ -> failwith ("compile_pp_expr: unsupported op " ^ op)
+      in
       let* s = compile_pp_expr ctx s x0 in
       let* s = compile_pp_expr ctx s x1 in
       reading s $ fun s w ->
@@ -495,7 +529,7 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
         let$ x1 = resolve_ w (src_E_ (s.env_length - 1)) in
         to_unit_ $ pop_env_ w;
         to_unit_ $ pop_env_ w;
-        push_env_ w (memo_from_int_ (add_ (int_from_word_ (zro_ x0)) (int_from_word_ (zro_ x1))));
+        push_env_ w (memo_from_int_ (op_code (int_from_word_ (zro_ x0)) (int_from_word_ (zro_ x1))));
         k (push_s (pop_s (pop_s s))) w]
   | Int i ->
       fun w ->
