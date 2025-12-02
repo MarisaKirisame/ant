@@ -94,7 +94,7 @@ let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
     | NEMatchList (target, nil_case, head_name, tail_name, cons_case) ->
         LC.EMatchList (aux ctx target, aux ctx nil_case, aux (tail_name :: head_name :: ctx) cons_case)
     | NEFix (func_name, arg_name, body) -> LC.EFix (aux (arg_name :: func_name :: ctx) body)
-    | NEHole -> LC.EHole
+    | NEHole -> LC.EHole None
   in
   aux ctx nexpr
 
@@ -130,7 +130,7 @@ let nexpr_of_expr ?(ctx = []) expr =
         let func_name = fresh_name ~hint:"f" () in
         let arg_name = fresh_name ~hint:"xs" () in
         NEFix (func_name, arg_name, aux (arg_name :: func_name :: ctx) body)
-    | LC.EHole -> NEHole
+    | LC.EHole _ -> NEHole
   in
   aux ctx expr
 
@@ -184,74 +184,222 @@ let left_to_right (expr : LC.expr) : LC.expr list =
   let tail = function [] -> failwith "left_to_right: not expecting empty list" | _ :: t -> t in
   let rec build e =
     match e with
-    | LC.EHole -> [ LC.EHole ]
-    | LC.EInt _ | LC.EVar _ | LC.ETrue | LC.EFalse | LC.ENil -> [ LC.EHole; e ]
+    | LC.EHole x -> [ LC.EHole x ]
+    | LC.EInt _ | LC.EVar _ | LC.ETrue | LC.EFalse | LC.ENil -> [ LC.EHole None; e ]
     | LC.EAbs body ->
         let steps_body = build body in
-        LC.EHole :: LC.EAbs LC.EHole :: List.map (fun s -> LC.EAbs s) (tail steps_body)
+        LC.EHole None :: LC.EAbs (LC.EHole None) :: List.map (fun s -> LC.EAbs s) (tail steps_body)
     | LC.EFix body ->
         let steps_body = build body in
-        LC.EHole :: LC.EFix LC.EHole :: List.map (fun s -> LC.EFix s) (tail steps_body)
+        LC.EHole None :: LC.EFix (LC.EHole None) :: List.map (fun s -> LC.EFix s) (tail steps_body)
     | LC.EPlus (l, r) ->
         let sl = build l in
         let sr = build r in
-        (LC.EHole :: LC.EPlus (LC.EHole, LC.EHole) :: List.map (fun s -> LC.EPlus (s, LC.EHole)) (tail sl))
+        LC.EHole None
+        :: LC.EPlus (LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.EPlus (s, LC.EHole None)) (tail sl)
         @ List.map (fun s -> LC.EPlus (l, s)) (tail sr)
     | LC.ELt (l, r) ->
         let sl = build l in
         let sr = build r in
-        (LC.EHole :: LC.ELt (LC.EHole, LC.EHole) :: List.map (fun s -> LC.ELt (s, LC.EHole)) (tail sl))
+        LC.EHole None
+        :: LC.ELt (LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.ELt (s, LC.EHole None)) (tail sl)
         @ List.map (fun s -> LC.ELt (l, s)) (tail sr)
     | LC.ELe (l, r) ->
         let sl = build l in
         let sr = build r in
-        (LC.EHole :: LC.ELe (LC.EHole, LC.EHole) :: List.map (fun s -> LC.ELe (s, LC.EHole)) (tail sl))
+        LC.EHole None
+        :: LC.ELe (LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.ELe (s, LC.EHole None)) (tail sl)
         @ List.map (fun s -> LC.ELe (l, s)) (tail sr)
     | LC.EGt (l, r) ->
         let sl = build l in
         let sr = build r in
-        (LC.EHole :: LC.EGt (LC.EHole, LC.EHole) :: List.map (fun s -> LC.EGt (s, LC.EHole)) (tail sl))
+        LC.EHole None
+        :: LC.EGt (LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.EGt (s, LC.EHole None)) (tail sl)
         @ List.map (fun s -> LC.EGt (l, s)) (tail sr)
     | LC.EGe (l, r) ->
         let sl = build l in
         let sr = build r in
-        (LC.EHole :: LC.EGe (LC.EHole, LC.EHole) :: List.map (fun s -> LC.EGe (s, LC.EHole)) (tail sl))
+        LC.EHole None
+        :: LC.EGe (LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.EGe (s, LC.EHole None)) (tail sl)
         @ List.map (fun s -> LC.EGe (l, s)) (tail sr)
     | LC.EApp (fn, arg) ->
         let sfn = build fn in
         let sarg = build arg in
-        (LC.EHole :: LC.EApp (LC.EHole, LC.EHole) :: List.map (fun s -> LC.EApp (s, LC.EHole)) (tail sfn))
+        LC.EHole None
+        :: LC.EApp (LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.EApp (s, LC.EHole None)) (tail sfn)
         @ List.map (fun s -> LC.EApp (fn, s)) (tail sarg)
     | LC.ELet (bound, body) ->
         let sbound = build bound in
         let sbody = build body in
-        (LC.EHole :: LC.ELet (LC.EHole, LC.EHole) :: List.map (fun s -> LC.ELet (s, LC.EHole)) (tail sbound))
+        LC.EHole None
+        :: LC.ELet (LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.ELet (s, LC.EHole None)) (tail sbound)
         @ List.map (fun s -> LC.ELet (bound, s)) (tail sbody)
     | LC.EIf (cond, thn, els) ->
         let scond = build cond in
         let sthn = build thn in
         let sels = build els in
-        LC.EHole
-        :: LC.EIf (LC.EHole, LC.EHole, LC.EHole)
-        :: List.map (fun s -> LC.EIf (s, LC.EHole, LC.EHole)) (tail scond)
-        @ List.map (fun s -> LC.EIf (cond, s, LC.EHole)) (tail sthn)
+        LC.EHole None
+        :: LC.EIf (LC.EHole None, LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.EIf (s, LC.EHole None, LC.EHole None)) (tail scond)
+        @ List.map (fun s -> LC.EIf (cond, s, LC.EHole None)) (tail sthn)
         @ List.map (fun s -> LC.EIf (cond, thn, s)) (tail sels)
     | LC.ECons (hd, tl) ->
         let shd = build hd in
         let stl = build tl in
-        (LC.EHole :: LC.ECons (LC.EHole, LC.EHole) :: List.map (fun s -> LC.ECons (s, LC.EHole)) (tail shd))
+        LC.EHole None
+        :: LC.ECons (LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.ECons (s, LC.EHole None)) (tail shd)
         @ List.map (fun s -> LC.ECons (hd, s)) (tail stl)
     | LC.EMatchList (target, nil_case, cons_case) ->
         let starget = build target in
         let snil = build nil_case in
         let scons = build cons_case in
-        LC.EHole
-        :: LC.EMatchList (LC.EHole, LC.EHole, LC.EHole)
-        :: List.map (fun s -> LC.EMatchList (s, LC.EHole, LC.EHole)) (tail starget)
-        @ List.map (fun s -> LC.EMatchList (target, s, LC.EHole)) (tail snil)
+        LC.EHole None
+        :: LC.EMatchList (LC.EHole None, LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.EMatchList (s, LC.EHole None, LC.EHole None)) (tail starget)
+        @ List.map (fun s -> LC.EMatchList (target, s, LC.EHole None)) (tail snil)
         @ List.map (fun s -> LC.EMatchList (target, nil_case, s)) (tail scons)
   in
   build expr
+
+module DemandedExpansion = struct
+  open LiveCEK
+
+  let id_counter = ref 0
+
+  let fresh_id () =
+    incr id_counter;
+    !id_counter
+
+  let oracle : (int, expr) Hashtbl.t = Hashtbl.create 32
+
+  let rec get_blocking_id stuck =
+    match stuck with
+    | SHole (id, _) -> ( match id with Some id -> id | None -> failwith "Target program has no hole!")
+    | STypeError _ -> failwith "Target program has type error!"
+    | SIndexError -> failwith "Target program has index error!"
+    | SApp (s, _) | SAdd0 (s, _) | SAdd1 (_, s) | SGt0 (s, _) | SGt1 (_, s) | SIf (s, _, _) | SMatchList (s, _, _) ->
+        get_blocking_id s
+
+  let reveal_shallow target_expr =
+    match target_expr with
+    | EPlus (l, r) ->
+        let id1, id2 = (fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 l;
+        Hashtbl.add oracle id2 r;
+        EPlus (EHole (Some id1), EHole (Some id2))
+    | ELt (l, r) ->
+        let id1, id2 = (fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 l;
+        Hashtbl.add oracle id2 r;
+        ELt (EHole (Some id1), EHole (Some id2))
+    | ELe (l, r) ->
+        let id1, id2 = (fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 l;
+        Hashtbl.add oracle id2 r;
+        ELe (EHole (Some id1), EHole (Some id2))
+    | EGt (l, r) ->
+        let id1, id2 = (fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 l;
+        Hashtbl.add oracle id2 r;
+        EGt (EHole (Some id1), EHole (Some id2))
+    | EGe (l, r) ->
+        let id1, id2 = (fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 l;
+        Hashtbl.add oracle id2 r;
+        EGe (EHole (Some id1), EHole (Some id2))
+    | EIf (c, t, e) ->
+        let id1, id2, id3 = (fresh_id (), fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 c;
+        Hashtbl.add oracle id2 t;
+        Hashtbl.add oracle id3 e;
+        EIf (EHole (Some id1), EHole (Some id2), EHole (Some id3))
+    | ELet (l, r) ->
+        let id1, id2 = (fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 l;
+        Hashtbl.add oracle id2 r;
+        ELet (EHole (Some id1), EHole (Some id2))
+    | EApp (f, x) ->
+        let id1, id2 = (fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 f;
+        Hashtbl.add oracle id2 x;
+        EApp (EHole (Some id1), EHole (Some id2))
+    | EAbs e ->
+        let id1 = fresh_id () in
+        Hashtbl.add oracle id1 e;
+        EAbs (EHole (Some id1))
+    | ECons (h, t) ->
+        let id1, id2 = (fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 h;
+        Hashtbl.add oracle id2 t;
+        ECons (EHole (Some id1), EHole (Some id2))
+    | EMatchList (v, n, c) ->
+        let id1, id2, id3 = (fresh_id (), fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 v;
+        Hashtbl.add oracle id2 n;
+        Hashtbl.add oracle id3 c;
+        EMatchList (EHole (Some id1), EHole (Some id2), EHole (Some id3))
+    | EFix e ->
+        let id1 = fresh_id () in
+        Hashtbl.add oracle id1 e;
+        EFix (EHole (Some id1))
+    | EInt _ | EVar _ | ETrue | EFalse | ENil | EHole _ -> target_expr
+
+  let rec apply_expansion expr target_id expansion =
+    match expr with
+    | EHole (Some id) when id = target_id -> expansion
+    | EHole id -> EHole id
+    | EPlus (l, r) -> EPlus (apply_expansion l target_id expansion, apply_expansion r target_id expansion)
+    | ELt (l, r) -> ELt (apply_expansion l target_id expansion, apply_expansion r target_id expansion)
+    | ELe (l, r) -> ELe (apply_expansion l target_id expansion, apply_expansion r target_id expansion)
+    | EGt (l, r) -> EGt (apply_expansion l target_id expansion, apply_expansion r target_id expansion)
+    | EGe (l, r) -> EGe (apply_expansion l target_id expansion, apply_expansion r target_id expansion)
+    | EAbs e -> EAbs (apply_expansion e target_id expansion)
+    | EApp (f, x) -> EApp (apply_expansion f target_id expansion, apply_expansion x target_id expansion)
+    | ELet (l, r) -> ELet (apply_expansion l target_id expansion, apply_expansion r target_id expansion)
+    | EIf (c, t, e) ->
+        EIf
+          ( apply_expansion c target_id expansion,
+            apply_expansion t target_id expansion,
+            apply_expansion e target_id expansion )
+    | ECons (h, t) -> ECons (apply_expansion h target_id expansion, apply_expansion t target_id expansion)
+    | EMatchList (v, n, c) ->
+        EMatchList
+          ( apply_expansion v target_id expansion,
+            apply_expansion n target_id expansion,
+            apply_expansion c target_id expansion )
+    | EFix e -> EFix (apply_expansion e target_id expansion)
+    | EInt _ | EVar _ | ETrue | EFalse | ENil -> expr
+
+  let rec reconstruct acc current_prog =
+    let result = eval (from_ocaml_expr current_prog) (from_ocaml_list from_ocaml_value Nil) in
+    let result = to_ocaml_value result.words in
+
+    match result with
+    | VInt _ | VTrue | VFalse | VNil | VCons _ | VAbs _ | VFix _ -> acc
+    | VStuck s ->
+        let blocking_id = get_blocking_id s in
+        let target_subtree = Hashtbl.find oracle blocking_id in
+        let expansion = reveal_shallow target_subtree in
+        let next_prog = apply_expansion current_prog blocking_id expansion in
+        reconstruct (next_prog :: acc) next_prog
+
+  let expand prog =
+    Hashtbl.clear oracle;
+    id_counter := 0;
+    let start_prog = EHole (Some 0) in
+    Hashtbl.add oracle 0 prog;
+    reconstruct [] start_prog
+end
+
+let demanded_expand = DemandedExpansion.expand
 
 let rec pp_value fmt value =
   match value with
@@ -276,7 +424,7 @@ let rec pp_value fmt value =
   | LC.VStuck stuck -> pp_stuck fmt stuck
 
 and pp_stuck fmt = function
-  | LC.SHole env -> Format.fprintf fmt "<hole env=%d>" (len_live_list env)
+  | LC.SHole (_, env) -> Format.fprintf fmt "<hole env=%d>" (len_live_list env)
   | LC.STypeError (value, ty) -> Format.fprintf fmt "<type-error %a : %a>" pp_value value pp_vtype ty
   | LC.SIndexError -> Format.pp_print_string fmt "<index-error>"
   | LC.SApp (stuck, expr) -> Format.fprintf fmt "<stuck app %a %a>" pp_stuck stuck pp_expr expr
@@ -405,8 +553,14 @@ let run () : unit =
     (value_to_string (eval_expression (LC.ELet (mapinc, LC.EApp (LC.EVar (nat_from_int 0), nats 45 LC.ENil)))));
   let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) random_list LC.ENil in
   let quicksort_expr = expr_of_nexpr quicksort_nexpr in
+  let demanded_epxand_expr = demanded_expand quicksort_expr in
   print_endline "left_to_right quicksort (list fixed):";
   left_to_right quicksort_expr
+  |> List.iteri (fun i e ->
+      let applied = LC.EApp (e, random_list_expr) in
+      Printf.printf "step %d value: %s\n" i (value_to_string (eval_expression applied)));
+  print_endline "demanded_expand quicksort (list fixed):";
+  demanded_epxand_expr
   |> List.iteri (fun i e ->
       let applied = LC.EApp (e, random_list_expr) in
       Printf.printf "step %d value: %s\n" i (value_to_string (eval_expression applied)));
