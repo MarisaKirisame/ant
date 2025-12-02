@@ -13,8 +13,8 @@ module ResolveGlobal = struct
     match p with
     | PVar (x, _) -> Set.add acc x
     | PTup (ps, _) -> List.fold ~init:acc ~f:collect_pattern_vars ps
-    | PCtorApp (_, Some p, _) -> collect_pattern_vars acc p
-    | PCtorApp (_, None, _) | PInt _ | PBool _ | PUnit | PAny -> acc
+    | PCtorApp (_, [], _) | PInt _ | PBool _ | PUnit | PAny -> acc
+    | PCtorApp (_, ps, _) -> Stdlib.List.fold_left collect_pattern_vars acc ps
 
   let rec resolve_expr (env : env) (e : 'a expr) : 'a expr =
     let recurse = resolve_expr env in
@@ -70,6 +70,7 @@ let update_ctx_nodup ctx ~(key : string) ~value =
   | `Duplicate -> elab_error [%string "update_ctx_nodup: duplicate definition: %{key}"]
 
 let update_ctx_shadow ctx ~(key : string) ~value = Map.update ctx key ~f:(fun _ -> value)
+let rec arrow_arg_count ty = match repr ty with TArrow (_, ty2, _) -> 1 + arrow_arg_count ty2 | _ -> 0
 
 let rec cycle_free = function
   | TVar { contents = Unbound _ } -> ()
@@ -79,7 +80,7 @@ let rec cycle_free = function
   | TArrow (t1, t2, ls) ->
       let level = ls.level_new in
       ls.level_new <- TyLevel.marker_level;
-      List.iter ~f:cycle_free t1;
+      cycle_free t1;
       cycle_free t2;
       ls.level_new <- level
   | TPrim _ -> ()
@@ -108,6 +109,27 @@ let update_level l = function
         ls.level_new <- l)
   | _ -> ()
 
+let occurs_check tv ty =
+  let rec occurs ty =
+    match repr ty with
+    | TVar tvr when Core.phys_equal tv tvr -> true
+    | TVar { contents = Link ty } -> occurs ty
+    | TArrow (ty1, ty2, ls) -> occurs_composite ls (fun () -> occurs ty1 || occurs ty2)
+    | TTup (tys, ls) | TArr (tys, ls) | TApp (_, tys, ls) -> occurs_composite ls (fun () -> List.exists tys ~f:occurs)
+    | _ -> false
+  and occurs_composite ls f =
+    if TyLevel.(ls.level_new = marker_level) then false
+    else
+      let level = ls.level_new in
+      ls.level_new <- TyLevel.marker_level;
+      let res = f () in
+      ls.level_new <- level;
+      res
+  in
+  if occurs ty then
+    let s = Syntax.string_of_document @@ Type.pp_ty ty in
+    elab_error [%string "unification would create an infinite type: %{s}"]
+
 let rec unify ty1 ty2 =
   if Core.phys_equal ty1 ty2 then ()
   else
@@ -122,6 +144,7 @@ let rec unify ty1 ty2 =
         then tv1 := Link t2
         else tv2 := Link t1
     | TVar ({ contents = Unbound (_, l) } as tv), t' | t', TVar ({ contents = Unbound (_, l) } as tv) ->
+        occurs_check tv t';
         update_level l t';
         tv := Link t'
     | TArrow (tyl1, tyl2, ll), TArrow (tyr1, tyr2, lr) ->
@@ -129,7 +152,7 @@ let rec unify ty1 ty2 =
         let min_level = TyLevel.min ll.level_new lr.level_new in
         ll.level_new <- TyLevel.marker_level;
         lr.level_new <- TyLevel.marker_level;
-        List.iter2_exn ~f:(unify_lev min_level) tyl1 tyr1;
+        unify_lev min_level tyl1 tyr1;
         unify_lev min_level tyl2 tyr2;
         ll.level_new <- min_level;
         lr.level_new <- min_level
@@ -186,7 +209,7 @@ let force_delayed_adjustments () =
     | TArrow (ty1, ty2, ls) ->
         let level = ls.level_new in
         ls.level_new <- TyLevel.marker_level;
-        let acc = List.fold_left ~init:acc ~f:(fun acc ty -> loop acc level ty @ acc) ty1 in
+        let acc = loop acc level ty1 in
         let acc = loop acc level ty2 in
         ls.level_new <- level;
         ls.level_old <- level;
@@ -209,11 +232,11 @@ let generalize ty =
     | TVar ({ contents = Unbound (name, l) } as tvr) when TyLevel.(current_level () < l) ->
         tvr := Unbound (name, TyLevel.generic_level)
     | TArrow (ty1, ty2, ls) when TyLevel.(current_level () < ls.level_new) ->
-        let ty1 = List.map ~f:repr ty1 in
+        let ty1 = repr ty1 in
         let ty2 = repr ty2 in
-        List.iter ~f:loop ty1;
+        loop ty1;
         loop ty2;
-        let l = List.fold_left ~init:(get_level ty2) ~f:(fun ml ty -> TyLevel.max ml (get_level ty)) ty1 in
+        let l = TyLevel.max (get_level ty2) (get_level ty1) in
         ls.level_old <- l;
         ls.level_new <- l (* set the exact level upper bound *)
     | (TApp (_, tys, ls) | TTup (tys, ls) | TArr (tys, ls)) when TyLevel.(current_level () < ls.level_new) ->
@@ -250,7 +273,7 @@ let instantiate ty =
             (tv, (name, tv) :: subst))
     | TVar { contents = Link ty } -> loop subst ty
     | TArrow (ty1, ty2, ls) when TyLevel.(ls.level_new = generic_level) ->
-        let ty1, subst = fold_aux loop subst ty1 in
+        let ty1, subst = loop subst ty1 in
         let ty2, subst = loop subst ty2 in
         (new_arrow ty1 ty2, subst)
     | TApp (name, tys, ls) when TyLevel.(ls.level_new = generic_level) ->
@@ -273,8 +296,8 @@ let instantiate ty =
 
 let type_of_builtin builtin =
   match builtin with
-  | "print_endline" -> new_arrow [ TPrim Str ] (TPrim Unit)
-  | "print_string" -> new_arrow [ TPrim Str ] (TPrim Unit)
+  | "print_endline" -> new_arrow (TPrim Str) (TPrim Unit)
+  | "print_string" -> new_arrow (TPrim Str) (TPrim Unit)
   | _ -> elab_error "type_of_builtin: unknown builtin"
 
 (* currently assume all operators are polymorphic *)
@@ -282,10 +305,10 @@ let type_of_op op =
   match op with
   | "+" | "-" | "*" | "/" | "%" ->
       let t = new_tvar () in
-      new_arrow [ t; t ] t
+      new_arrow t (new_arrow t t)
   | "<" | "<=" | ">" | ">=" | "==" | "!=" ->
       let t = new_tvar () in
-      new_arrow [ t; t ] (TPrim Bool)
+      new_arrow t (new_arrow t (TPrim Bool))
   | _ -> elab_error [%string "type_of_op: unknown op: %{op}"]
 
 let rec type_of_pattern (ctx : Type.ty StrMap.t) (p : 'a pattern) : 'a pattern * Type.ty =
@@ -301,29 +324,20 @@ let rec type_of_pattern (ctx : Type.ty StrMap.t) (p : 'a pattern) : 'a pattern *
       let ps, ty_ps = List.unzip @@ List.map ~f:(type_of_pattern ctx) ps in
       let ty = new_tup ty_ps in
       (PTup (ps, { info with ty = Some ty }), ty)
-  | PCtorApp (c, None, info) -> (
+  | PCtorApp (c, [], info) -> (
       match Map.find ctx c with
       | Some ty ->
           let ty = instantiate ty in
-          (PCtorApp (c, None, { info with ty = Some ty }), ty)
+          (PCtorApp (c, [], { info with ty = Some ty }), ty)
       | None -> elab_error [%string "Constructor not found: %{c}"])
-  | PCtorApp (c, Some (PTup (args, info')), info) -> (
+  | PCtorApp (c, args, info) -> (
       match Map.find ctx c with
       | Some ty ->
           let ty = instantiate ty in
           let args, ty_args = List.unzip @@ List.map ~f:(type_of_pattern ctx) args in
           let tyr = new_tvar () in
-          unify ty (new_arrow ty_args tyr);
-          (PCtorApp (c, Some (PTup (args, info')), { info with ty = Some tyr }), tyr)
-      | None -> elab_error [%string "Constructor not found: %{c}"])
-  | PCtorApp (c, Some p, info) -> (
-      match Map.find ctx c with
-      | Some ty ->
-          let ty = instantiate ty in
-          let p, ty_p = type_of_pattern ctx p in
-          let tyr = new_tvar () in
-          unify ty (new_arrow [ ty_p ] tyr);
-          (PCtorApp (c, Some p, { info with ty = Some tyr }), tyr)
+          unify ty (Stdlib.List.fold_right new_arrow ty_args tyr);
+          (PCtorApp (c, args, { info with ty = Some tyr }), tyr)
       | None -> elab_error [%string "Constructor not found: %{c}"])
 
 type binder_kind = Nothing | Trivial | NonTrivial
@@ -337,8 +351,7 @@ let rec bind_pattern_variables_nodup ctx p =
     | PVar (x, { ty = Some t; _ }) -> update_ctx_nodup ctx ~key:x ~value:t
     | PVar (x, _) -> elab_error [%string "Cannot infer the type of variable: %{x}"]
     | PTup (ps, _) -> List.fold_left ~init:ctx ~f:loop ps
-    | PCtorApp (_, None, _) -> ctx
-    | PCtorApp (_, Some p, _) -> loop ctx p
+    | PCtorApp (_, ps, _) -> Stdlib.List.fold_left loop ctx ps
   in
   loop ctx p
 
@@ -356,8 +369,7 @@ let rec bind_pattern_variables_shadow ctx p =
         | `Duplicate -> elab_error [%string "Variable %{x} already bound"])
     | PVar (x, _) -> elab_error [%string "Cannot infer the type of variable: %{x}"]
     | PTup (ps, _) -> List.fold_left ~init:ctx ~f:loop ps
-    | PCtorApp (_, None, _) -> ctx
-    | PCtorApp (_, Some p, _) -> loop ctx p
+    | PCtorApp (_, ps, _) -> Stdlib.List.fold_left loop ctx ps
   in
   loop ctx p
 
@@ -370,8 +382,7 @@ let rec generalize_pattern_variables p =
   | PVar (_, { ty = Some t; _ }) -> generalize t
   | PVar (x, _) -> elab_error [%string "Cannot infer the type of variable: %{x}"]
   | PTup (ps, _) -> List.iter ~f:(fun p -> generalize_pattern_variables p) ps
-  | PCtorApp (_, None, _) -> ()
-  | PCtorApp (_, Some p, _) -> generalize_pattern_variables p
+  | PCtorApp (_, ps, _) -> List.iter ~f:(fun p -> generalize_pattern_variables p) ps
 
 let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
   try
@@ -407,7 +418,7 @@ let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
         let f, tyf = type_of ctx f in
         let args, ty_args = List.unzip @@ List.map ~f:(type_of ctx) xs in
         let tyr = new_tvar () in
-        unify tyf (new_arrow ty_args tyr);
+        unify tyf (Stdlib.List.fold_right new_arrow ty_args tyr);
         (App (f, args, { info with ty = Some tyr }), tyr)
     | If (c, t, f, info) ->
         let c, tyc = type_of ctx c in
@@ -421,7 +432,7 @@ let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
         let l, tyl = type_of ctx l in
         let r, tyr = type_of ctx r in
         let ty = new_tvar () in
-        unify tyop (new_arrow [ tyl; tyr ] ty);
+        unify tyop (new_arrow tyl (new_arrow tyr ty));
         (Op (op, l, r, { info with ty = Some ty }), ty)
     | Let (BSeq (e1, info), e2, info') ->
         let e1, ty1 = type_of ctx e1 in
@@ -472,7 +483,7 @@ let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
         let ps, ty_ps = List.unzip @@ List.map ~f:(type_of_pattern ctx) ps in
         let ctx = List.fold_left ~init:ctx ~f:(fun ctx p -> bind_pattern_variables_shadow ctx p) ps in
         let e, ty_e = type_of ctx e in
-        let ty = new_arrow ty_ps ty_e in
+        let ty = Stdlib.List.fold_right new_arrow ty_ps ty_e in
         (Lam (ps, e, { info with ty = Some ty }), ty)
     | Sel (_e, FIndex _i, _info) -> failwith "not implemented"
     | Sel (_e, FName _x, _info) -> failwith "not implemented"
@@ -521,7 +532,7 @@ let top_type_of_prog (p : info prog) : info prog =
     | TArrow (ty1, ty2) ->
         let rec flatten acc ty = match ty with TArrow (t1, t2) -> flatten (t1 :: acc) t2 | _ -> (List.rev acc, ty) in
         let args, ret = flatten [ ty1 ] ty2 in
-        Type.new_arrow (List.map ~f:(convert_ty ctx arity) args) (convert_ty ctx arity ret)
+        Stdlib.List.fold_right Type.new_arrow (List.map ~f:(convert_ty ctx arity) args) (convert_ty ctx arity ret)
     | TTuple tys -> Type.(new_tup (List.map ~f:(convert_ty ctx arity) tys))
     | TNamedVar x ->
         if Map.mem ctx x then Map.find_exn ctx x
@@ -551,7 +562,7 @@ let top_type_of_prog (p : info prog) : info prog =
         ys ty_params
     in
     let ty_args = List.map ~f:(convert_ty ctx arity) xs in
-    let ctor_ty = match ty_args with [] -> tyr | _ -> new_arrow ty_args tyr in
+    let ctor_ty = match ty_args with [] -> tyr | _ -> Stdlib.List.fold_right new_arrow ty_args tyr in
 
     TyLevel.leave ();
 

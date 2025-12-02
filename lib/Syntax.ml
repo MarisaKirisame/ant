@@ -9,7 +9,7 @@ type 'a pattern =
   | PUnit
   | PVar of string * 'a
   | PTup of 'a pattern list * 'a
-  | PCtorApp of string * 'a pattern option * 'a
+  | PCtorApp of string * 'a pattern list * 'a
 
 type field = FName of string | FIndex of int
 
@@ -67,12 +67,13 @@ let rec pp_pattern_internal c pat =
   | PInt n -> string (string_of_int n)
   | PBool b -> string (string_of_bool b)
   | PUnit -> string "()"
-  | PCtorApp (fn, a, _) -> (
-      match a with
-      | None -> string fn
-      | Some a ->
-          let inner = string fn ^^ space ^^ pp_pattern_internal true a in
-          pp inner)
+  | PCtorApp (fn, args, _) ->
+      string fn ^^ space
+      ^^ concat_map
+           (fun a ->
+             let inner = pp_pattern_internal true a in
+             pp inner)
+           args
   | PTup (xs, _) ->
       let inner = separate_map (comma ^^ space) (pp_pattern_internal true) xs in
       pp inner
@@ -110,9 +111,9 @@ let pp_expr =
     | Builtin (Builtin b, _) -> string b
     | Var (x, _) -> string x
     | Ctor (c, _) -> string c
-    | App (Ctor (ct, aux1), xs, aux2) when List.length xs > 1 ->
+    (* | App (Ctor (ct, aux1), xs, aux2) when List.length xs > 1 ->
         (* special case for ctor application. for OCaml compatibility *)
-        f c (App (Var (ct, aux1), [ Tup (xs, aux2) ], aux2))
+        f c (App (Var (ct, aux1), [ Tup (xs, aux2) ], aux2)) *)
     | App (fn, [], _) -> f c fn
     | App (fn, xs, _) -> f true fn ^^ space ^^ separate_map space (f true) xs |> pp
     | Op (op, lhs, rhs, _) -> f true lhs ^^ space ^^ string op ^^ space ^^ f true rhs |> pp
@@ -260,7 +261,7 @@ let rec pattern_tag_map (f : 'a -> 'b) (pattern : 'a pattern) : 'b pattern =
   | PUnit -> PUnit
   | PVar (name, tag) -> PVar (name, f tag)
   | PTup (patterns, tag) -> PTup (List.map (pattern_tag_map f) patterns, f tag)
-  | PCtorApp (ctor, payload, tag) -> PCtorApp (ctor, Option.map (pattern_tag_map f) payload, f tag)
+  | PCtorApp (ctor, payload, tag) -> PCtorApp (ctor, List.map (pattern_tag_map f) payload, f tag)
 
 let rec expr_tag_map (f : 'a -> 'b) (expr : 'a expr) : 'b expr =
   match expr with
