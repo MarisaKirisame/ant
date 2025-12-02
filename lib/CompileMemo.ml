@@ -61,17 +61,10 @@ module Liveness = struct
         (PTup (patterns', stx_info_of_tag tag fv_after), fv_before)
     | PCtorApp (ctor, payload, tag) -> (
         match payload with
-        | [] -> (PCtorApp (ctor, [], stx_info_of_tag tag fv_after), fv_after)
-        | payload ->
-            let rec aux l acc =
-              match l with
-              | [] -> acc
-              | x :: tail ->
-                  let x', r = annotate_pattern x (snd acc) in
-                  aux tail (x' :: fst acc, r)
-            in
-            let payload', fv_before = aux (List.rev payload) ([], fv_after) in
-            (PCtorApp (ctor, payload', stx_info_of_tag tag fv_after), fv_before))
+        | None -> (PCtorApp (ctor, None, stx_info_of_tag tag fv_after), fv_after)
+        | Some payload ->
+            let payload', fv_before = annotate_pattern payload fv_after in
+            (PCtorApp (ctor, Some payload', stx_info_of_tag tag fv_after), fv_before))
     | PAny | PInt _ | PBool _ | PUnit -> (pattern_tag_map (fun _ -> failwith "impossible") pat, fv_after)
 
   and annotate_pattern_list (patterns : bool pattern list) (fv_after : unit StrMap.t) :
@@ -562,12 +555,23 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
         (fun (pat, expr) ->
           (*todo: special casing for now, as pat design need changes. *)
           match pat with
-          | PCtorApp (cname, [], _) ->
+          | PCtorApp (cname, None, _) ->
               ( g cname,
                 [%seqs
                   to_unit_ $ pop_env_ w;
                   compile_pp_expr ctx s expr k w] )
-          | PCtorApp (cname, xs, _) when List.for_all (function PVar _ -> true | _ -> false) xs ->
+          | PCtorApp (cname, Some (PVar (x0, _)), _) ->
+              ( g cname,
+                with_splits 1
+                  (memo_splits_ (pair_value_ x))
+                  (function
+                    | [ x0_v ] ->
+                        [%seqs
+                          to_unit_ $ pop_env_ w;
+                          push_env_ w x0_v;
+                          compile_pp_expr ctx (extend_s s x0) expr (fun s w -> drop s [ x0 ] w k) w]
+                    | _ -> failwith "with_splits: unexpected arity") )
+          | PCtorApp (cname, Some (PTup (xs, _)), _) when List.for_all (function PVar _ -> true | _ -> false) xs ->
               let xs = List.map (function PVar (name, _) -> name | _ -> failwith "impossible") xs in
               let n = List.length xs in
               ( g cname,
