@@ -34,8 +34,8 @@ let free, free_p =
     | PVar (x, _) -> SSet.add x s
     | PUnit -> s
     | PTup (ps, _) -> List.fold_left do_pattern s ps
-    | PCtorApp (_, None, _) -> s
-    | PCtorApp (_, Some p, _) -> do_pattern s p
+    | PCtorApp (_, [], _) -> s
+    | PCtorApp (_, ps, _) -> List.fold_left do_pattern s ps
   in
   ((fun e -> do_expr SSet.empty e), fun p -> do_pattern SSet.empty p)
 
@@ -283,8 +283,8 @@ let defunc ctx expr =
         let sorted_p_fvl = List.map (fun x -> PVar (x, i)) @@ SSet.elements fvs in
         let body, l = aux ctx x in
         let abs, case =
-          if SSet.is_empty fvs then (Ctor (ct, i), PCtorApp (ct, None, i))
-          else (App (Ctor (ct, i), sorted_fvl, i), PCtorApp (ct, Some (PTup (sorted_p_fvl, i)), i))
+          if SSet.is_empty fvs then (Ctor (ct, i), PCtorApp (ct, [], i))
+          else (App (Ctor (ct, i), sorted_fvl, i), PCtorApp (ct, sorted_p_fvl, i))
         in
         (abs, (PTup (case :: ps, i), body) :: l)
     | _ -> aux ctx expr
