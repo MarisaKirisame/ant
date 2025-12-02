@@ -95,8 +95,7 @@ pattern:
 
 ctor_pattern:
   | "<ctor>" { PCtorApp ($1, None, empty_info) }
-  | "<ctor>" delimited_pattern { PCtorApp ($1, Some $2, empty_info) }
-  | "<ctor>" delimited_pattern llist1(delimited_pattern) { PCtorApp ($1, Some (PTup ($2 :: $3, empty_info)), empty_info) }
+  | "<ctor>" llist1(delimited_pattern) { PCtorApp ($1, Some (PTup ($2, empty_info)), empty_info) }
 
 delimited_pattern:
   | "<int>" { PInt $1 }
