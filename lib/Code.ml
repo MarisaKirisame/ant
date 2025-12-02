@@ -46,6 +46,8 @@ let lam_ (a : string) (f : 'a code -> 'b code) : ('a -> 'b) code =
   let a = gensym a in
   from_ir (Paren (Lam ([ Var a ], to_ir (f (var_ a)))))
 
+let lam_unit_ (f : unit -> 'a code) : (unit -> 'a) code = from_ir (Paren (Lam ([ Any ], to_ir (f ()))))
+
 let lam2_ (a : string) (b : string) (f : 'a code -> 'b code -> 'c code) : ('a -> 'b -> 'c) code =
   let a = gensym a in
   let b = gensym b in
