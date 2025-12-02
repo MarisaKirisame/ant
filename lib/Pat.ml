@@ -100,8 +100,9 @@ let pat_desc pattern =
   | PInt n -> PDInt n
   | PBool b -> PDBool b
   | PUnit -> PDUnit
-  | PCtorApp (ctor, [], _) -> PDCtor (ctor, 0)
-  | PCtorApp (ctor, args, _) -> PDCtor (ctor, List.length args)
+  | PCtorApp (ctor, None, _) -> PDCtor (ctor, 0)
+  | PCtorApp (ctor, Some (PTup (args, _)), _) -> PDCtor (ctor, List.length args)
+  | PCtorApp (ctor, Some _, _) -> PDCtor (ctor, 1)
   | PTup (args, _) -> PDTuple (List.length args)
   | _ -> failwith "Invalid pattern"
 
@@ -110,8 +111,9 @@ let is_compatible desc pat =
   | PDInt x, PInt y -> x = y
   | PDBool x, PBool y -> x = y
   | PDUnit, PUnit -> true
-  | PDCtor (ctor, n), PCtorApp (ctor', args, _) when ctor = ctor' -> List.length args = n
-  | PDCtor (ctor, n), PCtorApp (ctor', [], _) when ctor = ctor' -> n = 0
+  | PDCtor (ctor, n), PCtorApp (ctor', Some (PTup (args, _)), _) when ctor = ctor' -> List.length args = n
+  | PDCtor (ctor, n), PCtorApp (ctor', None, _) when ctor = ctor' -> n = 0
+  | PDCtor (ctor, n), PCtorApp (ctor', Some _, _) when ctor = ctor' -> n = 1
   | PDTuple n, PTup (args, _) -> List.length args = n
   | _ -> false
 
@@ -130,13 +132,13 @@ let spec_cell ctor pat n occ =
   | PTup (xs, _) when is_compatible ctor pat ->
       let new_row = xs in
       (new_row, Some OccurrenceMap.empty)
-  | PCtorApp (_, args, _) when is_compatible ctor pat ->
+  | PCtorApp (_, Some (PTup (args, _)), _) when is_compatible ctor pat ->
       let new_row = args in
       (new_row, Some OccurrenceMap.empty)
-  (* | PCtorApp (_, Some arg, _) when is_compatible ctor pat ->
+  | PCtorApp (_, Some arg, _) when is_compatible ctor pat ->
       let new_row = [ arg ] in
-      (new_row, Some OccurrenceMap.empty) *)
-  | PCtorApp (_, [], _) when is_compatible ctor pat -> ([], Some OccurrenceMap.empty)
+      (new_row, Some OccurrenceMap.empty)
+  | PCtorApp (_, None, _) when is_compatible ctor pat -> ([], Some OccurrenceMap.empty)
   | _ -> ([], None)
 
 let spec_row ctor n col occs row bnd =
@@ -168,9 +170,9 @@ let check_arity arity_map pat =
     | None -> StringMap.add s nu arity_map
   in
   match pat with
-  | PCtorApp (ctor, [], _) -> compare_old_and_new ctor 0
-  | PCtorApp (ctor, args, _) -> compare_old_and_new ctor (List.length args)
-  (* | PCtorApp (ctor, Some _, _) -> compare_old_and_new ctor 1 *)
+  | PCtorApp (ctor, None, _) -> compare_old_and_new ctor 0
+  | PCtorApp (ctor, Some (PTup (args, _)), _) -> compare_old_and_new ctor (List.length args)
+  | PCtorApp (ctor, Some _, _) -> compare_old_and_new ctor 1
   | _ -> arity_map
 
 let split_at n =

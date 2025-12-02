@@ -48,7 +48,7 @@ type ty =
   | TPrim of pty
   | TTup of ty list * levels
   | TArr of ty list * levels
-  | TArrow of ty * ty * levels
+  | TArrow of ty list * ty * levels
   | TVar of tv ref
   | TApp of string * ty list * levels
 
@@ -81,15 +81,15 @@ let rec pp_ty ?(print_level = false) =
       let doc = string "[" ^^ separate_map (string ", ") pp_ty ts ^^ string "]" ^^ doc_level in
       ls.level_new <- level;
       doc
-  | TArrow (tx, ty, ls) ->
+  | TArrow (ts, ty, ls) ->
       let level = ls.level_new in
       let doc_level = pl ls in
       ls.level_new <- TyLevel.marker_level;
-      (* let doc =
+      let doc =
         (if List.length ts >= 1 then parens (separate_map (string ", ") pp_ty ts)
          else separate_map (string ", ") pp_ty ts)
-        ^^ string " -> " ^^ pp_ty ty ^^ doc_level *)
-      let doc = parens (pp_ty tx ^^ string " -> " ^^ pp_ty ty ^^ doc_level) in
+        ^^ string " -> " ^^ pp_ty ty ^^ doc_level
+      in
       ls.level_new <- level;
       doc
   | TVar { contents = Unbound (name, l) } ->

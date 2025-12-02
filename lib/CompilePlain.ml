@@ -41,8 +41,8 @@ let rec compile_pat (p : 'a pattern) : document =
   | PVar (name, _) -> string name
   | PUnit -> string "()"
   | PTup (xs, _) -> string "(" ^^ separate_map (string ", ") compile_pat xs ^^ string ")"
-  | PCtorApp (name, [], _) -> string name
-  | PCtorApp (name, p', _) -> string name ^^ space ^^ parens (separate_map (string ", ") compile_pat p')
+  | PCtorApp (name, None, _) -> string name
+  | PCtorApp (name, Some p', _) -> string name ^^ space ^^ compile_pat p'
 
 and parens_compile_pat p = parens (compile_pat p)
 

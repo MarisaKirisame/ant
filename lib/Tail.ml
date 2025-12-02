@@ -50,7 +50,8 @@ and mark_tail_pattern (pattern : 'a pattern) : bool pattern =
   | PUnit -> PUnit
   | PVar (name, _) -> PVar (name, false)
   | PTup (patterns, _) -> PTup (List.map mark_tail_pattern patterns, false)
-  | PCtorApp (ctor, ps, _) -> PCtorApp (ctor, List.map mark_tail_pattern ps, false)
+  | PCtorApp (ctor, None, _) -> PCtorApp (ctor, None, false)
+  | PCtorApp (ctor, Some pattern, _) -> PCtorApp (ctor, Some (mark_tail_pattern pattern), false)
 
 and mark_tail_cases is_tail (MatchPattern cases) =
   MatchPattern (List.map (fun (pattern, expr) -> (mark_tail_pattern pattern, mark_tail_expr_impl is_tail expr)) cases)
