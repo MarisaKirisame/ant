@@ -31,7 +31,7 @@ type expr =
   | ECons of expr * expr
   | EMatchList of expr * expr * expr
   | EFix of expr
-  | EHole
+  | EHole of option int
 ;;
 
 type value = 
@@ -51,7 +51,7 @@ and vtype =
   | VTList
 
 and stuck =
-  | SHole of list value
+  | SHole of option int * list value
   | STypeError of value * vtype
   | SIndexError
   | SApp of stuck * expr
@@ -143,7 +143,7 @@ let rec eval = fun expr env ->
     | VFix (e, env_) -> eval e (Cons (eval x env) (Cons fv env_))
     | VStuck fs -> VStuck (SApp fs x)
     | _ -> VStuck (STypeError fv VTFunc))
-  | EHole -> VStuck (SHole env)
+  | EHole id -> VStuck (SHole id env)
   | ETrue -> VTrue
   | EFalse -> VFalse
   | EIf (i, t, e) -> 

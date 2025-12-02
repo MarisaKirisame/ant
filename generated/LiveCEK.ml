@@ -139,7 +139,7 @@ type expr =
   | ECons of expr * expr
   | EMatchList of expr * expr * expr
   | EFix of expr
-  | EHole
+  | EHole of int option
 
 let rec from_ocaml_expr x =
   match x with
@@ -162,7 +162,7 @@ let rec from_ocaml_expr x =
   | EMatchList (x0, x1, x2) ->
       Memo.appends [ Memo.from_constructor tag_EMatchList; from_ocaml_expr x0; from_ocaml_expr x1; from_ocaml_expr x2 ]
   | EFix x0 -> Memo.appends [ Memo.from_constructor tag_EFix; from_ocaml_expr x0 ]
-  | EHole -> Memo.appends [ Memo.from_constructor tag_EHole ]
+  | EHole x0 -> Memo.appends [ Memo.from_constructor tag_EHole; from_ocaml_option (fun x -> Memo.from_int x) x0 ]
 
 let rec to_ocaml_expr x =
   let h, t = Option.get (Memo.list_match x) in
@@ -212,7 +212,9 @@ let rec to_ocaml_expr x =
   | c when c = tag_EFix ->
       let x0 = Memo.splits_1 t in
       EFix (to_ocaml_expr x0)
-  | c when c = tag_EHole -> EHole
+  | c when c = tag_EHole ->
+      let x0 = Memo.splits_1 t in
+      EHole (to_ocaml_option (fun x -> Word.get_value (Memo.to_word x)) x0)
   | _ -> failwith "unreachable"
 
 type value =
@@ -228,7 +230,7 @@ type value =
 and vtype = VTInt | VTFunc | VTBool | VTList
 
 and stuck =
-  | SHole of value list
+  | SHole of int option * value list
   | STypeError of value * vtype
   | SIndexError
   | SApp of stuck * expr
@@ -263,7 +265,13 @@ and from_ocaml_vtype x =
 
 and from_ocaml_stuck x =
   match x with
-  | SHole x0 -> Memo.appends [ Memo.from_constructor tag_SHole; from_ocaml_list (fun x -> from_ocaml_value x) x0 ]
+  | SHole (x0, x1) ->
+      Memo.appends
+        [
+          Memo.from_constructor tag_SHole;
+          from_ocaml_option (fun x -> Memo.from_int x) x0;
+          from_ocaml_list (fun x -> from_ocaml_value x) x1;
+        ]
   | STypeError (x0, x1) ->
       Memo.appends [ Memo.from_constructor tag_STypeError; from_ocaml_value x0; from_ocaml_vtype x1 ]
   | SIndexError -> Memo.appends [ Memo.from_constructor tag_SIndexError ]
@@ -313,8 +321,8 @@ and to_ocaml_stuck x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
   | c when c = tag_SHole ->
-      let x0 = Memo.splits_1 t in
-      SHole (to_ocaml_list (fun x -> to_ocaml_value x) x0)
+      let x0, x1 = Memo.splits_2 t in
+      SHole (to_ocaml_option (fun x -> Word.get_value (Memo.to_word x)) x0, to_ocaml_list (fun x -> to_ocaml_value x) x1)
   | c when c = tag_STypeError ->
       let x0, x1 = Memo.splits_2 t in
       STypeError (to_ocaml_value x0, to_ocaml_vtype x1)
@@ -401,9 +409,9 @@ let () =
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 0);
           assert_env_length w_5 4;
-          let ctor_arg_39 = pop_env w_5 in
           let ctor_arg_40 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_40; ctor_arg_39 ]);
+          let ctor_arg_41 = pop_env w_5 in
+          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_41; ctor_arg_40 ]);
           assert_env_length w_5 3;
           ignore (env_call w_5 [] 2);
           w_5.state.c <- pc_to_exp (int_to_pc 4);
@@ -478,9 +486,9 @@ let () =
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 0);
           assert_env_length w_5 4;
-          let ctor_arg_96 = pop_env w_5 in
           let ctor_arg_97 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_97; ctor_arg_96 ]);
+          let ctor_arg_98 = pop_env w_5 in
+          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_98; ctor_arg_97 ]);
           assert_env_length w_5 3;
           ignore (env_call w_5 [] 2);
           w_5.state.c <- pc_to_exp (int_to_pc 4);
@@ -493,13 +501,13 @@ let () =
           assert_env_length w_5 5;
           push_env w_5 (Dynarray.get w_5.state.e 1);
           assert_env_length w_5 6;
-          let ctor_arg_98 = pop_env w_5 in
           let ctor_arg_99 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_99; ctor_arg_98 ]);
-          assert_env_length w_5 5;
           let ctor_arg_100 = pop_env w_5 in
+          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_100; ctor_arg_99 ]);
+          assert_env_length w_5 5;
           let ctor_arg_101 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_101; ctor_arg_100 ]);
+          let ctor_arg_102 = pop_env w_5 in
+          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_102; ctor_arg_101 ]);
           assert_env_length w_5 4;
           ignore (env_call w_5 [] 2);
           w_5.state.c <- pc_to_exp (int_to_pc 4);
@@ -508,9 +516,9 @@ let () =
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 1 tl_0;
           assert_env_length w_5 2;
-          let ctor_arg_102 = pop_env w_5 in
           let ctor_arg_103 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_VCons; ctor_arg_103; ctor_arg_102 ]);
+          let ctor_arg_104 = pop_env w_5 in
+          push_env w_5 (Memo.appends [ Memo.from_constructor tag_VCons; ctor_arg_104; ctor_arg_103 ]);
           assert_env_length w_5 1;
           drop_n w_5 1 0;
           assert_env_length w_5 1;
@@ -781,15 +789,23 @@ let () =
           w_4.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_4
       | c_2 when c_2 = tag_EHole ->
+          let splits_13 = Memo.splits (snd x_2) in
+          let split0_13 = List.nth splits_13 0 in
           ignore (pop_env w_4);
-          assert_env_length w_4 2;
+          push_env w_4 split0_13;
+          assert_env_length w_4 3;
+          push_env w_4 (Dynarray.get w_4.state.e 2);
+          assert_env_length w_4 4;
           push_env w_4 (Dynarray.get w_4.state.e 1);
-          assert_env_length w_4 3;
+          assert_env_length w_4 5;
           let ctor_arg_6 = pop_env w_4 in
-          push_env w_4 (Memo.appends [ Memo.from_constructor tag_SHole; ctor_arg_6 ]);
-          assert_env_length w_4 3;
           let ctor_arg_7 = pop_env w_4 in
-          push_env w_4 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_7 ]);
+          push_env w_4 (Memo.appends [ Memo.from_constructor tag_SHole; ctor_arg_7; ctor_arg_6 ]);
+          assert_env_length w_4 4;
+          let ctor_arg_8 = pop_env w_4 in
+          push_env w_4 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_8 ]);
+          assert_env_length w_4 4;
+          drop_n w_4 4 1;
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
       | c_2 when c_2 = tag_ETrue ->
@@ -805,12 +821,12 @@ let () =
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
       | c_2 when c_2 = tag_EIf ->
-          let splits_13 = Memo.splits (snd x_2) in
-          let split0_13 = List.nth splits_13 0 in
-          let split1_8 = List.nth splits_13 1 in
-          let split2_0 = List.nth splits_13 2 in
+          let splits_14 = Memo.splits (snd x_2) in
+          let split0_14 = List.nth splits_14 0 in
+          let split1_8 = List.nth splits_14 1 in
+          let split2_0 = List.nth splits_14 2 in
           ignore (pop_env w_4);
-          push_env w_4 split0_13;
+          push_env w_4 split0_14;
           push_env w_4 split1_8;
           push_env w_4 split2_0;
           assert_env_length w_4 5;
@@ -829,11 +845,11 @@ let () =
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
       | c_2 when c_2 = tag_ECons ->
-          let splits_14 = Memo.splits (snd x_2) in
-          let split0_14 = List.nth splits_14 0 in
-          let split1_9 = List.nth splits_14 1 in
+          let splits_15 = Memo.splits (snd x_2) in
+          let split0_15 = List.nth splits_15 0 in
+          let split1_9 = List.nth splits_15 1 in
           ignore (pop_env w_4);
-          push_env w_4 split0_14;
+          push_env w_4 split0_15;
           push_env w_4 split1_9;
           assert_env_length w_4 4;
           push_env w_4 (Dynarray.get w_4.state.e 2);
@@ -845,12 +861,12 @@ let () =
           w_4.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_4
       | c_2 when c_2 = tag_EMatchList ->
-          let splits_15 = Memo.splits (snd x_2) in
-          let split0_15 = List.nth splits_15 0 in
-          let split1_10 = List.nth splits_15 1 in
-          let split2_1 = List.nth splits_15 2 in
+          let splits_16 = Memo.splits (snd x_2) in
+          let split0_16 = List.nth splits_16 0 in
+          let split1_10 = List.nth splits_16 1 in
+          let split2_1 = List.nth splits_16 2 in
           ignore (pop_env w_4);
-          push_env w_4 split0_15;
+          push_env w_4 split0_16;
           push_env w_4 split1_10;
           push_env w_4 split2_1;
           assert_env_length w_4 5;
@@ -873,10 +889,10 @@ let () =
       let x_3 = resolve w_6 last_3 in
       match Word.get_value (fst x_3) with
       | c_3 when c_3 = tag_VInt ->
-          let splits_16 = Memo.splits (snd x_3) in
-          let split0_16 = List.nth splits_16 0 in
+          let splits_17 = Memo.splits (snd x_3) in
+          let split0_17 = List.nth splits_17 0 in
           ignore (pop_env w_6);
-          push_env w_6 split0_16;
+          push_env w_6 split0_17;
           assert_env_length w_6 4;
           push_env w_6 (Dynarray.get w_6.state.e 1);
           assert_env_length w_6 5;
@@ -887,21 +903,21 @@ let () =
           w_6.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_6
       | c_3 when c_3 = tag_VStuck ->
-          let splits_17 = Memo.splits (snd x_3) in
-          let split0_17 = List.nth splits_17 0 in
+          let splits_18 = Memo.splits (snd x_3) in
+          let split0_18 = List.nth splits_18 0 in
           ignore (pop_env w_6);
-          push_env w_6 split0_17;
+          push_env w_6 split0_18;
           assert_env_length w_6 4;
           push_env w_6 (Dynarray.get w_6.state.e 3);
           assert_env_length w_6 5;
           push_env w_6 (Dynarray.get w_6.state.e 1);
           assert_env_length w_6 6;
-          let ctor_arg_8 = pop_env w_6 in
           let ctor_arg_9 = pop_env w_6 in
-          push_env w_6 (Memo.appends [ Memo.from_constructor tag_SAdd0; ctor_arg_9; ctor_arg_8 ]);
-          assert_env_length w_6 5;
           let ctor_arg_10 = pop_env w_6 in
-          push_env w_6 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_10 ]);
+          push_env w_6 (Memo.appends [ Memo.from_constructor tag_SAdd0; ctor_arg_10; ctor_arg_9 ]);
+          assert_env_length w_6 5;
+          let ctor_arg_11 = pop_env w_6 in
+          push_env w_6 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_11 ]);
           assert_env_length w_6 5;
           drop_n w_6 5 1;
           assert_env_length w_6 4;
@@ -917,12 +933,12 @@ let () =
           assert_env_length w_6 4;
           push_env w_6 (Memo.from_constructor tag_VTInt);
           assert_env_length w_6 5;
-          let ctor_arg_11 = pop_env w_6 in
           let ctor_arg_12 = pop_env w_6 in
-          push_env w_6 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_12; ctor_arg_11 ]);
-          assert_env_length w_6 4;
           let ctor_arg_13 = pop_env w_6 in
-          push_env w_6 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_13 ]);
+          push_env w_6 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_13; ctor_arg_12 ]);
+          assert_env_length w_6 4;
+          let ctor_arg_14 = pop_env w_6 in
+          push_env w_6 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_14 ]);
           assert_env_length w_6 4;
           drop_n w_6 4 1;
           assert_env_length w_6 3;
@@ -940,10 +956,10 @@ let () =
       let x_4 = resolve w_7 last_4 in
       match Word.get_value (fst x_4) with
       | c_4 when c_4 = tag_VInt ->
-          let splits_18 = Memo.splits (snd x_4) in
-          let split0_18 = List.nth splits_18 0 in
+          let splits_19 = Memo.splits (snd x_4) in
+          let split0_19 = List.nth splits_19 0 in
           ignore (pop_env w_7);
-          push_env w_7 split0_18;
+          push_env w_7 split0_19;
           assert_env_length w_7 4;
           push_env w_7 (Dynarray.get w_7.state.e 1);
           assert_env_length w_7 5;
@@ -954,21 +970,21 @@ let () =
           w_7.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_7
       | c_4 when c_4 = tag_VStuck ->
-          let splits_19 = Memo.splits (snd x_4) in
-          let split0_19 = List.nth splits_19 0 in
+          let splits_20 = Memo.splits (snd x_4) in
+          let split0_20 = List.nth splits_20 0 in
           ignore (pop_env w_7);
-          push_env w_7 split0_19;
+          push_env w_7 split0_20;
           assert_env_length w_7 4;
           push_env w_7 (Dynarray.get w_7.state.e 3);
           assert_env_length w_7 5;
           push_env w_7 (Dynarray.get w_7.state.e 1);
           assert_env_length w_7 6;
-          let ctor_arg_14 = pop_env w_7 in
           let ctor_arg_15 = pop_env w_7 in
-          push_env w_7 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_15; ctor_arg_14 ]);
-          assert_env_length w_7 5;
           let ctor_arg_16 = pop_env w_7 in
-          push_env w_7 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_16 ]);
+          push_env w_7 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_16; ctor_arg_15 ]);
+          assert_env_length w_7 5;
+          let ctor_arg_17 = pop_env w_7 in
+          push_env w_7 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_17 ]);
           assert_env_length w_7 5;
           drop_n w_7 5 1;
           assert_env_length w_7 4;
@@ -984,12 +1000,12 @@ let () =
           assert_env_length w_7 4;
           push_env w_7 (Memo.from_constructor tag_VTInt);
           assert_env_length w_7 5;
-          let ctor_arg_17 = pop_env w_7 in
           let ctor_arg_18 = pop_env w_7 in
-          push_env w_7 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_18; ctor_arg_17 ]);
-          assert_env_length w_7 4;
           let ctor_arg_19 = pop_env w_7 in
-          push_env w_7 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_19 ]);
+          push_env w_7 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_19; ctor_arg_18 ]);
+          assert_env_length w_7 4;
+          let ctor_arg_20 = pop_env w_7 in
+          push_env w_7 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_20 ]);
           assert_env_length w_7 4;
           drop_n w_7 4 1;
           assert_env_length w_7 3;
@@ -1007,10 +1023,10 @@ let () =
       let x_5 = resolve w_8 last_5 in
       match Word.get_value (fst x_5) with
       | c_5 when c_5 = tag_VInt ->
-          let splits_20 = Memo.splits (snd x_5) in
-          let split0_20 = List.nth splits_20 0 in
+          let splits_21 = Memo.splits (snd x_5) in
+          let split0_21 = List.nth splits_21 0 in
           ignore (pop_env w_8);
-          push_env w_8 split0_20;
+          push_env w_8 split0_21;
           assert_env_length w_8 4;
           push_env w_8 (Dynarray.get w_8.state.e 1);
           assert_env_length w_8 5;
@@ -1021,21 +1037,21 @@ let () =
           w_8.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_8
       | c_5 when c_5 = tag_VStuck ->
-          let splits_21 = Memo.splits (snd x_5) in
-          let split0_21 = List.nth splits_21 0 in
+          let splits_22 = Memo.splits (snd x_5) in
+          let split0_22 = List.nth splits_22 0 in
           ignore (pop_env w_8);
-          push_env w_8 split0_21;
+          push_env w_8 split0_22;
           assert_env_length w_8 4;
           push_env w_8 (Dynarray.get w_8.state.e 3);
           assert_env_length w_8 5;
           push_env w_8 (Dynarray.get w_8.state.e 1);
           assert_env_length w_8 6;
-          let ctor_arg_20 = pop_env w_8 in
           let ctor_arg_21 = pop_env w_8 in
-          push_env w_8 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_21; ctor_arg_20 ]);
-          assert_env_length w_8 5;
           let ctor_arg_22 = pop_env w_8 in
-          push_env w_8 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_22 ]);
+          push_env w_8 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_22; ctor_arg_21 ]);
+          assert_env_length w_8 5;
+          let ctor_arg_23 = pop_env w_8 in
+          push_env w_8 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_23 ]);
           assert_env_length w_8 5;
           drop_n w_8 5 1;
           assert_env_length w_8 4;
@@ -1051,12 +1067,12 @@ let () =
           assert_env_length w_8 4;
           push_env w_8 (Memo.from_constructor tag_VTInt);
           assert_env_length w_8 5;
-          let ctor_arg_23 = pop_env w_8 in
           let ctor_arg_24 = pop_env w_8 in
-          push_env w_8 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_24; ctor_arg_23 ]);
-          assert_env_length w_8 4;
           let ctor_arg_25 = pop_env w_8 in
-          push_env w_8 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_25 ]);
+          push_env w_8 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_25; ctor_arg_24 ]);
+          assert_env_length w_8 4;
+          let ctor_arg_26 = pop_env w_8 in
+          push_env w_8 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_26 ]);
           assert_env_length w_8 4;
           drop_n w_8 4 1;
           assert_env_length w_8 3;
@@ -1074,10 +1090,10 @@ let () =
       let x_6 = resolve w_9 last_6 in
       match Word.get_value (fst x_6) with
       | c_6 when c_6 = tag_VInt ->
-          let splits_22 = Memo.splits (snd x_6) in
-          let split0_22 = List.nth splits_22 0 in
+          let splits_23 = Memo.splits (snd x_6) in
+          let split0_23 = List.nth splits_23 0 in
           ignore (pop_env w_9);
-          push_env w_9 split0_22;
+          push_env w_9 split0_23;
           assert_env_length w_9 4;
           push_env w_9 (Dynarray.get w_9.state.e 1);
           assert_env_length w_9 5;
@@ -1088,21 +1104,21 @@ let () =
           w_9.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_9
       | c_6 when c_6 = tag_VStuck ->
-          let splits_23 = Memo.splits (snd x_6) in
-          let split0_23 = List.nth splits_23 0 in
+          let splits_24 = Memo.splits (snd x_6) in
+          let split0_24 = List.nth splits_24 0 in
           ignore (pop_env w_9);
-          push_env w_9 split0_23;
+          push_env w_9 split0_24;
           assert_env_length w_9 4;
           push_env w_9 (Dynarray.get w_9.state.e 3);
           assert_env_length w_9 5;
           push_env w_9 (Dynarray.get w_9.state.e 1);
           assert_env_length w_9 6;
-          let ctor_arg_26 = pop_env w_9 in
           let ctor_arg_27 = pop_env w_9 in
-          push_env w_9 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_27; ctor_arg_26 ]);
-          assert_env_length w_9 5;
           let ctor_arg_28 = pop_env w_9 in
-          push_env w_9 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_28 ]);
+          push_env w_9 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_28; ctor_arg_27 ]);
+          assert_env_length w_9 5;
+          let ctor_arg_29 = pop_env w_9 in
+          push_env w_9 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_29 ]);
           assert_env_length w_9 5;
           drop_n w_9 5 1;
           assert_env_length w_9 4;
@@ -1118,12 +1134,12 @@ let () =
           assert_env_length w_9 4;
           push_env w_9 (Memo.from_constructor tag_VTInt);
           assert_env_length w_9 5;
-          let ctor_arg_29 = pop_env w_9 in
           let ctor_arg_30 = pop_env w_9 in
-          push_env w_9 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_30; ctor_arg_29 ]);
-          assert_env_length w_9 4;
           let ctor_arg_31 = pop_env w_9 in
-          push_env w_9 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_31 ]);
+          push_env w_9 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_31; ctor_arg_30 ]);
+          assert_env_length w_9 4;
+          let ctor_arg_32 = pop_env w_9 in
+          push_env w_9 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_32 ]);
           assert_env_length w_9 4;
           drop_n w_9 4 1;
           assert_env_length w_9 3;
@@ -1141,10 +1157,10 @@ let () =
       let x_7 = resolve w_10 last_7 in
       match Word.get_value (fst x_7) with
       | c_7 when c_7 = tag_VInt ->
-          let splits_24 = Memo.splits (snd x_7) in
-          let split0_24 = List.nth splits_24 0 in
+          let splits_25 = Memo.splits (snd x_7) in
+          let split0_25 = List.nth splits_25 0 in
           ignore (pop_env w_10);
-          push_env w_10 split0_24;
+          push_env w_10 split0_25;
           assert_env_length w_10 4;
           push_env w_10 (Dynarray.get w_10.state.e 1);
           assert_env_length w_10 5;
@@ -1155,21 +1171,21 @@ let () =
           w_10.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_10
       | c_7 when c_7 = tag_VStuck ->
-          let splits_25 = Memo.splits (snd x_7) in
-          let split0_25 = List.nth splits_25 0 in
+          let splits_26 = Memo.splits (snd x_7) in
+          let split0_26 = List.nth splits_26 0 in
           ignore (pop_env w_10);
-          push_env w_10 split0_25;
+          push_env w_10 split0_26;
           assert_env_length w_10 4;
           push_env w_10 (Dynarray.get w_10.state.e 3);
           assert_env_length w_10 5;
           push_env w_10 (Dynarray.get w_10.state.e 1);
           assert_env_length w_10 6;
-          let ctor_arg_32 = pop_env w_10 in
           let ctor_arg_33 = pop_env w_10 in
-          push_env w_10 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_33; ctor_arg_32 ]);
-          assert_env_length w_10 5;
           let ctor_arg_34 = pop_env w_10 in
-          push_env w_10 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_34 ]);
+          push_env w_10 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_34; ctor_arg_33 ]);
+          assert_env_length w_10 5;
+          let ctor_arg_35 = pop_env w_10 in
+          push_env w_10 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_35 ]);
           assert_env_length w_10 5;
           drop_n w_10 5 1;
           assert_env_length w_10 4;
@@ -1185,12 +1201,12 @@ let () =
           assert_env_length w_10 4;
           push_env w_10 (Memo.from_constructor tag_VTInt);
           assert_env_length w_10 5;
-          let ctor_arg_35 = pop_env w_10 in
           let ctor_arg_36 = pop_env w_10 in
-          push_env w_10 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_36; ctor_arg_35 ]);
-          assert_env_length w_10 4;
           let ctor_arg_37 = pop_env w_10 in
-          push_env w_10 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_37 ]);
+          push_env w_10 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_37; ctor_arg_36 ]);
+          assert_env_length w_10 4;
+          let ctor_arg_38 = pop_env w_10 in
+          push_env w_10 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_38 ]);
           assert_env_length w_10 4;
           drop_n w_10 4 1;
           assert_env_length w_10 3;
@@ -1208,10 +1224,10 @@ let () =
       let x_8 = resolve w_11 last_8 in
       match Word.get_value (fst x_8) with
       | c_8 when c_8 = tag_Some ->
-          let splits_26 = Memo.splits (snd x_8) in
-          let split0_26 = List.nth splits_26 0 in
+          let splits_27 = Memo.splits (snd x_8) in
+          let split0_27 = List.nth splits_27 0 in
           ignore (pop_env w_11);
-          push_env w_11 split0_26;
+          push_env w_11 split0_27;
           assert_env_length w_11 1;
           push_env w_11 (Dynarray.get w_11.state.e 0);
           assert_env_length w_11 2;
@@ -1225,8 +1241,8 @@ let () =
           assert_env_length w_11 0;
           push_env w_11 (Memo.from_constructor tag_SIndexError);
           assert_env_length w_11 1;
-          let ctor_arg_38 = pop_env w_11 in
-          push_env w_11 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_38 ]);
+          let ctor_arg_39 = pop_env w_11 in
+          push_env w_11 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_39 ]);
           assert_env_length w_11 1;
           drop_n w_11 1 0;
           assert_env_length w_11 1;
@@ -1242,11 +1258,11 @@ let () =
       let x_9 = resolve w_12 last_9 in
       match Word.get_value (fst x_9) with
       | c_9 when c_9 = tag_VAbs ->
-          let splits_27 = Memo.splits (snd x_9) in
-          let split0_27 = List.nth splits_27 0 in
-          let split1_11 = List.nth splits_27 1 in
+          let splits_28 = Memo.splits (snd x_9) in
+          let split0_28 = List.nth splits_28 0 in
+          let split1_11 = List.nth splits_28 1 in
           ignore (pop_env w_12);
-          push_env w_12 split0_27;
+          push_env w_12 split0_28;
           push_env w_12 split1_11;
           assert_env_length w_12 5;
           push_env w_12 (Dynarray.get w_12.state.e 3);
@@ -1260,11 +1276,11 @@ let () =
           w_12.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_12
       | c_9 when c_9 = tag_VFix ->
-          let splits_28 = Memo.splits (snd x_9) in
-          let split0_28 = List.nth splits_28 0 in
-          let split1_12 = List.nth splits_28 1 in
+          let splits_29 = Memo.splits (snd x_9) in
+          let split0_29 = List.nth splits_29 0 in
+          let split1_12 = List.nth splits_29 1 in
           ignore (pop_env w_12);
-          push_env w_12 split0_28;
+          push_env w_12 split0_29;
           push_env w_12 split1_12;
           assert_env_length w_12 5;
           push_env w_12 (Dynarray.get w_12.state.e 3);
@@ -1278,21 +1294,21 @@ let () =
           w_12.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_12
       | c_9 when c_9 = tag_VStuck ->
-          let splits_29 = Memo.splits (snd x_9) in
-          let split0_29 = List.nth splits_29 0 in
+          let splits_30 = Memo.splits (snd x_9) in
+          let split0_30 = List.nth splits_30 0 in
           ignore (pop_env w_12);
-          push_env w_12 split0_29;
+          push_env w_12 split0_30;
           assert_env_length w_12 4;
           push_env w_12 (Dynarray.get w_12.state.e 3);
           assert_env_length w_12 5;
           push_env w_12 (Dynarray.get w_12.state.e 1);
           assert_env_length w_12 6;
-          let ctor_arg_41 = pop_env w_12 in
           let ctor_arg_42 = pop_env w_12 in
-          push_env w_12 (Memo.appends [ Memo.from_constructor tag_SApp; ctor_arg_42; ctor_arg_41 ]);
-          assert_env_length w_12 5;
           let ctor_arg_43 = pop_env w_12 in
-          push_env w_12 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_43 ]);
+          push_env w_12 (Memo.appends [ Memo.from_constructor tag_SApp; ctor_arg_43; ctor_arg_42 ]);
+          assert_env_length w_12 5;
+          let ctor_arg_44 = pop_env w_12 in
+          push_env w_12 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_44 ]);
           assert_env_length w_12 5;
           drop_n w_12 5 1;
           assert_env_length w_12 4;
@@ -1308,12 +1324,12 @@ let () =
           assert_env_length w_12 4;
           push_env w_12 (Memo.from_constructor tag_VTFunc);
           assert_env_length w_12 5;
-          let ctor_arg_44 = pop_env w_12 in
           let ctor_arg_45 = pop_env w_12 in
-          push_env w_12 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_45; ctor_arg_44 ]);
-          assert_env_length w_12 4;
           let ctor_arg_46 = pop_env w_12 in
-          push_env w_12 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_46 ]);
+          push_env w_12 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_46; ctor_arg_45 ]);
+          assert_env_length w_12 4;
+          let ctor_arg_47 = pop_env w_12 in
+          push_env w_12 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_47 ]);
           assert_env_length w_12 4;
           drop_n w_12 4 1;
           assert_env_length w_12 3;
@@ -1351,10 +1367,10 @@ let () =
           w_13.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_13
       | c_10 when c_10 = tag_VStuck ->
-          let splits_30 = Memo.splits (snd x_10) in
-          let split0_30 = List.nth splits_30 0 in
+          let splits_31 = Memo.splits (snd x_10) in
+          let split0_31 = List.nth splits_31 0 in
           ignore (pop_env w_13);
-          push_env w_13 split0_30;
+          push_env w_13 split0_31;
           assert_env_length w_13 4;
           push_env w_13 (Dynarray.get w_13.state.e 3);
           assert_env_length w_13 5;
@@ -1362,13 +1378,13 @@ let () =
           assert_env_length w_13 6;
           push_env w_13 (Dynarray.get w_13.state.e 2);
           assert_env_length w_13 7;
-          let ctor_arg_47 = pop_env w_13 in
           let ctor_arg_48 = pop_env w_13 in
           let ctor_arg_49 = pop_env w_13 in
-          push_env w_13 (Memo.appends [ Memo.from_constructor tag_SIf; ctor_arg_49; ctor_arg_48; ctor_arg_47 ]);
-          assert_env_length w_13 5;
           let ctor_arg_50 = pop_env w_13 in
-          push_env w_13 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_50 ]);
+          push_env w_13 (Memo.appends [ Memo.from_constructor tag_SIf; ctor_arg_50; ctor_arg_49; ctor_arg_48 ]);
+          assert_env_length w_13 5;
+          let ctor_arg_51 = pop_env w_13 in
+          push_env w_13 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_51 ]);
           assert_env_length w_13 5;
           drop_n w_13 5 1;
           assert_env_length w_13 4;
@@ -1383,12 +1399,12 @@ let () =
           assert_env_length w_13 5;
           push_env w_13 (Memo.from_constructor tag_VTBool);
           assert_env_length w_13 6;
-          let ctor_arg_51 = pop_env w_13 in
           let ctor_arg_52 = pop_env w_13 in
-          push_env w_13 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_52; ctor_arg_51 ]);
-          assert_env_length w_13 5;
           let ctor_arg_53 = pop_env w_13 in
-          push_env w_13 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_53 ]);
+          push_env w_13 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_53; ctor_arg_52 ]);
+          assert_env_length w_13 5;
+          let ctor_arg_54 = pop_env w_13 in
+          push_env w_13 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_54 ]);
           assert_env_length w_13 5;
           drop_n w_13 5 1;
           assert_env_length w_13 4;
@@ -1416,11 +1432,11 @@ let () =
           w_14.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_14
       | c_11 when c_11 = tag_VCons ->
-          let splits_31 = Memo.splits (snd x_11) in
-          let split0_31 = List.nth splits_31 0 in
-          let split1_13 = List.nth splits_31 1 in
+          let splits_32 = Memo.splits (snd x_11) in
+          let split0_32 = List.nth splits_32 0 in
+          let split1_13 = List.nth splits_32 1 in
           ignore (pop_env w_14);
-          push_env w_14 split0_31;
+          push_env w_14 split0_32;
           push_env w_14 split1_13;
           assert_env_length w_14 5;
           push_env w_14 (Dynarray.get w_14.state.e 2);
@@ -1431,22 +1447,22 @@ let () =
           assert_env_length w_14 8;
           push_env w_14 (Dynarray.get w_14.state.e 0);
           assert_env_length w_14 9;
-          let ctor_arg_54 = pop_env w_14 in
           let ctor_arg_55 = pop_env w_14 in
-          push_env w_14 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_55; ctor_arg_54 ]);
-          assert_env_length w_14 8;
           let ctor_arg_56 = pop_env w_14 in
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_56; ctor_arg_55 ]);
+          assert_env_length w_14 8;
           let ctor_arg_57 = pop_env w_14 in
-          push_env w_14 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_57; ctor_arg_56 ]);
+          let ctor_arg_58 = pop_env w_14 in
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_58; ctor_arg_57 ]);
           assert_env_length w_14 7;
           ignore (env_call w_14 [] 2);
           w_14.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_14
       | c_11 when c_11 = tag_VStuck ->
-          let splits_32 = Memo.splits (snd x_11) in
-          let split0_32 = List.nth splits_32 0 in
+          let splits_33 = Memo.splits (snd x_11) in
+          let split0_33 = List.nth splits_33 0 in
           ignore (pop_env w_14);
-          push_env w_14 split0_32;
+          push_env w_14 split0_33;
           assert_env_length w_14 4;
           push_env w_14 (Dynarray.get w_14.state.e 3);
           assert_env_length w_14 5;
@@ -1454,13 +1470,13 @@ let () =
           assert_env_length w_14 6;
           push_env w_14 (Dynarray.get w_14.state.e 2);
           assert_env_length w_14 7;
-          let ctor_arg_58 = pop_env w_14 in
           let ctor_arg_59 = pop_env w_14 in
           let ctor_arg_60 = pop_env w_14 in
-          push_env w_14 (Memo.appends [ Memo.from_constructor tag_SMatchList; ctor_arg_60; ctor_arg_59; ctor_arg_58 ]);
-          assert_env_length w_14 5;
           let ctor_arg_61 = pop_env w_14 in
-          push_env w_14 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_61 ]);
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_SMatchList; ctor_arg_61; ctor_arg_60; ctor_arg_59 ]);
+          assert_env_length w_14 5;
+          let ctor_arg_62 = pop_env w_14 in
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_62 ]);
           assert_env_length w_14 5;
           drop_n w_14 5 1;
           assert_env_length w_14 4;
@@ -1475,12 +1491,12 @@ let () =
           assert_env_length w_14 5;
           push_env w_14 (Memo.from_constructor tag_VTList);
           assert_env_length w_14 6;
-          let ctor_arg_62 = pop_env w_14 in
           let ctor_arg_63 = pop_env w_14 in
-          push_env w_14 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_63; ctor_arg_62 ]);
-          assert_env_length w_14 5;
           let ctor_arg_64 = pop_env w_14 in
-          push_env w_14 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_64 ]);
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_64; ctor_arg_63 ]);
+          assert_env_length w_14 5;
+          let ctor_arg_65 = pop_env w_14 in
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_65 ]);
           assert_env_length w_14 5;
           drop_n w_14 5 1;
           assert_env_length w_14 4;
@@ -1500,8 +1516,8 @@ let () =
       ignore (pop_env w_16);
       push_env w_16 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
       assert_env_length w_16 5;
-      let ctor_arg_65 = pop_env w_16 in
-      push_env w_16 (Memo.appends [ Memo.from_constructor tag_VInt; ctor_arg_65 ]);
+      let ctor_arg_66 = pop_env w_16 in
+      push_env w_16 (Memo.appends [ Memo.from_constructor tag_VInt; ctor_arg_66 ]);
       assert_env_length w_16 5;
       drop_n w_16 5 1;
       assert_env_length w_16 4;
@@ -1524,10 +1540,10 @@ let () =
       let x_12 = resolve w_15 last_12 in
       match Word.get_value (fst x_12) with
       | c_12 when c_12 = tag_VInt ->
-          let splits_33 = Memo.splits (snd x_12) in
-          let split0_33 = List.nth splits_33 0 in
+          let splits_34 = Memo.splits (snd x_12) in
+          let split0_34 = List.nth splits_34 0 in
           ignore (pop_env w_15);
-          push_env w_15 split0_33;
+          push_env w_15 split0_34;
           assert_env_length w_15 4;
           push_env w_15 (Dynarray.get w_15.state.e 1);
           assert_env_length w_15 5;
@@ -1535,21 +1551,21 @@ let () =
           w_15.state.c <- pc_to_exp (int_to_pc 15);
           stepped w_15
       | c_12 when c_12 = tag_VStuck ->
-          let splits_34 = Memo.splits (snd x_12) in
-          let split0_34 = List.nth splits_34 0 in
+          let splits_35 = Memo.splits (snd x_12) in
+          let split0_35 = List.nth splits_35 0 in
           ignore (pop_env w_15);
-          push_env w_15 split0_34;
+          push_env w_15 split0_35;
           assert_env_length w_15 4;
           push_env w_15 (Dynarray.get w_15.state.e 0);
           assert_env_length w_15 5;
           push_env w_15 (Dynarray.get w_15.state.e 3);
           assert_env_length w_15 6;
-          let ctor_arg_66 = pop_env w_15 in
           let ctor_arg_67 = pop_env w_15 in
-          push_env w_15 (Memo.appends [ Memo.from_constructor tag_SAdd1; ctor_arg_67; ctor_arg_66 ]);
-          assert_env_length w_15 5;
           let ctor_arg_68 = pop_env w_15 in
-          push_env w_15 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_68 ]);
+          push_env w_15 (Memo.appends [ Memo.from_constructor tag_SAdd1; ctor_arg_68; ctor_arg_67 ]);
+          assert_env_length w_15 5;
+          let ctor_arg_69 = pop_env w_15 in
+          push_env w_15 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_69 ]);
           assert_env_length w_15 5;
           drop_n w_15 5 1;
           assert_env_length w_15 4;
@@ -1569,12 +1585,12 @@ let () =
           assert_env_length w_15 4;
           push_env w_15 (Memo.from_constructor tag_VTInt);
           assert_env_length w_15 5;
-          let ctor_arg_69 = pop_env w_15 in
           let ctor_arg_70 = pop_env w_15 in
-          push_env w_15 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_70; ctor_arg_69 ]);
-          assert_env_length w_15 4;
           let ctor_arg_71 = pop_env w_15 in
-          push_env w_15 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_71 ]);
+          push_env w_15 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_71; ctor_arg_70 ]);
+          assert_env_length w_15 4;
+          let ctor_arg_72 = pop_env w_15 in
+          push_env w_15 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_72 ]);
           assert_env_length w_15 4;
           drop_n w_15 4 1;
           assert_env_length w_15 3;
@@ -1633,10 +1649,10 @@ let () =
       let x_13 = resolve w_17 last_13 in
       match Word.get_value (fst x_13) with
       | c_13 when c_13 = tag_VInt ->
-          let splits_35 = Memo.splits (snd x_13) in
-          let split0_35 = List.nth splits_35 0 in
+          let splits_36 = Memo.splits (snd x_13) in
+          let split0_36 = List.nth splits_36 0 in
           ignore (pop_env w_17);
-          push_env w_17 split0_35;
+          push_env w_17 split0_36;
           assert_env_length w_17 4;
           push_env w_17 (Dynarray.get w_17.state.e 1);
           assert_env_length w_17 5;
@@ -1644,21 +1660,21 @@ let () =
           w_17.state.c <- pc_to_exp (int_to_pc 17);
           stepped w_17
       | c_13 when c_13 = tag_VStuck ->
-          let splits_36 = Memo.splits (snd x_13) in
-          let split0_36 = List.nth splits_36 0 in
+          let splits_37 = Memo.splits (snd x_13) in
+          let split0_37 = List.nth splits_37 0 in
           ignore (pop_env w_17);
-          push_env w_17 split0_36;
+          push_env w_17 split0_37;
           assert_env_length w_17 4;
           push_env w_17 (Dynarray.get w_17.state.e 0);
           assert_env_length w_17 5;
           push_env w_17 (Dynarray.get w_17.state.e 3);
           assert_env_length w_17 6;
-          let ctor_arg_72 = pop_env w_17 in
           let ctor_arg_73 = pop_env w_17 in
-          push_env w_17 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_73; ctor_arg_72 ]);
-          assert_env_length w_17 5;
           let ctor_arg_74 = pop_env w_17 in
-          push_env w_17 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_74 ]);
+          push_env w_17 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_74; ctor_arg_73 ]);
+          assert_env_length w_17 5;
+          let ctor_arg_75 = pop_env w_17 in
+          push_env w_17 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_75 ]);
           assert_env_length w_17 5;
           drop_n w_17 5 1;
           assert_env_length w_17 4;
@@ -1678,12 +1694,12 @@ let () =
           assert_env_length w_17 4;
           push_env w_17 (Memo.from_constructor tag_VTInt);
           assert_env_length w_17 5;
-          let ctor_arg_75 = pop_env w_17 in
           let ctor_arg_76 = pop_env w_17 in
-          push_env w_17 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_76; ctor_arg_75 ]);
-          assert_env_length w_17 4;
           let ctor_arg_77 = pop_env w_17 in
-          push_env w_17 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_77 ]);
+          push_env w_17 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_77; ctor_arg_76 ]);
+          assert_env_length w_17 4;
+          let ctor_arg_78 = pop_env w_17 in
+          push_env w_17 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_78 ]);
           assert_env_length w_17 4;
           drop_n w_17 4 1;
           assert_env_length w_17 3;
@@ -1742,10 +1758,10 @@ let () =
       let x_14 = resolve w_19 last_14 in
       match Word.get_value (fst x_14) with
       | c_14 when c_14 = tag_VInt ->
-          let splits_37 = Memo.splits (snd x_14) in
-          let split0_37 = List.nth splits_37 0 in
+          let splits_38 = Memo.splits (snd x_14) in
+          let split0_38 = List.nth splits_38 0 in
           ignore (pop_env w_19);
-          push_env w_19 split0_37;
+          push_env w_19 split0_38;
           assert_env_length w_19 4;
           push_env w_19 (Dynarray.get w_19.state.e 1);
           assert_env_length w_19 5;
@@ -1753,21 +1769,21 @@ let () =
           w_19.state.c <- pc_to_exp (int_to_pc 19);
           stepped w_19
       | c_14 when c_14 = tag_VStuck ->
-          let splits_38 = Memo.splits (snd x_14) in
-          let split0_38 = List.nth splits_38 0 in
+          let splits_39 = Memo.splits (snd x_14) in
+          let split0_39 = List.nth splits_39 0 in
           ignore (pop_env w_19);
-          push_env w_19 split0_38;
+          push_env w_19 split0_39;
           assert_env_length w_19 4;
           push_env w_19 (Dynarray.get w_19.state.e 0);
           assert_env_length w_19 5;
           push_env w_19 (Dynarray.get w_19.state.e 3);
           assert_env_length w_19 6;
-          let ctor_arg_78 = pop_env w_19 in
           let ctor_arg_79 = pop_env w_19 in
-          push_env w_19 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_79; ctor_arg_78 ]);
-          assert_env_length w_19 5;
           let ctor_arg_80 = pop_env w_19 in
-          push_env w_19 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_80 ]);
+          push_env w_19 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_80; ctor_arg_79 ]);
+          assert_env_length w_19 5;
+          let ctor_arg_81 = pop_env w_19 in
+          push_env w_19 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_81 ]);
           assert_env_length w_19 5;
           drop_n w_19 5 1;
           assert_env_length w_19 4;
@@ -1787,12 +1803,12 @@ let () =
           assert_env_length w_19 4;
           push_env w_19 (Memo.from_constructor tag_VTInt);
           assert_env_length w_19 5;
-          let ctor_arg_81 = pop_env w_19 in
           let ctor_arg_82 = pop_env w_19 in
-          push_env w_19 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_82; ctor_arg_81 ]);
-          assert_env_length w_19 4;
           let ctor_arg_83 = pop_env w_19 in
-          push_env w_19 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_83 ]);
+          push_env w_19 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_83; ctor_arg_82 ]);
+          assert_env_length w_19 4;
+          let ctor_arg_84 = pop_env w_19 in
+          push_env w_19 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_84 ]);
           assert_env_length w_19 4;
           drop_n w_19 4 1;
           assert_env_length w_19 3;
@@ -1851,10 +1867,10 @@ let () =
       let x_15 = resolve w_21 last_15 in
       match Word.get_value (fst x_15) with
       | c_15 when c_15 = tag_VInt ->
-          let splits_39 = Memo.splits (snd x_15) in
-          let split0_39 = List.nth splits_39 0 in
+          let splits_40 = Memo.splits (snd x_15) in
+          let split0_40 = List.nth splits_40 0 in
           ignore (pop_env w_21);
-          push_env w_21 split0_39;
+          push_env w_21 split0_40;
           assert_env_length w_21 4;
           push_env w_21 (Dynarray.get w_21.state.e 1);
           assert_env_length w_21 5;
@@ -1862,21 +1878,21 @@ let () =
           w_21.state.c <- pc_to_exp (int_to_pc 21);
           stepped w_21
       | c_15 when c_15 = tag_VStuck ->
-          let splits_40 = Memo.splits (snd x_15) in
-          let split0_40 = List.nth splits_40 0 in
+          let splits_41 = Memo.splits (snd x_15) in
+          let split0_41 = List.nth splits_41 0 in
           ignore (pop_env w_21);
-          push_env w_21 split0_40;
+          push_env w_21 split0_41;
           assert_env_length w_21 4;
           push_env w_21 (Dynarray.get w_21.state.e 0);
           assert_env_length w_21 5;
           push_env w_21 (Dynarray.get w_21.state.e 3);
           assert_env_length w_21 6;
-          let ctor_arg_84 = pop_env w_21 in
           let ctor_arg_85 = pop_env w_21 in
-          push_env w_21 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_85; ctor_arg_84 ]);
-          assert_env_length w_21 5;
           let ctor_arg_86 = pop_env w_21 in
-          push_env w_21 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_86 ]);
+          push_env w_21 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_86; ctor_arg_85 ]);
+          assert_env_length w_21 5;
+          let ctor_arg_87 = pop_env w_21 in
+          push_env w_21 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_87 ]);
           assert_env_length w_21 5;
           drop_n w_21 5 1;
           assert_env_length w_21 4;
@@ -1896,12 +1912,12 @@ let () =
           assert_env_length w_21 4;
           push_env w_21 (Memo.from_constructor tag_VTInt);
           assert_env_length w_21 5;
-          let ctor_arg_87 = pop_env w_21 in
           let ctor_arg_88 = pop_env w_21 in
-          push_env w_21 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_88; ctor_arg_87 ]);
-          assert_env_length w_21 4;
           let ctor_arg_89 = pop_env w_21 in
-          push_env w_21 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_89 ]);
+          push_env w_21 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_89; ctor_arg_88 ]);
+          assert_env_length w_21 4;
+          let ctor_arg_90 = pop_env w_21 in
+          push_env w_21 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_90 ]);
           assert_env_length w_21 4;
           drop_n w_21 4 1;
           assert_env_length w_21 3;
@@ -1960,10 +1976,10 @@ let () =
       let x_16 = resolve w_23 last_16 in
       match Word.get_value (fst x_16) with
       | c_16 when c_16 = tag_VInt ->
-          let splits_41 = Memo.splits (snd x_16) in
-          let split0_41 = List.nth splits_41 0 in
+          let splits_42 = Memo.splits (snd x_16) in
+          let split0_42 = List.nth splits_42 0 in
           ignore (pop_env w_23);
-          push_env w_23 split0_41;
+          push_env w_23 split0_42;
           assert_env_length w_23 4;
           push_env w_23 (Dynarray.get w_23.state.e 1);
           assert_env_length w_23 5;
@@ -1971,21 +1987,21 @@ let () =
           w_23.state.c <- pc_to_exp (int_to_pc 23);
           stepped w_23
       | c_16 when c_16 = tag_VStuck ->
-          let splits_42 = Memo.splits (snd x_16) in
-          let split0_42 = List.nth splits_42 0 in
+          let splits_43 = Memo.splits (snd x_16) in
+          let split0_43 = List.nth splits_43 0 in
           ignore (pop_env w_23);
-          push_env w_23 split0_42;
+          push_env w_23 split0_43;
           assert_env_length w_23 4;
           push_env w_23 (Dynarray.get w_23.state.e 0);
           assert_env_length w_23 5;
           push_env w_23 (Dynarray.get w_23.state.e 3);
           assert_env_length w_23 6;
-          let ctor_arg_90 = pop_env w_23 in
           let ctor_arg_91 = pop_env w_23 in
-          push_env w_23 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_91; ctor_arg_90 ]);
-          assert_env_length w_23 5;
           let ctor_arg_92 = pop_env w_23 in
-          push_env w_23 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_92 ]);
+          push_env w_23 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_92; ctor_arg_91 ]);
+          assert_env_length w_23 5;
+          let ctor_arg_93 = pop_env w_23 in
+          push_env w_23 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_93 ]);
           assert_env_length w_23 5;
           drop_n w_23 5 1;
           assert_env_length w_23 4;
@@ -2005,12 +2021,12 @@ let () =
           assert_env_length w_23 4;
           push_env w_23 (Memo.from_constructor tag_VTInt);
           assert_env_length w_23 5;
-          let ctor_arg_93 = pop_env w_23 in
           let ctor_arg_94 = pop_env w_23 in
-          push_env w_23 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_94; ctor_arg_93 ]);
-          assert_env_length w_23 4;
           let ctor_arg_95 = pop_env w_23 in
-          push_env w_23 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_95 ]);
+          push_env w_23 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_95; ctor_arg_94 ]);
+          assert_env_length w_23 4;
+          let ctor_arg_96 = pop_env w_23 in
+          push_env w_23 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_96 ]);
           assert_env_length w_23 4;
           drop_n w_23 4 1;
           assert_env_length w_23 3;
@@ -2048,7 +2064,7 @@ let () = Words.set_constructor_degree 20 1
 let () = Words.set_constructor_degree 21 (-1)
 let () = Words.set_constructor_degree 22 (-2)
 let () = Words.set_constructor_degree 23 0
-let () = Words.set_constructor_degree 24 1
+let () = Words.set_constructor_degree 24 0
 let () = Words.set_constructor_degree 25 0
 let () = Words.set_constructor_degree 26 (-1)
 let () = Words.set_constructor_degree 27 1
@@ -2061,7 +2077,7 @@ let () = Words.set_constructor_degree 33 1
 let () = Words.set_constructor_degree 34 1
 let () = Words.set_constructor_degree 35 1
 let () = Words.set_constructor_degree 36 1
-let () = Words.set_constructor_degree 37 0
+let () = Words.set_constructor_degree 37 (-1)
 let () = Words.set_constructor_degree 38 (-1)
 let () = Words.set_constructor_degree 39 1
 let () = Words.set_constructor_degree 40 (-1)
