@@ -487,29 +487,20 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
             goto_ w (Hashtbl.find_exn ctx.func_pc f)]
   | If (cond, thn, els, _) ->
       let* s = compile_pp_expr ctx s cond in
-      let then_branch = compile_pp_expr ctx (pop_s s) thn k in
-      let else_branch = compile_pp_expr ctx (pop_s s) els k in
       fun w ->
         let cond_name = gensym "cond" in
-        seqs_
-          [
-            (fun () -> assert_env_length_ w (int_ s.env_length));
-            (fun () ->
-              from_ir
-                (LetIn
-                   ( to_pat (var_pat_ cond_name),
-                     to_ir (resolve_ w (src_E_ (s.env_length - 1))),
-                     to_ir
-                       (seqs_
-                          [
-                            (fun () -> to_unit_ $ pop_env_ w);
-                            (fun () ->
-                              let cond_bool =
-                                code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0")
-                              in
-                              if_ cond_bool (then_branch w) (else_branch w));
-                          ]) )));
-          ]
+        [%seqs
+          assert_env_length_ w (int_ s.env_length);
+          let_pat_in_ (var_pat_ cond_name)
+            (resolve_ w (src_E_ (s.env_length - 1)))
+            [%seqs
+              to_unit_ $ pop_env_ w;
+              let$ if_kont = paren (lam_unit_ (fun _ -> k s w)) in
+              let k = fun _ _ -> app_ if_kont unit_ in
+              let cond_bool = code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0") in
+              let then_branch = compile_pp_expr ctx (pop_s s) thn k in
+              let else_branch = compile_pp_expr ctx (pop_s s) els k in
+              if_ cond_bool (then_branch w) (else_branch w)]]
   | Op (op, x0, x1, _) ->
       let op_code =
         match op with
