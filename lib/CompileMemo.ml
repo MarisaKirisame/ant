@@ -545,7 +545,6 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
     assert_env_length_ w (int_ s.env_length);
     let$ last = src_E_ (s.env_length - 1) in
     let$ x = resolve_ w last in
-    to_unit_ $ pop_env_ w;
     let s = pop_s s in
     let dummy = gensym "c" in
     let g cname =
@@ -556,7 +555,11 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
         (fun (pat, expr) ->
           (*todo: special casing for now, as pat design need changes. *)
           match pat with
-          | PCtorApp (cname, None, _) -> (g cname, compile_pp_expr ctx s expr k w)
+          | PCtorApp (cname, None, _) ->
+              ( g cname,
+                [%seqs
+                  to_unit_ $ pop_env_ w;
+                  compile_pp_expr ctx s expr k w] )
           | PCtorApp (cname, Some (PVar (x0, _)), _) ->
               ( g cname,
                 with_splits 1
@@ -564,6 +567,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                   (function
                     | [ x0_v ] ->
                         [%seqs
+                          to_unit_ $ pop_env_ w;
                           push_env_ w x0_v;
                           compile_pp_expr ctx (extend_s s x0) expr (fun s w -> drop s [ x0 ] w k) w]
                     | _ -> failwith "with_splits: unexpected arity") )
@@ -576,6 +580,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                   (function
                     | ys when List.length ys == n ->
                         [%seqs
+                          to_unit_ $ pop_env_ w;
                           seqs_ (List.map (fun y -> fun _ -> [%seqs push_env_ w y]) ys);
                           compile_pp_expr ctx
                             (List.fold_left (fun s x -> extend_s s x) s xs)
@@ -583,8 +588,17 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                             (fun s w -> drop s (List.rev xs) w k)
                             w]
                     | _ -> failwith "with_splits: unexpected arity") )
-          | PAny -> (string "_", compile_pp_expr ctx s expr k w)
-          | PVar (x, _) -> (string x, compile_pp_expr ctx (extend_s s x) expr k w)
+          | PAny ->
+              ( string "_",
+                [%seqs
+                  to_unit_ $ pop_env_ w;
+                  compile_pp_expr ctx s expr k w] )
+          | PVar (x_, _) ->
+              ( string x_,
+                [%seqs
+                  push_env_ w (get_env_ w (int_ (s.env_length - 1)));
+                  to_unit_ $ pop_env_ w;
+                  compile_pp_expr ctx (extend_s s x_) expr (fun s w -> drop s [ x_ ] w k) w] )
           | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
         c
     in
