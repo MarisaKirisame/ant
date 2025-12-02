@@ -38,6 +38,10 @@ rule token =
   | "->" { ARROW }
   | "::" { CONS }
   | "+" { PLUS }
+  | "<=" { LE }
+  | ">=" { GE }
+  | "<" { LT }
+  | ">" { GT }
   | "=" { EQUAL }
   | "." { DOT }
   | "(" { LPAREN }

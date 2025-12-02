@@ -16,6 +16,10 @@ type option 'a =
 type expr =
   | EInt of int
   | EPlus of expr * expr
+  | ELt of expr * expr
+  | ELe of expr * expr
+  | EGt of expr * expr
+  | EGe of expr * expr
   | EVar of nat
   | EAbs of expr
   | EApp of expr * expr
@@ -53,6 +57,8 @@ and stuck =
   | SApp of stuck * expr
   | SAdd0 of stuck * expr
   | SAdd1 of value * stuck
+  | SGt0 of stuck * expr
+  | SGt1 of value * stuck
   | SIf of stuck * expr * expr
   | SMatchList of stuck * expr * expr
 ;;
@@ -78,6 +84,50 @@ let rec eval = fun expr env ->
       | VStuck ys -> VStuck (SAdd1 xv ys)
       | _ -> VStuck (STypeError yv VTInt))
     | VStuck xs -> VStuck (SAdd0 xs y)
+    | _ -> VStuck (STypeError xv VTInt))
+  | ELt (x, y) ->
+    let xv = eval x env in
+    (match xv with
+    | VInt xi ->
+      let yv = eval y env in
+      (match yv with
+      | VInt yi -> if xi < yi then VTrue else VFalse
+      | VStuck ys -> VStuck (SGt1 xv ys)
+      | _ -> VStuck (STypeError yv VTInt))
+    | VStuck xs -> VStuck (SGt0 xs y)
+    | _ -> VStuck (STypeError xv VTInt))
+  | ELe (x, y) ->
+    let xv = eval x env in
+    (match xv with
+    | VInt xi ->
+      let yv = eval y env in
+      (match yv with
+      | VInt yi -> if xi <= yi then VTrue else VFalse
+      | VStuck ys -> VStuck (SGt1 xv ys)
+      | _ -> VStuck (STypeError yv VTInt))
+    | VStuck xs -> VStuck (SGt0 xs y)
+    | _ -> VStuck (STypeError xv VTInt))
+  | EGt (x, y) ->
+    let xv = eval x env in
+    (match xv with
+    | VInt xi ->
+      let yv = eval y env in
+      (match yv with
+      | VInt yi -> if xi > yi then VTrue else VFalse
+      | VStuck ys -> VStuck (SGt1 xv ys)
+      | _ -> VStuck (STypeError yv VTInt))
+    | VStuck xs -> VStuck (SGt0 xs y)
+    | _ -> VStuck (STypeError xv VTInt))
+  | EGe (x, y) ->
+    let xv = eval x env in
+    (match xv with
+    | VInt xi ->
+      let yv = eval y env in
+      (match yv with
+      | VInt yi -> if xi >= yi then VTrue else VFalse
+      | VStuck ys -> VStuck (SGt1 xv ys)
+      | _ -> VStuck (STypeError yv VTInt))
+    | VStuck xs -> VStuck (SGt0 xs y)
     | _ -> VStuck (STypeError xv VTInt))
   | EVar idx -> 
     (match index env idx with

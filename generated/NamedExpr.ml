@@ -1,6 +1,10 @@
 type nexpr =
   | NEInt of int
   | NEPlus of nexpr * nexpr
+  | NELt of nexpr * nexpr
+  | NELe of nexpr * nexpr
+  | NEGt of nexpr * nexpr
+  | NEGe of nexpr * nexpr
   | NEVar of string
   | NEAbs of string * nexpr
   | NEApp of nexpr * nexpr

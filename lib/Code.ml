@@ -98,6 +98,22 @@ let seqs_ (xs : (unit -> unit code) list) : unit code = Stdlib.List.fold_left se
 let zro_ (x : ('a * 'b) code) : 'a code = app_ (from_ir $ Function "fst") x
 let pair_value_ (x : (Word.t * Value.seq) code) : Value.seq code = app_ (from_ir $ Function "snd") x
 let add_ (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " + " ^^ uncode y)
+
+let lt_ (x : int code) (y : int code) : int code =
+  code $ parens (string "(if " ^^ uncode x ^^ string " < " ^^ uncode y ^^ string " then 1 else 0)")
+
+let le_ (x : int code) (y : int code) : int code =
+  code $ parens (string "(if " ^^ uncode x ^^ string " <= " ^^ uncode y ^^ string " then 1 else 0)")
+
+let gt_ (x : int code) (y : int code) : int code =
+  code $ parens (string "(if " ^^ uncode x ^^ string " > " ^^ uncode y ^^ string " then 1 else 0)")
+
+let ge_ (x : int code) (y : int code) : int code =
+  code $ parens (string "(if " ^^ uncode x ^^ string " >= " ^^ uncode y ^^ string " then 1 else 0)")
+
+let if_ (cond : 'a code) (then_ : 'b code) (else_ : 'b code) : 'b code =
+  code $ group (string "if " ^^ uncode cond ^^ string " then " ^^ uncode then_ ^^ string " else " ^^ uncode else_)
+
 let dyn_array_get_ (arr : 'a Dynarray.t code) (i : int code) : 'a code = app2_ (from_ir $ Function "Dynarray.get") arr i
 let dyn_array_remove_last_ (arr : 'a Dynarray.t code) : unit code = app_ (from_ir $ Function "Dynarray.remove_last") arr
 let world_state_ (w : world code) : state code = code $ parens (uncode w ^^ string ".state")

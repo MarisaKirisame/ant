@@ -75,6 +75,10 @@ let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
   let rec aux ctx = function
     | NEInt i -> LC.EInt i
     | NEPlus (lhs, rhs) -> LC.EPlus (aux ctx lhs, aux ctx rhs)
+    | NELt (lhs, rhs) -> LC.ELt (aux ctx lhs, aux ctx rhs)
+    | NELe (lhs, rhs) -> LC.ELe (aux ctx lhs, aux ctx rhs)
+    | NEGt (lhs, rhs) -> LC.EGt (aux ctx lhs, aux ctx rhs)
+    | NEGe (lhs, rhs) -> LC.EGe (aux ctx lhs, aux ctx rhs)
     | NEVar name -> (
         match index_of_name ctx name 0 with
         | Some idx -> LC.EVar (nat_from_int idx)
@@ -100,6 +104,10 @@ let nexpr_of_expr ?(ctx = []) expr =
     match expr with
     | LC.EInt i -> NEInt i
     | LC.EPlus (lhs, rhs) -> NEPlus (aux ctx lhs, aux ctx rhs)
+    | LC.ELt (lhs, rhs) -> NELt (aux ctx lhs, aux ctx rhs)
+    | LC.ELe (lhs, rhs) -> NELe (aux ctx lhs, aux ctx rhs)
+    | LC.EGt (lhs, rhs) -> NEGt (aux ctx lhs, aux ctx rhs)
+    | LC.EGe (lhs, rhs) -> NEGe (aux ctx lhs, aux ctx rhs)
     | LC.EVar idx -> NEVar (lookup_name ctx (int_of_nat idx))
     | LC.EAbs body ->
         let param = fresh_name ~hint:"x" () in
@@ -145,6 +153,10 @@ let pp_nexpr fmt nexpr =
     match expr with
     | NEInt i -> Format.pp_print_int fmt i
     | NEPlus (lhs, rhs) -> Format.fprintf fmt "(%a + %a)" aux lhs aux rhs
+    | NELt (lhs, rhs) -> Format.fprintf fmt "(%a < %a)" aux lhs aux rhs
+    | NELe (lhs, rhs) -> Format.fprintf fmt "(%a <= %a)" aux lhs aux rhs
+    | NEGt (lhs, rhs) -> Format.fprintf fmt "(%a > %a)" aux lhs aux rhs
+    | NEGe (lhs, rhs) -> Format.fprintf fmt "(%a >= %a)" aux lhs aux rhs
     | NEVar name -> Format.pp_print_string fmt name
     | NEAbs (param, body) -> Format.fprintf fmt "(fun %s -> %a)" param aux body
     | NEApp (fn, arg) -> Format.fprintf fmt "(%a %a)" aux fn aux arg
@@ -195,6 +207,8 @@ and pp_stuck fmt = function
   | LC.SApp (stuck, expr) -> Format.fprintf fmt "<stuck app %a %a>" pp_stuck stuck pp_expr expr
   | LC.SAdd0 (stuck, expr) -> Format.fprintf fmt "<stuck add0 %a %a>" pp_stuck stuck pp_expr expr
   | LC.SAdd1 (value, stuck) -> Format.fprintf fmt "<stuck add1 %a %a>" pp_value value pp_stuck stuck
+  | LC.SGt0 (stuck, expr) -> Format.fprintf fmt "<stuck gt0 %a %a>" pp_stuck stuck pp_expr expr
+  | LC.SGt1 (value, stuck) -> Format.fprintf fmt "<stuck gt1 %a %a>" pp_value value pp_stuck stuck
   | LC.SIf (stuck, thn, els) -> Format.fprintf fmt "<stuck if %a %a %a>" pp_stuck stuck pp_expr thn pp_expr els
   | LC.SMatchList (stuck, nil_case, cons_case) ->
       Format.fprintf fmt "<stuck match %a %a %a>" pp_stuck stuck pp_expr nil_case pp_expr cons_case
@@ -252,6 +266,10 @@ let run () : unit =
     let rec build n = if n == x then acc else LC.ECons (LC.EInt n, build (n + 1)) in
     build 0
   in
+  let lt_demo = LC.EIf (LC.ELt (LC.EInt 1, LC.EInt 2), LC.EInt 42, LC.EInt 0) in
+  print_endline "lt demo:";
+  print_endline (expr_to_string lt_demo);
+  print_endline (value_to_string (eval_expression lt_demo));
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 2))));
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 40))));
   print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 45))));

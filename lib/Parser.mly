@@ -19,10 +19,10 @@ open SynInfo
 %left ","
 %right "->"
 %left "="
+%left "<" "<=" ">" ">="
 %left "+" "-"
 %left "*" "/"
 %nonassoc below_HASH
-%nonassoc "#"
 %nonassoc "<int>" "<id>" "<ctor>" "<raw_ctor>" "(" "["
 
 %%
@@ -128,6 +128,12 @@ case : pattern "->" expr { ($1, $3) }
 %inline infix_op0:
   | "=" { "=" }
 
+%inline infix_op1:
+  | "<" { "<" }
+  | "<=" { "<=" }
+  | ">" { ">" }
+  | ">=" { ">=" }
+
 %inline infix_op2:
   | "+" { "+" }
   | "-" { "-" }
@@ -166,6 +172,7 @@ expr:
       | _ -> App ($1, $2, empty_info)
     }
   | expr infix_op0 expr { Op ($2, $1, $3, empty_info) }
+  | expr infix_op1 expr { Op ($2, $1, $3, empty_info) }
   | expr infix_op2 expr { Op ($2, $1, $3, empty_info) }
   | expr infix_op3 expr { Op ($2, $1, $3, empty_info) }
   | "let" binding "in" expr { let (p, e) = $2 in Let (BOne (p, e, empty_info), $4, empty_info) }
