@@ -29,7 +29,7 @@ let map =
   let rec map =
     fun f l -> match l with
     | Nil -> Nil 
-    | Cons (hd, tl) -> Cons (f hd) (map f tl)
+    | Cons hd tl -> Cons (f hd) (map f tl)
   in map;;
 let f = fun x -> x + 1;;
 let _ = map f (Cons 1 (Cons 2 Nil));;
