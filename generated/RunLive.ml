@@ -280,13 +280,23 @@ module DemandedExpansion = struct
 
   let oracle : (int, expr) Hashtbl.t = Hashtbl.create 32
 
-  let rec get_blocking_id stuck =
+  let rec get_blocking_id_value = function
+    | VStuck s -> get_blocking_id_stuck s
+    | VCons (h, t) -> ( match get_blocking_id_value h with Some id -> Some id | None -> get_blocking_id_value t)
+    | VAbs (_, env) | VFix (_, env) -> get_blocking_id_env env
+    | _ -> None
+
+  and get_blocking_id_env = function
+    | LC.Nil -> None
+    | LC.Cons (v, vs) -> ( match get_blocking_id_value v with Some id -> Some id | None -> get_blocking_id_env vs)
+
+  and get_blocking_id_stuck stuck =
     match stuck with
-    | SHole (id, _) -> ( match id with Some id -> id | None -> failwith "Target program has no hole!")
-    | STypeError _ -> failwith "Target program has type error!"
-    | SIndexError -> failwith "Target program has index error!"
-    | SApp (s, _) | SAdd0 (s, _) | SAdd1 (_, s) | SGt0 (s, _) | SGt1 (_, s) | SIf (s, _, _) | SMatchList (s, _, _) ->
-        get_blocking_id s
+    | SHole (id, _) -> id
+    | STypeError _ -> None
+    | SIndexError -> None
+    | SApp (s, _) | SAdd0 (s, _) | SGt0 (s, _) | SIf (s, _, _) | SMatchList (s, _, _) -> get_blocking_id_stuck s
+    | SAdd1 (_, s) | SGt1 (_, s) -> get_blocking_id_stuck s
 
   let reveal_shallow target_expr =
     match target_expr with
@@ -378,28 +388,24 @@ module DemandedExpansion = struct
     | EFix e -> EFix (apply_expansion e target_id expansion)
     | EInt _ | EVar _ | ETrue | EFalse | ENil -> expr
 
-  let rec reconstruct acc current_prog =
-    let result = eval (from_ocaml_expr current_prog) (from_ocaml_list from_ocaml_value Nil) in
-    let result = to_ocaml_value result.words in
-
-    match result with
-    | VInt _ | VTrue | VFalse | VNil | VCons _ | VAbs _ | VFix _ -> acc
-    | VStuck s ->
-        let blocking_id = get_blocking_id s in
-        let target_subtree = Hashtbl.find oracle blocking_id in
-        let expansion = reveal_shallow target_subtree in
-        let next_prog = apply_expansion current_prog blocking_id expansion in
-        reconstruct (next_prog :: acc) next_prog
-
-  let expand prog =
+  let interactive prog use =
     Hashtbl.clear oracle;
     id_counter := 0;
     let start_prog = EHole (Some 0) in
     Hashtbl.add oracle 0 prog;
-    reconstruct [] start_prog
+    let rec loop iter current_prog =
+      match get_blocking_id_value (use iter current_prog) with
+      | None -> ()
+      | Some blocking_id ->
+          let target_subtree = Hashtbl.find oracle blocking_id in
+          let expansion = reveal_shallow target_subtree in
+          let next_prog = apply_expansion current_prog blocking_id expansion in
+          loop (iter + 1) next_prog
+    in
+    loop 0 start_prog
 end
 
-let demanded_expand = DemandedExpansion.expand
+let demanded_interactive = DemandedExpansion.interactive
 
 let rec pp_value fmt value =
   match value with
@@ -558,11 +564,11 @@ let run () : unit =
   |> List.iteri (fun i e ->
       let applied = LC.EApp (e, random_list_expr) in
       Printf.printf "step %d value: %s\n" i (value_to_string (eval_expression applied)));
-  print_endline "demanded_expand quicksort (list fixed):";
-  let demanded_epxand_expr = demanded_expand quicksort_expr in
-  demanded_epxand_expr
-  |> List.iteri (fun i e ->
+  print_endline "demanded_interactive quicksort (list fixed):";
+  demanded_interactive quicksort_expr (fun i e ->
       Printf.printf "step %d ast: %s\n" i (expr_to_string e);
       let applied = LC.EApp (e, random_list_expr) in
-      Printf.printf "step %d value: %s\n" i (value_to_string (eval_expression applied)));
+      let value = eval_expression applied in
+      Printf.printf "step %d value: %s\n" i (value_to_string value);
+      value);
   ()
