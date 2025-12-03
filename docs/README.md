@@ -31,8 +31,7 @@ make run          # regenerate generated/*.ml, format, and execute GeneratedMain
 - `generated/` – Auto-generated OCaml modules (rebuilt by `make`).
 - `examples/` – Sample `.ant` programs; `examples/Test.ant` is the default demo.
 - `bench/` – Benchmarks.
-- `internal.md` / `dependency.md` – Design notes.
-- `AGENTS.md` – How the Codex agent operates in this repo.
+- `docs/` – Project documentation (`README.md`, `internal.md`, `dependency.md`, `motivation.md`, `AGENTS.md`).
 
 ## Command-Line Interface
 Run `dune exec ant -- INPUT OUTPUT [flags]` to compile or inspect a program. The output file collects whatever artifacts you request.
