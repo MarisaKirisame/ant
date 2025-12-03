@@ -553,15 +553,16 @@ let run () : unit =
     (value_to_string (eval_expression (LC.ELet (mapinc, LC.EApp (LC.EVar (nat_from_int 0), nats 45 LC.ENil)))));
   let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) random_list LC.ENil in
   let quicksort_expr = expr_of_nexpr quicksort_nexpr in
-  let demanded_epxand_expr = demanded_expand quicksort_expr in
   print_endline "left_to_right quicksort (list fixed):";
   left_to_right quicksort_expr
   |> List.iteri (fun i e ->
       let applied = LC.EApp (e, random_list_expr) in
       Printf.printf "step %d value: %s\n" i (value_to_string (eval_expression applied)));
   print_endline "demanded_expand quicksort (list fixed):";
+  let demanded_epxand_expr = demanded_expand quicksort_expr in
   demanded_epxand_expr
   |> List.iteri (fun i e ->
+      Printf.printf "step %d ast: %s\n" i (expr_to_string e);
       let applied = LC.EApp (e, random_list_expr) in
       Printf.printf "step %d value: %s\n" i (value_to_string (eval_expression applied)));
   ()

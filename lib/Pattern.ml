@@ -1,6 +1,7 @@
 open Value
 open Words
 open BatFingerTree
+
 (* Patterns are a compact, finger-tree representation of "value-with-holes".
  * Ant uses three related structures:
  *   - words   : fully concrete values (prefix traversals) used at the runtime boundary.
