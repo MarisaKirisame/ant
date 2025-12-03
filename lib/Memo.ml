@@ -247,7 +247,8 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   let state = { c; e; k; sc = 0 } in
   let i = ref 0 in
   let hist : history = ref [] in
-  (*note that the two argument are reversed*)
+  (* Binary counter that incrementally composes adjacent slices; arguments are
+     reversed so the newest slice sits on the right-hand side during carry. *)
   let compose_slice (y : slice) (x : slice) =
     let step = Dependency.compose_step x.step y.step in
     m := step :: !m;

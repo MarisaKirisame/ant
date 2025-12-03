@@ -3,15 +3,8 @@ module Hasher = Hash.MCRC32C
 open Word
 include Reference
 
-(* The Value type.
- * This is the basic value type which will be manipulated by Ant under the hoold.
- * The Value type provide capabilities of that of Seq.ml, as well as *Reference*.
- *
- * Roughly speaking, Reference provide a read barrier over part of the value,
- * so read of those values will be interrupted, and corresponding memo table operation
- * will be carried out.
- *
- * Note: Value should not alias. Doing so will mess with the fetch_length, which is bad. 
+(* Values extend the word finger tree with References so we can represent
+ * partially materialised environments/continuations.
  *)
 type fg_et = Word of Word.t | Reference of reference [@@deriving eq]
 
@@ -67,6 +60,9 @@ let rec pop_n (s : seq) (n : int) : seq * seq =
   else (
     assert ((summary s).degree >= n);
     assert ((summary s).max_degree >= n);
+    (* split stops at the first node whose max_degree reaches the target;
+       this guarantees the head of [y] holds the boundary element we need to
+       include in the left slice. *)
     let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
     let w, v = Generic.front_exn ~monoid ~measure y in
     let m = summary x in

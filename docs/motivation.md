@@ -27,14 +27,15 @@ Memoise *prefixes* of CEK machine executions rather than whole calls:
    machine is a numbered program counter.
 2. Encode environments and continuations as finger trees with monoid measures
    that capture length, degree (how “complete” a value is), and hashes.
-3. Store reusable fragments `F[XS] -> G[XS]` in a memo trie keyed by the control
-   location plus the measured slices of the environment/continuation.
-4. When execution revisits the same prefix, splice the live bindings directly into
-   `G` and fast-forward without replaying the intermediate steps.
+3. Record every executed step as a pattern over the CEK state together with the
+   resulting state and step count.
+4. When execution revisits a compatible prefix, unify the pattern with the live
+   state, splice the bindings into the recorded result, and fast-forward instead
+   of replaying the intermediate steps.
 
-The runtime does not guess: every memoised skip corresponds to an actual execution
-fragment it has already witnessed.  If the lookup fails, the VM simply continues
-stepping normally, expanding the memo table as it goes.
+The runtime does not guess: every skip corresponds to an execution fragment it
+has already witnessed. If no match exists, the VM simply continues stepping and
+adds the new fragment to the memo list.
 
 ## Why It Matters
 
@@ -50,12 +51,12 @@ stepping normally, expanding the memo table as it goes.
 
 ## What Makes Ant Different
 
-- **Prefix-sensitivity over exact equality.**  Traditional memo systems “all or
-  nothing” reuse.  Ant’s finger trees allow it to recognise and reuse partial
+- **Prefix-sensitivity over exact equality.** Traditional memo systems “all or
+  nothing” reuse. Ant’s finger trees and pattern unification let it reuse partial
   matches on demand.
-- **Runtime-guided structure synthesis.**  The memo trie records what the evaluator
-  actually needed; there is no up-front dependency discovery pass.
-- **Composable hashing.**  The monoid hash layer means large prefixes can be
+- **Runtime-guided structure synthesis.** Recorded steps capture exactly which
+  slices were inspected; no separate dependency-discovery pass is required.
+- **Composable hashing.** The monoid hash layer means large prefixes can be
   compared without re-reading every word, keeping lookup latency low.
 
 ## Where We’re Heading

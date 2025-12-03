@@ -11,6 +11,7 @@ These notes document how the Codex agent currently works in this repository so y
 - `make build|run|dependency` trigger `nightly.py`, which still touches the opam switch named `ant`; expect the harmless “already installed switch” warning.
 - Long `make` runs can timeout at 30 s unless explicitly requested with a longer timeout.
 - OCaml warnings (pattern-match exhaustiveness, unused rec) currently surface during builds; they are known noise unless you ask otherwise.
+- Files under `generated/` are rebuild artifacts; `make run` will overwrite them—avoid manual edits there.
 
 ## Typical Workflow
 1. Inspect files or use `rg`/`sed` for context.
@@ -23,6 +24,7 @@ These notes document how the Codex agent currently works in this repository so y
 - Mention if you want tests or runs skipped; otherwise the agent will try to execute the relevant `make` target.
 - For formatting-only runs, prefer `make run` (already calls `dune fmt --display=quiet`).
 - If you add or remove modules, update `lib/dune` accordingly; the agent will check this automatically.
+- Docs live in `docs/README.md`, `docs/internal.md`, `docs/dependency.md`, and `docs/motivation.md`; point to the relevant one when asking for edits.
 
 ## Task Handoff
 - After edits, run `git status -sb` to confirm expectations.
