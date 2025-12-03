@@ -200,6 +200,9 @@ let string_of_step (step : step) : string =
   "(" ^ string_of_cek src ^ " -> " ^ string_of_cek dst ^ ")"
 
 let compose_step (x : step) (y : step) : step =
+  (* Compose two recorded steps that share a program counter boundary by
+     unifying x.dst with y.src, then replaying both with the resolved holes to
+     produce a single wider fragment. *)
   if not (x.dst.c.pc = y.src.c.pc) then (
     print_endline "cannot compose steps:";
     print_endline ("x step: " ^ string_of_step x);

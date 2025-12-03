@@ -1,34 +1,18 @@
 open Value
 open Words
 open BatFingerTree
-(* Ant have 3 subtly different data structures, all of which employ finger tree on monoid parsing.
- * Todo: the name sucks. Find better ones.
- * - words: representing a fully concrete value, which is the type user will deal with.
- * - value/seq: representing a value with variables, which we represent results in e.g. memization.
- * - pattern: representing a pattern with holes, which we use to match against Values.
- *)
-
-(* An efficient data structure to represent data. 
- *   This enable pattern matching in O(log(input_size + pattern_size) * holes_count) times.
- * To match a value against a pattern, 
- *   go through the pattern slices left to right, skipping offset and popping off the matching value in the slice.
- * Note that the offsets are consecutive, i.e., the first slice's offset is from the start of the value,
- *   the second slice's offset is from the end of the first slice's value, and so on.
- * All data that got skipped is then bounded to the pattern varables, which we do not give name to for compositionality.
- * There are 4 key operations on patterns, all with similar algorithmic complexity:
- *   - Pattern matching, which we just described.
- *   - Pattern application, the inverse of pattern matching.
- *   - Antiunification, which computes the most specific generalization of two patterns.
- *   - Unification, which computes the most general specialization of a pattern and a value.
- * To use the memo trie, walk down the trie using pattern matching.
- * To insert an entry to the memo trie, walk down the trie with pattern matching and build a leaf node.
- *   If the descend stopped midway, use antiunification to build a branch node holding the two conflicting patterns.
- * The hardest operation is to compose two steps (A[X] -> B[X]) and (C[Y] -> D[Y]).
- *   To do this:
- *   - 0: Unify the seq B with the pattern C, getting substitution map F and a pattern G,
- *       such that B[F[X]] = C[G[X]]
- *   - 1: Build up A'[X] = A[F[X]], D'[X] = D[G[X]]
- *   - 2: The composed step is then A'[X] -> D'[X], which we add to the memo trie.
+(* Patterns are a compact, finger-tree representation of "value-with-holes".
+ * Ant uses three related structures:
+ *   - words   : fully concrete values (prefix traversals) used at the runtime boundary.
+ *   - value   : words extended with References that defer slices of env/cont.
+ *   - pattern : holes plus concrete prefixes, used to summarise states for memo hits.
+ *
+ * The measure tracks degree, max_degree, and hole counts, letting us split and
+ * fuse adjacent components in O(log n). Matching walks the pattern left to
+ * right, binding skipped slices to anonymous holes; the inverse operation
+ * (`compose_pattern`) rebuilds a concrete value from those bindings. These
+ * operations underpin dependency matching and step composition in
+ * Dependency.make_step/compose_step.
  *)
 (*todo: do we actually need hole_count?*)
 type measure = { degree : int; max_degree : int; hole_count : int }
