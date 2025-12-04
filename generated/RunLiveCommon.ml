@@ -439,3 +439,12 @@ let eval_expression ~write_steps x =
   let exec_res = LC.eval (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
   write_steps exec_res;
   LC.to_ocaml_value exec_res.words
+
+let quicksort_nexpr =
+  parse_nexpr
+    "let append = fix append xs. fun ys -> match xs with [] -> ys | h :: t -> h :: (append t ys) in let filter = fun p \
+     -> fix filter xs. match xs with [] -> [] | h :: t -> if p h then h :: (filter t) else (filter t) in fix quicksort \
+     xs. match xs with [] -> [] | pivot :: rest -> let smaller = quicksort (filter (fun x -> x < pivot) rest) in let \
+     greater = quicksort (filter (fun x -> x >= pivot) rest) in append smaller (pivot :: greater)"
+
+let quicksort_expr = expr_of_nexpr quicksort_nexpr
