@@ -1,28 +1,18 @@
 (library
  (name runmodes)
  (modules
-<<<<<<< HEAD
-=======
   FromHazel
->>>>>>> 439a490 (save)
   LiveCEK
   LiveLexer
   LiveParser
   NamedExpr
-<<<<<<< HEAD
   RunLiveCommon
   RunLiveSimple
   RunLiveLeftToRight
   RunLiveDemandDriven
   RunTailRec
   RunTest)
- (libraries ant)
-=======
-  RunLive
-  RunTailRec
-  RunTest)
  (libraries ant yojson sexplib)
->>>>>>> 439a490 (save)
  (wrapped false)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))

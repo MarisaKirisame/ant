@@ -596,7 +596,8 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
           | PVar (x_, _) ->
               ( string x_,
                 [%seqs
-                  push_env_ w (get_env_ w (int_ (s.env_length - 1)));
+                  (*note that we are not -1ing because s is already popped.*)
+                  push_env_ w (get_env_ w (int_ s.env_length));
                   to_unit_ $ pop_env_ w;
                   compile_pp_expr ctx (extend_s s x_) expr (fun s w -> drop s [ x_ ] w k) w] )
           | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
