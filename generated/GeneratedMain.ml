@@ -1,10 +1,12 @@
-let usage = "Usage: GeneratedMain <live|test|tailrec>"
+let usage = "Usage: GeneratedMain <live-simple|live-left-to-right|live-demand-driven|test|tailrec>"
 
 let () =
   match Array.to_list Sys.argv with
   | [ _; mode ] -> (
       match String.lowercase_ascii mode with
-      | "live" -> RunLive.run ()
+      | "live-simple" -> RunLiveSimple.run ()
+      | "live-left-to-right" -> RunLiveLeftToRight.run ()
+      | "live-demand-driven" -> RunLiveDemandDriven.run ()
       | "test" -> RunTest.run ()
       | "tailrec" -> RunTailRec.run ()
       | _ ->
