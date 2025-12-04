@@ -3,15 +3,6 @@ let steps_file = "eval_steps_demand_driven.json"
 module Common = RunLiveCommon
 module LC = Common.LC
 
-let quicksort_nexpr =
-  Common.parse_nexpr
-    "let append = fix append xs. fun ys -> match xs with [] -> ys | h :: t -> h :: (append t ys) in let filter = fun p \
-     -> fix filter xs. match xs with [] -> [] | h :: t -> if p h then h :: (filter t) else (filter t) in fix quicksort \
-     xs. match xs with [] -> [] | pivot :: rest -> let smaller = quicksort (filter (fun x -> x < pivot) rest) in let \
-     greater = quicksort (filter (fun x -> x >= pivot) rest) in append smaller (pivot :: greater)"
-
-let quicksort_expr = Common.expr_of_nexpr quicksort_nexpr
-
 let random_list =
   [
     17;
@@ -72,7 +63,7 @@ let run () =
   Common.with_steps_writer steps_file (fun write_steps ->
       let eval expr = Common.eval_expression ~write_steps expr in
       print_endline "demanded_interactive quicksort (list fixed):";
-      Common.demanded_interactive quicksort_expr (fun i e ->
+      Common.demanded_interactive Common.quicksort_expr (fun i e ->
           Printf.printf "step %d ast: %s\n" i (Common.expr_to_string e);
           let applied = LC.EApp (e, random_list_expr) in
           let value = eval applied in
