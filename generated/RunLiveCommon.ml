@@ -1,6 +1,4 @@
 open Ant
-open Common
-open Word
 open NamedExpr
 module LC = LiveCEK
 
@@ -37,7 +35,7 @@ let base_names =
 let make_name_generator () =
   let used = Hashtbl.create 16 in
   let counter = ref 0 in
-  let rec fresh ?hint () =
+  let fresh ?hint () =
     let base =
       match hint with
       | Some h -> h
@@ -449,17 +447,24 @@ and pp_vtype fmt = function
   | LC.VTList -> Format.pp_print_string fmt "list"
 
 let value_to_string value = Format.asprintf "%a" pp_value value
-let steps_output_path = "eval_steps.json"
 
-let steps_out : out_channel Lazy.t =
-  lazy (open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_output_path)
+type step_writer = Memo.exec_result -> unit
 
-let () = at_exit (fun () -> if Lazy.is_val steps_out then close_out_noerr (Lazy.force steps_out))
+let with_steps_writer steps_path f =
+  let oc = open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_path in
+  Fun.protect
+    ~finally:(fun () -> close_out_noerr oc)
+    (fun () ->
+      let write_steps_json (r : Memo.exec_result) : unit =
+        Printf.fprintf oc "{\"step\":%d,\"without_memo_step\":%d}\n" r.step r.without_memo_step;
+        flush oc
+      in
+      f write_steps_json)
 
-let write_steps_json (r : Memo.exec_result) : unit =
-  let oc = Lazy.force steps_out in
-  Printf.fprintf oc "{\"step\":%d,\"without_memo_step\":%d}\n" r.step r.without_memo_step;
-  flush oc
+let eval_expression ~write_steps x =
+  let exec_res = LC.eval (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
+  write_steps exec_res;
+  LC.to_ocaml_value exec_res.words
 
 let quicksort_nexpr : nexpr =
   parse_nexpr
@@ -468,10 +473,7 @@ let quicksort_nexpr : nexpr =
      xs. match xs with [] -> [] | pivot :: rest -> let smaller = quicksort (filter (fun x -> x < pivot) rest) in let \
      greater = quicksort (filter (fun x -> x >= pivot) rest) in append smaller (pivot :: greater)"
 
-let eval_expression x =
-  let exec_res = LC.eval (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
-  write_steps_json exec_res;
-  LC.to_ocaml_value exec_res.words
+let quicksort_expr = expr_of_nexpr quicksort_nexpr
 
 let mapinc =
   LC.EFix
@@ -536,10 +538,13 @@ let random_list =
     58;
   ]
 
-let run () : unit =
+let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) random_list LC.ENil
+
+let run_simple_benchmark ~write_steps () =
+  let eval expr = eval_expression ~write_steps expr in
   print_endline "mapinc:";
   print_endline (expr_to_string mapinc);
-  print_endline (value_to_string (eval_expression (LC.EInt 42)));
+  print_endline (value_to_string (eval (LC.EInt 42)));
   let repeat_list x =
     let rec build n acc = if n == 0 then acc else build (n - 1) (LC.ECons (LC.EInt 1, acc)) in
     build x LC.ENil
@@ -548,27 +553,29 @@ let run () : unit =
     let rec build n = if n == x then acc else LC.ECons (LC.EInt n, build (n + 1)) in
     build 0
   in
-  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 2))));
-  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 40))));
-  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, repeat_list 45))));
-  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 40 LC.ENil))));
-  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 45 LC.ENil))));
-  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 46 LC.ENil))));
-  print_endline (value_to_string (eval_expression (LC.EApp (mapinc, nats 45 (nats 45 LC.ENil)))));
-  print_endline
-    (value_to_string (eval_expression (LC.ELet (mapinc, LC.EApp (LC.EVar (nat_from_int 0), nats 45 LC.ENil)))));
-  let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) random_list LC.ENil in
-  let quicksort_expr = expr_of_nexpr quicksort_nexpr in
+  print_endline (value_to_string (eval (LC.EApp (mapinc, repeat_list 2))));
+  print_endline (value_to_string (eval (LC.EApp (mapinc, repeat_list 40))));
+  print_endline (value_to_string (eval (LC.EApp (mapinc, repeat_list 45))));
+  print_endline (value_to_string (eval (LC.EApp (mapinc, nats 40 LC.ENil))));
+  print_endline (value_to_string (eval (LC.EApp (mapinc, nats 45 LC.ENil))));
+  print_endline (value_to_string (eval (LC.EApp (mapinc, nats 46 LC.ENil))));
+  print_endline (value_to_string (eval (LC.EApp (mapinc, nats 45 (nats 45 LC.ENil)))));
+  print_endline (value_to_string (eval (LC.ELet (mapinc, LC.EApp (LC.EVar (nat_from_int 0), nats 45 LC.ENil)))))
+
+let run_left_to_right_benchmark ~write_steps () =
+  let eval expr = eval_expression ~write_steps expr in
   print_endline "left_to_right quicksort (list fixed):";
   left_to_right quicksort_expr
   |> List.iteri (fun i e ->
       let applied = LC.EApp (e, random_list_expr) in
-      Printf.printf "step %d value: %s\n" i (value_to_string (eval_expression applied)));
+      Printf.printf "step %d value: %s\n" i (value_to_string (eval applied)))
+
+let run_demanded_benchmark ~write_steps () =
+  let eval expr = eval_expression ~write_steps expr in
   print_endline "demanded_interactive quicksort (list fixed):";
   demanded_interactive quicksort_expr (fun i e ->
       Printf.printf "step %d ast: %s\n" i (expr_to_string e);
       let applied = LC.EApp (e, random_list_expr) in
-      let value = eval_expression applied in
+      let value = eval applied in
       Printf.printf "step %d value: %s\n" i (value_to_string value);
-      value);
-  ()
+      value)
