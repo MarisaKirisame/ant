@@ -630,7 +630,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
           let r =
             ( lam_ "w" (fun w -> compile_pp_expr ctx s term (fun s w -> return s w) w),
-              string "let rec" ^^ space ^^ string name ^^ space
+              string "let rec" ^^ space ^^ string name ^^ space ^^ string "memo" ^^ space
               ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
               ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
               ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
@@ -701,8 +701,7 @@ let pp_cek_ant x =
   let generated_stmt = separate_map (break 1) (compile_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
-  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ string "let memo = init_memo () " ^^ break 1 ^^ ctor_tag_decls ctx
-  ^^ break 1 ^^ generated_stmt ^^ break 1
+  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ ctor_tag_decls ctx ^^ break 1 ^^ generated_stmt ^^ break 1
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string "let () = add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i)))

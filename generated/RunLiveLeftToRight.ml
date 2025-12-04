@@ -61,7 +61,8 @@ let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) 
 
 let run () =
   Common.with_steps_writer steps_file (fun write_steps ->
-      let eval expr = Common.eval_expression ~write_steps expr in
+      let memo = Ant.Memo.init_memo () in
+      let eval expr = Common.eval_expression ~memo ~write_steps expr in
       print_endline "left_to_right quicksort (list fixed):";
       Common.left_to_right Common.quicksort_expr
       |> List.iteri (fun i e ->

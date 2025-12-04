@@ -61,7 +61,8 @@ let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) 
 
 let run () =
   Common.with_steps_writer steps_file (fun write_steps ->
-      let eval expr = Common.eval_expression ~write_steps expr in
+      let memo = Ant.Memo.init_memo () in
+      let eval expr = Common.eval_expression ~memo ~write_steps expr in
       print_endline "demanded_interactive quicksort (list fixed):";
       Common.demanded_interactive Common.quicksort_expr (fun i e ->
           Printf.printf "step %d ast: %s\n" i (Common.expr_to_string e);
