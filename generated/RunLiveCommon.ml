@@ -435,8 +435,8 @@ let with_steps_writer steps_path f =
       in
       f write_steps_json)
 
-let eval_expression ~write_steps x =
-  let exec_res = LC.eval (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
+let eval_expression ~memo ~write_steps x =
+  let exec_res = LC.eval memo (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
   write_steps exec_res;
   LC.to_ocaml_value exec_res.words
 

@@ -4,7 +4,6 @@ open Memo
 open Value
 open Common
 
-let memo = init_memo ()
 let tag_cont_done = 0
 let tag_Nil = 1
 let tag_Cons = 2
@@ -26,7 +25,7 @@ let rec to_ocaml_int_list x =
       Cons (Word.get_value (Memo.to_word x0), to_ocaml_int_list x1)
   | _ -> failwith "unreachable"
 
-let rec list_incr (x0 : Value.seq) : exec_result =
+let rec list_incr memo (x0 : Value.seq) : exec_result =
   exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let () =

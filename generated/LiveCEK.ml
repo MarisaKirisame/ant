@@ -4,7 +4,6 @@ open Memo
 open Value
 open Common
 
-let memo = init_memo ()
 let tag_cont_done = 0
 let tag_Z = 1
 let tag_S = 2
@@ -393,10 +392,10 @@ and to_ocaml_stuck x =
       SFst (to_ocaml_stuck x0)
   | _ -> failwith "unreachable"
 
-let rec index (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+let rec index memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
   exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
-let rec eval (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+let rec eval memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
   exec_cek (pc_to_exp (int_to_pc 4)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let () =

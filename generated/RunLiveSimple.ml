@@ -14,7 +14,8 @@ let mapinc =
 
 let run () =
   Common.with_steps_writer steps_file (fun write_steps ->
-      let eval expr = Common.eval_expression ~write_steps expr in
+      let memo = Ant.Memo.init_memo () in
+      let eval expr = Common.eval_expression ~memo ~write_steps expr in
       print_endline "mapinc:";
       print_endline (Common.expr_to_string mapinc);
       print_endline (Common.value_to_string (eval (LC.EInt 42)));
