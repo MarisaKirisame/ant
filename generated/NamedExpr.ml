@@ -16,6 +16,9 @@ type nexpr =
   | NECons of nexpr * nexpr
   | NEMatchList of nexpr * nexpr * string * string * nexpr
   | NEFix of string * string * nexpr
+  | NEPair of nexpr * nexpr
+  | NEZro of nexpr
+  | NEFst of nexpr
   | NEHole
 
 let pp_nexpr fmt nexpr =
@@ -40,6 +43,9 @@ let pp_nexpr fmt nexpr =
         Format.fprintf fmt "(match %a with [] -> %a | %s :: %s -> %a)" aux target aux nil_case head_name tail_name aux
           cons_case
     | NEFix (func_name, arg_name, body) -> Format.fprintf fmt "(fix %s %s. %a)" func_name arg_name aux body
+    | NEPair (a, b) -> Format.fprintf fmt "(%a, %a)" aux a aux b
+    | NEZro p -> Format.fprintf fmt "(zro %a)" aux p
+    | NEFst p -> Format.fprintf fmt "(fst %a)" aux p
     | NEHole -> Format.pp_print_string fmt "hole"
   in
   aux fmt nexpr
