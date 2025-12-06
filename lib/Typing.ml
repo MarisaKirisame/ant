@@ -275,6 +275,7 @@ let type_of_builtin builtin =
   match builtin with
   | "print_endline" -> new_arrow [ TPrim Str ] (TPrim Unit)
   | "print_string" -> new_arrow [ TPrim Str ] (TPrim Unit)
+  | "failwith" -> new_arrow [ TPrim Str ] (new_tvar ())
   | _ -> elab_error "type_of_builtin: unknown builtin"
 
 (* currently assume all operators are polymorphic *)
@@ -286,6 +287,8 @@ let type_of_op op =
   | "<" | "<=" | ">" | ">=" | "==" | "!=" ->
       let t = new_tvar () in
       new_arrow [ t; t ] (TPrim Bool)
+  | "&&" | "||" -> new_arrow [ TPrim Bool; TPrim Bool ] (TPrim Bool)
+  | "=" -> new_arrow [ TPrim Int; TPrim Int ] (TPrim Bool)
   | _ -> elab_error [%string "type_of_op: unknown op: %{op}"]
 
 let rec type_of_pattern (ctx : Type.ty StrMap.t) (p : 'a pattern) : 'a pattern * Type.ty =

@@ -1,4 +1,4 @@
-let steps_file = "eval_steps_left_to_right.json"
+(* let steps_file = "eval_steps_left_to_right.json"
 
 module Common = RunLiveCommon
 module LC = Common.LC
@@ -94,14 +94,13 @@ let left_to_right (expr : LC.expr) : LC.expr list =
   in
   build expr
 
-let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) Common.random_list LC.ENil
-
-let run () =
-  Common.with_steps_writer steps_file (fun write_steps ->
+let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) Common.random_list LC.ENil *)
+let run () = print_endline "commented out"
+(* Common.with_steps_writer steps_file (fun write_steps ->
       let memo = Ant.Memo.init_memo () in
       let eval expr = Common.eval_expression ~memo ~write_steps expr in
       print_endline "left_to_right quicksort (list fixed):";
       left_to_right Common.quicksort_expr
       |> List.iteri (fun i e ->
           let applied = LC.EApp (e, random_list_expr) in
-          Printf.printf "step %d value: %s\n" i (Common.value_to_string (eval applied))))
+          Printf.printf "step %d value: %s\n" i (Common.value_to_string (eval applied)))) *)

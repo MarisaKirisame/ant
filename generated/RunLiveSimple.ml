@@ -1,4 +1,4 @@
-let steps_file = "eval_steps_simple.json"
+(* let steps_file = "eval_steps_simple.json"
 
 module Common = RunLiveCommon
 module LC = Common.LC
@@ -10,10 +10,10 @@ let mapinc =
          LC.EVar (Common.nat_from_int 0),
          LC.ECons
            ( LC.EPlus (LC.EInt 1, LC.EVar (Common.nat_from_int 1)),
-             LC.EApp (LC.EVar (Common.nat_from_int 3), LC.EVar (Common.nat_from_int 0)) ) ))
+             LC.EApp (LC.EVar (Common.nat_from_int 3), LC.EVar (Common.nat_from_int 0)) ) )) *)
 
-let run () =
-  Common.with_steps_writer steps_file (fun write_steps ->
+let run () = print_endline "commented out"
+(* Common.with_steps_writer steps_file (fun write_steps ->
       let memo = Ant.Memo.init_memo () in
       let eval expr = Common.eval_expression ~memo ~write_steps expr in
       print_endline "mapinc:";
@@ -35,4 +35,4 @@ let run () =
       print_endline (Common.value_to_string (eval (LC.EApp (mapinc, nats 46 LC.ENil))));
       print_endline (Common.value_to_string (eval (LC.EApp (mapinc, nats 45 (nats 45 LC.ENil)))));
       print_endline
-        (Common.value_to_string (eval (LC.ELet (mapinc, LC.EApp (LC.EVar (Common.nat_from_int 0), nats 45 LC.ENil))))))
+        (Common.value_to_string (eval (LC.ELet (mapinc, LC.EApp (LC.EVar (Common.nat_from_int 0), nats 45 LC.ENil)))))) *)
