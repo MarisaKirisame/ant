@@ -60,8 +60,9 @@ let unwrap_env = fun env ->
   | MkEnv e -> e;;
 
 let cons_env = fun x env ->
-  let e = unwrap_env env in
-  MkEnv (Cons x e);;
+  match env with
+  | MkEnv e ->
+    MkEnv (Cons x e);;
 
 let caddr_ = fun e ->
   match e with
@@ -186,10 +187,51 @@ let rec if_ = fun env v thn els ->
     thn Unit
 *)
 
+let rec is_quote = fun e ->
+  match e with
+  | ECons fn t ->
+    (match fn with
+    | EAtom a ->
+      (match a with
+      | ASymbol sym ->
+        (match sym with
+        | SQuote -> Some (cdr_ e)
+        | _ -> None)
+      | _ -> None)
+    | _ -> None)
+  | _ -> None;;
+
+let car = fun v ->
+  match is_quote v with
+  | None -> failwith "car: input is not quote"
+  | Some w ->
+    match w with
+    | ECons _ _ -> quote (car_ w)
+    | _ -> failwith "car: pair expected";;
+
+let cdr = fun v ->
+  match is_quote v with
+  | None -> failwith "cdr: input is not quote"
+  | Some w ->
+    match w with
+    | ECons _ _ -> quote (cdr_ w)
+    | _ -> failwith "cdr: pair expected";;
+
+let cons = fun x y ->
+  match is_quote x with
+  | None -> failwith "cons: input is not quote"
+  | Some x_ ->
+    match is_quote y with
+    | None -> failwith "cons: input is not quote"
+    | Some y_ -> quote (ECons x_ y_);;
+
 let rec is_atom_ = fun env v ->
-  match eval v env with
-  | ECons _ _ -> const_true Unit
-  | _ -> const_false Unit
+  match is_quote v with
+  | None -> failwith "is_atom_: input is not quote"
+  | Some w ->
+    match w with
+    | ECons _ _ -> const_false Unit
+    | _ -> const_true Unit
 
 and is_eq_ = fun env x y ->
   if expr_eq (eval x env) (eval y env) then const_true Unit else const_false Unit
@@ -208,8 +250,8 @@ and pairlis = fun n ys env ->
   else
     match ys with
     | Nil -> failwith "pairlis: arguments too few"
-    | Cons y tl_ys ->
-      pairlis (n - 1) tl_ys (cons_env y env) (* leftmost with the largest dbi *)
+    | Cons y tl ->
+      pairlis (n - 1) tl (cons_env y env) (* leftmost with the largest dbi *)
 
 and evlis = fun exps env ->
   match exps with
@@ -221,9 +263,10 @@ and evcon = fun clauses env ->
   match clauses with
   | ECons head tail ->
     if expr_eq (eval (car_ head) env) (const_false Unit) then
-      eval (cadr_ head) env
-    else
       evcon tail env
+    else
+      eval (cadr_ head) env
+  | _ -> failwith "no cond clause matched"
 
 and eval = fun exp env ->
   match exp with
@@ -235,12 +278,12 @@ and eval = fun exp env ->
     (match is_symbol (car_ exp) with
     | Some sym ->
       (match sym with
-      | SQuote -> quote (cdr_ exp)
-      | SAtom -> is_atom_ env (eval (cdr_ exp) env)
+      | SQuote -> exp
+      | SAtom -> is_atom_ env (eval (cadr_ exp) env)
       | SEq -> is_eq_ env (eval (cadr_ exp) env) (eval (caddr_ exp) env)
-      | SCar -> car_ (eval (cadr_ exp) env)
-      | SCdr -> cdr_ (eval (cadr_ exp) env)
-      | SCons -> ECons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
+      | SCar -> car (eval (cadr_ exp) env)
+      | SCdr -> cdr (eval (cadr_ exp) env)
+      | SCons -> cons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCond -> evcon (cdr_ exp) env
       | _ -> failwith "invalid symbol here")
     | None ->
@@ -252,14 +295,38 @@ and eval = fun exp env ->
           | SLambda nargs ->
             let body = caddar_ exp in
             let args = evlis (cdr_ exp) env in
-            let env_new = pairlis nargs args env in
-            eval body env_new
+            (match env with
+            | MkEnv _ ->
+              let env_new = pairlis nargs args env in
+              eval body env_new
+            | _ -> failwith "???")
+          | SLabel ->
+            let env_with_label = cons_env (car_ exp) env in
+            let new_exp = ECons (caddar_ exp) (cdr_ exp) in
+            eval new_exp env_with_label
+          | SQuote -> failwith "unexpected function quote"
+          | SEq -> failwith "unexpected function eq"
+          | SCons -> failwith "unexpected function cons"
+          | SCond -> failwith "unexpected function cond"
+          | SAtom -> failwith "unexpected function atom"
+          | SCar -> failwith "unexpected function car"
+          | SCdr -> failwith "unexpected function cdr"
           | _ -> failwith "1")
         | None ->
-          failwith "2")
+          (match caar_ exp with
+          | EAtom a ->
+            (match a with
+            | AVar _ -> failwith "unexpected function var"
+            | ANumber _ -> failwith "unexpected function number"
+            | ASymbol _ -> failwith "2"
+            | ANIL -> failwith "unexpected function nil")
+          | _ -> failwith "2"))
       | _ ->
         (match is_var (car_ exp) with
         | Some i ->
           let f = lookup i env in
           eval (ECons f (cdr_ exp)) env
-        | None -> failwith "not_implemented"));;
+        | None -> exp));;
+
+let evalquote = fun fn args ->
+  eval (ECons fn args) (MkEnv Nil);;
