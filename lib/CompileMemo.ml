@@ -434,6 +434,8 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
         [%seqs
           assert_env_length_ w (int_ s.env_length);
           aux (List.length xs) []]
+  | App (Builtin (Builtin "failwith", _), [ Str err ], _) ->
+      fun _ -> [%seqs failwith_ (code (dquotes (string err))) (* TODO: escape *)]
   | App (GVar (f, _), xs, info) ->
       let at_tail_pos = info.tail in
       check_scope s;
@@ -484,10 +486,14 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
       let op_code =
         match op with
         | "+" -> add_
+        | "-" -> sub_
+        | "=" -> eq_
         | "<" -> lt_
         | "<=" -> le_
         | ">" -> gt_
         | ">=" -> ge_
+        | "&&" -> land_
+        | "||" -> lor_
         | _ -> failwith ("compile_pp_expr: unsupported op " ^ op)
       in
       let* s = compile_pp_expr ctx s x0 in
@@ -506,6 +512,18 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
         [%seqs
           assert_env_length_ w (int_ s.env_length);
           push_env_ w (memo_from_int_ (int_ i));
+          k (push_s s) w]
+  | Bool true ->
+      fun w ->
+        [%seqs
+          assert_env_length_ w (int_ s.env_length);
+          push_env_ w (memo_from_int_ (int_ 1));
+          k (push_s s) w]
+  | Bool false ->
+      fun w ->
+        [%seqs
+          assert_env_length_ w (int_ s.env_length);
+          push_env_ w (memo_from_int_ (int_ 0));
           k (push_s s) w]
   | Let (BOne (PVar (l, _), v, _), r, _) ->
       check_scope s;
@@ -552,8 +570,11 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                           push_env_ w x0_v;
                           compile_pp_expr ctx (extend_s s x0) expr (fun s w -> drop s [ x0 ] w k) w]
                     | _ -> failwith "with_splits: unexpected arity") )
-          | PCtorApp (cname, Some (PTup (xs, _)), _) when List.for_all (function PVar _ -> true | _ -> false) xs ->
-              let xs = List.map (function PVar (name, _) -> name | _ -> failwith "impossible") xs in
+          | PCtorApp (cname, Some (PTup (xs, _)), _)
+            when List.for_all (function PVar _ | PAny -> true | _ -> false) xs ->
+              let xs =
+                List.map (function PVar (name, _) -> name | PAny -> gensym "_" | _ -> failwith "impossible") xs
+              in
               let n = List.length xs in
               ( case cname,
                 with_splits n
@@ -584,8 +605,59 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
           | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
         c
     in
-    let default_case = (string "_", unreachable_ (Dynarray.length codes)) in
+    let default_case =
+      ( string dummy,
+        unreachable__ (Dynarray.length codes) (code (string "(string_of_int (" ^^ string dummy ^^ string "))")) )
+    in
     paren $ match_raw_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])]
+
+let compile_binding (ctx : ctx) name ps term entry_code : document =
+  let s =
+    List.fold_left
+      (fun s p ->
+        match p with
+        | PVar (n, _) -> extend_s s n
+        | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern p))
+      (new_scope ()) ps
+  in
+  let arg_num = s.env_length in
+  let cont_done_tag = ctor_tag_name ctx "cont_done" in
+  set_code entry_code (lam_ "w" (fun w -> compile_pp_expr ctx s term (fun s w -> return s w) w));
+  string "let rec" ^^ space ^^ string name ^^ space ^^ string "memo" ^^ space
+  ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
+  ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
+  ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
+  ^^ string "(Dynarray.of_list" ^^ string "["
+  ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
+  ^^ string "]" ^^ string ")" ^^ string "("
+  ^^ uncode (from_constructor_ cont_done_tag)
+  ^^ string ")" ^^ string " memo)"
+
+let compile_bindings (ctx : ctx) (s : 'a stmt) (b : 'a binding) : document =
+  let f =
+   fun x term ->
+    match term with
+    | Lam (ps, term, _) -> compile_binding ctx x ps term
+    | _ -> failwith "compile_bindings: function must have at least one argument"
+  in
+  match b with
+  | BOne (x, term, _) ->
+      let name = match x with PVar (x, _) -> x | _ -> failwith "bad match" in
+      let pc = add_code None in
+      Hashtbl.add_exn ctx.func_pc ~key:name ~data:pc;
+      f name term pc
+  | BRec xs ->
+      let pcs =
+        List.map
+          (fun (x, term, _) ->
+            let name = match x with PVar (x, _) -> x | _ -> failwith "bad match" in
+            let pc = add_code None in
+            Hashtbl.add_exn ctx.func_pc ~key:name ~data:pc;
+            (name, pc, term))
+          xs
+      in
+      separate_map (break 1) (fun (name, pc, term) -> f name term pc) pcs
+  | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
 
 let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with
@@ -594,35 +666,8 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
       CompileType.compile_ty_binding ctx.ctag tb
   | Type (TBRec trs as tb) ->
       List.iter (fun (_, Enum { params = _; ctors }) -> register_constructors ctx ctors) trs;
-      CompileType.compile_ty_binding ctx.ctag tb
-  | Term (BOne (x, Lam (ps, term, _), _) | BRec [ (x, Lam (ps, term, _), _) ]) ->
-      let s =
-        List.fold_left
-          (fun s p ->
-            match p with
-            | PVar (n, _) -> extend_s s n
-            | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern p))
-          (new_scope ()) ps
-      in
-      let arg_num = s.env_length in
-      let name = match x with PVar (x, _) -> x | _ -> failwith "bad match" in
-      let cont_done_tag = ctor_tag_name ctx "cont_done" in
-      add_code_k (fun entry_code ->
-          Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
-          let r =
-            ( lam_ "w" (fun w -> compile_pp_expr ctx s term (fun s w -> return s w) w),
-              string "let rec" ^^ space ^^ string name ^^ space ^^ string "memo" ^^ space
-              ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
-              ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
-              ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
-              ^^ string "(Dynarray.of_list" ^^ string "["
-              ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
-              ^^ string "]" ^^ string ")" ^^ string "("
-              ^^ uncode (from_constructor_ cont_done_tag)
-              ^^ string ")" ^^ string " memo)" )
-          in
-          r)
-  | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
+      CompileType.compile_ty_binding tb
+  | Term b -> compile_bindings ctx s b
 
 let generate_apply_cont ctx =
   set_code apply_cont
