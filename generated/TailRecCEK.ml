@@ -83,8 +83,9 @@ let () =
           push_env w_1 (Dynarray.get w_1.state.e 2);
           assert_env_length w_1 6;
           push_env w_1 (Dynarray.get w_1.state.e 1);
-          w_1.state.c <- pc_to_exp (int_to_pc 2)
-      | _ -> failwith "unreachable (3)")
+          w_1.state.c <- pc_to_exp (int_to_pc 2);
+          stepped w_1
+      | c_0 -> failwith ("unreachable:" ^ string_of_int c_0 ^ "(3)"))
     3
 
 let () = Words.set_constructor_degree 0 1
