@@ -1,0 +1,265 @@
+type list 'a =
+  | Nil
+  | Cons of 'a * list 'a;;
+
+type unit = Unit;;
+
+type option 'a =
+  | None
+  | Some of 'a;;
+
+type symbol =
+  | SLambda of int
+  | SLabel
+  | SQuote
+  | SEq
+  | SCons
+  | SCond
+  | SAtom
+  | SCar
+  | SCdr;;
+
+type atom =
+  | AVar of int
+  | ANumber of int
+  | ASymbol of symbol
+  | ANIL;;
+
+type expr =
+  | EAtom of atom
+  | ECons of expr * expr;;
+
+let quote = fun e -> ECons (EAtom (ASymbol SQuote)) e;;
+
+type env = MkEnv of list expr;;
+
+let is_symbol = fun e ->
+  match e with
+  | EAtom a ->
+    (match a with
+    | ASymbol sym -> Some sym
+    | _ -> None)
+  | _ -> None;;
+
+let is_var = fun e ->
+  match e with
+  | EAtom a ->
+    (match a with
+    | AVar i -> Some i
+    | _ -> None)
+  | _ -> None;;
+
+let const_Nil = fun _ -> EAtom ANIL;;
+
+let const_false = fun _ -> EAtom ANIL;;
+
+let const_true = fun _ -> EAtom (ANumber 0);;
+
+let unwrap_env = fun env ->
+  match env with
+  | MkEnv e -> e;;
+
+let cons_env = fun x env ->
+  let e = unwrap_env env in
+  MkEnv (Cons x e);;
+
+let caddr_ = fun e ->
+  match e with
+  | ECons _ x ->
+    match x with
+    | ECons _ y ->
+      match y with
+      | ECons z _ -> z;;
+
+let cadr_ = fun e ->
+  match e with
+  | ECons _ x ->
+    match x with
+    | ECons y _ -> y;;
+
+let caar_ = fun e ->
+  match e with
+  | ECons x _ ->
+    match x with
+    | ECons y _ -> y;;
+
+let cadar_ = fun e ->
+  match e with
+  | ECons x _ ->
+    match x with
+    | ECons _ y ->
+      match y with
+      | ECons z _ -> z;;
+
+let caddar_ = fun e ->
+  match e with
+  | ECons x _ ->
+    match x with
+    | ECons _ y ->
+      match y with
+      | ECons _ z ->
+        match z with
+        | ECons w _ -> w;;
+
+let car_ = fun e ->
+  match e with
+  | ECons x _ -> x;;
+
+let cdr_ = fun e ->
+  match e with
+  | ECons _ y -> y;;
+
+let symbol_eq = fun x y ->
+  match x with
+  | SLambda a ->
+    (match y with
+    | SLambda b -> a = b
+    | _ -> false)
+  | SLabel ->
+    (match y with
+    | SLabel -> true
+    | _ -> false)
+  | SQuote ->
+    (match y with
+    | SQuote -> true
+    | _ -> false)
+  | SEq ->
+    (match y with
+    | SEq -> true
+    | _ -> false)
+  | SCons ->
+    (match y with
+    | SCons -> true
+    | _ -> false)
+  | SCond ->
+    (match y with
+    | SCond -> true
+    | _ -> false)
+  | SAtom ->
+    (match y with
+    | SAtom -> true
+    | _ -> false)
+  | SCar ->
+    (match y with
+    | SCar -> true
+    | _ -> false)
+  | SCdr ->
+    (match y with
+    | SCdr -> true
+    | _ -> false);;
+
+let rec atom_eq = fun x y ->
+  match x with
+  | AVar a ->
+    (match y with
+    | AVar b -> a = b
+    | _ -> false)
+  | ANumber a ->
+    (match y with
+    | ANumber b -> a = b
+    | _ -> false)
+  | ASymbol a ->
+    (match y with
+    | ASymbol b -> symbol_eq a b
+    | _ -> false)
+  | ANIL ->
+    (match y with
+    | ANIL -> true
+    | _ -> false);;
+
+let rec expr_eq = fun x y ->
+  match x with
+  | EAtom a ->
+    (match y with
+    | EAtom b -> atom_eq a b
+    | _ -> false)
+  | ECons xh xt ->
+    (match y with
+    | ECons yh yt -> expr_eq xh yh && expr_eq xt yt
+    | _ -> false);;
+
+(*
+let rec if_ = fun env v thn els ->
+  if expr_eq  (eval v env) (const_false Unit) then
+    els Unit
+  else
+    thn Unit
+*)
+
+let rec is_atom_ = fun env v ->
+  match eval v env with
+  | ECons _ _ -> const_true Unit
+  | _ -> const_false Unit
+
+and is_eq_ = fun env x y ->
+  if expr_eq (eval x env) (eval y env) then const_true Unit else const_false Unit
+
+and lookup = fun x env ->
+  match unwrap_env env with
+  | Nil -> failwith "empty environment"
+  | Cons head tail ->
+    if x = 0 then
+      head
+    else
+      lookup (x - 1) (MkEnv tail)
+
+and pairlis = fun n ys env ->
+  if n = 0 then env
+  else
+    match ys with
+    | Nil -> failwith "pairlis: arguments too few"
+    | Cons y tl_ys ->
+      pairlis (n - 1) tl_ys (cons_env y env) (* leftmost with the largest dbi *)
+
+and evlis = fun exps env ->
+  match exps with
+  | ECons hd tl ->
+    Cons (eval hd env) (evlis tl env)
+  | _ -> Nil
+
+and evcon = fun clauses env ->
+  match clauses with
+  | ECons head tail ->
+    if expr_eq (eval (car_ head) env) (const_false Unit) then
+      eval (cadr_ head) env
+    else
+      evcon tail env
+
+and eval = fun exp env ->
+  match exp with
+  | EAtom a ->
+    (match a with
+    | AVar i -> lookup i env
+    | _ -> exp)
+  | ECons _ _ ->
+    (match is_symbol (car_ exp) with
+    | Some sym ->
+      (match sym with
+      | SQuote -> quote (cdr_ exp)
+      | SAtom -> is_atom_ env (eval (cdr_ exp) env)
+      | SEq -> is_eq_ env (eval (cadr_ exp) env) (eval (caddr_ exp) env)
+      | SCar -> car_ (eval (cadr_ exp) env)
+      | SCdr -> cdr_ (eval (cadr_ exp) env)
+      | SCons -> ECons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
+      | SCond -> evcon (cdr_ exp) env
+      | _ -> failwith "invalid symbol here")
+    | None ->
+      match car_ exp with
+      | ECons _ _ ->
+        (match is_symbol (caar_ exp) with
+        | Some sym ->
+          (match sym with
+          | SLambda nargs ->
+            let body = caddar_ exp in
+            let args = evlis (cdr_ exp) env in
+            let env_new = pairlis nargs args env in
+            eval body env_new
+          | _ -> failwith "1")
+        | None ->
+          failwith "2")
+      | _ ->
+        (match is_var (car_ exp) with
+        | Some i ->
+          let f = lookup i env in
+          eval (ECons f (cdr_ exp)) env
+        | None -> failwith "not_implemented"));;

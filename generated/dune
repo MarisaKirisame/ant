@@ -13,6 +13,8 @@
   RunLiveDemandDriven
   TailRecCEK
   RunTailRec
+  LispCEK
+  RunLisp
   RunTest)
  (libraries ant yojson sexplib)
  (wrapped false)

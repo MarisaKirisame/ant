@@ -204,6 +204,20 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         ],
         env=env,
     )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Lisp.ant",
+            "generated/LispCEK.ml",
+            "--compile",
+            "--backend",
+            "memo",
+        ],
+        env=env,
+    )
 
 
 def run_project() -> None:
@@ -211,8 +225,9 @@ def run_project() -> None:
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
     opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
-    for mode in ("live-simple", "live-left-to-right", "live-demand-driven", "hazel"):
-        opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
+    # for mode in ("live-simple", "live-left-to-right", "live-demand-driven"):
+    #     opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
+    opam_exec(["dune", "exec", "GeneratedMain", "lisp"], env=env)
 
 
 def profile_project() -> None:

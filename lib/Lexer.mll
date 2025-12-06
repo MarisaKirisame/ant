@@ -26,6 +26,7 @@ let convert_escaped c =
 let builtin_table = Hashtbl.of_seq @@ List.to_seq
     [ ("print_endline"      , ())
     ; ("print_string"       , ())
+    ; ("failwith"       , ())
     ]
 
 let keywords_table = Hashtbl.of_seq @@ List.to_seq
@@ -68,6 +69,8 @@ let mops_table = Hashtbl.of_seq @@ List.to_seq
     ; ("<="   , TK_LE)
     ; (">="   , TK_GE)
     ; (";;"   , TK_SEMISEMI)
+    ; ("&&"   , TK_LAND)
+    ; ("||"   , TK_LOR)
     ]
 }
 
@@ -85,7 +88,7 @@ let int_lit       = ddigit+
 let bool_lit      = "true" | "false"
 let escaped       = ['\\' '\'' '"' 'n' 't' 'r' 'f' 'b']
 let sops          = ['.' ',' ';' '_' '(' ')' '[' ']' '<' '>' '+' '-' '*' '/' '=' '|' '\'']
-let mops          = "->" | "<=" | ">=" | ";;"
+let mops          = "->" | "<=" | ">=" | ";;" | "&&" | "||"
 
 rule tokenize = parse
   | eof             { TK_EOF }
