@@ -14,6 +14,7 @@
   TailRecCEK
   RunTailRec
   LispCEK
+  LispFrontend
   RunLisp
   RunTest)
  (libraries ant yojson sexplib)

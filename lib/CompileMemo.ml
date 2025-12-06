@@ -439,16 +439,21 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
   | App (GVar (f, _), xs, info) ->
       let at_tail_pos = info.tail in
       check_scope s;
-      let keep, keep_s = keep_only s info.fv in
-      let keep_length = keep_s.env_length in
       let xs_length = List.length xs in
+      let* s_after_args = compile_pp_exprs ctx s xs in
+      assert (s_after_args.env_length >= xs_length);
+      let lexical_scope =
+        if xs_length = 0 then s_after_args else { s_after_args with env_length = s_after_args.env_length - xs_length }
+      in
+      check_scope lexical_scope;
+      let keep, keep_s = keep_only lexical_scope info.fv in
+      let keep_length = keep_s.env_length in
       if at_tail_pos then (
         assert (keep_length = 0);
         (* a tail call cannot keep anything *)
-        let* s = compile_pp_exprs ctx s xs in
         fun w ->
           [%seqs
-            assert_env_length_ w (int_ s.env_length);
+            assert_env_length_ w (int_ s_after_args.env_length);
             to_unit_ $ env_call_ w (list_literal_of_ int_ []) (int_ xs_length);
             goto_ w (Hashtbl.find_exn ctx.func_pc f)])
       else
@@ -459,29 +464,28 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
               set_k_ w (get_next_cont_ tl);
               restore_env_ w (int_ keep_length) tl;
               k (push_s keep_s) w]);
-        let* s = compile_pp_exprs ctx s xs in
         fun w ->
           [%seqs
-            assert_env_length_ w (int_ s.env_length);
-            (let$ keep = env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ xs_length) in
-             set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ w ]));
+            assert_env_length_ w (int_ s_after_args.env_length);
+            (let$ keep_vals = env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ xs_length) in
+             set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep_vals; world_kont_ w ]));
             goto_ w (Hashtbl.find_exn ctx.func_pc f)]
   | If (cond, thn, els, _) ->
       let* s = compile_pp_expr ctx s cond in
-      fun w ->
-        let cond_name = gensym "cond" in
-        [%seqs
-          assert_env_length_ w (int_ s.env_length);
-          let_pat_in_ (var_pat_ cond_name)
-            (resolve_ w (src_E_ (s.env_length - 1)))
-            [%seqs
-              to_unit_ $ pop_env_ w;
-              let$ if_kont = paren (lam_unit_ (fun _ -> k s w)) in
-              let k = fun _ _ -> app_ if_kont unit_ in
-              let cond_bool = code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0") in
-              let then_branch = compile_pp_expr ctx (pop_s s) thn k in
-              let else_branch = compile_pp_expr ctx (pop_s s) els k in
-              if_ cond_bool (then_branch w) (else_branch w)]]
+      reading s $ fun s w ->
+      let cond_name = gensym "cond" in
+      [%seqs
+        assert_env_length_ w (int_ s.env_length);
+        let_pat_in_ (var_pat_ cond_name)
+          (resolve_ w (src_E_ (s.env_length - 1)))
+          [%seqs
+            to_unit_ $ pop_env_ w;
+            let$ if_kont = paren (lam_unit_ (fun _ -> k s w)) in
+            let k = fun _ _ -> app_ if_kont unit_ in
+            let cond_bool = code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0") in
+            let then_branch = compile_pp_expr ctx (pop_s s) thn k in
+            let else_branch = compile_pp_expr ctx (pop_s s) els k in
+            if_ cond_bool (then_branch w) (else_branch w)]]
   | Op (op, x0, x1, _) ->
       let op_code =
         match op with

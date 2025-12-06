@@ -1,6 +1,7 @@
 module LC = LispCEK
 module Memo = Ant.Memo
 module Word = Ant.Word.Word
+module Frontend = LispFrontend
 
 let with_memo f =
   let memo = Memo.init_memo () in
@@ -20,25 +21,25 @@ let seq_of_expr_list exprs = lisp_list_of_list exprs |> LC.from_ocaml_list LC.fr
 let int_of_seq seq = Word.get_value (Memo.to_word seq)
 
 let string_of_symbol = function
-  | LC.SLambda n -> Printf.sprintf "SLambda(%d)" n
-  | LC.SLabel -> "SLabel"
-  | LC.SQuote -> "SQuote"
-  | LC.SEq -> "SEq"
-  | LC.SCons -> "SCons"
-  | LC.SCond -> "SCond"
-  | LC.SAtom -> "SAtom"
-  | LC.SCar -> "SCar"
-  | LC.SCdr -> "SCdr"
+  | LC.SLambda n -> Printf.sprintf "lambda(%d)" n
+  | LC.SLabel -> "label"
+  | LC.SQuote -> "quote"
+  | LC.SEq -> "eq"
+  | LC.SCons -> "cons"
+  | LC.SCond -> "cond"
+  | LC.SAtom -> "atom"
+  | LC.SCar -> "car"
+  | LC.SCdr -> "cdr"
 
 let string_of_atom = function
-  | LC.AVar i -> Printf.sprintf "AVar(%d)" i
-  | LC.ANumber i -> Printf.sprintf "ANumber(%d)" i
-  | LC.ASymbol sym -> Printf.sprintf "ASymbol(%s)" (string_of_symbol sym)
-  | LC.ANIL -> "ANIL"
+  | LC.AVar i -> Printf.sprintf "#%d" i
+  | LC.ANumber i -> Printf.sprintf "%d" i
+  | LC.ASymbol sym -> Printf.sprintf "%s" (string_of_symbol sym)
+  | LC.ANIL -> "()"
 
 let rec string_of_expr = function
-  | LC.EAtom atom -> "EAtom(" ^ string_of_atom atom ^ ")"
-  | LC.ECons (hd, tl) -> "ECons(" ^ string_of_expr hd ^ ", " ^ string_of_expr tl ^ ")"
+  | LC.EAtom atom -> "" ^ string_of_atom atom ^ ""
+  | LC.ECons (hd, tl) -> "(" ^ string_of_expr hd ^ " " ^ string_of_expr tl ^ ")"
 
 let string_of_expr_list exprs = "[" ^ String.concat "; " (List.map string_of_expr exprs) ^ "]"
 let string_of_option show = function LC.None -> "None" | LC.Some value -> "Some " ^ show value
@@ -53,13 +54,16 @@ let expect_expr = expect_equal ~show:string_of_expr
 let expect_expr_list = expect_equal ~show:string_of_expr_list
 let expect_option show = expect_equal ~show:(string_of_option show)
 
-let test_quote () =
-  let quoted = LC.EAtom (LC.ANumber 5) in
-  let seq_arg = LC.from_ocaml_expr quoted in
-  let res = with_memo (fun memo -> LC.quote memo seq_arg) in
-  let actual = LC.to_ocaml_expr res.words in
-  let expected = LC.ECons (LC.EAtom (LC.ASymbol LC.SQuote), quoted) in
-  expect_expr "quote wraps its input with SQuote" expected actual
+let eval_expr expr =
+  let seq = LC.from_ocaml_expr expr in
+  let res = with_memo (fun memo -> LC.eval memo seq empty_env_seq) in
+  LC.to_ocaml_expr res.words
+
+let eval_string code =
+  let expr = Frontend.compile_string code in
+  Printf.printf "compiled: %s\n" (string_of_expr expr);
+  print_endline "";
+  eval_expr expr
 
 let test_const_values () =
   let unit_seq = LC.from_ocaml_unit LC.Unit in
@@ -133,8 +137,8 @@ let test_eval_var () =
   expect_expr "eval resolves variables using the environment" (List.nth env_values 1) (LC.to_ocaml_expr res.words)
 
 let test_eval_quote () =
-  let args = expr_list [ LC.EAtom (LC.ANumber 12) ] in
-  let expr = LC.ECons (LC.EAtom (LC.ASymbol LC.SQuote), args) in
+  let arg = LC.EAtom (LC.ANumber 12) in
+  let expr = LC.ECons (LC.EAtom (LC.ASymbol LC.SQuote), arg) in
   let res = with_memo (fun memo -> LC.eval memo (LC.from_ocaml_expr expr) empty_env_seq) in
   expect_expr "eval handles quote special form" expr (LC.to_ocaml_expr res.words)
 
@@ -157,8 +161,52 @@ let test_evlis () =
   let expected = [ LC.EAtom (LC.ANumber 1); LC.EAtom (LC.ANumber 2) ] in
   expect_expr_list "evlis evaluates each list member" expected actual
 
+let test_frontend_literal () =
+  let result = eval_string "(quote (1 2))" in
+  let quoted =
+    LC.ECons
+      ( LC.EAtom (LC.ASymbol LC.SQuote),
+        LC.ECons
+          (LC.ECons (LC.EAtom (LC.ANumber 1), ECons (LC.EAtom (LC.ANumber 2), LC.EAtom LC.ANIL)), LC.EAtom LC.ANIL) )
+  in
+  let expected = quoted in
+  expect_expr "frontend parses quoted list" expected result
+
+let test_lambda_application () =
+  let result = eval_string "((lambda (x) x) 42)" in
+  expect_expr "lambda returns its argument" (LC.EAtom (LC.ANumber 42)) result
+
+let test_manual_lambda () =
+  let body = LC.EAtom (LC.AVar 0) in
+  let lambda_expr = expr_list [ LC.EAtom (LC.ASymbol (LC.SLambda 1)); LC.EAtom LC.ANIL; body ] in
+  let program = expr_list [ lambda_expr; LC.EAtom (LC.ANumber 42) ] in
+  let result = eval_expr program in
+  expect_expr "manual lambda application" (LC.EAtom (LC.ANumber 42)) result
+
+let test_eval_cdr () =
+  let tail = LC.ECons (LC.EAtom (LC.ASymbol LC.SQuote), ECons (LC.EAtom (LC.ANumber 2), LC.EAtom LC.ANIL)) in
+  let full =
+    LC.ECons
+      ( LC.EAtom (LC.ASymbol LC.SQuote),
+        LC.ECons (LC.EAtom (LC.ANumber 1), ECons (LC.EAtom (LC.ANumber 2), LC.EAtom LC.ANIL)) )
+  in
+  let result = with_memo (fun memo -> LC.cdr memo (LC.from_ocaml_expr full)) in
+  expect_expr "cdr test" tail (LC.to_ocaml_expr result.words)
+
+(* let test_label_recursion () =
+  let code =
+    "((label copy\n\
+    \        (lambda (xs)\n\
+    \          (cond\n\
+    \            ((atom xs) (quote ()))\n\
+    \            ((quote (0)) (cons (car xs) (copy (cdr xs))))  )))\n\
+    \    (quote (1)))"
+  in
+  let result = eval_string code in
+  let expected = expr_list [ LC.EAtom (LC.ANumber 1); LC.EAtom (LC.ANumber 2); LC.EAtom (LC.ANumber 3) ] in
+  expect_expr "label enables recursion for list copy" expected result *)
+
 let run () =
-  test_quote ();
   test_const_values ();
   test_is_symbol ();
   test_is_var ();
@@ -170,4 +218,9 @@ let run () =
   test_eval_quote ();
   test_is_eq ();
   test_evlis ();
+  test_frontend_literal ();
+  test_lambda_application ();
+  test_manual_lambda ();
+  test_eval_cdr ();
+  (* test_label_recursion (); *)
   print_endline "LispCEK smoke tests completed."
