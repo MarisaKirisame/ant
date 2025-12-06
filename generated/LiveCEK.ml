@@ -641,7 +641,7 @@ let () =
           ignore (env_call w_2 [] 2);
           w_2.state.c <- pc_to_exp (int_to_pc 1);
           stepped w_2
-      | _ -> failwith "unreachable (2)")
+      | c_1 -> failwith ("unreachable:" ^ string_of_int c_1 ^ "(2)"))
     2
 
 let () =
@@ -668,7 +668,7 @@ let () =
           push_env w_1 (Memo.from_constructor tag_None);
           assert_env_length w_1 3;
           return_n w_1 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (3)")
+      | c_0 -> failwith ("unreachable:" ^ string_of_int c_0 ^ "(3)"))
     3
 
 let () =
@@ -997,7 +997,7 @@ let () =
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_13; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_4
-      | _ -> failwith "unreachable (5)")
+      | c_2 -> failwith ("unreachable:" ^ string_of_int c_2 ^ "(5)"))
     5
 
 let () =
@@ -1064,7 +1064,7 @@ let () =
           drop_n w_6 3 1;
           assert_env_length w_6 2;
           return_n w_6 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (6)")
+      | c_3 -> failwith ("unreachable:" ^ string_of_int c_3 ^ "(6)"))
     6
 
 let () =
@@ -1131,7 +1131,7 @@ let () =
           drop_n w_7 3 1;
           assert_env_length w_7 2;
           return_n w_7 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (7)")
+      | c_4 -> failwith ("unreachable:" ^ string_of_int c_4 ^ "(7)"))
     7
 
 let () =
@@ -1198,7 +1198,7 @@ let () =
           drop_n w_8 3 1;
           assert_env_length w_8 2;
           return_n w_8 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (8)")
+      | c_5 -> failwith ("unreachable:" ^ string_of_int c_5 ^ "(8)"))
     8
 
 let () =
@@ -1265,7 +1265,7 @@ let () =
           drop_n w_9 3 1;
           assert_env_length w_9 2;
           return_n w_9 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (9)")
+      | c_6 -> failwith ("unreachable:" ^ string_of_int c_6 ^ "(9)"))
     9
 
 let () =
@@ -1332,7 +1332,7 @@ let () =
           drop_n w_10 3 1;
           assert_env_length w_10 2;
           return_n w_10 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (10)")
+      | c_7 -> failwith ("unreachable:" ^ string_of_int c_7 ^ "(10)"))
     10
 
 let () =
@@ -1366,7 +1366,7 @@ let () =
           drop_n w_11 1 0;
           assert_env_length w_11 1;
           return_n w_11 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (11)")
+      | c_8 -> failwith ("unreachable:" ^ string_of_int c_8 ^ "(11)"))
     11
 
 let () =
@@ -1455,7 +1455,7 @@ let () =
           drop_n w_12 3 1;
           assert_env_length w_12 2;
           return_n w_12 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (12)")
+      | c_9 -> failwith ("unreachable:" ^ string_of_int c_9 ^ "(12)"))
     12
 
 let () =
@@ -1530,7 +1530,7 @@ let () =
           drop_n w_13 4 2;
           assert_env_length w_13 2;
           return_n w_13 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (13)")
+      | c_10 -> failwith ("unreachable:" ^ string_of_int c_10 ^ "(13)"))
     13
 
 let () =
@@ -1594,7 +1594,7 @@ let () =
           drop_n w_14 1 0;
           assert_env_length w_14 1;
           return_n w_14 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (14)")
+      | c_11 -> failwith ("unreachable:" ^ string_of_int c_11 ^ "(14)"))
     14
 
 let () =
@@ -1658,7 +1658,7 @@ let () =
           drop_n w_15 1 0;
           assert_env_length w_15 1;
           return_n w_15 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (15)")
+      | c_12 -> failwith ("unreachable:" ^ string_of_int c_12 ^ "(15)"))
     15
 
 let () =
@@ -1750,7 +1750,7 @@ let () =
           drop_n w_16 4 2;
           assert_env_length w_16 2;
           return_n w_16 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (16)")
+      | c_13 -> failwith ("unreachable:" ^ string_of_int c_13 ^ "(16)"))
     16
 
 let () =
@@ -1848,7 +1848,7 @@ let () =
           drop_n w_17 1 0;
           assert_env_length w_17 1;
           return_n w_17 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (18)")
+      | c_14 -> failwith ("unreachable:" ^ string_of_int c_14 ^ "(18)"))
     18
 
 let () =
@@ -1957,7 +1957,7 @@ let () =
           drop_n w_19 1 0;
           assert_env_length w_19 1;
           return_n w_19 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (20)")
+      | c_15 -> failwith ("unreachable:" ^ string_of_int c_15 ^ "(20)"))
     20
 
 let () =
@@ -2066,7 +2066,7 @@ let () =
           drop_n w_21 1 0;
           assert_env_length w_21 1;
           return_n w_21 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (22)")
+      | c_16 -> failwith ("unreachable:" ^ string_of_int c_16 ^ "(22)"))
     22
 
 let () =
@@ -2175,7 +2175,7 @@ let () =
           drop_n w_23 1 0;
           assert_env_length w_23 1;
           return_n w_23 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (24)")
+      | c_17 -> failwith ("unreachable:" ^ string_of_int c_17 ^ "(24)"))
     24
 
 let () =
@@ -2284,7 +2284,7 @@ let () =
           drop_n w_25 1 0;
           assert_env_length w_25 1;
           return_n w_25 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (26)")
+      | c_18 -> failwith ("unreachable:" ^ string_of_int c_18 ^ "(26)"))
     26
 
 let () = Words.set_constructor_degree 0 1

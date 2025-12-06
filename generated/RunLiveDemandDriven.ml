@@ -1,4 +1,4 @@
-let steps_file = "eval_steps_demand_driven.json"
+(* let steps_file = "eval_steps_demand_driven.json"
 
 module Common = RunLiveCommon
 module LC = Common.LC
@@ -139,10 +139,9 @@ module DemandedExpansion = struct
     loop 0 start_prog
 end
 
-let demanded_interactive = DemandedExpansion.interactive
-
-let run () =
-  Common.with_steps_writer steps_file (fun write_steps ->
+let demanded_interactive = DemandedExpansion.interactive *)
+let run () = print_endline "commented out"
+(* Common.with_steps_writer steps_file (fun write_steps ->
       let memo = Ant.Memo.init_memo () in
       let eval expr = Common.eval_expression ~memo ~write_steps expr in
       print_endline "demanded_interactive quicksort (list fixed):";
@@ -151,4 +150,4 @@ let run () =
           let applied = LC.EApp (e, Common.random_list_expr) in
           let value = eval applied in
           Printf.printf "step %d value: %s\n" i (Common.value_to_string value);
-          value))
+          value)) *)
