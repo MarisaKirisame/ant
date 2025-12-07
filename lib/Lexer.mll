@@ -27,6 +27,7 @@ let builtin_table = Hashtbl.of_seq @@ List.to_seq
     [ ("print_endline"      , ())
     ; ("print_string"       , ())
     ; ("failwith"       , ())
+    ; ("failwith_int"       , ())
     ]
 
 let keywords_table = Hashtbl.of_seq @@ List.to_seq
