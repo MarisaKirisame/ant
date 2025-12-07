@@ -24,7 +24,8 @@ type symbol =
   | SCond
   | SAtom
   | SCar
-  | SCdr;;
+  | SCdr
+  | SNull;;
 
 type atom =
   | AVar of int
@@ -91,11 +92,19 @@ let expr_is_num = fun e ->
     | ANumber x -> Some x
     | _ -> None;;
 
-let const_Nil = fun _ -> EAtom ANIL;;
+let expr_is_nil = fun e ->
+  match e with
+  | ECons fn t -> false
+  | EAtom a ->
+    match a with
+    | ANIL -> true
+    | _ -> false;;
 
-let expr_false = fun _ -> EAtom ANIL;;
+(* let const_Nil = fun _ -> EAtom ANIL;; *)
 
-let expr_true = fun _ -> EAtom (ANumber 0);;
+(* let expr_false = fun _ -> EAtom ANIL;; *)
+
+(* let expr_true = fun _ -> EAtom (ANumber 0);; *)
 
 let value_false = fun _ -> VNIL;;
 
@@ -290,28 +299,45 @@ let is_atom_ = fun v ->
   | VCons _ _ -> value_false Unit
   | VClosure _ _ _ -> value_true Unit;;
 
-let rec is_eq_ = fun x y ->
-  if value_eq x y then value_true Unit else value_false Unit
+let is_eq_ = fun x y ->
+  if value_eq x y then value_true Unit else value_false Unit;;
 
-and lookup = fun i env ->
+let rec lookup = fun i env ->
   match unwrap_env env with
   | Nil -> failwith "empty environment"
   | Cons head tail ->
     if env_entry_name head = i then
       env_entry_value head
     else
-      lookup i (MkEnv tail)
+      lookup i (MkEnv tail);;
 
-and pairlis = fun xs ys env ->
+let rec pairlis = fun xs ys env ->
   match xs with
   | Nil -> env
   | Cons x x_tl ->
     match ys with
     | Nil -> failwith "pairlis: arguments too few"
     | Cons y tl ->
-      pairlis x_tl tl (cons_env (EnvEntry x y) env)
+      pairlis x_tl tl (cons_env (EnvEntry x y) env);;
 
-and evlis = fun exps env ->
+let rec destruct_names = fun names ->
+  match names with
+  | ECons a t ->
+    match expr_is_num a with
+    | Some x -> Cons x (destruct_names t)
+    | _ -> failwith "destruct_names: impossible, names must be int literals"
+  | _ -> Nil;;
+
+let is_null_ = fun v ->
+  match v with
+  | VQuote e ->
+    if expr_is_nil e then
+      value_true Unit
+    else
+      value_false Unit
+  | _ -> value_false Unit;;
+
+let rec evlis = fun exps env ->
   match exps with
   | ECons hd tl ->
     Cons (eval hd env) (evlis tl env)
@@ -326,14 +352,6 @@ and evcon = fun clauses env ->
       eval (cadr_ head) env
   | _ -> failwith "no cond clause matched"
 
-and destruct_names = fun names ->
-  match names with
-  | ECons a t ->
-    match expr_is_num a with
-    | Some x -> Cons x (destruct_names t)
-    | _ -> failwith "destruct_names: impossible, names must be int literals"
-  | _ -> Nil
-
 and eval = fun exp env ->
   match exp with
   | EAtom a ->
@@ -341,7 +359,7 @@ and eval = fun exp env ->
     | AVar i -> lookup i env
     | ANumber x -> VNumber x
     | ASymbol sym -> VSymbol sym
-    | ANIL -> VNIL)
+    | ANIL -> failwith "ill-formed expression: NIL")
   | ECons _ _ ->
     (match expr_is_symbol (car_ exp) with
     | Some sym ->
@@ -353,6 +371,7 @@ and eval = fun exp env ->
       | SCdr -> cdr (eval (cadr_ exp) env)
       | SCons -> VCons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCond -> evcon (cdr_ exp) env
+      | SNull -> is_null_ (eval (cadr_ exp) env)
       | _ -> failwith "invalid symbol here")
     | None ->
       match car_ exp with
@@ -380,6 +399,7 @@ and eval = fun exp env ->
           | SAtom -> failwith "unexpected function atom"
           | SCar -> failwith "unexpected function car"
           | SCdr -> failwith "unexpected function cdr"
+          | SNull -> failwith "unexpected function null"
           | _ -> failwith "1")
         | None ->
           (match caar_ exp with
