@@ -38,11 +38,13 @@
       (cons (cons (car xs) (car ys))
             (pairlis (cdr xs) (cdr ys) env))))
 
-(defvar a '(1 2 3))
-(defvar a '(2 1 3))
-(defvar b '(7 8 9))
+;; (defvar a '(1 2 3))
+;; (defvar a '(2 1 3))
+;; (defvar b '(7 8 9))
 
-(defvar e (pairlis a b '()))
+;; (defvar e (pairlis a b '()))
+
+(define isvar (x) (and (pair? x) (eq? (car x) 'var))) ;; symbol `var` is specially supported, and has no runtime behavior
 
 (define evlis (exps env)
   (if (null? exps)
@@ -60,8 +62,8 @@
 (define eval* (exp env)
   (cond
     ;; variable
-    ((symbol? exp)
-     (lookup exp env))
+    ((isvar exp)
+     (lookup (cadr exp) env))
 
     ;; quoted constant: (quote x)
     ((and (pair? exp) (eq? (car exp) 'quote))
@@ -77,11 +79,9 @@
 
     ((and (pair? exp) (eq? (car exp) 'car))
      (car (eval* (cadr exp) env)))
-    ;;  (error -4))
 
     ((and (pair? exp) (eq? (car exp) 'cdr))
      (cdr (eval* (cadr exp) env)))
-    ;;  (error -4))
 
     ((and (pair? exp) (eq? (car exp) 'cons))
      (cons (eval* (cadr exp) env)
@@ -123,4 +123,6 @@
 
 ;; (eval* (cons 'cdr '('(1 2 3))) '())
 
-(evalquote 'cdr '('(1 2 3)))
+;; (evalquote 'cdr '('(1 2 3)))
+
+(eval* (cons 'var '(1)) (cons (cons 1 2) '()))

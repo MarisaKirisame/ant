@@ -32,7 +32,8 @@ type symbol =
   | SNull
   | STrue
   | SFalse
-  | SError;;
+  | SError
+  | SVar;;
 
 type atom =
   | AVar of int
@@ -258,6 +259,14 @@ let symbol_eq = fun x y ->
   | SNull ->
     (match y with
     | SNull -> true
+    | _ -> false)
+  | SError ->
+    (match y with
+    | SError -> true
+    | _ -> false)
+  | SVar ->
+    (match y with
+    | SVar -> true
     | _ -> false);;
 
 let rec atom_eq = fun x y ->
@@ -466,6 +475,7 @@ and eval = fun exp env ->
       | SNull -> is_null_ (eval (cadr_ exp) env)
       | STrue -> failwith "true is not PROCEDURE"
       | SFalse -> failwith "false is not PROCEDURE"
+      | SVar -> failwith "eval: symbol var is not intended to be used this way"
       | SError ->
         let err = eval (cadr_ exp) env in
         let err_code = (match value_is_number_or_quote_number err with | None -> failwith "eval: user error code must evalutes to integer" | Some x -> x) in
@@ -510,6 +520,7 @@ and eval = fun exp env ->
           | SCdr -> failwith "unexpected function cdr"
           | SNull -> failwith "unexpected function null"
           | SError -> failwith "unexpected function error"
+          | SVar -> failwith "eval: symbol var is not intended to be used this way"
           | _ -> failwith "1" )
         | None ->
           (match caar_ exp with

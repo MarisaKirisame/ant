@@ -38,6 +38,7 @@ let string_of_symbol = function
   | LC.SSymbol -> "symbol"
   | LC.STrue -> "true"
   | LC.SFalse -> "false"
+  | LC.SVar -> "var"
 
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "#%d" i
