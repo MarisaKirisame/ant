@@ -193,7 +193,7 @@ let test_eval_cdr () =
   let result = with_memo (fun memo -> LC.cdr memo (LC.from_ocaml_expr full)) in
   expect_expr "cdr test" tail (LC.to_ocaml_expr result.words)
 
-(* let test_label_recursion () =
+let test_label_recursion () =
   let code =
     "((label copy\n\
     \        (lambda (xs)\n\
@@ -204,7 +204,7 @@ let test_eval_cdr () =
   in
   let result = eval_string code in
   let expected = expr_list [ LC.EAtom (LC.ANumber 1); LC.EAtom (LC.ANumber 2); LC.EAtom (LC.ANumber 3) ] in
-  expect_expr "label enables recursion for list copy" expected result *)
+  expect_expr "label enables recursion for list copy" expected result
 
 let run () =
   test_const_values ();
