@@ -276,6 +276,7 @@ let type_of_builtin builtin =
   | "print_endline" -> new_arrow [ TPrim Str ] (TPrim Unit)
   | "print_string" -> new_arrow [ TPrim Str ] (TPrim Unit)
   | "failwith" -> new_arrow [ TPrim Str ] (new_tvar ())
+  | "failwith_int" -> new_arrow [ TPrim Int ] (new_tvar ())
   | _ -> elab_error "type_of_builtin: unknown builtin"
 
 (* currently assume all operators are polymorphic *)

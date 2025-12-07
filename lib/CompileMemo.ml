@@ -436,6 +436,13 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
           aux (List.length xs) []]
   | App (Builtin (Builtin "failwith", _), [ Str err ], _) ->
       fun _ -> [%seqs failwith_ (code (dquotes (string err))) (* TODO: escape *)]
+  | App (Builtin (Builtin "failwith_int", _), [ x ], _) ->
+      let* s = compile_pp_expr ctx s x in
+      reading s $ fun s w ->
+      [%seqs
+        let$ err = resolve_ w (src_E_ (s.env_length - 1)) in
+        to_unit_ $ pop_env_ w;
+        failwith_ (string_of_int_ (int_from_word_ (zro_ err)))]
   | App (GVar (f, _), xs, info) ->
       let at_tail_pos = info.tail in
       check_scope s;
