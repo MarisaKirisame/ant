@@ -110,6 +110,7 @@ let builtin_symbol = function
   | "symbol" -> Some LC.SSymbol
   | "true" -> Some LC.STrue
   | "false" -> Some LC.SFalse
+  | "var" -> Some LC.SVar
   | _ -> None
 
 let expr_nil = LC.EAtom LC.ANIL
