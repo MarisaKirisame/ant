@@ -1,6 +1,6 @@
 module LC = LispCEK
 
-exception Parse_error of string
+exception ParseError of string
 
 type token = LParen | RParen | Quote | Number of int | Symbol of string
 type sexpr = SNumber of int | SSymbol of string | SList of sexpr list
@@ -41,17 +41,17 @@ let tokenize input =
             done;
             let token = String.sub input i (!j - i) in
             aux !j (Symbol token :: acc))
-          else raise (Parse_error (Printf.sprintf "unexpected character %c" ch))
+          else raise (ParseError (Printf.sprintf "unexpected character %c" ch))
   in
   aux 0 []
 
 let rec parse_sexpr tokens =
   match tokens with
-  | [] -> raise (Parse_error "unexpected end of input")
+  | [] -> raise (ParseError "unexpected end of input")
   | LParen :: rest ->
       let exprs, rest' = parse_list [] rest in
       (SList exprs, rest')
-  | RParen :: _ -> raise (Parse_error "unexpected )")
+  | RParen :: _ -> raise (ParseError "unexpected )")
   | Quote :: rest ->
       let expr, rest' = parse_sexpr rest in
       (SList [ SSymbol "quote"; expr ], rest')
@@ -60,16 +60,20 @@ let rec parse_sexpr tokens =
 
 and parse_list acc tokens =
   match tokens with
-  | [] -> raise (Parse_error "unterminated list")
+  | [] -> raise (ParseError "unterminated list")
   | RParen :: rest -> (List.rev acc, rest)
   | _ ->
       let expr, rest = parse_sexpr tokens in
       parse_list (expr :: acc) rest
 
+let rec parse_core_exn tokens =
+  let expr, rest = parse_sexpr tokens in
+  match rest with [] -> [ expr ] | _ -> expr :: parse_core_exn rest
+
 let parse_exn input =
   let tokens = tokenize input in
-  let expr, rest = parse_sexpr tokens in
-  match rest with [] -> expr | _ -> raise (Parse_error "extra tokens after expression")
+  let exprs = parse_core_exn tokens in
+  match exprs with [ expr ] -> expr | _ -> SList exprs
 
 let rec list_to_expr = function [] -> LC.EAtom LC.ANIL | x :: xs -> LC.ECons (x, list_to_expr xs)
 
@@ -82,6 +86,7 @@ let builtin_symbol = function
   | "cons" -> Some LC.SCons
   | "cond" -> Some LC.SCond
   | "define" -> Some LC.SDefine
+  | "null" -> Some LC.SNull
   | _ -> None
 
 let expr_nil = LC.EAtom LC.ANIL
@@ -93,7 +98,7 @@ let rec compile_quote expr =
   | SSymbol sym -> (
       match builtin_symbol sym with
       | Some s -> LC.EAtom (LC.ASymbol s)
-      | None -> raise (Parse_error ("unknown symbol in quote: " ^ sym)))
+      | None -> raise (ParseError ("unknown symbol in quote: " ^ sym)))
   | SList lst -> list_to_expr (List.map compile_quote lst)
 
 type compile_ctx = (string * int) list
@@ -102,14 +107,14 @@ let fresh_id next_id = (next_id, next_id + 1)
 
 let rec lookup_var ctx name =
   match ctx with
-  | [] -> raise (Parse_error ("unbound variable " ^ name))
+  | [] -> raise (ParseError ("unbound variable " ^ name))
   | (hd, id) :: tl -> if String.equal hd name then id else lookup_var tl name
 
 let parse_param_list params =
   match params with
   | SList lst ->
-      List.map (function SSymbol name -> name | _ -> raise (Parse_error "lambda parameters must be symbols")) lst
-  | _ -> raise (Parse_error "lambda parameter list expected")
+      List.map (function SSymbol name -> name | _ -> raise (ParseError "lambda parameters must be symbols")) lst
+  | _ -> raise (ParseError "lambda parameter list expected")
 
 let bind_params ctx next_id names =
   let rec aux ctx next_id acc = function
@@ -135,7 +140,7 @@ let rec compile_expr ctx next_id sexpr =
   | SList (SSymbol "quote" :: rest) -> (
       match rest with
       | [ value ] -> (list_to_expr [ LC.EAtom (LC.ASymbol LC.SQuote); compile_quote value ], next_id)
-      | _ -> raise (Parse_error "quote expects one argument"))
+      | _ -> raise (ParseError "quote expects one argument"))
   | SList [ SSymbol "lambda"; params; body ] -> compile_lambda ctx next_id params body
   | SList elements ->
       let compiled_elements, next_id = compile_seq ctx next_id elements in
@@ -158,7 +163,7 @@ and compile_define ctx next_id name args =
       ( list_to_expr [ LC.EAtom (LC.ASymbol LC.SDefine); LC.EAtom (LC.ANumber name_id); params_expr; body_expr ],
         next_id,
         (name, name_id) )
-  | _ -> raise (Parse_error "define expects a name, parameter list, and body")
+  | _ -> raise (ParseError "define expects a name, parameter list, and body")
 
 and compile_seq ctx next_id sexprs =
   match sexprs with
@@ -169,7 +174,7 @@ and compile_seq ctx next_id sexprs =
           let define_expr, next_id, binding = compile_define ctx next_id name define_tail in
           let rest_exprs, next_id = compile_seq (binding :: ctx) next_id rest in
           (define_expr :: rest_exprs, next_id)
-      | SList (SSymbol "define" :: _ :: _) -> raise (Parse_error "define name must be a symbol")
+      | SList (SSymbol "define" :: _ :: _) -> raise (ParseError "define name must be a symbol")
       | _ ->
           let expr, next_id = compile_expr ctx next_id sexpr in
           let rest_exprs, next_id = compile_seq ctx next_id rest in

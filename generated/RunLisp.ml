@@ -30,12 +30,13 @@ let string_of_symbol = function
   | LC.SAtom -> "atom"
   | LC.SCar -> "car"
   | LC.SCdr -> "cdr"
+  | LC.SNull -> "null"
 
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "#%d" i
   | LC.ANumber i -> Printf.sprintf "%d" i
   | LC.ASymbol sym -> Printf.sprintf "%s" (string_of_symbol sym)
-  | LC.ANIL -> "()"
+  | LC.ANIL -> "NIL"
 
 let rec string_of_expr = function
   | LC.EAtom atom -> string_of_atom atom
@@ -57,7 +58,7 @@ let rec string_of_value = function
   | LC.VSymbol sym -> Printf.sprintf "%s" (string_of_symbol sym)
   | LC.VQuote e -> Printf.sprintf "(quote %s)" (string_of_expr e)
   | LC.VNIL -> "()"
-  | LC.VCons (x, y) -> Printf.sprintf "(cons %s %s)" (string_of_value x) (string_of_value y)
+  | LC.VCons (x, y) -> Printf.sprintf "(%s . %s)" (string_of_value x) (string_of_value y)
   | LC.VClosure _ -> "PROCEDURE"
 
 let string_of_expr_list exprs = "[" ^ String.concat "; " (List.map string_of_expr exprs) ^ "]"
@@ -118,6 +119,8 @@ let test_car_after_cons () =
   let code = "(car (cons 5 (quote ())))" in
   expect_eval "car unwraps the head of cons cells" code (LC.VNumber 5)
 
+let read_file_content filename = In_channel.with_open_text filename In_channel.input_all
+
 let run () =
   test_eval_cdr ();
   test_label_recursion ();
@@ -126,4 +129,7 @@ let run () =
   test_eq_number_literals_false ();
   test_cond_short_circuits ();
   test_car_after_cons ();
+  let code = read_file_content "./generated/Lisp.lisp" in
+  let r = eval_string code in
+  print_endline (string_of_value r);
   print_endline "LispCEK smoke tests completed."
