@@ -129,6 +129,9 @@ let rec lookup_var ctx name =
   | [] -> raise (ParseError ("unbound variable " ^ name))
   | (hd, id) :: tl -> if String.equal hd name then id else lookup_var tl name
 
+let rec lookup_var_opt ctx name =
+  match ctx with [] -> None | (hd, id) :: tl -> if String.equal hd name then Some id else lookup_var_opt tl name
+
 let parse_param_list params =
   match params with
   | SList lst ->
@@ -174,15 +177,49 @@ and compile_lambda ctx next_id params body =
 and compile_define ctx next_id name args =
   match args with
   | [ params; body ] ->
-      let name_id, next_id = fresh_id next_id in
-      let ctx_with_name = (name, name_id) :: ctx in
+      let existing = lookup_var_opt ctx name in
+      let name_id, next_id =
+        match existing with
+        | Some id -> (id, next_id)
+        | None ->
+            let id, next_id = fresh_id next_id in
+            (id, next_id)
+      in
+      let ctx_with_name = match existing with Some _ -> ctx | None -> (name, name_id) :: ctx in
       let param_names = parse_param_list params in
       let params_expr, ctx_for_body, next_id = bind_params ctx_with_name next_id param_names in
       let body_expr, next_id = compile_expr ctx_for_body next_id body in
       ( list_to_expr [ LC.EAtom (LC.ASymbol LC.SDefine); LC.EAtom (LC.ANumber name_id); params_expr; body_expr ],
         next_id,
-        (name, name_id) )
+        ctx_with_name )
   | _ -> raise (ParseError "define expects a name, parameter list, and body")
+
+and preallocate_define_block ctx next_id sexprs =
+  let rec aux ctx next_id seqs =
+    match seqs with
+    | SList (SSymbol "define" :: SSymbol name :: _) :: rest ->
+        let ctx, next_id =
+          match lookup_var_opt ctx name with
+          | Some _ -> (ctx, next_id)
+          | None ->
+              let id, next_id = fresh_id next_id in
+              ((name, id) :: ctx, next_id)
+        in
+        aux ctx next_id rest
+    | SList (SSymbol "define" :: _ :: _) :: _ -> raise (ParseError "define name must be a symbol")
+    | SList (SList (SSymbol "define" :: SSymbol name :: _) :: kont) :: rest ->
+        let ctx, next_id =
+          match lookup_var_opt ctx name with
+          | Some _ -> (ctx, next_id)
+          | None ->
+              let id, next_id = fresh_id next_id in
+              ((name, id) :: ctx, next_id)
+        in
+        aux ctx next_id (SList kont :: rest)
+    | SList (SList (SSymbol "define" :: _ :: _) :: _) :: _ -> raise (ParseError "define name must be a symbol")
+    | _ -> (ctx, next_id)
+  in
+  aux ctx next_id sexprs
 
 and compile_defvar ctx next_id name args =
   match args with
@@ -200,8 +237,9 @@ and compile_seq ctx next_id sexprs =
   | sexpr :: rest -> (
       match sexpr with
       | SList (SSymbol "define" :: SSymbol name :: define_tail) ->
-          let define_expr, next_id, binding = compile_define ctx next_id name define_tail in
-          let rest_exprs, next_id = compile_seq (binding :: ctx) next_id rest in
+          let ctx_with_block, next_id = preallocate_define_block ctx next_id (sexpr :: rest) in
+          let define_expr, next_id, _ = compile_define ctx_with_block next_id name define_tail in
+          let rest_exprs, next_id = compile_seq ctx_with_block next_id rest in
           (define_expr :: rest_exprs, next_id)
       | SList (SSymbol "define" :: _ :: _) -> raise (ParseError "define name must be a symbol")
       | SList (SSymbol "defvar" :: SSymbol name :: defvar_tail) ->
