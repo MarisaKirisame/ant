@@ -31,6 +31,7 @@ let string_of_symbol = function
   | LC.SCar -> "car"
   | LC.SCdr -> "cdr"
   | LC.SNull -> "null"
+  | LC.SError -> "error"
 
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "#%d" i

@@ -99,6 +99,7 @@ let builtin_symbol = function
   | "cond" -> Some LC.SCond
   | "define" -> Some LC.SDefine
   | "null" -> Some LC.SNull
+  | "error" -> Some LC.SError
   | _ -> None
 
 let expr_nil = LC.EAtom LC.ANIL
