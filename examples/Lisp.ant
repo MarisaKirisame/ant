@@ -25,7 +25,8 @@ type symbol =
   | SAtom
   | SCar
   | SCdr
-  | SNull;;
+  | SNull
+  | SError;;
 
 type atom =
   | AVar of int
@@ -43,7 +44,7 @@ type value =
   | VQuote of expr
   | VNIL
   | VCons of value * value
-  | VClosure of int * expr * env
+  | VClosure of int * expr
 
 and env_entry = EnvEntry of int * value
 
@@ -58,15 +59,6 @@ let env_entry_name = fun ent ->
 let env_entry_value = fun ent ->
   match ent with
   | EnvEntry _ value -> value;;
-
-(* let rec value_to_expr = fun v ->
-  match v with
-  | VNumber x -> EAtom (ANumber x)
-  | VSymbol sym -> EAtom (ASymbol sym)
-  | VQuote e -> quote_expr e
-  | VNIL -> EAtom ANIL
-  | VCons x y -> ECons (EAtom (ASymbol SCons)) (ECons (value_to_expr x) (ECons (value_to_expr y) (EAtom ANIL)))
-  | VClosure _ _ _ -> failwith "value_to_expr: unexpected CLOSURE";; *)
 
 let expr_is_symbol = fun e ->
   match e with
@@ -99,6 +91,12 @@ let expr_is_nil = fun e ->
     match a with
     | ANIL -> true
     | _ -> false;;
+
+let value_is_number_or_quote_number = fun v ->
+  match v with
+  | VNumber x -> Some x
+  | VQuote e -> expr_is_num e
+  | _ -> None;;
 
 (* let const_Nil = fun _ -> EAtom ANIL;; *)
 
@@ -250,6 +248,10 @@ let rec value_eq = fun x y ->
   | VNumber a ->
     (match y with
     | VNumber b -> a = b
+    | VQuote e -> (* as per Scheme, `'n = n` holds while `''n = n` does not hold *)
+      (match expr_is_num e with
+      | None -> false
+      | Some m -> a = m)
     | _ -> false)
   | VSymbol a ->
     (match y with
@@ -258,13 +260,17 @@ let rec value_eq = fun x y ->
   | VQuote a ->
     (match y with
     | VQuote b -> expr_eq a b
+    | VNumber n ->
+      (match expr_is_num a with
+      | None -> false
+      | Some m -> n = m)
     | _ -> false)
   | VNIL ->
     (match y with
     | VNIL -> true
     | _ -> false)
   | VCons ah at -> false (* Scheme does this, and so do we *)
-  | VClosure n1 e1 env1 -> false;;
+  | VClosure _ _ -> false;;
 
 let car = fun v ->
   match v with
@@ -276,7 +282,7 @@ let car = fun v ->
     | _ -> failwith "car: PAIR expected" )
   | VNIL -> failwith "car: cannot apply on NIL"
   | VCons x _ -> x
-  | VClosure _ _ _ -> failwith "car: cannot apply on CLOSURE";;
+  | VClosure _ _ -> failwith "car: cannot apply on CLOSURE";;
 
 let cdr = fun v ->
   match v with
@@ -288,7 +294,7 @@ let cdr = fun v ->
     | _ -> failwith "cdr: PAIR expected" )
   | VNIL -> failwith "cdr: cannot apply on NIL"
   | VCons _ y -> y
-  | VClosure _ _ _ -> failwith "cdr: cannot apply on CLOSURE";;
+  | VClosure _ _ -> failwith "cdr: cannot apply on CLOSURE";;
 
 let is_atom_ = fun v ->
   match v with
@@ -297,7 +303,7 @@ let is_atom_ = fun v ->
   | VQuote _ -> value_true Unit
   | VNIL -> value_true Unit
   | VCons _ _ -> value_false Unit
-  | VClosure _ _ _ -> value_true Unit;;
+  | VClosure _ _ -> value_true Unit;;
 
 let is_eq_ = fun x y ->
   if value_eq x y then value_true Unit else value_false Unit;;
@@ -326,7 +332,10 @@ let rec destruct_names = fun names ->
     (match expr_is_num a with
     | Some x -> Cons x (destruct_names t)
     | _ -> failwith "destruct_names: impossible, names must be int literals" )
-  | _ -> Nil;;
+  | EAtom a ->
+    match a with
+    | ANIL -> Nil
+    | _ -> failwith "destruct_names: impossible";;
 
 let is_null_ = fun v ->
   match v with
@@ -372,6 +381,10 @@ and eval = fun exp env ->
       | SCons -> VCons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCond -> evcon (cdr_ exp) env
       | SNull -> is_null_ (eval (cadr_ exp) env)
+      | SError ->
+        let err = eval (cadr_ exp) env in
+        let err_code = (match value_is_number_or_quote_number err with | None -> failwith "eval: user error code must evalutes to integer" | Some x -> x) in
+        failwith_int err_code
       | _ -> failwith "invalid symbol here")
     | None ->
       match car_ exp with
@@ -388,7 +401,7 @@ and eval = fun exp env ->
           | SDefine -> (* ( define f (i j) (+ #i #j) ) kont *)
             let lam = ECons (EAtom (ASymbol (SLambda))) (cddar_ exp) in
             let name = (match expr_is_num (cadar_ exp) with | None -> failwith "eval: function name must be int literal" | Some x -> x) in
-            let closure = VClosure name lam env in (* we cannot setup env for self referencing now, so instead we store the id of the function *)
+            let closure = VClosure name lam in
             let env_with_def = cons_env (EnvEntry name closure) env in
             let kont = cadr_ exp in
             eval kont env_with_def
@@ -400,6 +413,7 @@ and eval = fun exp env ->
           | SCar -> failwith "unexpected function car"
           | SCdr -> failwith "unexpected function cdr"
           | SNull -> failwith "unexpected function null"
+          | SError -> failwith "unexpected function error"
           | _ -> failwith "1")
         | None ->
           (match caar_ exp with
@@ -419,9 +433,8 @@ and eval = fun exp env ->
           | VQuote _ -> failwith "QUOTE is not PROCEDURE"
           | VNIL -> failwith "NIL is not PROCEDURE"
           | VCons _ _ -> failwith "PAIR is not PROCEDURE"
-          | VClosure name lam captured ->
-            let env_self = cons_env (EnvEntry name (VClosure name lam captured)) captured in
-            eval (ECons lam (cdr_ exp)) env_self)
+          | VClosure name lam ->
+            eval (ECons lam (cdr_ exp)) env)
         | None ->
           (match car_ exp with
           | EAtom a ->
