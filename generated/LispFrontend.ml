@@ -106,6 +106,10 @@ let builtin_symbol = function
   | "null" -> Some LC.SNull
   | "error" -> Some LC.SError
   | "if" -> Some LC.SIf
+  | "pair" -> Some LC.SPair
+  | "symbol" -> Some LC.SSymbol
+  | "true" -> Some LC.STrue
+  | "false" -> Some LC.SFalse
   | _ -> None
 
 let expr_nil = LC.EAtom LC.ANIL
@@ -215,7 +219,7 @@ and preallocate_define_block ctx next_id sexprs =
               let id, next_id = fresh_id next_id in
               ((name, id) :: ctx, next_id)
         in
-        aux ctx next_id (SList kont :: rest)
+        aux ctx next_id (kont @ rest)
     | SList (SList (SSymbol "define" :: _ :: _) :: _) :: _ -> raise (ParseError "define name must be a symbol")
     | _ -> (ctx, next_id)
   in
@@ -241,6 +245,11 @@ and compile_seq ctx next_id sexprs =
           let define_expr, next_id, _ = compile_define ctx_with_block next_id name define_tail in
           let rest_exprs, next_id = compile_seq ctx_with_block next_id rest in
           (define_expr :: rest_exprs, next_id)
+      | SList (SList (SSymbol "define" :: _) :: _) ->
+          let ctx_with_block, next_id = preallocate_define_block ctx next_id [ sexpr ] in
+          let expr, next_id = compile_expr ctx_with_block next_id sexpr in
+          let rest_exprs, next_id = compile_seq ctx next_id rest in
+          (expr :: rest_exprs, next_id)
       | SList (SSymbol "define" :: _ :: _) -> raise (ParseError "define name must be a symbol")
       | SList (SSymbol "defvar" :: SSymbol name :: defvar_tail) ->
           let defvar_expr, next_id, binding = compile_defvar ctx next_id name defvar_tail in
