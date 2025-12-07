@@ -19,6 +19,12 @@ let tokenize input =
       | '(' -> aux (i + 1) (LParen :: acc)
       | ')' -> aux (i + 1) (RParen :: acc)
       | '\'' -> aux (i + 1) (Quote :: acc)
+      | ';' ->
+          let j = ref i in
+          while !j < len && input.[!j] != '\n' do
+            j := !j + 1
+          done;
+          aux (!j + 1) acc (* skip \n *)
       | ch ->
           if (ch >= '0' && ch <= '9') || ch = '-' then (
             let j = ref i in
