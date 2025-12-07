@@ -26,6 +26,7 @@
             (pairlis (cdr xs) (cdr ys) env))))
 
 (defvar a '(1 2 3))
+(defvar a '(2 1 3))
 (defvar b '(7 8 9))
 
 (defvar e (pairlis a b '()))
