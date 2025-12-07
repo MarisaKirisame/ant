@@ -7,11 +7,24 @@
 (define eq? (a b)
     (eq a b))
 
+(define symbol? (a)
+    (symbol a))
+
+(define pair? (a)
+    (pair a))
+
+(define atom? (a)
+    (atom a))
+
+(define and (a b) (if a (if b true false) false ))
+
 (define else () (quote 0))
 
 (define caar (xs) (car (car xs)))
 (define cdar (xs) (cdr (car xs)))
 (define cadar (xs) (car (cdr (car xs))))
+(define caddar (xs) (car (cdr (cdr (car xs)))))
+(define caddr (xs) (car (cdr (cdr xs))))
 (define cadr (xs) (car (cdr xs)))
 
 (define lookup (x env)
@@ -31,82 +44,83 @@
 
 (defvar e (pairlis a b '()))
 
-;; (define evlis (exps env)
-;;   (if (null? exps)
-;;       '()
-;;       (cons (eval* (car exps) env)
-;;             (evlis (cdr exps) env))))
+(define evlis (exps env)
+  (if (null? exps)
+      '()
+      (cons (eval* (car exps) env)
+            (evlis (cdr exps) env))))
 
-;; (lookup 1 (cons (cons 1 2) (cons (cons 2 3) '())))
-(lookup 2 e)
+(define evcon (clauses env)
+  (cond ((null? clauses) (error -2))
+        ((eval* (caar clauses) env)
+         (eval* (cadar clauses) env))
+        (else
+         (evcon (cdr clauses) env))))
 
-; 
-; (define (evcon clauses env)
-;   (cond ((null? clauses) (error "no cond clause matched"))
-;         ((eval* (caar clauses) env)
-;          (eval* (cadar clauses) env))
-;         (else
-;          (evcon (cdr clauses) env))))
-; 
-; (define (eval* exp env)
-;   (cond
-;     ;; variable
-;     ((symbol? exp)
-;      (lookup exp env))
-; 
-;     ;; quoted constant: (quote x)
-;     ((and (pair? exp) (eq? (car exp) 'quote))
-;      (cadr exp))
-; 
-;     ;; special forms built in
-;     ((and (pair? exp) (eq? (car exp) 'atom))
-;      (atom? (eval* (cadr exp) env)))
-; 
-;     ((and (pair? exp) (eq? (car exp) 'eq))
-;      (eq? (eval* (cadr exp) env)
-;           (eval* (caddr exp) env)))
-; 
-;     ((and (pair? exp) (eq? (car exp) 'car))
-;      (car (eval* (cadr exp) env)))
-; 
-;     ((and (pair? exp) (eq? (car exp) 'cdr))
-;      (cdr (eval* (cadr exp) env)))
-; 
-;     ((and (pair? exp) (eq? (car exp) 'cons))
-;      (cons (eval* (cadr exp) env)
-;            (eval* (caddr exp) env)))
-; 
-;     ((and (pair? exp) (eq? (car exp) 'cond))
-;      (evcon (cdr exp) env))
-; 
-;     ;; function call where operator is a symbol
-;     ((symbol? (car exp))
-;      (eval* (cons (lookup (car exp) env)
-;                   (cdr exp))
-;             env))
-; 
-;     ;; ( (lambda (x ...) body) arg1 arg2 ...)
-;     ((and (pair? (car exp))
-;           (eq? (caar exp) 'lambda))
-;      (let* ((params (cadar exp))
-;             (body   (caddar exp))
-;             (args   (evlis (cdr exp) env))
-;             (env*   (pairlis params args env)))
-;        (eval* body env*)))
-; 
-;     ;; ( (label f (lambda (...) body)) arg1 arg2 ...)
-;     ((and (pair? (car exp))
-;           (eq? (caar exp) 'label))
-;      (let* ((fname  (cadar exp))
-;             (fdef   (caddar exp))
-;             (env*   (cons (cons fname (car exp)) env)))
-;        (eval* (cons fdef (cdr exp)) env*)))
-; 
-;     (else
-;      (error "bad expression" exp))))
-; 
-; ;; McCarthy’s entry point was essentially:
-; ;;   evalquote[fn; args] = apply[fn; args; NIL]
-; ;; In this style you can write:
-; (define (evalquote fn args)
-;   (eval* (cons fn args) '()))
+(define eval* (exp env)
+  (cond
+    ;; variable
+    ((symbol? exp)
+     (lookup exp env))
+
+    ;; quoted constant: (quote x)
+    ((and (pair? exp) (eq? (car exp) 'quote))
+     (cadr exp))
+
+    ;; special forms built in
+    ((and (pair? exp) (eq? (car exp) 'atom))
+     (atom? (eval* (cadr exp) env)))
+
+    ((and (pair? exp) (eq? (car exp) 'eq))
+     (eq? (eval* (cadr exp) env)
+          (eval* (caddr exp) env)))
+
+    ((and (pair? exp) (eq? (car exp) 'car))
+     (car (eval* (cadr exp) env)))
+    ;;  (error -4))
+
+    ((and (pair? exp) (eq? (car exp) 'cdr))
+     (cdr (eval* (cadr exp) env)))
+    ;;  (error -4))
+
+    ((and (pair? exp) (eq? (car exp) 'cons))
+     (cons (eval* (cadr exp) env)
+           (eval* (caddr exp) env)))
+
+    ((and (pair? exp) (eq? (car exp) 'cond))
+     (evcon (cdr exp) env))
+
+    ;; function call where operator is a symbol
+    ;; ((symbol? (car exp))
+    ;;  (eval* (cons (lookup (car exp) env)
+    ;;               (cdr exp))
+    ;;         env))
+
+    ;; ( (lambda (x ...) body) arg1 arg2 ...)
+    ;; ((and (pair? (car exp))
+    ;;       (eq? (caar exp) 'lambda))
+    ;;  (let* ((params (cadar exp))
+    ;;         (body   (caddar exp))
+    ;;         (args   (evlis (cdr exp) env))
+    ;;         (env*   (pairlis params args env)))
+    ;;    (eval* body env*)))
+
+    ;; ( (label f (lambda (...) body)) arg1 arg2 ...)
+    ;; ((and (pair? (car exp))
+    ;;       (eq? (caar exp) 'label))
+    ;;  (let* ((fname  (cadar exp))
+    ;;         (fdef   (caddar exp))
+    ;;         (env*   (cons (cons fname (car exp)) env)))
+    ;;    (eval* (cons fdef (cdr exp)) env*)))
+
+    (else
+     (error -3))))
+
+(define evalquote (fn args)
+  (eval* (cons fn args) '()))
+
+;; (eval* '(cdr '(1 2 3)) '())
+
+;; (eval* (cons 'cdr '('(1 2 3))) '())
+
+(evalquote 'cdr '('(1 2 3)))

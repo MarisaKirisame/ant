@@ -25,9 +25,13 @@ type symbol =
   | SCons
   | SCond
   | SAtom
+  | SPair
+  | SSymbol
   | SCar
   | SCdr
   | SNull
+  | STrue
+  | SFalse
   | SError;;
 
 type atom =
@@ -227,6 +231,22 @@ let symbol_eq = fun x y ->
     (match y with
     | SAtom -> true
     | _ -> false)
+  | SPair ->
+    (match y with
+    | SPair -> true
+    | _ -> false)
+  | SSymbol ->
+    (match y with
+    | SSymbol -> true
+    | _ -> false)
+  | STrue ->
+    (match y with
+    | STrue -> true
+    | _ -> false)
+  | SFalse ->
+    (match y with
+    | SFalse -> true
+    | _ -> false)
   | SCar ->
     (match y with
     | SCar -> true
@@ -234,6 +254,10 @@ let symbol_eq = fun x y ->
   | SCdr ->
     (match y with
     | SCdr -> true
+    | _ -> false)
+  | SNull ->
+    (match y with
+    | SNull -> true
     | _ -> false);;
 
 let rec atom_eq = fun x y ->
@@ -325,6 +349,30 @@ let is_atom_ = fun v ->
   | VCons _ _ -> value_false Unit
   | VClosure _ _ -> value_true Unit;;
 
+let is_pair_ = fun v ->
+  match v with
+  | VNumber _ -> value_false Unit
+  | VSymbol _ -> value_false Unit
+  | VQuote e ->
+    (match e with
+    | ECons _ _ -> value_true Unit
+    | _ -> value_false Unit )
+  | VNIL -> value_false Unit
+  | VCons _ _ -> value_true Unit
+  | VClosure _ _ -> value_false Unit;;
+
+let is_symbol_ = fun v ->
+  match v with
+  | VNumber _ -> value_false Unit
+  | VSymbol _ -> value_true Unit
+  | VQuote e ->
+    (match expr_is_symbol e with
+    | Some _ -> value_true Unit
+    | _ -> value_false Unit )
+  | VNIL -> value_false Unit
+  | VCons _ _ -> value_false Unit
+  | VClosure _ _ -> value_false Unit;;
+
 let is_eq_ = fun x y ->
   if value_eq x y then value_true Unit else value_false Unit;;
 
@@ -387,7 +435,11 @@ and eval = fun exp env ->
     (match a with
     | AVar i -> lookup i env
     | ANumber x -> VNumber x
-    | ASymbol sym -> VSymbol sym
+    | ASymbol sym ->
+      (match sym with
+      | STrue -> value_true Unit
+      | SFalse -> value_false Unit
+      | _ -> failwith "cannot directly evaluate this symbol")
     | ANIL -> failwith "ill-formed expression: NIL")
   | ECons _ _ ->
     (match expr_is_symbol (car_ exp) with
@@ -395,6 +447,8 @@ and eval = fun exp env ->
       (match sym with
       | SQuote -> VQuote (cadr_ exp)
       | SAtom -> is_atom_ (eval (cadr_ exp) env)
+      | SPair -> is_pair_ (eval (cadr_ exp) env)
+      | SSymbol -> is_symbol_ (eval (cadr_ exp) env)
       | SEq -> is_eq_ (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCar -> car (eval (cadr_ exp) env)
       | SCdr -> cdr (eval (cadr_ exp) env)
@@ -410,6 +464,8 @@ and eval = fun exp env ->
       | SCons -> VCons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCond -> evcon (cdr_ exp) env
       | SNull -> is_null_ (eval (cadr_ exp) env)
+      | STrue -> failwith "true is not PROCEDURE"
+      | SFalse -> failwith "false is not PROCEDURE"
       | SError ->
         let err = eval (cadr_ exp) env in
         let err_code = (match value_is_number_or_quote_number err with | None -> failwith "eval: user error code must evalutes to integer" | Some x -> x) in
@@ -446,6 +502,10 @@ and eval = fun exp env ->
           | SIf -> failwith "unexpected function if"
           | SCond -> failwith "unexpected function cond"
           | SAtom -> failwith "unexpected function atom"
+          | SPair -> failwith "unexpected function pair"
+          | SSymbol -> failwith "unexpected function symbol"
+          | STrue -> failwith "unexpected function true"
+          | SFalse -> failwith "unexpected function false"
           | SCar -> failwith "unexpected function car"
           | SCdr -> failwith "unexpected function cdr"
           | SNull -> failwith "unexpected function null"
