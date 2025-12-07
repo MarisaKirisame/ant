@@ -2,6 +2,13 @@ type list 'a =
   | Nil
   | Cons of 'a * list 'a;;
 
+let rec list_length_tc = fun l len ->
+  match l with
+  | Nil -> len
+  | Cons _ tail -> list_length_tc tail (len + 1);;
+
+let list_length = fun l -> list_length_tc l 0;;
+
 type unit = Unit;;
 
 type option 'a =
@@ -9,8 +16,8 @@ type option 'a =
   | Some of 'a;;
 
 type symbol =
-  | SLambda of int
-  | SLabel
+  | SLambda
+  | SDefine
   | SQuote
   | SEq
   | SCons
@@ -33,12 +40,32 @@ type value =
   | VNumber of int
   | VSymbol of symbol
   | VQuote of expr
+  | VNIL
   | VCons of value * value
-  | VClosure of int * expr * env;;
+  | VClosure of int * expr * env
+
+and env_entry = EnvEntry of int * value
+
+and env = MkEnv of list env_entry;;
 
 let quote_expr = fun e -> ECons (EAtom (ASymbol SQuote)) e;;
 
-type env = MkEnv of list expr;;
+let env_entry_name = fun ent ->
+  match ent with
+  | EnvEntry name _ -> name;;
+
+let env_entry_value = fun ent ->
+  match ent with
+  | EnvEntry _ value -> value;;
+
+let rec value_to_expr = fun v ->
+  match v with
+  | VNumber x -> EAtom (ANumber x)
+  | VSymbol sym -> EAtom (ASymbol sym)
+  | VQuote e -> quote_expr e
+  | VNIL -> EAtom ANIL
+  | VCons x y -> ECons (EAtom (ASymbol SCons)) (ECons (value_to_expr x) (ECons (value_to_expr y) (EAtom ANIL)))
+  | VClosure _ _ _ -> failwith "value_to_expr: unexpected CLOSURE";;
 
 let is_symbol = fun e ->
   match e with
@@ -58,9 +85,13 @@ let is_var = fun e ->
 
 let const_Nil = fun _ -> EAtom ANIL;;
 
-let const_false = fun _ -> EAtom ANIL;;
+let expr_false = fun _ -> EAtom ANIL;;
 
-let const_true = fun _ -> EAtom (ANumber 0);;
+let expr_true = fun _ -> EAtom (ANumber 0);;
+
+let value_false = fun _ -> VNIL;;
+
+let value_true = fun _ -> VNumber 0;;
 
 let unwrap_env = fun env ->
   match env with
@@ -91,6 +122,20 @@ let caar_ = fun e ->
     match x with
     | ECons y _ -> y;;
 
+let cdar_ = fun e ->
+  match e with
+  | ECons x _ ->
+    match x with
+    | ECons _ y -> y;;
+
+let cddar_ = fun e ->
+  match e with
+  | ECons x _ ->
+    match x with
+    | ECons _ y ->
+      match y with
+      | ECons _ z -> z;;
+
 let cadar_ = fun e ->
   match e with
   | ECons x _ ->
@@ -119,13 +164,13 @@ let cdr_ = fun e ->
 
 let symbol_eq = fun x y ->
   match x with
-  | SLambda a ->
+  | SLambda ->
     (match y with
-    | SLambda b -> a = b
+    | SLambda -> true
     | _ -> false)
-  | SLabel ->
+  | SDefine ->
     (match y with
-    | SLabel -> true
+    | SDefine -> true
     | _ -> false)
   | SQuote ->
     (match y with
@@ -181,9 +226,42 @@ let rec expr_eq = fun x y ->
     (match y with
     | EAtom b -> atom_eq a b
     | _ -> false)
-  | ECons xh xt ->
+  | ECons _ _ -> false;; (* Scheme does this, and so do we *)
+  (* | ECons xh xt ->
     (match y with
     | ECons yh yt -> expr_eq xh yh && expr_eq xt yt
+    | _ -> false);; *)
+
+let rec value_eq = fun x y ->
+  match x with
+  | VNumber a ->
+    (match y with
+    | VNumber b -> a = b
+    | _ -> false)
+  | VSymbol a ->
+    (match y with
+    | VSymbol b -> symbol_eq a b
+    | _ -> false)
+  | VQuote a ->
+    (match y with
+    | VQuote b -> expr_eq a b
+    | _ -> false)
+  | VNIL ->
+    (match y with
+    | VNIL -> true
+    | _ -> false)
+  | VCons ah at -> false (* Scheme does this, and so do we *)
+  | VClosure n1 e1 env1 -> false
+
+and env_eq = fun x y ->
+  match x with
+  | Nil ->
+    (match y with
+    | Nil -> true
+    | _ -> false)
+  | Cons xh xt ->
+    (match y with
+    | Cons yh yt -> value_eq xh yh && env_eq xt yt
     | _ -> false);;
 
 (*
@@ -194,71 +272,83 @@ let rec if_ = fun env v thn els ->
     thn Unit
 *)
 
-let rec is_quote = fun e ->
+let expr_is_num = fun e ->
   match e with
-  | ECons fn t ->
-    (match fn with
-    | EAtom a ->
-      (match a with
-      | ASymbol sym ->
-        (match sym with
-        | SQuote -> Some (cdr_ e)
-        | _ -> None)
-      | _ -> None)
-    | _ -> None)
-  | _ -> None;;
+  | ECons fn t -> None
+  | EAtom a ->
+    match a with
+    | ANumber x -> Some x
+    | _ -> None;;
 
 let car = fun v ->
+  match v with
+  | VNumber _ -> failwith "car: cannot apply on NUMBER"
+  | VSymbol _ -> failwith "car: cannot apply on SYMBOL"
+  | VQuote e ->
+    (match e with
+    | ECons _ _ -> VQuote (car_ e)
+    | _ -> failwith "car: PAIR expected" )
+  | VNIL -> failwith "car: cannot apply on NIL"
+  | VCons x _ -> x
+  | VClosure _ _ _ -> failwith "car: cannot apply on CLOSURE";;
+
+let cdr = fun v ->
+  match v with
+  | VNumber _ -> failwith "cdr: cannot apply on NUMBER"
+  | VSymbol _ -> failwith "cdr: cannot apply on SYMBOL"
+  | VQuote e ->
+    (match e with
+    | ECons _ _ -> VQuote (cdr_ e)
+    | _ -> failwith "cdr: PAIR expected" )
+  | VNIL -> failwith "cdr: cannot apply on NIL"
+  | VCons _ y -> y
+  | VClosure _ _ _ -> failwith "cdr: cannot apply on CLOSURE";;
+
+(* 
   match is_quote v with
   | None -> failwith "car: input is not quote"
   | Some w ->
     match w with
     | ECons _ _ -> quote (car_ w)
-    | _ -> failwith "car: pair expected";;
+    | _ -> failwith "car: pair expected";; *)
 
-let cdr = fun v ->
+(* let cdr = fun v ->
   match is_quote v with
   | None -> failwith "cdr: input is not quote"
   | Some w ->
     match w with
     | ECons _ _ -> quote (cdr_ w)
-    | _ -> failwith "cdr: pair expected";;
+    | _ -> failwith "cdr: pair expected";; *)
 
-let cons = fun x y ->
-  match is_quote x with
-  | None -> failwith "cons: input is not quote"
-  | Some x_ ->
-    match is_quote y with
-    | None -> failwith "cons: input is not quote"
-    | Some y_ -> quote (ECons x_ y_);;
+let is_atom_ = fun v ->
+  match v with
+  | VNumber _ -> value_true Unit
+  | VSymbol _ -> value_true Unit
+  | VQuote _ -> value_true Unit
+  | VNIL -> value_true Unit
+  | VCons _ _ -> value_false Unit
+  | VClosure _ _ _ -> value_true Unit;;
 
-let rec is_atom_ = fun env v ->
-  match is_quote v with
-  | None -> failwith "is_atom_: input is not quote"
-  | Some w ->
-    match w with
-    | ECons _ _ -> const_false Unit
-    | _ -> const_true Unit
+let rec is_eq_ = fun x y ->
+  if value_eq x y then value_true Unit else value_false Unit
 
-and is_eq_ = fun env x y ->
-  if expr_eq (eval x env) (eval y env) then const_true Unit else const_false Unit
-
-and lookup = fun x env ->
+and lookup = fun i env ->
   match unwrap_env env with
   | Nil -> failwith "empty environment"
   | Cons head tail ->
-    if x = 0 then
-      head
+    if env_entry_name head = i then
+      env_entry_value head
     else
-      lookup (x - 1) (MkEnv tail)
+      lookup i (MkEnv tail)
 
-and pairlis = fun n ys env ->
-  if n = 0 then env
-  else
+and pairlis = fun xs ys env ->
+  match xs with
+  | Nil -> env
+  | Cons x x_tl ->
     match ys with
     | Nil -> failwith "pairlis: arguments too few"
     | Cons y tl ->
-      pairlis (n - 1) tl (cons_env y env) (* leftmost with the largest dbi *)
+      pairlis x_tl tl (cons_env (EnvEntry x y) env)
 
 and evlis = fun exps env ->
   match exps with
@@ -269,28 +359,38 @@ and evlis = fun exps env ->
 and evcon = fun clauses env ->
   match clauses with
   | ECons head tail ->
-    if expr_eq (eval (car_ head) env) (const_false Unit) then
+    if value_eq (eval (car_ head) env) (value_false Unit) then
       evcon tail env
     else
       eval (cadr_ head) env
   | _ -> failwith "no cond clause matched"
+
+and destruct_names = fun names ->
+  match names with
+  | ECons a t ->
+    match expr_is_num a with
+    | Some x -> Cons x (destruct_names t)
+    | _ -> failwith "destruct_names: impossible, names must be int literals"
+  | _ -> Nil
 
 and eval = fun exp env ->
   match exp with
   | EAtom a ->
     (match a with
     | AVar i -> lookup i env
-    | _ -> exp)
+    | ANumber x -> VNumber x
+    | ASymbol sym -> VSymbol sym
+    | ANIL -> VNIL)
   | ECons _ _ ->
     (match is_symbol (car_ exp) with
     | Some sym ->
       (match sym with
-      | SQuote -> exp
-      | SAtom -> is_atom_ env (eval (cadr_ exp) env)
-      | SEq -> is_eq_ env (eval (cadr_ exp) env) (eval (caddr_ exp) env)
+      | SQuote -> VQuote (cadr_ exp)
+      | SAtom -> is_atom_ (eval (cadr_ exp) env)
+      | SEq -> is_eq_ (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCar -> car (eval (cadr_ exp) env)
       | SCdr -> cdr (eval (cadr_ exp) env)
-      | SCons -> cons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
+      | SCons -> VCons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCond -> evcon (cdr_ exp) env
       | _ -> failwith "invalid symbol here")
     | None ->
@@ -299,18 +399,19 @@ and eval = fun exp env ->
         (match is_symbol (caar_ exp) with
         | Some sym ->
           (match sym with
-          | SLambda nargs ->
+          | SLambda -> (* ( lambda (i j) (+ #i #j) ) args... *)
+            let params = destruct_names (cadar_ exp) in
             let body = caddar_ exp in
             let args = evlis (cdr_ exp) env in
-            (match env with
-            | MkEnv _ ->
-              let env_new = pairlis nargs args env in
-              eval body env_new
-            | _ -> failwith "???")
-          | SLabel ->
-            let env_with_label = cons_env (car_ exp) env in
-            let new_exp = ECons (caddar_ exp) (cdr_ exp) in
-            eval new_exp env_with_label
+            let env_new = pairlis params args env in
+            eval body env_new
+          | SDefine -> (* ( define f (i j) (+ #i #j) ) kont *)
+            let lam = ECons (EAtom (ASymbol (SLambda))) (cddar_ exp) in
+            let name = (match expr_is_num (cadar_ exp) with | None -> failwith "eval: function name must be int literal" | Some x -> x) in
+            let closure = VClosure name lam env in (* we cannot setup env for self referencing now, so instead we store the id of the function *)
+            let env_with_def = cons_env (EnvEntry name closure) env in
+            let kont = cadr_ exp in
+            eval kont env_with_def
           | SQuote -> failwith "unexpected function quote"
           | SEq -> failwith "unexpected function eq"
           | SCons -> failwith "unexpected function cons"
@@ -331,9 +432,16 @@ and eval = fun exp env ->
       | _ ->
         (match is_var (car_ exp) with
         | Some i ->
-          let f = lookup i env in
-          eval (ECons f (cdr_ exp)) env
-        | None -> exp));;
+          (match lookup i env with
+          | VNumber _ -> failwith "NUMBER is not PROCEDURE"
+          | VSymbol _ -> failwith "SYMBOL is not PROCEDURE"
+          | VQuote _ -> failwith "QUOTE is not PROCEDURE"
+          | VNIL -> failwith "NIL is not PROCEDURE"
+          | VCons _ _ -> failwith "PAIR is not PROCEDURE"
+          | VClosure name lam captured ->
+            let env_self = cons_env (EnvEntry name (VClosure name lam captured)) captured in
+            eval (ECons lam (cdr_ exp)) env_self)
+        | None -> failwith "impossible"));;
 
 let evalquote = fun fn args ->
   eval (ECons fn args) (MkEnv Nil);;

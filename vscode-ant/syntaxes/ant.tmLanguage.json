@@ -16,9 +16,13 @@
         {
           "name": "comment.block.ant",
           "begin": "\\(\\*",
-          "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.ant" } },
+          "beginCaptures": {
+            "0": { "name": "comment.block.ant punctuation.definition.comment.begin.ant" }
+          },
           "end": "\\*\\)",
-          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.ant" } },
+          "endCaptures": {
+            "0": { "name": "comment.block.ant punctuation.definition.comment.end.ant" }
+          },
           "patterns": [{ "include": "#comments" }]
         }
       ]
