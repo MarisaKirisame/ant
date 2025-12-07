@@ -1,0 +1,30 @@
+{
+  "name": "ant-syntax-highlighting",
+  "displayName": "Ant Syntax Highlighting",
+  "description": "Lightweight syntax highlighting for the Ant language.",
+  "version": "0.0.1",
+  "publisher": "ant-lang",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "ant",
+        "aliases": ["Ant", "ant"],
+        "extensions": [".ant"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ant",
+        "scopeName": "source.ant",
+        "path": "./syntaxes/ant.tmLanguage.json"
+      }
+    ]
+  }
+}

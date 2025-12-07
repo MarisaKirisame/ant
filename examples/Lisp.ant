@@ -29,7 +29,14 @@ type expr =
   | EAtom of atom
   | ECons of expr * expr;;
 
-let quote = fun e -> ECons (EAtom (ASymbol SQuote)) e;;
+type value =
+  | VNumber of int
+  | VSymbol of symbol
+  | VQuote of expr
+  | VCons of value * value
+  | VClosure of int * expr * env;;
+
+let quote_expr = fun e -> ECons (EAtom (ASymbol SQuote)) e;;
 
 type env = MkEnv of list expr;;
 
