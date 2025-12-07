@@ -323,9 +323,9 @@ let rec pairlis = fun xs ys env ->
 let rec destruct_names = fun names ->
   match names with
   | ECons a t ->
-    match expr_is_num a with
+    (match expr_is_num a with
     | Some x -> Cons x (destruct_names t)
-    | _ -> failwith "destruct_names: impossible, names must be int literals"
+    | _ -> failwith "destruct_names: impossible, names must be int literals" )
   | _ -> Nil;;
 
 let is_null_ = fun v ->
