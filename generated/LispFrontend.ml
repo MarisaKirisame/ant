@@ -52,6 +52,10 @@ let rec parse_sexpr tokens =
       let d, rest' = parse_list [] rest in
       let kont, rest' = parse_list_no_paren [] rest' in
       (SList (SList (SSymbol "define" :: d) :: kont), rest')
+  | LParen :: Symbol "defvar" :: rest ->
+      let d, rest' = parse_list [] rest in
+      let kont, rest' = parse_list_no_paren [] rest' in
+      (SList (SList (SSymbol "defvar" :: d) :: kont), rest')
   | LParen :: rest ->
       let exprs, rest' = parse_list [] rest in
       (SList exprs, rest')
@@ -98,8 +102,10 @@ let builtin_symbol = function
   | "cons" -> Some LC.SCons
   | "cond" -> Some LC.SCond
   | "define" -> Some LC.SDefine
+  | "defvar" -> Some LC.SDefvar
   | "null" -> Some LC.SNull
   | "error" -> Some LC.SError
+  | "if" -> Some LC.SIf
   | _ -> None
 
 let expr_nil = LC.EAtom LC.ANIL
@@ -178,6 +184,16 @@ and compile_define ctx next_id name args =
         (name, name_id) )
   | _ -> raise (ParseError "define expects a name, parameter list, and body")
 
+and compile_defvar ctx next_id name args =
+  match args with
+  | [ value ] ->
+      let name_id, next_id = fresh_id next_id in
+      let value_expr, next_id = compile_expr ctx next_id value in
+      ( list_to_expr [ LC.EAtom (LC.ASymbol LC.SDefvar); LC.EAtom (LC.ANumber name_id); value_expr ],
+        next_id,
+        (name, name_id) )
+  | _ -> raise (ParseError "defvar expects a name and value")
+
 and compile_seq ctx next_id sexprs =
   match sexprs with
   | [] -> ([], next_id)
@@ -188,6 +204,11 @@ and compile_seq ctx next_id sexprs =
           let rest_exprs, next_id = compile_seq (binding :: ctx) next_id rest in
           (define_expr :: rest_exprs, next_id)
       | SList (SSymbol "define" :: _ :: _) -> raise (ParseError "define name must be a symbol")
+      | SList (SSymbol "defvar" :: SSymbol name :: defvar_tail) ->
+          let defvar_expr, next_id, binding = compile_defvar ctx next_id name defvar_tail in
+          let rest_exprs, next_id = compile_seq (binding :: ctx) next_id rest in
+          (defvar_expr :: rest_exprs, next_id)
+      | SList (SSymbol "defvar" :: _ :: _) -> raise (ParseError "defvar name must be a symbol")
       | _ ->
           let expr, next_id = compile_expr ctx next_id sexpr in
           let rest_exprs, next_id = compile_seq ctx next_id rest in

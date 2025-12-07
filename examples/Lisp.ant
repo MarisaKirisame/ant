@@ -20,6 +20,8 @@ type symbol =
   | SDefine
   | SQuote
   | SEq
+  | SIf
+  | SDefvar
   | SCons
   | SCond
   | SAtom
@@ -125,6 +127,16 @@ let caddr_ = fun e ->
       match y with
       | ECons z _ -> z;;
 
+let cadddr_ = fun e ->
+  match e with
+  | ECons _ x ->
+    match x with
+    | ECons _ y ->
+      match y with
+      | ECons _ z ->
+        match z with
+        | ECons w _ -> w;;
+
 let cadr_ = fun e ->
   match e with
   | ECons _ x ->
@@ -194,6 +206,14 @@ let symbol_eq = fun x y ->
   | SEq ->
     (match y with
     | SEq -> true
+    | _ -> false)
+  | SDefvar ->
+    (match y with
+    | SDefvar -> true
+    | _ -> false)
+  | SIf ->
+    (match y with
+    | SIf -> true
     | _ -> false)
   | SCons ->
     (match y with
@@ -378,6 +398,15 @@ and eval = fun exp env ->
       | SEq -> is_eq_ (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCar -> car (eval (cadr_ exp) env)
       | SCdr -> cdr (eval (cadr_ exp) env)
+      | SIf ->
+        let c = cadr_ exp in
+        let t = caddr_ exp in
+        let f = cadddr_ exp in
+        let c_ = eval c env in
+        if value_eq c_ (value_false Unit) then
+          eval f env
+        else
+          eval t env
       | SCons -> VCons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCond -> evcon (cdr_ exp) env
       | SNull -> is_null_ (eval (cadr_ exp) env)
@@ -385,13 +414,13 @@ and eval = fun exp env ->
         let err = eval (cadr_ exp) env in
         let err_code = (match value_is_number_or_quote_number err with | None -> failwith "eval: user error code must evalutes to integer" | Some x -> x) in
         failwith_int err_code
-      | _ -> failwith "invalid symbol here")
+      | _ -> failwith "invalid symbol here" )
     | None ->
       match car_ exp with
       | ECons _ _ ->
         (match expr_is_symbol (caar_ exp) with
         | Some sym ->
-          (match sym with
+          (match sym with 
           | SLambda -> (* ( lambda (i j) (+ #i #j) ) args... *)
             let params = destruct_names (cadar_ exp) in
             let body = caddar_ exp in
@@ -405,16 +434,23 @@ and eval = fun exp env ->
             let env_with_def = cons_env (EnvEntry name closure) env in
             let kont = cadr_ exp in
             eval kont env_with_def
+          | SDefvar -> (* (defvar i val) kont *)
+            let val = eval (caddar_ exp) env in
+            let name = (match expr_is_num (cadar_ exp) with | None -> failwith "eval: defvar name must be int literal" | Some x -> x) in
+            let env_with_def = cons_env (EnvEntry name val) env in
+            let kont = cadr_ exp in
+            eval kont env_with_def
           | SQuote -> failwith "unexpected function quote"
           | SEq -> failwith "unexpected function eq"
           | SCons -> failwith "unexpected function cons"
+          | SIf -> failwith "unexpected function if"
           | SCond -> failwith "unexpected function cond"
           | SAtom -> failwith "unexpected function atom"
           | SCar -> failwith "unexpected function car"
           | SCdr -> failwith "unexpected function cdr"
           | SNull -> failwith "unexpected function null"
           | SError -> failwith "unexpected function error"
-          | _ -> failwith "1")
+          | _ -> failwith "1" )
         | None ->
           (match caar_ exp with
           | EAtom a ->
@@ -422,8 +458,8 @@ and eval = fun exp env ->
             | AVar _ -> failwith "unexpected function var"
             | ANumber _ -> failwith "unexpected function number"
             | ASymbol _ -> failwith "invalid symbol here"
-            | ANIL -> failwith "unexpected function nil")
-          | ECons _ _ -> failwith "unexpected CONS"))
+            | ANIL -> failwith "unexpected function nil" )
+          | ECons _ _ -> failwith "unexpected CONS" ))
       | _ ->
         (match expr_is_var (car_ exp) with
         | Some i ->
@@ -441,8 +477,8 @@ and eval = fun exp env ->
             (match a with
             | ANumber _ -> failwith "NUMBER is not PROCEDURE"
             | ANIL -> failwith "NIL is not PROCEDURE"
-            | _ -> failwith "impossible")
-          | _ -> failwith "impossible")));;
+            | _ -> failwith "impossible" )
+          | _ -> failwith "impossible" )));;
 (* 
 let evalquote = fun fn args ->
   eval (ECons fn args) (MkEnv Nil);; *)

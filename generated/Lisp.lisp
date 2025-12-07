@@ -16,24 +16,29 @@
 
 (define lookup (x env)
   (cond ((null? env) (error -1))
-        ((eq? x (caar env)) (cadar env))
+        ((eq? x (caar env)) (cdar env))
         ((quote 0) (lookup x (cdr env)))))
 
-(lookup 1 '( (1 2) (0 1) ))
+(define pairlis (xs ys env)
+  (if (null? xs)
+      env
+      (cons (cons (car xs) (car ys))
+            (pairlis (cdr xs) (cdr ys) env))))
 
-; ((define 12 (13 14) (cond ((#0 #14) (error 0)) ((#2 #13 (#6 #14)) (#8 #14)) ((quote 0) (#12 #13 (cdr #14))))) (#12 1 (quote (1 2 3 4))))
+(defvar a '(1 2 3))
+(defvar b '(7 8 9))
 
-; (define (pairlis xs ys env)
-;   (if (null? xs)
-;       env
-;       (cons (cons (car xs) (car ys))
-;             (pairlis (cdr xs) (cdr ys) env))))
-; 
-; (define (evlis exps env)
-;   (if (null? exps)
-;       '()
-;       (cons (eval* (car exps) env)
-;             (evlis (cdr exps) env))))
+(defvar e (pairlis a b '()))
+
+;; (define evlis (exps env)
+;;   (if (null? exps)
+;;       '()
+;;       (cons (eval* (car exps) env)
+;;             (evlis (cdr exps) env))))
+
+;; (lookup 1 (cons (cons 1 2) (cons (cons 2 3) '())))
+(lookup 2 e)
+
 ; 
 ; (define (evcon clauses env)
 ;   (cond ((null? clauses) (error "no cond clause matched"))
