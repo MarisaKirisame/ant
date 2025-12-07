@@ -48,6 +48,10 @@ let tokenize input =
 let rec parse_sexpr tokens =
   match tokens with
   | [] -> raise (ParseError "unexpected end of input")
+  | LParen :: Symbol "define" :: rest ->
+      let d, rest' = parse_list [] rest in
+      let kont, rest' = parse_list_no_paren [] rest' in
+      (SList (SList (SSymbol "define" :: d) :: kont), rest')
   | LParen :: rest ->
       let exprs, rest' = parse_list [] rest in
       (SList exprs, rest')
@@ -66,14 +70,22 @@ and parse_list acc tokens =
       let expr, rest = parse_sexpr tokens in
       parse_list (expr :: acc) rest
 
-let rec parse_core_exn tokens =
+and parse_list_no_paren acc tokens =
+  match tokens with
+  | [] -> (List.rev acc, [])
+  | RParen :: _ -> (List.rev acc, tokens)
+  | _ ->
+      let expr, rest = parse_sexpr tokens in
+      parse_list_no_paren (expr :: acc) rest
+
+(* let rec parse_core_exn tokens =
   let expr, rest = parse_sexpr tokens in
-  match rest with [] -> [ expr ] | _ -> expr :: parse_core_exn rest
+  match rest with [] -> [ expr ] | _ -> expr :: parse_core_exn rest *)
 
 let parse_exn input =
   let tokens = tokenize input in
-  let exprs = parse_core_exn tokens in
-  match exprs with [ expr ] -> expr | _ -> SList exprs
+  let expr, rest = parse_sexpr tokens in
+  match rest with [] -> expr | _ -> raise (ParseError "unexpected extra tokens")
 
 let rec list_to_expr = function [] -> LC.EAtom LC.ANIL | x :: xs -> LC.ECons (x, list_to_expr xs)
 
