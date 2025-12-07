@@ -32,6 +32,8 @@ let string_of_symbol = function
   | LC.SCdr -> "cdr"
   | LC.SNull -> "null"
   | LC.SError -> "error"
+  | LC.SIf -> "if"
+  | LC.SDefvar -> "defvar"
 
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "#%d" i
