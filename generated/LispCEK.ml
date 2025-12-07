@@ -3132,6 +3132,12 @@ let () =
           w_100.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_vals_5; w_100.state.k ];
           w_100.state.c <- pc_to_exp (int_to_pc 16);
           stepped w_100
+      | _ ->
+          ignore (pop_env w_100);
+          assert_env_length w_100 1;
+          push_env w_100 (Memo.from_constructor tag_Nil);
+          assert_env_length w_100 2;
+          return_n w_100 2 (pc_to_exp (int_to_pc 0))
       | c_63 -> failwith ("unreachable:" ^ string_of_int c_63 ^ "(101)"))
     101
 
@@ -3429,14 +3435,6 @@ let () =
       | _ ->
           ignore (pop_env w_113);
           failwith "destruct_names: impossible, names must be int literals"
-      | _ ->
-          ignore (pop_env w_113);
-          assert_env_length w_113 1;
-          push_env w_113 (Memo.from_constructor tag_Nil);
-          assert_env_length w_113 2;
-          drop_n w_113 2 1;
-          assert_env_length w_113 1;
-          return_n w_113 1 (pc_to_exp (int_to_pc 0))
       | c_70 -> failwith ("unreachable:" ^ string_of_int c_70 ^ "(113)"))
     113
 
