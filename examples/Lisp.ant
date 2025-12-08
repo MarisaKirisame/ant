@@ -413,6 +413,17 @@ let is_null_ = fun v ->
   | VNIL -> value_true_
   | _ -> value_false_;;
 
+let rec expr_repr = fun e ->
+  match e with
+  | EAtom a ->
+    (match a with
+    | ANIL -> VNIL
+    | AVar i -> VCons (VSymbol SVar) (VCons (VNumber i) VNIL)
+    | ANumber x -> VNumber x
+    | ASymbol sym -> VSymbol sym)
+  | ECons hd tl ->
+    cons_ (expr_repr hd) (expr_repr tl);;
+
 let rec evlis = fun exps env ->
   match exps with
   | ECons hd tl ->
@@ -432,7 +443,7 @@ and eval = fun exp env ->
   match exp with
   | EAtom a ->
     (match a with
-    | AVar i -> (* lookup i env *)
+    | AVar i ->
       let r = lookup i env in
       try_unquote_value r
     | ANumber x -> VNumber x
@@ -446,11 +457,8 @@ and eval = fun exp env ->
     (match expr_is_symbol (car_ exp) with
     | Some sym ->
       (match sym with
-      | SQuote -> (* VQuote (cadr_ exp) *)
-        let r = cadr_ exp in
-        (match expr_is_num r with
-        | Some x -> VNumber x
-        | None -> VQuote r)
+      | SQuote ->
+        try_unquote_value (expr_repr (cadr_ exp))
       | SAtom -> is_atom_ (eval (cadr_ exp) env)
       | SPair -> is_pair_ (eval (cadr_ exp) env)
       | SSymbol -> is_symbol_ (eval (cadr_ exp) env)
