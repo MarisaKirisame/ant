@@ -115,13 +115,6 @@
        (eval* body env*)))))
        
        )
-    ;; ((and (pair? (car exp))
-    ;;       (eq? (caar exp) 'lambda))
-    ;;  (let* ((params (cadar exp))
-    ;;         (body   (caddar exp))
-    ;;         (args   (evlis (cdr exp) env))
-    ;;         (env*   (pairlis params args env)))
-    ;;    (eval* body env*)))
 
     ;; ( (define f (...) body) kont )
     ((and (pair? exp) (and (pair? (car exp))
@@ -133,16 +126,6 @@
        (eval* (cadr exp) env*))))
       ;;  lam)))
        )
-    ;; ( (label f (lambda (...) body)) arg1 arg2 ...)
-    ;; ((and (pair? (car exp))
-    ;;       (eq? (caar exp) 'label))
-    ;;  (let* ((fname  (cadar exp))
-    ;;         (fdef   (caddar exp))
-    ;;         (env*   (cons (cons fname (car exp)) env)))
-    ;;    (eval* (cons fdef (cdr exp)) env*)))
-
-    ((and (pair? exp) (pair? (car exp)))
-     (cdar exp))
 
     (else
      (error -3))))
