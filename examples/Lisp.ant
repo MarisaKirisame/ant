@@ -33,7 +33,10 @@ type symbol =
   | STrue
   | SFalse
   | SError
-  | SVar;;
+  | SNum
+  | SVar
+  | SAnd
+  ;;
 
 type atom =
   | AVar of int
@@ -57,7 +60,22 @@ and env_entry = EnvEntry of int * value
 
 and env = MkEnv of list env_entry;;
 
-let quote_expr = fun e -> ECons (EAtom (ASymbol SQuote)) e;;
+let quote_expr = fun e -> ECons (EAtom (ASymbol SQuote)) (ECons e (EAtom ANIL));;
+
+let rec value_to_expr = fun v ->
+  match v with
+  | VNumber x -> Some (EAtom (ANumber x))
+  | VSymbol sym -> Some (EAtom (ASymbol sym))
+  | VQuote e -> Some (quote_expr e)
+  | VNIL -> Some (EAtom ANIL)
+  | VCons x y ->
+    (match value_to_expr x with
+    | None -> None
+    | Some x_ ->
+      (match value_to_expr y with
+      | None -> None
+      | Some y_ -> Some (ECons (EAtom (ASymbol SCons)) (ECons x_ (ECons y_ (EAtom ANIL))))))
+  | VClosure _ _ -> None;;
 
 let env_entry_name = fun ent ->
   match ent with
@@ -264,9 +282,17 @@ let symbol_eq = fun x y ->
     (match y with
     | SError -> true
     | _ -> false)
+  | SNum ->
+    (match y with
+    | SNum -> true
+    | _ -> false)
   | SVar ->
     (match y with
     | SVar -> true
+    | _ -> false)
+  | SAnd ->
+    (match y with
+    | SAnd -> true
     | _ -> false);;
 
 let rec atom_eq = fun x y ->
@@ -332,6 +358,11 @@ let car = fun v ->
   | VQuote e ->
     (match e with
     | ECons _ _ -> VQuote (car_ e)
+    | EAtom a ->
+      (match a with
+      | ANumber n -> failwith_int n
+      | ANIL -> failwith "car: encountered NIL"
+      | ASymbol sym -> failwith "car: encountered symbol")
     | _ -> failwith "car: PAIR expected" )
   | VNIL -> failwith "car: cannot apply on NIL"
   | VCons x _ -> x
@@ -357,6 +388,15 @@ let is_atom_ = fun v ->
   | VNIL -> value_true Unit
   | VCons _ _ -> value_false Unit
   | VClosure _ _ -> value_true Unit;;
+
+let is_num_ = fun v ->
+  match v with
+  | VNumber _ -> value_true Unit
+  | VSymbol _ -> value_false Unit
+  | VQuote _ -> value_false Unit
+  | VNIL -> value_false Unit
+  | VCons _ _ -> value_false Unit
+  | VClosure _ _ -> value_false Unit;;
 
 let is_pair_ = fun v ->
   match v with
@@ -385,6 +425,33 @@ let is_symbol_ = fun v ->
 let is_eq_ = fun x y ->
   if value_eq x y then value_true Unit else value_false Unit;;
 
+let cons_ = fun x y ->
+  match y with
+  | VQuote e ->
+    (match e with
+    | ECons _ _ -> VCons x y
+      (* (match value_to_expr x with
+      | None -> VCons x y
+      | Some x_ -> VQuote (ECons x_ e)) *)
+    | EAtom a ->
+      (match a with
+      | ANIL -> VCons x VNIL
+      | _ -> VCons x y))
+  | _ -> VCons x y;;
+
+let try_unquote_value = fun r ->
+  match r with
+  | VQuote e ->
+    (match e with
+      | ECons _ _ -> r
+      | EAtom a ->
+        match a with
+        | ANumber x -> VNumber x
+        | ANIL -> VNIL
+        | ASymbol sym -> VSymbol sym
+        | _ -> r)
+  | _ -> r;;
+
 let rec lookup = fun i env ->
   match unwrap_env env with
   | Nil -> failwith "empty environment"
@@ -401,7 +468,7 @@ let rec pairlis = fun xs ys env ->
     match ys with
     | Nil -> failwith "pairlis: arguments too few"
     | Cons y tl ->
-      pairlis x_tl tl (cons_env (EnvEntry x y) env);;
+      cons_env (EnvEntry x y) (pairlis x_tl tl env);;
 
 let rec destruct_names = fun names ->
   match names with
@@ -421,6 +488,7 @@ let is_null_ = fun v ->
       value_true Unit
     else
       value_false Unit
+  | VNIL -> value_true Unit
   | _ -> value_false Unit;;
 
 let rec evlis = fun exps env ->
@@ -442,7 +510,9 @@ and eval = fun exp env ->
   match exp with
   | EAtom a ->
     (match a with
-    | AVar i -> lookup i env
+    | AVar i -> (* lookup i env *)
+      let r = lookup i env in
+      try_unquote_value r
     | ANumber x -> VNumber x
     | ASymbol sym ->
       (match sym with
@@ -454,13 +524,17 @@ and eval = fun exp env ->
     (match expr_is_symbol (car_ exp) with
     | Some sym ->
       (match sym with
-      | SQuote -> VQuote (cadr_ exp)
+      | SQuote -> (* VQuote (cadr_ exp) *)
+        let r = cadr_ exp in
+        (match expr_is_num r with
+        | Some x -> VNumber x
+        | None -> VQuote r)
       | SAtom -> is_atom_ (eval (cadr_ exp) env)
       | SPair -> is_pair_ (eval (cadr_ exp) env)
       | SSymbol -> is_symbol_ (eval (cadr_ exp) env)
       | SEq -> is_eq_ (eval (cadr_ exp) env) (eval (caddr_ exp) env)
-      | SCar -> car (eval (cadr_ exp) env)
-      | SCdr -> cdr (eval (cadr_ exp) env)
+      | SCar -> try_unquote_value (car (eval (cadr_ exp) env))
+      | SCdr -> try_unquote_value (cdr (eval (cadr_ exp) env))
       | SIf ->
         let c = cadr_ exp in
         let t = caddr_ exp in
@@ -470,17 +544,26 @@ and eval = fun exp env ->
           eval f env
         else
           eval t env
-      | SCons -> VCons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
+      | SCons -> try_unquote_value (cons_ (eval (cadr_ exp) env) (eval (caddr_ exp) env))
       | SCond -> evcon (cdr_ exp) env
       | SNull -> is_null_ (eval (cadr_ exp) env)
       | STrue -> failwith "true is not PROCEDURE"
       | SFalse -> failwith "false is not PROCEDURE"
       | SVar -> failwith "eval: symbol var is not intended to be used this way"
+      | SNum -> is_num_ (eval (cadr_ exp) env)
+      | SAnd ->
+        let f = value_false Unit in
+        if value_eq (eval (cadr_ exp) env) f then
+          f
+        else if value_eq (eval (caddr_ exp) env) f then
+          f
+        else
+          value_true Unit
       | SError ->
         let err = eval (cadr_ exp) env in
         let err_code = (match value_is_number_or_quote_number err with | None -> failwith "eval: user error code must evalutes to integer" | Some x -> x) in
         failwith_int err_code
-      | _ -> failwith "invalid symbol here" )
+      | _ -> failwith "invalid symbol here1" )
     | None ->
       match car_ exp with
       | ECons _ _ ->
@@ -520,6 +603,8 @@ and eval = fun exp env ->
           | SCdr -> failwith "unexpected function cdr"
           | SNull -> failwith "unexpected function null"
           | SError -> failwith "unexpected function error"
+          | SNum -> failwith "unexpected function num"
+          | SAnd -> failwith "unexpected function and"
           | SVar -> failwith "eval: symbol var is not intended to be used this way"
           | _ -> failwith "1" )
         | None ->
@@ -528,7 +613,7 @@ and eval = fun exp env ->
             (match a with
             | AVar _ -> failwith "unexpected function var"
             | ANumber _ -> failwith "unexpected function number"
-            | ASymbol _ -> failwith "invalid symbol here"
+            | ASymbol _ -> failwith "invalid symbol here2"
             | ANIL -> failwith "unexpected function nil" )
           | ECons _ _ -> failwith "unexpected CONS" ))
       | _ ->
