@@ -34,6 +34,7 @@ type symbol =
   | SNum
   | SVar
   | SAnd
+  | SElse
   ;;
 
 type atom =
@@ -49,7 +50,6 @@ type expr =
 type value =
   | VNumber of int
   | VSymbol of symbol
-  | VQuote of expr
   | VNIL
   | VCons of value * value
   | VClosure of int * expr;;
@@ -101,7 +101,6 @@ let expr_is_nil = fun e ->
 let value_is_number_or_quote_number = fun v ->
   match v with
   | VNumber x -> Some x
-  | VQuote e -> expr_is_num e
   | _ -> None;;
 
 let value_true_ = VNumber 0;;
@@ -119,7 +118,6 @@ let expr_is_false = fun e ->
 let value_is_false = fun v ->
   match v with
   | VNIL -> true
-  | VQuote e -> expr_is_false e
   | _ -> false;;
 
 let caddr_ = fun e ->
@@ -213,7 +211,8 @@ let symbol_int = fun sym ->
   | SError    -> 16
   | SNum      -> 17
   | SVar      -> 18
-  | SAnd      -> 19;;
+  | SAnd      -> 19
+  | SElse     -> 20;;
 
 let symbol_eq = fun x y ->
   symbol_int x = symbol_int y;;
@@ -252,43 +251,20 @@ let rec value_eq = fun x y ->
   | VNumber a ->
     (match y with
     | VNumber b -> a = b
-    | VQuote e -> (* as per Scheme, `'n = n` holds while `''n = n` does not hold *)
-      (match expr_is_num e with
-      | None -> false
-      | Some m -> a = m)
     | _ -> false)
   | VNIL ->
     (match y with
     | VNIL -> true
-    | VQuote e -> expr_is_nil e
     | _ -> false)
   | VSymbol a ->
     (match y with
     | VSymbol b -> symbol_eq a b
-    | _ -> false)
-  | VQuote a ->
-    (match y with
-    | VQuote b -> expr_eq a b
-    | VNumber n ->
-      (match expr_is_num a with
-      | None -> false
-      | Some m -> n = m)
-    | VNIL -> expr_is_nil a
     | _ -> false);;
 
 let car = fun v ->
   match v with
   | VNumber _ -> failwith "car: cannot apply on NUMBER"
   | VSymbol _ -> failwith "car: cannot apply on SYMBOL"
-  | VQuote e ->
-    (match e with
-    | ECons _ _ -> VQuote (car_ e)
-    | EAtom a ->
-      (match a with
-      | ANumber n -> failwith "car: encountered number"
-      | ANIL -> failwith "car: encountered NIL"
-      | ASymbol sym -> failwith "car: encountered symbol")
-    | _ -> failwith "car: PAIR expected" )
   | VNIL -> failwith "car: cannot apply on NIL"
   | VCons x _ -> x
   | VClosure _ _ -> failwith "car: cannot apply on CLOSURE";;
@@ -297,10 +273,6 @@ let cdr = fun v ->
   match v with
   | VNumber _ -> failwith "cdr: cannot apply on NUMBER"
   | VSymbol _ -> failwith "cdr: cannot apply on SYMBOL"
-  | VQuote e ->
-    (match e with
-    | ECons _ _ -> VQuote (cdr_ e)
-    | _ -> failwith "cdr: PAIR expected" )
   | VNIL -> failwith "cdr: cannot apply on NIL"
   | VCons _ y -> y
   | VClosure _ _ -> failwith "cdr: cannot apply on CLOSURE";;
@@ -309,7 +281,6 @@ let is_atom_ = fun v ->
   match v with
   | VNumber _ -> value_true_
   | VSymbol _ -> value_true_
-  | VQuote _ -> value_true_
   | VNIL -> value_true_
   | VCons _ _ -> value_false_
   | VClosure _ _ -> value_true_;;
@@ -318,7 +289,6 @@ let is_num_ = fun v ->
   match v with
   | VNumber _ -> value_true_
   | VSymbol _ -> value_false_
-  | VQuote _ -> value_false_
   | VNIL -> value_false_
   | VCons _ _ -> value_false_
   | VClosure _ _ -> value_false_;;
@@ -327,10 +297,6 @@ let is_pair_ = fun v ->
   match v with
   | VNumber _ -> value_false_
   | VSymbol _ -> value_false_
-  | VQuote e ->
-    (match e with
-    | ECons _ _ -> value_true_
-    | _ -> value_false_ )
   | VNIL -> value_false_
   | VCons _ _ -> value_true_
   | VClosure _ _ -> value_false_;;
@@ -339,40 +305,12 @@ let is_symbol_ = fun v ->
   match v with
   | VNumber _ -> value_false_
   | VSymbol _ -> value_true_
-  | VQuote e ->
-    (match expr_is_symbol e with
-    | Some _ -> value_true_
-    | _ -> value_false_ )
   | VNIL -> value_false_
   | VCons _ _ -> value_false_
   | VClosure _ _ -> value_false_;;
 
 let is_eq_ = fun x y ->
   if value_eq x y then value_true_ else value_false_;;
-
-let cons_ = fun x y ->
-  match y with
-  | VQuote e ->
-    (match e with
-    | ECons _ _ -> VCons x y
-    | EAtom a ->
-      (match a with
-      | ANIL -> VCons x VNIL
-      | _ -> VCons x y))
-  | _ -> VCons x y;;
-
-let try_unquote_value = fun r ->
-  match r with
-  | VQuote e ->
-    (match e with
-    | ECons _ _ -> r
-    | EAtom a ->
-      match a with
-      | ANumber x -> VNumber x
-      | ANIL -> VNIL
-      | ASymbol sym -> VSymbol sym
-      | _ -> r)
-  | _ -> r;;
 
 let rec lookup = fun i env ->
   match env with
@@ -405,11 +343,6 @@ let rec destruct_names = fun names ->
 
 let is_null_ = fun v ->
   match v with
-  | VQuote e ->
-    if expr_is_nil e then
-      value_true_
-    else
-      value_false_
   | VNIL -> value_true_
   | _ -> value_false_;;
 
@@ -422,7 +355,7 @@ let rec expr_repr = fun e ->
     | ANumber x -> VNumber x
     | ASymbol sym -> VSymbol sym)
   | ECons hd tl ->
-    cons_ (expr_repr hd) (expr_repr tl);;
+    VCons (expr_repr hd) (expr_repr tl);;
 
 let rec evlis = fun exps env ->
   match exps with
@@ -443,12 +376,11 @@ and eval = fun exp env ->
   match exp with
   | EAtom a ->
     (match a with
-    | AVar i ->
-      let r = lookup i env in
-      try_unquote_value r
+    | AVar i -> lookup i env
     | ANumber x -> VNumber x
     | ASymbol sym ->
       (match sym with
+      | SElse -> value_true_
       | STrue -> value_true_
       | SFalse -> value_false_
       | _ -> failwith "cannot directly evaluate this symbol")
@@ -457,14 +389,13 @@ and eval = fun exp env ->
     (match expr_is_symbol (car_ exp) with
     | Some sym ->
       (match sym with
-      | SQuote ->
-        try_unquote_value (expr_repr (cadr_ exp))
+      | SQuote -> expr_repr (cadr_ exp)
       | SAtom -> is_atom_ (eval (cadr_ exp) env)
       | SPair -> is_pair_ (eval (cadr_ exp) env)
       | SSymbol -> is_symbol_ (eval (cadr_ exp) env)
       | SEq -> is_eq_ (eval (cadr_ exp) env) (eval (caddr_ exp) env)
-      | SCar -> try_unquote_value (car (eval (cadr_ exp) env))
-      | SCdr -> try_unquote_value (cdr (eval (cadr_ exp) env))
+      | SCar -> car (eval (cadr_ exp) env)
+      | SCdr -> cdr (eval (cadr_ exp) env)
       | SIf ->
         let c = cadr_ exp in
         let t = caddr_ exp in
@@ -474,9 +405,10 @@ and eval = fun exp env ->
           eval f env
         else
           eval t env
-      | SCons -> try_unquote_value (cons_ (eval (cadr_ exp) env) (eval (caddr_ exp) env))
+      | SCons -> VCons (eval (cadr_ exp) env) (eval (caddr_ exp) env)
       | SCond -> evcon (cdr_ exp) env
       | SNull -> is_null_ (eval (cadr_ exp) env)
+      | SElse -> failwith "else is not PROCEDURE"
       | STrue -> failwith "true is not PROCEDURE"
       | SFalse -> failwith "false is not PROCEDURE"
       | SVar -> failwith "eval: symbol var is not intended to be used this way"
@@ -534,6 +466,7 @@ and eval = fun exp env ->
           | SError -> failwith "unexpected function error"
           | SNum -> failwith "unexpected function num"
           | SAnd -> failwith "unexpected function and"
+          | SElse -> failwith "unexpected function else"
           | SVar -> failwith "eval: symbol var is not intended to be used this way"
           | _ -> failwith "1" )
         | None ->
@@ -551,7 +484,6 @@ and eval = fun exp env ->
           (match lookup i env with
           | VNumber _ -> failwith "NUMBER is not PROCEDURE"
           | VSymbol _ -> failwith "SYMBOL is not PROCEDURE"
-          | VQuote _ -> failwith "QUOTE is not PROCEDURE"
           | VNIL -> failwith "NIL is not PROCEDURE"
           | VCons _ _ -> failwith "PAIR is not PROCEDURE"
           | VClosure name lam ->
