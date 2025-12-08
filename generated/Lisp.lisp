@@ -63,6 +63,10 @@
     ((num exp)
      exp)
 
+    ((and (symbol? exp) (eq? exp 'true)) 0)
+
+    ((and (symbol? exp) (eq? exp 'false)) '())
+
     ;; quoted constant: (quote x)
     ((and (pair? exp) (eq? (car exp) 'quote))
      (cadr exp))
@@ -115,8 +119,15 @@
        ((defvar fname  (cadar exp))
        ((defvar lam    (cons 'lambda (cddar exp)))
        ((defvar env*   (cons (cons fname lam) env))
-       (eval* (cadr exp) env*))))
-       )
+       (eval* (cadr exp) env*)))))
+
+    ;; ( (defvar i val) kont )
+    ((and (pair? exp) (and (pair? (car exp))
+          (eq? (caar exp) 'defvar)))
+       ((defvar vname  (cadar exp))
+       ((defvar val    (eval* (caddar exp) env))
+       ((defvar env*   (cons (cons vname val) env))
+       (eval* (cadr exp) env*)))))
 
     (else
      (error -3))))
@@ -124,6 +135,14 @@
 ((define evalquote (fn args)
   (eval* (cons fn args) '()))
 
-(eval* '((define 0 (1) (var 1)) ( (var 0) 42 )) '())
+;; (eval* '((define 0 (1) (var 1)) ( (var 0) 42 )) '())
+
+;; (eval* '((defvar 0 (var 1)) (var 0)) (cons (cons 1 2) '() ))
+
+;; (eval* (cons 'quote (cons 1 '())) '())
+
+(eval* '(quote (var 1)) '())
+
+;; (eval* 'false '())
 
 ))))))))))))))))))))
