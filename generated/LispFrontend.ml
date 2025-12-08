@@ -48,14 +48,14 @@ let tokenize input =
 let rec parse_sexpr tokens =
   match tokens with
   | [] -> raise (ParseError "unexpected end of input")
-  | LParen :: Symbol "define" :: rest ->
+  (* | LParen :: Symbol "define" :: rest ->
       let d, rest' = parse_list [] rest in
       let kont, rest' = parse_list_no_paren [] rest' in
       (SList (SList (SSymbol "define" :: d) :: kont), rest')
   | LParen :: Symbol "defvar" :: rest ->
       let d, rest' = parse_list [] rest in
       let kont, rest' = parse_list_no_paren [] rest' in
-      (SList (SList (SSymbol "defvar" :: d) :: kont), rest')
+      (SList (SList (SSymbol "defvar" :: d) :: kont), rest') *)
   | LParen :: rest ->
       let exprs, rest' = parse_list [] rest in
       (SList exprs, rest')
@@ -74,13 +74,13 @@ and parse_list acc tokens =
       let expr, rest = parse_sexpr tokens in
       parse_list (expr :: acc) rest
 
-and parse_list_no_paren acc tokens =
+(* and parse_list_no_paren acc tokens =
   match tokens with
   | [] -> (List.rev acc, [])
   | RParen :: _ -> (List.rev acc, tokens)
   | _ ->
       let expr, rest = parse_sexpr tokens in
-      parse_list_no_paren (expr :: acc) rest
+      parse_list_no_paren (expr :: acc) rest *)
 
 (* let rec parse_core_exn tokens =
   let expr, rest = parse_sexpr tokens in
@@ -101,6 +101,7 @@ let builtin_symbol = function
   | "cdr" -> Some LC.SCdr
   | "cons" -> Some LC.SCons
   | "cond" -> Some LC.SCond
+  | "lambda" -> Some LC.SLambda
   | "define" -> Some LC.SDefine
   | "defvar" -> Some LC.SDefvar
   | "null" -> Some LC.SNull
@@ -111,6 +112,8 @@ let builtin_symbol = function
   | "true" -> Some LC.STrue
   | "false" -> Some LC.SFalse
   | "var" -> Some LC.SVar
+  | "num" -> Some LC.SNum
+  | "and" -> Some LC.SAnd
   | _ -> None
 
 let expr_nil = LC.EAtom LC.ANIL
