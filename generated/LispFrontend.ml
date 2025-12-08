@@ -114,6 +114,7 @@ let builtin_symbol = function
   | "var" -> Some LC.SVar
   | "num" -> Some LC.SNum
   | "and" -> Some LC.SAnd
+  | "else" -> Some LC.SElse
   | _ -> None
 
 let expr_nil = LC.EAtom LC.ANIL
