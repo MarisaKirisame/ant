@@ -38,10 +38,10 @@ let string_of_symbol = function
   | LC.SAnd -> "and"
 
 let string_of_atom = function
-  | LC.AVar i -> Printf.sprintf "#%d" i
+  | LC.AVar i -> Printf.sprintf "(var %d)" i
   | LC.ANumber i -> Printf.sprintf "%d" i
   | LC.ASymbol sym -> Printf.sprintf "%s" (string_of_symbol sym)
-  | LC.ANIL -> "NIL"
+  | LC.ANIL -> "()"
 
 let rec string_of_expr = function
   | LC.EAtom atom -> string_of_atom atom
