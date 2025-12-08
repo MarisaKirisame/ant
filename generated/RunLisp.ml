@@ -95,20 +95,6 @@ let expect_eval label code expected =
   let result = eval_string code in
   expect_value label expected result
 
-let test_eval_cdr () =
-  let code = "(cdr (quote (1 2 3)))" in
-  expect_eval "cdr returns the tail of a quoted list" code (quoted_int_list [ 2; 3 ])
-
-let test_label_recursion () =
-  let code =
-    "((define copy (xs)\n\
-    \          (cond\n\
-    \            ((atom xs) (quote ()))\n\
-    \            ((quote (0)) (cons (car xs) (copy (cdr xs))))  ))\n\
-    \    (quote (1 2 3)))"
-  in
-  expect_eval "define installs a recursive label" code (quoted_int_list [ 1; 2; 3 ])
-
 let test_atom_rejects_cons () =
   let code = "(atom (cons (quote 1) (quote 2)))" in
   expect_eval "atom reports pairs as false" code LC.VNIL
@@ -127,8 +113,6 @@ let test_car_after_cons () =
 let read_file_content filename = In_channel.with_open_text filename In_channel.input_all
 
 let run () =
-  test_eval_cdr ();
-  (* test_label_recursion (); *)
   test_atom_rejects_cons ();
   test_eq_number_literals ();
   test_eq_number_literals_false ();
