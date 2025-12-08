@@ -21,11 +21,15 @@
 
 ((define cdar (xs) (cdr (car xs)))
 
+((define cddr (xs) (cdr (cdr xs)))
+
 ((define cddar (xs) (cdr (cdr (car xs))))
 
 ((define cadar (xs) (car (cdr (car xs))))
 
 ((define caddar (xs) (car (cdr (cdr (car xs)))))
+
+((define cadddr (xs) (car (cdr (cdr (cdr xs)))))
 
 ((define caddr (xs) (car (cdr (cdr xs))))
 
@@ -63,19 +67,44 @@
     ((num exp)
      exp)
 
-    ((and (symbol? exp) (eq? exp 'true)) 0)
-
-    ((and (symbol? exp) (eq? exp 'false)) '())
+    ;; variable
+    ((isvar exp)
+     (lookup (cadr exp) env))
 
     ;; quoted constant: (quote x)
     ((and (pair? exp) (eq? (car exp) 'quote))
      (cadr exp))
 
-    ;; variable
-    ((isvar exp)
-     (lookup (cadr exp) env))
+    ;; true and false symbols
+    ((and (symbol? exp) (eq? exp 'true)) 0)
+
+    ((and (symbol? exp) (eq? exp 'false)) '())
+
+    ((and (and (pair? exp) (eq? (car exp) 'and) ) (pair? (cdr exp)) )
+     (if (eval* (cadr exp) env)
+         (if (eval* (caddr exp) env)
+             true
+             false)
+         false))
+
+    ((and (and (and (pair? exp) (eq? (car exp) 'if) ) (pair? (cdr exp)) ) (pair? (cddr exp)))
+     (if (eval* (cadr exp) env)
+         (eval* (caddr exp) env)
+         (eval* (cadddr exp) env)))
 
     ;; special forms built in
+    ((and (pair? exp) (eq? (car exp) 'null))
+     (null? (eval* (cadr exp) env)))
+
+    ((and (pair? exp) (eq? (car exp) 'error))
+     (error (eval* (cadr exp) env)))
+
+    ((and (pair? exp) (eq? (car exp) 'pair))
+     (pair? (eval* (cadr exp) env)))
+
+    ((and (pair? exp) (eq? (car exp) 'num))
+     (num (eval* (cadr exp) env)))
+
     ((and (pair? exp) (eq? (car exp) 'atom))
      (atom? (eval* (cadr exp) env)))
 
@@ -137,12 +166,26 @@
 
 ;; (eval* '((define 0 (1) (var 1)) ( (var 0) 42 )) '())
 
-;; (eval* '((defvar 0 (var 1)) (var 0)) (cons (cons 1 2) '() ))
+(eval* '((defvar 0 (var 1)) (var 0)) (cons (cons 1 2) '() ))
 
 ;; (eval* (cons 'quote (cons 1 '())) '())
 
-(eval* '(quote (var 1)) '())
+;; (eval* '(quote (var 1)) '())
 
 ;; (eval* 'false '())
 
-))))))))))))))))))))
+;; (eval* '(if false 1 2) '())
+
+;; (eval* '(var 3) (cons (cons 3 42) '() ))
+
+;; (eval* '(error -100) '())
+
+;; (eval* '(and true false) '())
+
+;; (eval* '(and true true) '())
+
+;; (eval* '(pair '()) '())
+
+;; (eval* '(pair '(1)) '())
+
+))))))))))))))))))))))
