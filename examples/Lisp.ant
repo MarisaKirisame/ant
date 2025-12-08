@@ -62,21 +62,6 @@ and env = MkEnv of list env_entry;;
 
 let quote_expr = fun e -> ECons (EAtom (ASymbol SQuote)) (ECons e (EAtom ANIL));;
 
-let rec value_to_expr = fun v ->
-  match v with
-  | VNumber x -> Some (EAtom (ANumber x))
-  | VSymbol sym -> Some (EAtom (ASymbol sym))
-  | VQuote e -> Some (quote_expr e)
-  | VNIL -> Some (EAtom ANIL)
-  | VCons x y ->
-    (match value_to_expr x with
-    | None -> None
-    | Some x_ ->
-      (match value_to_expr y with
-      | None -> None
-      | Some y_ -> Some (ECons (EAtom (ASymbol SCons)) (ECons x_ (ECons y_ (EAtom ANIL))))))
-  | VClosure _ _ -> None;;
-
 let env_entry_name = fun ent ->
   match ent with
   | EnvEntry name _ -> name;;
@@ -430,9 +415,6 @@ let cons_ = fun x y ->
   | VQuote e ->
     (match e with
     | ECons _ _ -> VCons x y
-      (* (match value_to_expr x with
-      | None -> VCons x y
-      | Some x_ -> VQuote (ECons x_ e)) *)
     | EAtom a ->
       (match a with
       | ANIL -> VCons x VNIL
