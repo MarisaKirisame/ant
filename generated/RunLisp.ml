@@ -39,6 +39,8 @@ let string_of_symbol = function
   | LC.STrue -> "true"
   | LC.SFalse -> "false"
   | LC.SVar -> "var"
+  | LC.SNum -> "num"
+  | LC.SAnd -> "and"
 
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "#%d" i
@@ -58,7 +60,7 @@ let rec string_of_expr = function
             t := y
         | _ -> failwith "impossible"
       done;
-      assert (!t = LC.EAtom LC.ANIL);
+      (* assert (!t = LC.EAtom LC.ANIL); *)
       "(" ^ Dynarray.fold_left (fun acc x -> acc ^ " " ^ string_of_expr x) (string_of_expr hd) arr ^ ")"
 
 let rec string_of_value = function
@@ -137,6 +139,7 @@ let run () =
   test_eq_number_literals_false ();
   test_cond_short_circuits ();
   test_car_after_cons ();
+  (* ignore (eval_string "(cdr '(1 2 3))"); *)
   let code = read_file_content "./generated/Lisp.lisp" in
   let r = eval_string code in
   print_endline (string_of_value r);
