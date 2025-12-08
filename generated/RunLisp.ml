@@ -36,6 +36,7 @@ let string_of_symbol = function
   | LC.SVar -> "var"
   | LC.SNum -> "num"
   | LC.SAnd -> "and"
+  | LC.SElse -> "else"
 
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "(var %d)" i
@@ -61,7 +62,6 @@ let rec string_of_expr = function
 let rec string_of_value = function
   | LC.VNumber x -> Printf.sprintf "%d" x
   | LC.VSymbol sym -> Printf.sprintf "%s" (string_of_symbol sym)
-  | LC.VQuote e -> Printf.sprintf "(quote %s)" (string_of_expr e)
   | LC.VNIL -> "()"
   | LC.VCons (x, y) -> Printf.sprintf "(%s . %s)" (string_of_value x) (string_of_value y)
   | LC.VClosure _ -> "PROCEDURE"
@@ -77,8 +77,6 @@ let expect_equal ?(show = fun _ -> "<value>") label expected actual =
 
 let expect_value msg (x : LC.value) (y : LC.value) = expect_equal ~show:string_of_value msg x y
 let expr_of_int_list ints = List.map (fun n -> LC.EAtom (LC.ANumber n)) ints |> expr_list
-let quoted_int_list ints = LC.VQuote (expr_of_int_list ints)
-let quoted_number n = LC.VQuote (LC.EAtom (LC.ANumber n))
 
 let eval_expr expr =
   let seq = LC.from_ocaml_expr expr in
