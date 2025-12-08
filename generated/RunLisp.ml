@@ -9,13 +9,8 @@ let with_memo f =
 
 let rec lisp_list_of_list = function [] -> LC.Nil | x :: xs -> LC.Cons (x, lisp_list_of_list xs)
 let rec list_of_lisp = function LC.Nil -> [] | LC.Cons (hd, tl) -> hd :: list_of_lisp tl
-
-let env_seq_of_list exprs =
-  let env = LC.MkEnv (lisp_list_of_list exprs) in
-  LC.from_ocaml_env env
-
-let env_values_of_seq seq = match LC.to_ocaml_env seq with LC.MkEnv values -> list_of_lisp values
-let empty_env_seq = env_seq_of_list []
+let env_values_of_seq seq = list_of_lisp (LC.to_ocaml_list LC.to_ocaml_value seq)
+let empty_env_seq = LC.from_ocaml_list LC.from_ocaml_value (lisp_list_of_list [])
 let rec expr_list exprs = match exprs with [] -> LC.EAtom LC.ANIL | hd :: tl -> LC.ECons (hd, expr_list tl)
 let seq_of_expr_list exprs = lisp_list_of_list exprs |> LC.from_ocaml_list LC.from_ocaml_expr
 let int_of_seq seq = Word.get_value (Memo.to_word seq)

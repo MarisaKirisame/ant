@@ -443,6 +443,23 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
         let$ err = resolve_ w (src_E_ (s.env_length - 1)) in
         to_unit_ $ pop_env_ w;
         failwith_ (string_of_int_ (int_from_word_ (zro_ err)))]
+  | GVar (f, info) ->
+      check_scope s;
+      let keep, keep_s = keep_only s info.fv in
+      let keep_length = keep_s.env_length in
+      let cont_name = "cont_" ^ string_of_int ctx.conts_count in
+      (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
+      add_cont ctx cont_name (keep_length + 1) (fun w tl ->
+          [%seqs
+            set_k_ w (get_next_cont_ tl);
+            restore_env_ w (int_ keep_length) tl;
+            k (push_s keep_s) w]);
+      fun w ->
+        [%seqs
+          assert_env_length_ w (int_ s.env_length);
+          (let$ keep_vals = env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ 0) in
+           set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep_vals; world_kont_ w ]));
+          goto_ w (Hashtbl.find_exn ctx.func_pc f)]
   | App (GVar (f, _), xs, info) ->
       let at_tail_pos = info.tail in
       check_scope s;
@@ -645,9 +662,8 @@ let compile_binding (ctx : ctx) name ps term entry_code : document =
 let compile_bindings (ctx : ctx) (s : 'a stmt) (b : 'a binding) : document =
   let f =
    fun x term ->
-    match term with
-    | Lam (ps, term, _) -> compile_binding ctx x ps term
-    | _ -> failwith "compile_bindings: function must have at least one argument"
+    match term with Lam (ps, term, _) -> compile_binding ctx x ps term | _ -> compile_binding ctx x [] term
+   (* | _ -> failwith "compile_bindings: function must have at least one argument" *)
   in
   match b with
   | BOne (x, term, _) ->
