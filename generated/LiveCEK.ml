@@ -1842,8 +1842,9 @@ let () =
       assert_env_length w_21 5;
       let cond_0 = resolve w_21 (Source.E 4) in
       ignore (pop_env w_21);
-      let if_kont_0 =
-       fun _ ->
+      if Word.get_value (fst cond_0) <> 0 then (
+        assert_env_length w_21 4;
+        push_env w_21 (Memo.from_constructor tag_VTrue);
         assert_env_length w_21 5;
         drop_n w_21 5 1;
         assert_env_length w_21 4;
@@ -1855,16 +1856,22 @@ let () =
         assert_env_length w_21 1;
         drop_n w_21 1 0;
         assert_env_length w_21 1;
-        return_n w_21 1 (pc_to_exp (int_to_pc 0))
-      in
-      if Word.get_value (fst cond_0) <> 0 then (
-        assert_env_length w_21 4;
-        push_env w_21 (Memo.from_constructor tag_VTrue);
-        if_kont_0 ())
+        return_n w_21 1 (pc_to_exp (int_to_pc 0)))
       else (
         assert_env_length w_21 4;
         push_env w_21 (Memo.from_constructor tag_VFalse);
-        if_kont_0 ()))
+        assert_env_length w_21 5;
+        drop_n w_21 5 1;
+        assert_env_length w_21 4;
+        drop_n w_21 4 1;
+        assert_env_length w_21 3;
+        drop_n w_21 3 1;
+        assert_env_length w_21 2;
+        drop_n w_21 2 1;
+        assert_env_length w_21 1;
+        drop_n w_21 1 0;
+        assert_env_length w_21 1;
+        return_n w_21 1 (pc_to_exp (int_to_pc 0))))
     19
 
 let () =
@@ -1958,8 +1965,9 @@ let () =
       assert_env_length w_24 5;
       let cond_1 = resolve w_24 (Source.E 4) in
       ignore (pop_env w_24);
-      let if_kont_1 =
-       fun _ ->
+      if Word.get_value (fst cond_1) <> 0 then (
+        assert_env_length w_24 4;
+        push_env w_24 (Memo.from_constructor tag_VTrue);
         assert_env_length w_24 5;
         drop_n w_24 5 1;
         assert_env_length w_24 4;
@@ -1971,16 +1979,22 @@ let () =
         assert_env_length w_24 1;
         drop_n w_24 1 0;
         assert_env_length w_24 1;
-        return_n w_24 1 (pc_to_exp (int_to_pc 0))
-      in
-      if Word.get_value (fst cond_1) <> 0 then (
-        assert_env_length w_24 4;
-        push_env w_24 (Memo.from_constructor tag_VTrue);
-        if_kont_1 ())
+        return_n w_24 1 (pc_to_exp (int_to_pc 0)))
       else (
         assert_env_length w_24 4;
         push_env w_24 (Memo.from_constructor tag_VFalse);
-        if_kont_1 ()))
+        assert_env_length w_24 5;
+        drop_n w_24 5 1;
+        assert_env_length w_24 4;
+        drop_n w_24 4 1;
+        assert_env_length w_24 3;
+        drop_n w_24 3 1;
+        assert_env_length w_24 2;
+        drop_n w_24 2 1;
+        assert_env_length w_24 1;
+        drop_n w_24 1 0;
+        assert_env_length w_24 1;
+        return_n w_24 1 (pc_to_exp (int_to_pc 0))))
     22
 
 let () =
@@ -2074,8 +2088,9 @@ let () =
       assert_env_length w_27 5;
       let cond_2 = resolve w_27 (Source.E 4) in
       ignore (pop_env w_27);
-      let if_kont_2 =
-       fun _ ->
+      if Word.get_value (fst cond_2) <> 0 then (
+        assert_env_length w_27 4;
+        push_env w_27 (Memo.from_constructor tag_VTrue);
         assert_env_length w_27 5;
         drop_n w_27 5 1;
         assert_env_length w_27 4;
@@ -2087,16 +2102,22 @@ let () =
         assert_env_length w_27 1;
         drop_n w_27 1 0;
         assert_env_length w_27 1;
-        return_n w_27 1 (pc_to_exp (int_to_pc 0))
-      in
-      if Word.get_value (fst cond_2) <> 0 then (
-        assert_env_length w_27 4;
-        push_env w_27 (Memo.from_constructor tag_VTrue);
-        if_kont_2 ())
+        return_n w_27 1 (pc_to_exp (int_to_pc 0)))
       else (
         assert_env_length w_27 4;
         push_env w_27 (Memo.from_constructor tag_VFalse);
-        if_kont_2 ()))
+        assert_env_length w_27 5;
+        drop_n w_27 5 1;
+        assert_env_length w_27 4;
+        drop_n w_27 4 1;
+        assert_env_length w_27 3;
+        drop_n w_27 3 1;
+        assert_env_length w_27 2;
+        drop_n w_27 2 1;
+        assert_env_length w_27 1;
+        drop_n w_27 1 0;
+        assert_env_length w_27 1;
+        return_n w_27 1 (pc_to_exp (int_to_pc 0))))
     25
 
 let () =
@@ -2190,8 +2211,9 @@ let () =
       assert_env_length w_30 5;
       let cond_3 = resolve w_30 (Source.E 4) in
       ignore (pop_env w_30);
-      let if_kont_3 =
-       fun _ ->
+      if Word.get_value (fst cond_3) <> 0 then (
+        assert_env_length w_30 4;
+        push_env w_30 (Memo.from_constructor tag_VTrue);
         assert_env_length w_30 5;
         drop_n w_30 5 1;
         assert_env_length w_30 4;
@@ -2203,16 +2225,22 @@ let () =
         assert_env_length w_30 1;
         drop_n w_30 1 0;
         assert_env_length w_30 1;
-        return_n w_30 1 (pc_to_exp (int_to_pc 0))
-      in
-      if Word.get_value (fst cond_3) <> 0 then (
-        assert_env_length w_30 4;
-        push_env w_30 (Memo.from_constructor tag_VTrue);
-        if_kont_3 ())
+        return_n w_30 1 (pc_to_exp (int_to_pc 0)))
       else (
         assert_env_length w_30 4;
         push_env w_30 (Memo.from_constructor tag_VFalse);
-        if_kont_3 ()))
+        assert_env_length w_30 5;
+        drop_n w_30 5 1;
+        assert_env_length w_30 4;
+        drop_n w_30 4 1;
+        assert_env_length w_30 3;
+        drop_n w_30 3 1;
+        assert_env_length w_30 2;
+        drop_n w_30 2 1;
+        assert_env_length w_30 1;
+        drop_n w_30 1 0;
+        assert_env_length w_30 1;
+        return_n w_30 1 (pc_to_exp (int_to_pc 0))))
     28
 
 let () =
