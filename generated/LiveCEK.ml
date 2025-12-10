@@ -32,55 +32,57 @@ let tag_EZro = 24
 let tag_EFst = 25
 let tag_EFix = 26
 let tag_EHole = 27
-let tag_VInt = 28
-let tag_VAbs = 29
-let tag_VTrue = 30
-let tag_VFalse = 31
-let tag_VNil = 32
-let tag_VCons = 33
-let tag_VPair = 34
-let tag_VFix = 35
-let tag_VStuck = 36
-let tag_VTInt = 37
-let tag_VTFunc = 38
-let tag_VTBool = 39
-let tag_VTList = 40
-let tag_VTPair = 41
-let tag_SHole = 42
-let tag_STypeError = 43
-let tag_SIndexError = 44
-let tag_SApp = 45
-let tag_SAdd0 = 46
-let tag_SAdd1 = 47
-let tag_SGt0 = 48
-let tag_SGt1 = 49
-let tag_SIf = 50
-let tag_SMatchList = 51
-let tag_SZro = 52
-let tag_SFst = 53
-let tag_cont_1 = 54
-let tag_cont_2 = 55
-let tag_cont_3 = 56
-let tag_cont_4 = 57
-let tag_cont_5 = 58
-let tag_cont_6 = 59
-let tag_cont_7 = 60
-let tag_cont_8 = 61
-let tag_cont_9 = 62
-let tag_cont_10 = 63
-let tag_cont_11 = 64
-let tag_cont_12 = 65
-let tag_cont_13 = 66
-let tag_cont_14 = 67
-let tag_cont_15 = 68
-let tag_cont_16 = 69
-let tag_cont_17 = 70
-let tag_cont_18 = 71
-let tag_cont_19 = 72
-let tag_cont_20 = 73
-let tag_cont_21 = 74
-let tag_cont_22 = 75
-let tag_cont_23 = 76
+let tag_EUnit = 28
+let tag_VInt = 29
+let tag_VAbs = 30
+let tag_VUnit = 31
+let tag_VTrue = 32
+let tag_VFalse = 33
+let tag_VNil = 34
+let tag_VCons = 35
+let tag_VPair = 36
+let tag_VFix = 37
+let tag_VStuck = 38
+let tag_VTInt = 39
+let tag_VTFunc = 40
+let tag_VTBool = 41
+let tag_VTList = 42
+let tag_VTPair = 43
+let tag_SHole = 44
+let tag_STypeError = 45
+let tag_SIndexError = 46
+let tag_SApp = 47
+let tag_SAdd0 = 48
+let tag_SAdd1 = 49
+let tag_SGt0 = 50
+let tag_SGt1 = 51
+let tag_SIf = 52
+let tag_SMatchList = 53
+let tag_SZro = 54
+let tag_SFst = 55
+let tag_cont_1 = 56
+let tag_cont_2 = 57
+let tag_cont_3 = 58
+let tag_cont_4 = 59
+let tag_cont_5 = 60
+let tag_cont_6 = 61
+let tag_cont_7 = 62
+let tag_cont_8 = 63
+let tag_cont_9 = 64
+let tag_cont_10 = 65
+let tag_cont_11 = 66
+let tag_cont_12 = 67
+let tag_cont_13 = 68
+let tag_cont_14 = 69
+let tag_cont_15 = 70
+let tag_cont_16 = 71
+let tag_cont_17 = 72
+let tag_cont_18 = 73
+let tag_cont_19 = 74
+let tag_cont_20 = 75
+let tag_cont_21 = 76
+let tag_cont_22 = 77
+let tag_cont_23 = 78
 
 type nat = Z | S of nat
 
@@ -153,6 +155,7 @@ type expr =
   | EFst of expr
   | EFix of expr
   | EHole of int option
+  | EUnit
 
 let rec from_ocaml_expr x =
   match x with
@@ -179,6 +182,7 @@ let rec from_ocaml_expr x =
   | EFst x0 -> Memo.appends [ Memo.from_constructor tag_EFst; from_ocaml_expr x0 ]
   | EFix x0 -> Memo.appends [ Memo.from_constructor tag_EFix; from_ocaml_expr x0 ]
   | EHole x0 -> Memo.appends [ Memo.from_constructor tag_EHole; from_ocaml_option (fun x -> Memo.from_int x) x0 ]
+  | EUnit -> Memo.appends [ Memo.from_constructor tag_EUnit ]
 
 let rec to_ocaml_expr x =
   let h, t = Option.get (Memo.list_match x) in
@@ -240,11 +244,13 @@ let rec to_ocaml_expr x =
   | c when c = tag_EHole ->
       let x0 = Memo.splits_1 t in
       EHole (to_ocaml_option (fun x -> Word.get_value (Memo.to_word x)) x0)
+  | c when c = tag_EUnit -> EUnit
   | _ -> failwith "unreachable"
 
 type value =
   | VInt of int
   | VAbs of expr * value list
+  | VUnit
   | VTrue
   | VFalse
   | VNil
@@ -275,6 +281,7 @@ let rec from_ocaml_value x =
   | VAbs (x0, x1) ->
       Memo.appends
         [ Memo.from_constructor tag_VAbs; from_ocaml_expr x0; from_ocaml_list (fun x -> from_ocaml_value x) x1 ]
+  | VUnit -> Memo.appends [ Memo.from_constructor tag_VUnit ]
   | VTrue -> Memo.appends [ Memo.from_constructor tag_VTrue ]
   | VFalse -> Memo.appends [ Memo.from_constructor tag_VFalse ]
   | VNil -> Memo.appends [ Memo.from_constructor tag_VNil ]
@@ -326,6 +333,7 @@ let rec to_ocaml_value x =
   | c when c = tag_VAbs ->
       let x0, x1 = Memo.splits_2 t in
       VAbs (to_ocaml_expr x0, to_ocaml_list (fun x -> to_ocaml_value x) x1)
+  | c when c = tag_VUnit -> VUnit
   | c when c = tag_VTrue -> VTrue
   | c when c = tag_VFalse -> VFalse
   | c when c = tag_VNil -> VNil
@@ -997,6 +1005,12 @@ let () =
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_13; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4);
           stepped w_4
+      | c_2 when c_2 = tag_EUnit ->
+          ignore (pop_env w_4);
+          assert_env_length w_4 2;
+          push_env w_4 (Memo.from_constructor tag_VUnit);
+          assert_env_length w_4 3;
+          return_n w_4 3 (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (5)")
     5
 
@@ -2315,52 +2329,54 @@ let () = Words.set_constructor_degree 24 0
 let () = Words.set_constructor_degree 25 0
 let () = Words.set_constructor_degree 26 0
 let () = Words.set_constructor_degree 27 0
-let () = Words.set_constructor_degree 28 0
-let () = Words.set_constructor_degree 29 (-1)
-let () = Words.set_constructor_degree 30 1
+let () = Words.set_constructor_degree 28 1
+let () = Words.set_constructor_degree 29 0
+let () = Words.set_constructor_degree 30 (-1)
 let () = Words.set_constructor_degree 31 1
 let () = Words.set_constructor_degree 32 1
-let () = Words.set_constructor_degree 33 (-1)
-let () = Words.set_constructor_degree 34 (-1)
+let () = Words.set_constructor_degree 33 1
+let () = Words.set_constructor_degree 34 1
 let () = Words.set_constructor_degree 35 (-1)
-let () = Words.set_constructor_degree 36 0
-let () = Words.set_constructor_degree 37 1
-let () = Words.set_constructor_degree 38 1
+let () = Words.set_constructor_degree 36 (-1)
+let () = Words.set_constructor_degree 37 (-1)
+let () = Words.set_constructor_degree 38 0
 let () = Words.set_constructor_degree 39 1
 let () = Words.set_constructor_degree 40 1
 let () = Words.set_constructor_degree 41 1
-let () = Words.set_constructor_degree 42 (-1)
-let () = Words.set_constructor_degree 43 (-1)
-let () = Words.set_constructor_degree 44 1
+let () = Words.set_constructor_degree 42 1
+let () = Words.set_constructor_degree 43 1
+let () = Words.set_constructor_degree 44 (-1)
 let () = Words.set_constructor_degree 45 (-1)
-let () = Words.set_constructor_degree 46 (-1)
+let () = Words.set_constructor_degree 46 1
 let () = Words.set_constructor_degree 47 (-1)
 let () = Words.set_constructor_degree 48 (-1)
 let () = Words.set_constructor_degree 49 (-1)
-let () = Words.set_constructor_degree 50 (-2)
-let () = Words.set_constructor_degree 51 (-2)
-let () = Words.set_constructor_degree 52 0
-let () = Words.set_constructor_degree 53 0
-let () = Words.set_constructor_degree 54 (-2)
-let () = Words.set_constructor_degree 55 (-2)
+let () = Words.set_constructor_degree 50 (-1)
+let () = Words.set_constructor_degree 51 (-1)
+let () = Words.set_constructor_degree 52 (-2)
+let () = Words.set_constructor_degree 53 (-2)
+let () = Words.set_constructor_degree 54 0
+let () = Words.set_constructor_degree 55 0
 let () = Words.set_constructor_degree 56 (-2)
 let () = Words.set_constructor_degree 57 (-2)
 let () = Words.set_constructor_degree 58 (-2)
-let () = Words.set_constructor_degree 59 0
+let () = Words.set_constructor_degree 59 (-2)
 let () = Words.set_constructor_degree 60 (-2)
-let () = Words.set_constructor_degree 61 (-2)
-let () = Words.set_constructor_degree 62 (-3)
+let () = Words.set_constructor_degree 61 0
+let () = Words.set_constructor_degree 62 (-2)
 let () = Words.set_constructor_degree 63 (-2)
-let () = Words.set_constructor_degree 64 (-2)
-let () = Words.set_constructor_degree 65 0
-let () = Words.set_constructor_degree 66 0
-let () = Words.set_constructor_degree 67 (-3)
-let () = Words.set_constructor_degree 68 (-2)
-let () = Words.set_constructor_degree 69 (-2)
+let () = Words.set_constructor_degree 64 (-3)
+let () = Words.set_constructor_degree 65 (-2)
+let () = Words.set_constructor_degree 66 (-2)
+let () = Words.set_constructor_degree 67 0
+let () = Words.set_constructor_degree 68 0
+let () = Words.set_constructor_degree 69 (-3)
 let () = Words.set_constructor_degree 70 (-2)
 let () = Words.set_constructor_degree 71 (-2)
 let () = Words.set_constructor_degree 72 (-2)
 let () = Words.set_constructor_degree 73 (-2)
-let () = Words.set_constructor_degree 74 (-3)
-let () = Words.set_constructor_degree 75 (-1)
-let () = Words.set_constructor_degree 76 (-1)
+let () = Words.set_constructor_degree 74 (-2)
+let () = Words.set_constructor_degree 75 (-2)
+let () = Words.set_constructor_degree 76 (-3)
+let () = Words.set_constructor_degree 77 (-1)
+let () = Words.set_constructor_degree 78 (-1)
