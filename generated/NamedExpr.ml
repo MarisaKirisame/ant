@@ -5,6 +5,7 @@ type nexpr =
   | NELe of nexpr * nexpr
   | NEGt of nexpr * nexpr
   | NEGe of nexpr * nexpr
+  | NEAnd of nexpr * nexpr
   | NEVar of string
   | NEAbs of string * nexpr
   | NEApp of nexpr * nexpr
@@ -19,7 +20,9 @@ type nexpr =
   | NEPair of nexpr * nexpr
   | NEZro of nexpr
   | NEFst of nexpr
+  | NEUnit
   | NEHole
+[@@deriving eq]
 
 let pp_nexpr fmt nexpr =
   let rec aux fmt expr =
@@ -47,5 +50,7 @@ let pp_nexpr fmt nexpr =
     | NEZro p -> Format.fprintf fmt "(zro %a)" aux p
     | NEFst p -> Format.fprintf fmt "(fst %a)" aux p
     | NEHole -> Format.pp_print_string fmt "hole"
+    | NEUnit -> Format.pp_print_string fmt "()"
+    | NEAnd (lhs, rhs) -> Format.fprintf fmt "(%a && %a)" aux lhs aux rhs
   in
   aux fmt nexpr

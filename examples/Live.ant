@@ -35,11 +35,13 @@ type expr =
   | EFst of expr
   | EFix of expr
   | EHole of option int
+  | EUnit
 ;;
 
 type value = 
   | VInt of int
   | VAbs of expr * list value
+  | VUnit
   | VTrue
   | VFalse
   | VNil
@@ -178,4 +180,5 @@ let rec eval = fun expr env ->
     | VCons x xs -> eval c (Cons xs (Cons x env))
     | VStuck vs -> VStuck (SMatchList vs n c)
     | vv -> VStuck (STypeError vv VTList))
+  | EUnit -> VUnit
 ;;

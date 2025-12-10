@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,9 +58,10 @@ def compute_stats(ratios: Sequence[float]) -> SpeedupStats:
     """Compute summary statistics for a sequence of ratios."""
     if not ratios:
         raise ValueError("ratios is empty")
+    geo_mean = math.exp(statistics.mean(math.log(r) for r in ratios))
     return SpeedupStats(
         samples=len(ratios),
-        mean=statistics.mean(ratios),
+        mean=geo_mean,
         minimum=min(ratios),
         maximum=max(ratios),
     )

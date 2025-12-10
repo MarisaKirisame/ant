@@ -93,6 +93,9 @@ let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
         LC.EMatchList (aux ctx target, aux ctx nil_case, aux (tail_name :: head_name :: ctx) cons_case)
     | NEFix (func_name, arg_name, body) -> LC.EFix (aux (arg_name :: func_name :: ctx) body)
     | NEHole -> LC.EHole None
+    | NEAnd (lhs, rhs) -> LC.EIf (aux ctx lhs, aux ctx rhs, LC.EFalse)
+    | NEUnit -> LC.EUnit
+    | x -> failwith ("expr_of_nexpr not implemente for expr: " ^ Format.asprintf "%a" pp_nexpr x)
   in
   aux ctx nexpr
 
