@@ -5,32 +5,11 @@ open Memo
 open State
 open Code
 
-(*
- * CompileMemo builds the code generator that emits the specialised CEK VM.
- * There are three layers that cooperate:
- *   - Helpers in [Code] provide a small IR DSL.  Everything in this file
- *     should construct documents through those helpers instead of
- *     concatenating strings by hand.
- *   - A collection of combinators below (scope handling,
- *     continuation registry) tracks meta information such as constructor
- *     tags, environment layouts, and the code fragments for each generated
- *     continuation.
- *   - The printers at the bottom (`compile_*`, `generate_apply_cont`,
- *     `pp_cek_ant`) walk syntax/IR and produce OCaml source that encodes
- *     the CEK state machine, storing the resulting snippets in [codes] for
- *     later emission.
- * The goal is that high level transformations only talk in terms of the
- * DSL (int/lam/app/seq/…) while environment bookkeeping and code emission
- * stay centralised here.
- *)
+(* Backend overview moved to docs/internal.md#compilememo-backend. *)
 
 (*todo: do not do a stack machine*)
 
-(* As K come with interpretative overhead,
- *   we want to use K as little as possible,
- *   instead storing the computed temporary variables onto the env as a stack,
- *   only using K whenever we do a non-tail function call.
- *)
+(* Stack usage rationale is documented in docs/internal.md#compilememo-backend. *)
 
 exception DupKey
 

@@ -2,19 +2,8 @@ open Value
 open Words
 open BatFingerTree
 
-(* Patterns are a compact, finger-tree representation of "value-with-holes".
- * Ant uses three related structures:
- *   - words   : fully concrete values (prefix traversals) used at the runtime boundary.
- *   - value   : words extended with References that defer slices of env/cont.
- *   - pattern : holes plus concrete prefixes, used to summarise states for memo hits.
- *
- * The measure tracks degree, max_degree, and hole counts, letting us split and
- * fuse adjacent components in O(log n). Matching walks the pattern left to
- * right, binding skipped slices to anonymous holes; the inverse operation
- * (`compose_pattern`) rebuilds a concrete value from those bindings. These
- * operations underpin dependency matching and step composition in
- * Dependency.make_step/compose_step.
- *)
+(* Design notes on the pattern/value/word relationship now live in
+   docs/internal.md#patterns-as-finger-trees-patternml. *)
 (*todo: do we actually need hole_count?*)
 type measure = { degree : int; max_degree : int; hole_count : int }
 

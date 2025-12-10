@@ -46,14 +46,7 @@ let measure (et : fg_et) : measure_t =
 let summary x = Generic.measure ~monoid ~measure x
 let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
 
-(* Split at the values level, not the finger tree node level
-   Pop a specific number of elements from the seq represented by a finger tree
-   The count is determined by the `n`. All the elements with a `max_degree` less than `n` are popped.
-   Return a 2-tuple of
-    - a seq consisting of the popped elements *and an element from the head of the rest seq*
-      as the last element to check some invariants
-    - the remained part of the original seq
-*)
+(* pop_n semantics are documented in docs/internal.md#value-slicing-semantics-valueml. *)
 let rec pop_n (s : seq) (n : int) : seq * seq =
   assert (n >= 0);
   if n = 0 then (Generic.empty, s)

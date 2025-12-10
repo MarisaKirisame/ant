@@ -25,6 +25,23 @@ their responsibilities, and the data structures that make reuse possible.
    generated modules under `generated/`, formats the tree, and executes
    `GeneratedMain`.
 
+## CompileMemo Backend
+
+`CompileMemo.ml` builds the specialised CEK VM in three layers:
+- **IR helpers** – The `Code` module offers a small DSL for documents; all code
+  emission should go through these helpers rather than raw string
+  concatenation.
+- **Generation combinators** – Scope/continuation registries track constructor
+  tags, environment layouts, and the code fragments registered for each
+  continuation.
+- **Printers** – `compile_*`, `generate_apply_cont`, and `pp_cek_ant` traverse
+  syntax/IR to produce OCaml source, accumulating snippets in `codes` for final
+  emission.
+
+Temporary values are stored in the environment whenever possible to avoid
+interpretative overhead from the continuation stack `K`; we only use `K` for
+non-tail calls.
+
 ## Runtime Representation
 
 ### Words, Values, and Patterns (`Words.ml`, `Value.ml`, `Pattern.ml`)
@@ -37,6 +54,54 @@ their responsibilities, and the data structures that make reuse possible.
 - `Pattern.t` represents “holes plus concrete prefixes”. Patterns fuse adjacent
   holes/constructors and carry hole counts so they can match or compose states
   in logarithmic time.
+
+### Monoid Parsing (`Words.ml`)
+
+Ant treats values as strings via their prefix traversal (e.g. `Cons 0 (Cons 1
+Empty)` becomes `Cons 0 Cons 1 Empty`). Constructors have degrees of
+`1 - arity`; atomic values have degree `1`. A substring’s degree is the sum of
+its parts, so the first prefix that reaches degree `1` marks a complete value.
+Substrings can therefore represent whole values, several adjacent values, or
+incomplete prefixes (negative degree). Pattern matching can select a branch
+after seeing only the first word, deferring constructor arguments as
+references.
+
+### Patterns as Finger Trees (`Pattern.ml`)
+
+Patterns reuse the finger-tree machinery so “holes plus concrete prefixes” can
+be split and fused in `O(log n)`. The measure tracks degree, `max_degree`, and
+hole counts, allowing adjacent constructors or holes to be merged. During memo
+composition, `compose_pattern` rehydrates concrete values from the bindings
+produced while matching.
+
+### Value Slicing Semantics (`Value.ml`)
+
+`pop_n` splits a value sequence by *degree* rather than by finger-tree nodes. It
+finds the shortest prefix whose `max_degree` meets the requested count, returns
+that prefix (including the boundary element), and leaves the remainder. If the
+boundary is a `Reference`, only the needed portion of its degree is consumed.
+
+### CEK State Representation (`State.ml`)
+
+`exp` is intentionally not an ADT. Encoding the control component as a variant
+would add overhead, and it is unclear how to incrementalise recursive functions
+via such an ADT; instead memoisation focuses on CEK steps and the resolved
+environment/continuation slices captured per step.
+
+### Pattern Matrix Debug Output (`Pat.ml`)
+
+`pp_pattern_matrix` renders the lowered decision table for debugging:
+
+```
+arity = 4
+occurrence = [.0, .1, .2, .3]
+
+(PAny, PAny, PAny, PAny)   -> 1 with { .0 -> x, .1 -> y, .2 -> z, .3 -> w }
+(PInt 1, PAny, PAny, PAny) -> 2 with { }
+(PInt 2, PAny, PAny, PAny) -> 3 with { .0 -> z }
+(PInt 3, PAny, PAny, PAny) -> 4
+(PInt 4, PAny, PAny, PAny) -> 5
+```
 
 ### State (`State.ml`)
 - A CEK state is `{ c; e; k; sc }` (control, environment dynarray, continuation,

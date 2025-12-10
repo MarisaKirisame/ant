@@ -57,18 +57,7 @@ type 'a pattern_matrix = {
   acts : int list;
 }
 
-(*
-  output format:
-
-  arity = 4
-  occurrence = [\.0, \.1, \.2, \.3]
-  
-  (PAny, PAny, PAny, PAny)   -> 1 with { \.0 -> x, \.1 -> y, \.2 -> z, \.3 -> w }
-  (PInt 1, PAny, PAny, PAny) -> 2 with { }
-  (PInt 2, PAny, PAny, PAny) -> 3 with { \.0 -> z }
-  (PInt 3, PAny, PAny, PAny) -> 4 
-  (PInt 4, PAny, PAny, PAny) -> 5
-*)
+(* Pretty-printing example moved to docs/internal.md#pattern-matrix-debug-output-patml. *)
 
 let pp_pattern_matrix { arity; occs; bnds; pats; acts } =
   PPrint.(

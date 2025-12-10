@@ -5,15 +5,7 @@ module Hashtbl = Core.Hashtbl
 
 type env = value Dynarray.t
 
-(* One thing we might want is to have exp as an adt,
- *   which allow memoizing exp fragment to incrementalize the program under changes.
- * However, it
- *   0 - add extra overhead
- *   1 - we dont really need this for eval
- *   2 - is unclear how we actually do this with recursive function
- *         ideally, modifying a recursive function and nothing else
- *         should only cause all reexecution of that recursive function at the changed location.
- *)
+(* Notes on the control representation are in docs/internal.md#cek-state-representation-stateml. *)
 and exp = {
   (* One step transition. Throw an exception when done. *)
   step : world -> unit;
