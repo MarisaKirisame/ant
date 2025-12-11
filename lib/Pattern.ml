@@ -49,14 +49,14 @@ let pattern_cons (p : pat) (q : pattern) : pattern =
     | PCon p, PCon qh -> Generic.cons ~monoid ~measure:pat_measure qt (PCon (Words.append p qh))
     | PCon _, PVar _ | PVar _, PCon _ -> Generic.cons ~monoid ~measure:pat_measure q p
 
-let pattern_snoc (q : pattern) (p : pat) : pattern =
-  if Generic.is_empty q then Generic.singleton p
+let pattern_snoc (p : pattern) (q : pat) : pattern =
+  if Generic.is_empty p then Generic.singleton q
   else
-    let qh, qt = pattern_rear_exn q in
-    match (qt, p) with
-    | PVar qt, PVar p -> Generic.snoc ~monoid ~measure:pat_measure qh (make_pvar (qt + p))
-    | PCon qt, PCon p -> Generic.snoc ~monoid ~measure:pat_measure qh (PCon (Words.append qt p))
-    | PCon _, PVar _ | PVar _, PCon _ -> Generic.snoc ~monoid ~measure:pat_measure q p
+    let ph, pt = pattern_rear_exn p in
+    match (pt, q) with
+    | PVar pt, PVar q -> Generic.snoc ~monoid ~measure:pat_measure ph (make_pvar (pt + q))
+    | PCon pt, PCon q -> Generic.snoc ~monoid ~measure:pat_measure ph (PCon (Words.append pt q))
+    | PCon _, PVar _ | PVar _, PCon _ -> Generic.snoc ~monoid ~measure:pat_measure p q
 
 let pattern_append_unsafe x y = Generic.append ~monoid ~measure:pat_measure x y
 let pattern_cons_unsafe x y = Generic.cons ~monoid ~measure:pat_measure y x
