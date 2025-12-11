@@ -217,8 +217,49 @@ let rec dedup eq xs =
   | [ x ] -> [ x ]
   | x :: y :: rest -> if eq x y then dedup eq (y :: rest) else x :: dedup eq (y :: rest)
 
+let add_if_absent v acc = if List.mem v acc then acc else v :: acc
+
+let rec bound_vars pat acc =
+  match pat with
+  | VarPat name -> add_if_absent name acc
+  | TuplePat ps | ListPat ps -> List.fold_left (fun a p -> bound_vars p a) acc ps
+  | ConsPat (h, t) -> bound_vars t (bound_vars h acc)
+  | Wild | PMultiHole -> acc
+  | _ -> failwith ("bound_vars not implemented for pattern: " ^ Format.asprintf "%a" pp_expr pat)
+
+let rec free_vars_aux (x : expr) bound acc =
+  match x with
+  | Var name -> if List.mem name bound then acc else add_if_absent name acc
+  | EmptyHole | MultiHole | PMultiHole | Wild | Atom (Bool _) | Atom (Int _) -> acc
+  | BinOp (_, lhs, rhs) -> free_vars_aux lhs bound (free_vars_aux rhs bound acc)
+  | Match (scrut, cases) ->
+      let acc = free_vars_aux scrut bound acc in
+      let rec loop cases acc =
+        match cases with [] -> acc | (pat, expr) :: rest -> loop rest (free_vars_aux expr (bound_vars pat bound) acc)
+      in
+      loop cases acc
+  | Ap (func, arg) -> free_vars_aux func bound (free_vars_aux arg bound acc)
+  | Tuple ps -> List.fold_left (fun a p -> free_vars_aux p bound a) acc ps
+  | Cons (hd, tl) -> free_vars_aux hd bound (free_vars_aux tl bound acc)
+  | _ -> failwith ("free_vars not implemented for expr: " ^ Format.asprintf "%a" pp_expr x)
+
+let free_vars x = free_vars_aux x [] []
+
 let rec nexpr_of_expr_aux e names : nexpr =
   match e with
+  (*todo: this is suboptimal coding. we want a separate pass which remove pattern matching in function header*)
+  | Let (VarPat name, Fun (TuplePat params, fun_body), let_body) when List.mem name (free_vars fun_body) -> (
+      let param_names =
+        List.map
+          (function VarPat p -> p | _ -> failwith "Only VarPat supported in recursive function parameters")
+          params
+      in
+      match param_names with
+      | [] -> failwith "Recursive function needs at least one parameter"
+      | first :: rest ->
+          let body = nexpr_of_expr_aux fun_body names in
+          let body_with_rest = List.fold_right (fun p acc -> NEAbs (p, acc)) rest body in
+          NELet (name, NEFix (name, first, body_with_rest), nexpr_of_expr_aux let_body names))
   | Let (VarPat name, bound, body) -> NELet (name, nexpr_of_expr_aux bound names, nexpr_of_expr_aux body names)
   (*todo: use the new tuple mechanism*)
   | Fun (TuplePat params, body) ->
@@ -293,6 +334,7 @@ let rec clean_aux x (seen : string list) =
           clean_aux cons_case (tail_name :: head_name :: seen) )
   | NEApp (f, a) -> NEApp (clean_aux f seen, clean_aux a seen)
   | NECons (h, t) -> NECons (clean_aux h seen, clean_aux t seen)
+  | NEFix (name, param, body) -> NEFix (name, param, clean_aux body (param :: name :: seen))
   | _ -> failwith ("clean not implemented for expr: " ^ Format.asprintf "%a" pp_nexpr x)
 
 let clean x = clean_aux x []
@@ -305,6 +347,7 @@ let rec subst_deepest_hole y x =
 
 let test_string =
   {| (sorted ascending (1 :: 2 :: 3 :: [])) ::
+     (sorted descending (1 :: 2 :: 3 :: [])) ::
      (sorted ascending (1 :: 3 :: 2 :: [])) :: 
      (sorted ascending (1 :: 1 :: [])) ::
      (sorted descending (3 :: 2 :: 1 :: [])) ::
@@ -323,6 +366,8 @@ let run () =
       let eval expr = eval_expression ~memo ~write_steps expr in
       parse_program ()
       |> List.iteri (fun i nexpr ->
+          Format.printf "hazel candidate %d: %a@." i pp_nexpr nexpr;
           let expr = expr_of_nexpr nexpr in
+          Format.printf "hazel candidate %d expr: %a@." i RunLiveCommon.pp_expr expr;
           let value = eval expr in
           Printf.printf "hazel candidate %d value: %s\n" i (value_to_string value)))

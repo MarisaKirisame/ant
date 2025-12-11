@@ -132,6 +132,10 @@ let nexpr_of_expr ?(ctx = []) expr =
         let arg_name = fresh_name ~hint:"xs" () in
         NEFix (func_name, arg_name, aux (arg_name :: func_name :: ctx) body)
     | LC.EHole _ -> NEHole
+    | EUnit -> NEUnit
+    | EPair (lhs, rhs) -> NEPair (aux ctx lhs, aux ctx rhs)
+    | EZro x -> NEZro (aux ctx x)
+    | EFst x -> NEFst (aux ctx x)
   in
   aux ctx expr
 
