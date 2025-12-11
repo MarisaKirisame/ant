@@ -89,4 +89,25 @@ let rec splits (x : words) : words list =
     let h, t = pop x in
     h :: splits t
 
-  let rec lca (x : words) (y : words) : words =
+let lca_length (x : words) (y : words) : int =
+  let return n =
+    let xl, _ = slice_length x n in
+    let yl, _ = slice_length y n in
+    assert (equal xl yl);
+    (if n < min (length x) (length y) then
+       let xl1, _ = slice_length x (n + 1) in
+       let yl1, _ = slice_length y (n + 1) in
+       assert (not (equal xl1 yl1)));
+    n
+  in
+  let max_common_len = min (length x) (length y) in
+  (*[0, lo) is a common prefix, and we havent look at [lo, hi) yet.*)
+  let rec search lo hi =
+    if lo = hi then lo
+    else
+      let mid = (lo + hi + 1) / 2 in
+      let x_prefix, _ = slice_length x mid in
+      let y_prefix, _ = slice_length y mid in
+      if equal x_prefix y_prefix then search mid hi else search lo (mid - 1)
+  in
+  return (search 0 max_common_len)
