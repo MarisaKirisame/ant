@@ -52,8 +52,7 @@ let subst_state (x : state) (resolve : source -> seq option) : state =
   let c = x.c in
   let e = Dynarray.map (fun v -> subst resolve v) x.e in
   let k = subst resolve x.k in
-  let sc = x.sc in
-  { c; e; k; sc }
+  { c; e; k }
 
 let dyn_array_update (f : 'a -> 'a) (arr : 'a Dynarray.t) : unit =
   let len = Dynarray.length arr in
@@ -166,13 +165,10 @@ let get_next_cont (seqs : seq) : seq =
   let splitted = splits seqs in
   List.hd_exn (List.rev splitted)
 
-let stepped (w : world) : unit = w.state.sc <- w.state.sc + 1
-
 let return_n (w : world) (n : int) (return_exp : exp) : unit =
   assert (Dynarray.length w.state.e = n);
   w.state.e <- Dynarray.of_list [ Dynarray.get_last w.state.e ];
-  w.state.c <- return_exp;
-  stepped w
+  w.state.c <- return_exp
 
 let drop_n (w : world) (e : int) (n : int) : unit =
   assert (Dynarray.length w.state.e = e);
@@ -244,8 +240,9 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     assert (Dependency.state_equal x y);
     x
   in
-  let state = { c; e; k; sc = 0 } in
+  let state = { c; e; k } in
   let i = ref 0 in
+  let sc = ref 0 in
   let hist : history = ref [] in
   (* Binary counter that incrementally composes adjacent slices; arguments are
      reversed so the newest slice sits on the right-hand side during carry. *)
@@ -257,17 +254,19 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   let rec exec state =
     if is_done state then state
     else (
-      log ("step " ^ string_of_int !i ^ ": " ^ string_of_int state.sc);
+      log ("step " ^ string_of_int !i ^ ": " ^ string_of_int !sc);
       i := !i + 1;
       match lookup_step state m with
       | Some step ->
           hist := inc compose_slice { state; step } !hist;
+          sc := !sc + step.sc;
           dbg_step_through step state |> exec
       | None ->
           let old = copy_state state in
           let w = make_world state m in
           state.c.step w;
           let step = Dependency.make_step old w.resolved m in
+          sc := !sc + step.sc;
           m := step :: !m;
           hist := inc compose_slice { state = old; step } !hist;
           let st = dbg_step_through step old in
@@ -276,7 +275,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   let state = exec state in
   assert (Dynarray.length state.e = 1);
   ignore (fold_bin compose_slice None !hist);
-  print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int state.sc ^ " step.");
-  { words = Dynarray.get_last state.e; step = !i; without_memo_step = state.sc }
+  print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int !sc ^ " step.");
+  { words = Dynarray.get_last state.e; step = !i; without_memo_step = !sc }
 
 let exec_done _ = failwith "exec is done, should not call step anymore"

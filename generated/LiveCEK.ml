@@ -418,41 +418,35 @@ let () =
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 6);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 6)
       | c_19 when c_19 = tag_cont_2 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 7);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 7)
       | c_19 when c_19 = tag_cont_3 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 8);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 8)
       | c_19 when c_19 = tag_cont_4 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 9);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 9)
       | c_19 when c_19 = tag_cont_5 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 10);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 10)
       | c_19 when c_19 = tag_cont_6 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 0 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 11);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 11)
       | c_19 when c_19 = tag_cont_7 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
@@ -464,20 +458,17 @@ let () =
           push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_41; ctor_arg_40 ]);
           assert_env_length w_5 3;
           ignore (env_call w_5 [] 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 4)
       | c_19 when c_19 = tag_cont_8 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 12);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 12)
       | c_19 when c_19 = tag_cont_9 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 3 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 13);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 13)
       | c_19 when c_19 = tag_cont_10 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
@@ -488,8 +479,7 @@ let () =
           assert_env_length w_5 5;
           let keep_21 = env_call w_5 [ 2 ] 2 in
           w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_21; w_5.state.k ];
-          w_5.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 4)
       | c_19 when c_19 = tag_cont_11 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
@@ -500,58 +490,49 @@ let () =
           assert_env_length w_5 5;
           let keep_22 = env_call w_5 [ 2 ] 2 in
           w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; keep_22; w_5.state.k ];
-          w_5.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 4)
       | c_19 when c_19 = tag_cont_12 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 0 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 14);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 14)
       | c_19 when c_19 = tag_cont_13 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 0 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 15);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 15)
       | c_19 when c_19 = tag_cont_14 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 3 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 16);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 16)
       | c_19 when c_19 = tag_cont_15 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 18);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 18)
       | c_19 when c_19 = tag_cont_16 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 20);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 20)
       | c_19 when c_19 = tag_cont_17 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 22);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 22)
       | c_19 when c_19 = tag_cont_18 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 24)
       | c_19 when c_19 = tag_cont_19 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 26);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 26)
       | c_19 when c_19 = tag_cont_20 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
@@ -563,8 +544,7 @@ let () =
           push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_108; ctor_arg_107 ]);
           assert_env_length w_5 3;
           ignore (env_call w_5 [] 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 4)
       | c_19 when c_19 = tag_cont_21 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 3 tl_0;
@@ -582,8 +562,7 @@ let () =
           push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_112; ctor_arg_111 ]);
           assert_env_length w_5 4;
           ignore (env_call w_5 [] 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_5
+          w_5.state.c <- pc_to_exp (int_to_pc 4)
       | c_19 when c_19 = tag_cont_22 ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 1 tl_0;
@@ -614,8 +593,7 @@ let () =
     (fun w_0 ->
       assert_env_length w_0 2;
       push_env w_0 (Dynarray.get w_0.state.e 0);
-      w_0.state.c <- pc_to_exp (int_to_pc 3);
-      stepped w_0)
+      w_0.state.c <- pc_to_exp (int_to_pc 3))
     1
 
 let () =
@@ -647,8 +625,7 @@ let () =
           push_env w_2 (Dynarray.get w_2.state.e 4);
           assert_env_length w_2 7;
           ignore (env_call w_2 [] 2);
-          w_2.state.c <- pc_to_exp (int_to_pc 1);
-          stepped w_2
+          w_2.state.c <- pc_to_exp (int_to_pc 1)
       | _ -> failwith "unreachable (2)")
     2
 
@@ -668,8 +645,7 @@ let () =
           push_env w_1 split1_0;
           assert_env_length w_1 4;
           push_env w_1 (Dynarray.get w_1.state.e 1);
-          w_1.state.c <- pc_to_exp (int_to_pc 2);
-          stepped w_1
+          w_1.state.c <- pc_to_exp (int_to_pc 2)
       | _ ->
           ignore (pop_env w_1);
           assert_env_length w_1 2;
@@ -684,8 +660,7 @@ let () =
     (fun w_3 ->
       assert_env_length w_3 2;
       push_env w_3 (Dynarray.get w_3.state.e 0);
-      w_3.state.c <- pc_to_exp (int_to_pc 5);
-      stepped w_3)
+      w_3.state.c <- pc_to_exp (int_to_pc 5))
     4
 
 let () =
@@ -723,8 +698,7 @@ let () =
           assert_env_length w_4 6;
           let keep_0 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_0; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_ELt ->
           let splits_4 = Memo.splits (snd x_2) in
           let split0_4 = List.nth splits_4 0 in
@@ -739,8 +713,7 @@ let () =
           assert_env_length w_4 6;
           let keep_1 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; keep_1; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_ELe ->
           let splits_5 = Memo.splits (snd x_2) in
           let split0_5 = List.nth splits_5 0 in
@@ -755,8 +728,7 @@ let () =
           assert_env_length w_4 6;
           let keep_2 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_3; keep_2; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EGt ->
           let splits_6 = Memo.splits (snd x_2) in
           let split0_6 = List.nth splits_6 0 in
@@ -771,8 +743,7 @@ let () =
           assert_env_length w_4 6;
           let keep_3 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_3; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EGe ->
           let splits_7 = Memo.splits (snd x_2) in
           let split0_7 = List.nth splits_7 0 in
@@ -787,8 +758,7 @@ let () =
           assert_env_length w_4 6;
           let keep_4 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_4; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EVar ->
           let splits_8 = Memo.splits (snd x_2) in
           let split0_8 = List.nth splits_8 0 in
@@ -801,8 +771,7 @@ let () =
           assert_env_length w_4 5;
           let keep_5 = env_call w_4 [] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_5; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 1);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 1)
       | c_2 when c_2 = tag_EAbs ->
           let splits_9 = Memo.splits (snd x_2) in
           let split0_9 = List.nth splits_9 0 in
@@ -836,8 +805,7 @@ let () =
           assert_env_length w_4 7;
           let keep_6 = env_call w_4 [ 1; 4 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_6; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EFix ->
           let splits_11 = Memo.splits (snd x_2) in
           let split0_11 = List.nth splits_11 0 in
@@ -869,8 +837,7 @@ let () =
           assert_env_length w_4 6;
           let keep_7 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_7; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EHole ->
           let splits_13 = Memo.splits (snd x_2) in
           let split0_13 = List.nth splits_13 0 in
@@ -919,8 +886,7 @@ let () =
           assert_env_length w_4 7;
           let keep_8 = env_call w_4 [ 1; 3; 4 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_8; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_ENil ->
           ignore (pop_env w_4);
           assert_env_length w_4 2;
@@ -941,8 +907,7 @@ let () =
           assert_env_length w_4 6;
           let keep_9 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_9; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EPair ->
           let splits_16 = Memo.splits (snd x_2) in
           let split0_16 = List.nth splits_16 0 in
@@ -957,8 +922,7 @@ let () =
           assert_env_length w_4 6;
           let keep_10 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_10; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EZro ->
           let splits_17 = Memo.splits (snd x_2) in
           let split0_17 = List.nth splits_17 0 in
@@ -971,8 +935,7 @@ let () =
           assert_env_length w_4 5;
           let keep_11 = env_call w_4 [] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_12; keep_11; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EFst ->
           let splits_18 = Memo.splits (snd x_2) in
           let split0_18 = List.nth splits_18 0 in
@@ -985,8 +948,7 @@ let () =
           assert_env_length w_4 5;
           let keep_12 = env_call w_4 [] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; keep_12; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EMatchList ->
           let splits_19 = Memo.splits (snd x_2) in
           let split0_19 = List.nth splits_19 0 in
@@ -1003,8 +965,7 @@ let () =
           assert_env_length w_4 7;
           let keep_13 = env_call w_4 [ 1; 3; 4 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_13; w_4.state.k ];
-          w_4.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_4
+          w_4.state.c <- pc_to_exp (int_to_pc 4)
       | c_2 when c_2 = tag_EUnit ->
           ignore (pop_env w_4);
           assert_env_length w_4 2;
@@ -1033,8 +994,7 @@ let () =
           assert_env_length w_6 6;
           let keep_14 = env_call w_6 [ 2; 3 ] 2 in
           w_6.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; keep_14; w_6.state.k ];
-          w_6.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_6
+          w_6.state.c <- pc_to_exp (int_to_pc 4)
       | c_3 when c_3 = tag_VStuck ->
           let splits_21 = Memo.splits (snd x_3) in
           let split0_21 = List.nth splits_21 0 in
@@ -1100,8 +1060,7 @@ let () =
           assert_env_length w_7 6;
           let keep_15 = env_call w_7 [ 2; 3 ] 2 in
           w_7.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; keep_15; w_7.state.k ];
-          w_7.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_7
+          w_7.state.c <- pc_to_exp (int_to_pc 4)
       | c_4 when c_4 = tag_VStuck ->
           let splits_23 = Memo.splits (snd x_4) in
           let split0_23 = List.nth splits_23 0 in
@@ -1167,8 +1126,7 @@ let () =
           assert_env_length w_8 6;
           let keep_16 = env_call w_8 [ 2; 3 ] 2 in
           w_8.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; keep_16; w_8.state.k ];
-          w_8.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_8
+          w_8.state.c <- pc_to_exp (int_to_pc 4)
       | c_5 when c_5 = tag_VStuck ->
           let splits_25 = Memo.splits (snd x_5) in
           let split0_25 = List.nth splits_25 0 in
@@ -1234,8 +1192,7 @@ let () =
           assert_env_length w_9 6;
           let keep_17 = env_call w_9 [ 2; 3 ] 2 in
           w_9.state.k <- Memo.appends [ Memo.from_constructor tag_cont_18; keep_17; w_9.state.k ];
-          w_9.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_9
+          w_9.state.c <- pc_to_exp (int_to_pc 4)
       | c_6 when c_6 = tag_VStuck ->
           let splits_27 = Memo.splits (snd x_6) in
           let split0_27 = List.nth splits_27 0 in
@@ -1301,8 +1258,7 @@ let () =
           assert_env_length w_10 6;
           let keep_18 = env_call w_10 [ 2; 3 ] 2 in
           w_10.state.k <- Memo.appends [ Memo.from_constructor tag_cont_19; keep_18; w_10.state.k ];
-          w_10.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_10
+          w_10.state.c <- pc_to_exp (int_to_pc 4)
       | c_7 when c_7 = tag_VStuck ->
           let splits_29 = Memo.splits (snd x_7) in
           let split0_29 = List.nth splits_29 0 in
@@ -1406,8 +1362,7 @@ let () =
           assert_env_length w_12 8;
           let keep_19 = env_call w_12 [ 4; 5 ] 2 in
           w_12.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; keep_19; w_12.state.k ];
-          w_12.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_12
+          w_12.state.c <- pc_to_exp (int_to_pc 4)
       | c_9 when c_9 = tag_VFix ->
           let splits_32 = Memo.splits (snd x_9) in
           let split0_32 = List.nth splits_32 0 in
@@ -1424,8 +1379,7 @@ let () =
           assert_env_length w_12 8;
           let keep_20 = env_call w_12 [ 2; 4; 5 ] 2 in
           w_12.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; keep_20; w_12.state.k ];
-          w_12.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_12
+          w_12.state.c <- pc_to_exp (int_to_pc 4)
       | c_9 when c_9 = tag_VStuck ->
           let splits_33 = Memo.splits (snd x_9) in
           let split0_33 = List.nth splits_33 0 in
@@ -1487,8 +1441,7 @@ let () =
           push_env w_13 (Dynarray.get w_13.state.e 0);
           assert_env_length w_13 5;
           ignore (env_call w_13 [] 2);
-          w_13.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_13
+          w_13.state.c <- pc_to_exp (int_to_pc 4)
       | c_10 when c_10 = tag_VFalse ->
           ignore (pop_env w_13);
           assert_env_length w_13 3;
@@ -1497,8 +1450,7 @@ let () =
           push_env w_13 (Dynarray.get w_13.state.e 0);
           assert_env_length w_13 5;
           ignore (env_call w_13 [] 2);
-          w_13.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_13
+          w_13.state.c <- pc_to_exp (int_to_pc 4)
       | c_10 when c_10 = tag_VStuck ->
           let splits_34 = Memo.splits (snd x_10) in
           let split0_34 = List.nth splits_34 0 in
@@ -1690,8 +1642,7 @@ let () =
           push_env w_16 (Dynarray.get w_16.state.e 0);
           assert_env_length w_16 5;
           ignore (env_call w_16 [] 2);
-          w_16.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_16
+          w_16.state.c <- pc_to_exp (int_to_pc 4)
       | c_13 when c_13 = tag_VCons ->
           let splits_39 = Memo.splits (snd x_13) in
           let split0_39 = List.nth splits_39 0 in
@@ -1717,8 +1668,7 @@ let () =
           push_env w_16 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_68; ctor_arg_67 ]);
           assert_env_length w_16 7;
           ignore (env_call w_16 [] 2);
-          w_16.state.c <- pc_to_exp (int_to_pc 4);
-          stepped w_16
+          w_16.state.c <- pc_to_exp (int_to_pc 4)
       | c_13 when c_13 = tag_VStuck ->
           let splits_40 = Memo.splits (snd x_13) in
           let split0_40 = List.nth splits_40 0 in
@@ -1809,8 +1759,7 @@ let () =
           push_env w_17 (Dynarray.get w_17.state.e 1);
           assert_env_length w_17 5;
           push_env w_17 (Dynarray.get w_17.state.e 3);
-          w_17.state.c <- pc_to_exp (int_to_pc 17);
-          stepped w_17
+          w_17.state.c <- pc_to_exp (int_to_pc 17)
       | c_14 when c_14 = tag_VStuck ->
           let splits_42 = Memo.splits (snd x_14) in
           let split0_42 = List.nth splits_42 0 in
@@ -1918,8 +1867,7 @@ let () =
           push_env w_19 (Dynarray.get w_19.state.e 1);
           assert_env_length w_19 5;
           push_env w_19 (Dynarray.get w_19.state.e 3);
-          w_19.state.c <- pc_to_exp (int_to_pc 19);
-          stepped w_19
+          w_19.state.c <- pc_to_exp (int_to_pc 19)
       | c_15 when c_15 = tag_VStuck ->
           let splits_44 = Memo.splits (snd x_15) in
           let split0_44 = List.nth splits_44 0 in
@@ -2027,8 +1975,7 @@ let () =
           push_env w_21 (Dynarray.get w_21.state.e 1);
           assert_env_length w_21 5;
           push_env w_21 (Dynarray.get w_21.state.e 3);
-          w_21.state.c <- pc_to_exp (int_to_pc 21);
-          stepped w_21
+          w_21.state.c <- pc_to_exp (int_to_pc 21)
       | c_16 when c_16 = tag_VStuck ->
           let splits_46 = Memo.splits (snd x_16) in
           let split0_46 = List.nth splits_46 0 in
@@ -2136,8 +2083,7 @@ let () =
           push_env w_23 (Dynarray.get w_23.state.e 1);
           assert_env_length w_23 5;
           push_env w_23 (Dynarray.get w_23.state.e 3);
-          w_23.state.c <- pc_to_exp (int_to_pc 23);
-          stepped w_23
+          w_23.state.c <- pc_to_exp (int_to_pc 23)
       | c_17 when c_17 = tag_VStuck ->
           let splits_48 = Memo.splits (snd x_17) in
           let split0_48 = List.nth splits_48 0 in
@@ -2245,8 +2191,7 @@ let () =
           push_env w_25 (Dynarray.get w_25.state.e 1);
           assert_env_length w_25 5;
           push_env w_25 (Dynarray.get w_25.state.e 3);
-          w_25.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_25
+          w_25.state.c <- pc_to_exp (int_to_pc 25)
       | c_18 when c_18 = tag_VStuck ->
           let splits_50 = Memo.splits (snd x_18) in
           let split0_50 = List.nth splits_50 0 in

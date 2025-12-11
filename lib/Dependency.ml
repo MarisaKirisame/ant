@@ -185,8 +185,7 @@ let can_step_through (step : step) (state : state) : bool =
 let step_through (step : step) (state : state) : state =
   assert (step.src.c.pc = state.c.pc);
   let subst = Option.get (value_match_pattern_ek state step.src) in
-  let s = map_ek (subst_value subst) step.dst in
-  { s with sc = state.sc + step.sc }
+  map_ek (subst_value subst) step.dst
 
 let string_of_pat (p : pat) : string =
   match p with PVar n -> "PVar(" ^ string_of_int n ^ ")" | PCon w -> "PCon(" ^ string_of_words w ^ ")"
@@ -225,7 +224,7 @@ let compose_step (x : step) (y : step) : step =
         compose_pattern p s)
       (Option.get (zip_ek x.src s))
   in
-  let dst = { (pattern_to_value src) with sc = 0 } in
+  let dst = pattern_to_value src in
   let dst = step_through x dst in
   if not (can_step_through y dst) then (
     print_endline "cannot compose steps:";
@@ -235,8 +234,7 @@ let compose_step (x : step) (y : step) : step =
     print_endline ("y step: " ^ string_of_step y));
   assert (can_step_through y dst);
   let dst = step_through y dst in
-  assert (dst.sc = x.sc + y.sc);
-  { src; dst; sc = dst.sc }
+  { src; dst; sc = x.sc + y.sc }
 
 let make_step (value : state) (resolved : bool cek) m : step =
   let src =
