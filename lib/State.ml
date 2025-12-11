@@ -14,15 +14,7 @@ and exp = {
 }
 
 and kont = value
-
-and 'a cek = {
-  mutable c : exp;
-  mutable e : 'a Dynarray.t;
-  mutable k : 'a;
-  (* step_count *)
-  mutable sc : int;
-}
-
+and 'a cek = { mutable c : exp; mutable e : 'a Dynarray.t; mutable k : 'a }
 and state = value cek
 and step = { src : pattern cek; dst : value cek; sc : int }
 and memo = step list ref
@@ -39,37 +31,34 @@ let copy_state s : state =
   let c = s.c in
   let e = Dynarray.map (fun v -> v) s.e in
   let k = s.k in
-  let sc = s.sc in
-  { c; e; k; sc }
+  { c; e; k }
 
 (*the order is not fixed. use this for AC stuff*)
 let fold_ek (s : 'a cek) (acc : 'acc) (f : 'acc -> 'a -> 'acc) : 'acc =
   let acc = Dynarray.fold_left (fun acc v -> f acc v) acc s.e in
   f acc s.k
 
-let zip_ek (s1 : 'a cek) (s2 : 'b cek) : ('a * 'b) cek option =
-  if Dynarray.length s1.e != Dynarray.length s2.e then None
+let zip_ek (x : 'a cek) (y : 'b cek) : ('a * 'b) cek option =
+  if Dynarray.length x.e != Dynarray.length y.e then None
   else (
-    assert (Dynarray.length s1.e = Dynarray.length s2.e);
-    let c = s1.c in
-    let e = Dynarray.init (Dynarray.length s1.e) (fun i -> (Dynarray.get s1.e i, Dynarray.get s2.e i)) in
-    let k = (s1.k, s2.k) in
-    let sc = s1.sc in
-    Some { c; e; k; sc })
+    assert (Dynarray.length x.e = Dynarray.length y.e);
+    let c = x.c in
+    assert (x.c.pc = y.c.pc);
+    let e = Dynarray.init (Dynarray.length x.e) (fun i -> (Dynarray.get x.e i, Dynarray.get y.e i)) in
+    let k = (x.k, y.k) in
+    Some { c; e; k })
 
 let map_ek (f : 'a -> 'b) (s : 'a cek) : 'b cek =
   let c = s.c in
   let e = Dynarray.map f s.e in
   let k = f s.k in
-  let sc = s.sc in
-  { c; e; k; sc }
+  { c; e; k }
 
 let maps_ek (f : 'a -> source -> 'b) (s : 'a cek) : 'b cek =
   let c = s.c in
   let e = Dynarray.mapi (fun i v -> f v (Source.E i)) s.e in
   let k = f s.k Source.K in
-  let sc = s.sc in
-  { c; e; k; sc }
+  { c; e; k }
 
 let make_world state memo : world = { state; memo; resolved = map_ek (fun _ -> false) state }
 
@@ -87,13 +76,12 @@ let option_ek_to_ek_option (s : 'a option cek) : 'a cek option =
     let lst = Dynarray.to_list s.e in
     match option_list_to_list_option lst with Some vs -> Some (Dynarray.of_list vs) | None -> None
   in
-  match (e, s.k) with Some e, Some v -> Some { c; e; k = v; sc = s.sc } | _ -> None
+  match (e, s.k) with Some e, Some v -> Some { c; e; k = v } | _ -> None
 
 let string_of_cek (s : state) : string =
-  assert (s.sc <= 10000);
   "pc: " ^ string_of_int s.c.pc
   ^ (", e: " ^ (Dynarray.to_list s.e |> List.map string_of_value |> String.concat ", "))
-  ^ ", k: " ^ string_of_value s.k ^ ", sc: " ^ string_of_int s.sc
+  ^ ", k: " ^ string_of_value s.k
 
 let is_done (s : state) : bool =
   match Generic.front_exn s.k ~monoid:Value.monoid ~measure:Value.measure with

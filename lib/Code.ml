@@ -123,7 +123,6 @@ let state_env_ (s : state code) : env code = code $ parens (uncode s ^^ string "
 let world_env_ (w : world code) : env code = state_env_ @@ world_state_ w
 let state_kont_ (s : state code) : kont code = code $ parens (uncode s ^^ string ".k")
 let world_kont_ (w : world code) : kont code = state_kont_ @@ world_state_ w
-let stepped_ (w : world code) : unit code = app_ (code $ string "stepped") w
 
 let set_c_ (w : world code) (c : exp code) : unit code =
   code $ parens (uncode (world_state_ w) ^^ string ".c <- " ^^ uncode c)
@@ -134,10 +133,7 @@ let set_k_ (w : world code) (k : kont code) : unit code =
 let from_constructor_ (ctag : int code) : Value.seq code = app_ (from_ir $ Function "Memo.from_constructor") ctag
 let to_unit_ (x : 'a code) : unit code = app_ (from_ir $ Function "ignore") x
 let pop_env_ (w : world code) : Value.value code = app_ (from_ir $ Function "pop_env") w
-
-let goto_ (w : world code) (pc_value : pc) : unit code =
-  seq_ (set_c_ w (pc_to_exp_ (pc_ pc_value))) (fun _ -> stepped_ w)
-
+let goto_ (w : world code) (pc_value : pc) : unit code = set_c_ w (pc_to_exp_ (pc_ pc_value))
 let push_env_ (w : world code) (v : Value.seq code) : unit code = app2_ (from_ir $ Function "push_env") w v
 let get_env_ (w : world code) (i : int code) : Value.seq code = dyn_array_get_ (state_env_ @@ world_state_ w) i
 let exec_done_ (w : world code) : unit code = app_ (from_ir $ Function "exec_done") w

@@ -40,8 +40,7 @@ let () =
     (fun w_0 ->
       assert_env_length w_0 2;
       push_env w_0 (Dynarray.get w_0.state.e 0);
-      w_0.state.c <- pc_to_exp (int_to_pc 3);
-      stepped w_0)
+      w_0.state.c <- pc_to_exp (int_to_pc 3))
     1
 
 let () =
@@ -55,8 +54,7 @@ let () =
       push_env w_2 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
       assert_env_length w_2 6;
       ignore (env_call w_2 [] 2);
-      w_2.state.c <- pc_to_exp (int_to_pc 1);
-      stepped w_2)
+      w_2.state.c <- pc_to_exp (int_to_pc 1))
     2
 
 let () =
@@ -85,8 +83,7 @@ let () =
           push_env w_1 (Dynarray.get w_1.state.e 2);
           assert_env_length w_1 6;
           push_env w_1 (Dynarray.get w_1.state.e 1);
-          w_1.state.c <- pc_to_exp (int_to_pc 2);
-          stepped w_1
+          w_1.state.c <- pc_to_exp (int_to_pc 2)
       | _ -> failwith "unreachable (3)")
     3
 
