@@ -124,9 +124,16 @@ let rec antiunify (x : read) (y : read) : read =
   else
     let xh, xt = read_front_exn x in
     let yh, yt = read_front_exn y in
-    match (xh, yh) with 
+    match (xh, yh) with
     | RSkip xh, _ -> read_cons (RSkip xh) (antiunify xt (read_pop_n y xh))
     | _, RSkip yh -> read_cons (RSkip yh) (antiunify (read_pop_n x yh) yt)
     | RRead xh, _ -> read_cons (RRead xh) (antiunify xt (read_pop_n y xh))
     | _, RRead yh -> read_cons (RRead yh) (antiunify (read_pop_n x yh) yt)
-    | RCon xh, RCon yh -> x
+    | RCon xh, RCon yh ->
+        let lca_length = Words.lca_length xh yh in
+        if lca_length = 0 then read_cons (RRead 1) (antiunify (read_pop_n x 1) (read_pop_n y 1))
+        else
+          let xhh, xht = Words.slice_length xh lca_length in
+          let yhh, yht = Words.slice_length yh lca_length in
+          assert (Words.equal xhh yhh);
+          read_cons (RCon xhh) (antiunify (read_cons_unsafe (RCon xht) xt) (read_cons_unsafe (RCon yht) yt))
