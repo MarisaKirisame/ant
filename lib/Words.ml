@@ -88,3 +88,5 @@ let rec splits (x : words) : words list =
   else
     let h, t = pop x in
     h :: splits t
+
+  let rec lca (x : words) (y : words) : words =
