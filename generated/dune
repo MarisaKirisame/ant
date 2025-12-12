@@ -3,6 +3,7 @@
  (modules
   FromHazel
   LiveCEK
+  LivePlain
   LiveLexer
   LiveParser
   NamedExpr
