@@ -16,14 +16,15 @@ let rec compile_ty (x : 'a ty) : document =
   | TArrow (con, cov) -> compile_ty con ^^ string " -> " ^^ compile_ty cov
   | TTuple xs -> string "(" ^^ separate_map (string ", ") compile_ty xs ^^ string ")"
   | TNamed name -> string name
-  | TNamedVar name -> string name
+  | TNamedVar name -> string ("'" ^ name)
 
 let compile_ctor (name, tys, _) =
   if List.is_empty tys then string name
   else string name ^^ string " of " ^^ separate_map (string " * ") (fun x -> parens (compile_ty x)) tys
 
 let comple_type_decl name (Enum { params; ctors }) =
-  string name ^^ space ^^ separate_map space string params ^^ string " = "
+  separate_map space string (List.map (fun s -> "'" ^ s) params)
+  ^^ space ^^ string name ^^ space ^^ string " = "
   ^^ separate_map (string "| ") compile_ctor ctors
 
 let compile_type_binding x =

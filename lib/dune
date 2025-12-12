@@ -1,7 +1,7 @@
 (library
  (name ant)
  (public_name ant)
- (libraries pprint batteries core)
+ (libraries pprint batteries core core_unix.time_stamp_counter)
  (modules
   Lexer
   Tokens

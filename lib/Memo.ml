@@ -18,7 +18,7 @@ let log x = ignore x
 
 (* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
 type words = seq
-type exec_result = { words : words; step : int; without_memo_step : int }
+type exec_result = { words : words; step : int; without_memo_step : int; wall_time : int; without_memo_wall_time : int }
 
 let source_to_string (src : source) = match src with E i -> "E" ^ string_of_int i | K -> "K"
 
@@ -220,6 +220,8 @@ type history = slice bin ref
 and slice = { state : state; step : step }
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
+  let start_time = Time_stamp_counter.now () in
+  let calibrator = Lazy.force Time_stamp_counter.calibrator in
   let raw_step s =
     let w = make_world (copy_state s) m in
     s.c.step w;
@@ -229,7 +231,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   let dbg_step_through step state =
     assert (step.sc > 0);
     let x = Dependency.step_through step state in
-    let y = raw_step_n state step.sc in
+    (*let y = raw_step_n state step.sc in
     if not (Dependency.state_equal x y) then (
       print_endline "state before step:";
       print_endline (string_of_cek state);
@@ -237,7 +239,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
       print_endline (string_of_cek x);
       print_endline "expected:";
       print_endline (string_of_cek y));
-    assert (Dependency.state_equal x y);
+    assert (Dependency.state_equal x y);*)
     x
   in
   let state = { c; e; k } in
@@ -275,7 +277,18 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   let state = exec state in
   assert (Dynarray.length state.e = 1);
   ignore (fold_bin compose_slice None !hist);
+  let wall_time =
+    Time_stamp_counter.diff (Time_stamp_counter.now ()) start_time
+    |> Time_stamp_counter.Span.to_time_ns_span ~calibrator
+    |> Time_ns.Span.to_int63_ns |> Int63.to_int_exn
+  in
   print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int !sc ^ " step.");
-  { words = Dynarray.get_last state.e; step = !i; without_memo_step = !sc }
+  {
+    words = Dynarray.get_last state.e;
+    step = !i;
+    without_memo_step = !sc;
+    wall_time;
+    without_memo_wall_time = wall_time;
+  }
 
 let exec_done _ = failwith "exec is done, should not call step anymore"

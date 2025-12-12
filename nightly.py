@@ -171,6 +171,20 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "exec",
             "ant",
             "--",
+            "examples/Live.ant",
+            "generated/LivePlain.ml",
+            "--compile",
+            "--backend",
+            "plain",
+        ],
+        env=env,
+    )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
             "examples/TailRec.ant",
             "generated/TailRecCEK.ml",
             "--compile",

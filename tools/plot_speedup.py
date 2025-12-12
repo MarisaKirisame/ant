@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Plot speedup ratios from eval_steps.json produced by RunLive.
 
-Each line in the input file is a JSON object with the keys:
-  - "step": number of steps with memoization
-  - "without_memo_step": baseline step count without memoization
+The metric plotted (wall-clock time vs evaluation steps) is controlled by
+``REPORT_WALL_CLOCK_TIME`` below. Expected JSONL keys:
+  - When ``REPORT_WALL_CLOCK_TIME`` is True:
+      * "wall_time_ns": memoized wall-clock time
+      * "without_memo_wall_time_ns": baseline wall-clock time
+  - When False:
+      * "step": memoized step count
+      * "without_memo_step": baseline step count
 
-The script computes the speedup ratio `without_memo_step / step` per entry and
-plots it as a single line. The resulting plot is saved to ``speedup.png`` in
-the current working directory.
+The script computes the speedup ratio `baseline / memoized` per entry and plots
+it as a single line. The resulting plot is saved to ``speedup.png`` in the
+current working directory.
 """
 
 from __future__ import annotations
@@ -21,6 +26,19 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 import matplotlib.pyplot as plt
+
+# Toggle the metric being reported. When True, plot wall-clock time speedups;
+# when False, plot evaluation-step speedups.
+REPORT_WALL_CLOCK_TIME = True
+
+if REPORT_WALL_CLOCK_TIME:
+    MEMO_KEY = "wall_time_ns"
+    BASELINE_KEY = "without_memo_wall_time_ns"
+    METRIC_LABEL = "wall-clock time (ns)"
+else:
+    MEMO_KEY = "step"
+    BASELINE_KEY = "without_memo_step"
+    METRIC_LABEL = "evaluation steps"
 
 
 @dataclass(frozen=True)
@@ -42,11 +60,11 @@ def load_records(path: Path) -> list[float]:
                 continue
             try:
                 rec = json.loads(line)
-                step = rec["step"]
-                without = rec["without_memo_step"]
-                if step <= 0:
-                    raise ValueError("step must be positive")
-                ratios.append(without / step)
+                memo_value = rec[MEMO_KEY]
+                baseline_value = rec[BASELINE_KEY]
+                if memo_value <= 0:
+                    raise ValueError(f"{MEMO_KEY} must be positive")
+                ratios.append(baseline_value / memo_value)
             except Exception as exc:  # pylint: disable=broad-except
                 raise RuntimeError(f"failed to parse line {line_no}") from exc
     if not ratios:
@@ -73,8 +91,8 @@ def plot_speedup(ratios: Iterable[float], output: Path):
     plt.plot(xs, ratios, marker="o", linewidth=1.5)
     plt.yscale("log")
     plt.xlabel("Execution number (nth run)")
-    plt.ylabel("Speedup (baseline / memoized, log scale)")
-    plt.title("Memoization Speedup per Execution (log scale)")
+    plt.ylabel(f"Speedup ({METRIC_LABEL}, baseline / memoized, log scale)")
+    plt.title(f"Memoization Speedup per Execution ({METRIC_LABEL}, log scale)")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.tight_layout()
     plt.savefig(output)
