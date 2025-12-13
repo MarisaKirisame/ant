@@ -589,10 +589,10 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with
   | Type (TBOne (_, Enum { params = _; ctors }) as tb) ->
       register_constructors ctx ctors;
-      CompileType.compile_ty_binding tb
+      CompileType.compile_ty_binding ctx.ctag tb
   | Type (TBRec trs as tb) ->
       List.iter (fun (_, Enum { params = _; ctors }) -> register_constructors ctx ctors) trs;
-      CompileType.compile_ty_binding tb
+      CompileType.compile_ty_binding ctx.ctag tb
   | Term (BOne (x, Lam (ps, term, _), _) | BRec [ (x, Lam (ps, term, _), _) ]) ->
       let s =
         List.fold_left

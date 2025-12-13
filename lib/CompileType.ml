@@ -1,26 +1,7 @@
 open PPrint
 open Syntax
 
-let compile_ty_binding (binding : 'a ty_binding) : document =
-  let ctor_tag_map = Hashtbl.create 16 in
-  let tag_counter = ref 1 in
-  let get_tag c =
-    match Hashtbl.find_opt ctor_tag_map c with
-    | Some t -> t
-    | None ->
-        let t = !tag_counter in
-        incr tag_counter;
-        Hashtbl.add ctor_tag_map c t;
-        t
-  in
-
-  let collect_ctors = function
-    | TBOne (_, Enum { ctors; _ }) -> List.iter (fun (c, _, _) -> ignore (get_tag c)) ctors
-    | TBRec decls ->
-        List.iter (fun (_, Enum { ctors; _ }) -> List.iter (fun (c, _, _) -> ignore (get_tag c)) ctors) decls
-  in
-  collect_ctors binding;
-
+let compile_ty_binding (ctx : (string, int) Core.Hashtbl.t) (binding : 'a ty_binding) : document =
   let rec compile_conv is_to ty v =
     match ty with
     | TUnit ->
@@ -65,8 +46,12 @@ let compile_ty_binding (binding : 'a ty_binding) : document =
   in
 
   let compile_to_ctor (cname, args, _) =
+    let tag_name = "tag_" ^ cname in
+    let tag_id = Core.Hashtbl.find_exn ctx cname in
     let match_case =
-      string "|" ^^ space ^^ string "c" ^^ space ^^ string "when c = tag_" ^^ string cname ^^ space ^^ string "->"
+      string "|" ^^ space
+      ^^ string (string_of_int tag_id)
+      ^^ space ^^ string "(*" ^^ space ^^ string tag_name ^^ space ^^ string "*) ->"
     in
     let extraction =
       if args = [] then empty
