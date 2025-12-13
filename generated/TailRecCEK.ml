@@ -18,8 +18,8 @@ let rec from_ocaml_int_list x =
 let rec to_ocaml_int_list x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_Nil -> Nil
-  | c when c = tag_Cons ->
+  | 1 (* tag_Nil *) -> Nil
+  | 2 (* tag_Cons *) ->
       let x0, x1 = Memo.splits_2 t in
       Cons (Word.get_value (Memo.to_word x0), to_ocaml_int_list x1)
   | _ -> failwith "unreachable"

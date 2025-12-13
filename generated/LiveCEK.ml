@@ -94,8 +94,8 @@ let rec from_ocaml_nat x =
 let rec to_ocaml_nat x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_Z -> Z
-  | c when c = tag_S ->
+  | 1 (* tag_Z *) -> Z
+  | 2 (* tag_S *) ->
       let x0 = Memo.splits_1 t in
       S (to_ocaml_nat x0)
   | _ -> failwith "unreachable"
@@ -111,8 +111,8 @@ let rec from_ocaml_list from_generic_a x =
 let rec to_ocaml_list to_generic_a x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_Nil -> Nil
-  | c when c = tag_Cons ->
+  | 3 (* tag_Nil *) -> Nil
+  | 4 (* tag_Cons *) ->
       let x0, x1 = Memo.splits_2 t in
       Cons (to_generic_a x0, to_ocaml_list (fun x -> to_generic_a x) x1)
   | _ -> failwith "unreachable"
@@ -127,8 +127,8 @@ let rec from_ocaml_option from_generic_a x =
 let rec to_ocaml_option to_generic_a x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_None -> None
-  | c when c = tag_Some ->
+  | 5 (* tag_None *) -> None
+  | 6 (* tag_Some *) ->
       let x0 = Memo.splits_1 t in
       Some (to_generic_a x0)
   | _ -> failwith "unreachable"
@@ -187,64 +187,64 @@ let rec from_ocaml_expr x =
 let rec to_ocaml_expr x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_EInt ->
+  | 7 (* tag_EInt *) ->
       let x0 = Memo.splits_1 t in
       EInt (Word.get_value (Memo.to_word x0))
-  | c when c = tag_EPlus ->
+  | 8 (* tag_EPlus *) ->
       let x0, x1 = Memo.splits_2 t in
       EPlus (to_ocaml_expr x0, to_ocaml_expr x1)
-  | c when c = tag_ELt ->
+  | 9 (* tag_ELt *) ->
       let x0, x1 = Memo.splits_2 t in
       ELt (to_ocaml_expr x0, to_ocaml_expr x1)
-  | c when c = tag_ELe ->
+  | 10 (* tag_ELe *) ->
       let x0, x1 = Memo.splits_2 t in
       ELe (to_ocaml_expr x0, to_ocaml_expr x1)
-  | c when c = tag_EGt ->
+  | 11 (* tag_EGt *) ->
       let x0, x1 = Memo.splits_2 t in
       EGt (to_ocaml_expr x0, to_ocaml_expr x1)
-  | c when c = tag_EGe ->
+  | 12 (* tag_EGe *) ->
       let x0, x1 = Memo.splits_2 t in
       EGe (to_ocaml_expr x0, to_ocaml_expr x1)
-  | c when c = tag_EVar ->
+  | 13 (* tag_EVar *) ->
       let x0 = Memo.splits_1 t in
       EVar (to_ocaml_nat x0)
-  | c when c = tag_EAbs ->
+  | 14 (* tag_EAbs *) ->
       let x0 = Memo.splits_1 t in
       EAbs (to_ocaml_expr x0)
-  | c when c = tag_EApp ->
+  | 15 (* tag_EApp *) ->
       let x0, x1 = Memo.splits_2 t in
       EApp (to_ocaml_expr x0, to_ocaml_expr x1)
-  | c when c = tag_ELet ->
+  | 16 (* tag_ELet *) ->
       let x0, x1 = Memo.splits_2 t in
       ELet (to_ocaml_expr x0, to_ocaml_expr x1)
-  | c when c = tag_ETrue -> ETrue
-  | c when c = tag_EFalse -> EFalse
-  | c when c = tag_EIf ->
+  | 17 (* tag_ETrue *) -> ETrue
+  | 18 (* tag_EFalse *) -> EFalse
+  | 19 (* tag_EIf *) ->
       let x0, x1, x2 = Memo.splits_3 t in
       EIf (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)
-  | c when c = tag_ENil -> ENil
-  | c when c = tag_ECons ->
+  | 20 (* tag_ENil *) -> ENil
+  | 21 (* tag_ECons *) ->
       let x0, x1 = Memo.splits_2 t in
       ECons (to_ocaml_expr x0, to_ocaml_expr x1)
-  | c when c = tag_EMatchList ->
+  | 22 (* tag_EMatchList *) ->
       let x0, x1, x2 = Memo.splits_3 t in
       EMatchList (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)
-  | c when c = tag_EPair ->
+  | 23 (* tag_EPair *) ->
       let x0, x1 = Memo.splits_2 t in
       EPair (to_ocaml_expr x0, to_ocaml_expr x1)
-  | c when c = tag_EZro ->
+  | 24 (* tag_EZro *) ->
       let x0 = Memo.splits_1 t in
       EZro (to_ocaml_expr x0)
-  | c when c = tag_EFst ->
+  | 25 (* tag_EFst *) ->
       let x0 = Memo.splits_1 t in
       EFst (to_ocaml_expr x0)
-  | c when c = tag_EFix ->
+  | 26 (* tag_EFix *) ->
       let x0 = Memo.splits_1 t in
       EFix (to_ocaml_expr x0)
-  | c when c = tag_EHole ->
+  | 27 (* tag_EHole *) ->
       let x0 = Memo.splits_1 t in
       EHole (to_ocaml_option (fun x -> Word.get_value (Memo.to_word x)) x0)
-  | c when c = tag_EUnit -> EUnit
+  | 28 (* tag_EUnit *) -> EUnit
   | _ -> failwith "unreachable"
 
 type value =
@@ -327,26 +327,26 @@ and from_ocaml_stuck x =
 let rec to_ocaml_value x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_VInt ->
+  | 29 (* tag_VInt *) ->
       let x0 = Memo.splits_1 t in
       VInt (Word.get_value (Memo.to_word x0))
-  | c when c = tag_VAbs ->
+  | 30 (* tag_VAbs *) ->
       let x0, x1 = Memo.splits_2 t in
       VAbs (to_ocaml_expr x0, to_ocaml_list (fun x -> to_ocaml_value x) x1)
-  | c when c = tag_VUnit -> VUnit
-  | c when c = tag_VTrue -> VTrue
-  | c when c = tag_VFalse -> VFalse
-  | c when c = tag_VNil -> VNil
-  | c when c = tag_VCons ->
+  | 31 (* tag_VUnit *) -> VUnit
+  | 32 (* tag_VTrue *) -> VTrue
+  | 33 (* tag_VFalse *) -> VFalse
+  | 34 (* tag_VNil *) -> VNil
+  | 35 (* tag_VCons *) ->
       let x0, x1 = Memo.splits_2 t in
       VCons (to_ocaml_value x0, to_ocaml_value x1)
-  | c when c = tag_VPair ->
+  | 36 (* tag_VPair *) ->
       let x0, x1 = Memo.splits_2 t in
       VPair (to_ocaml_value x0, to_ocaml_value x1)
-  | c when c = tag_VFix ->
+  | 37 (* tag_VFix *) ->
       let x0, x1 = Memo.splits_2 t in
       VFix (to_ocaml_expr x0, to_ocaml_list (fun x -> to_ocaml_value x) x1)
-  | c when c = tag_VStuck ->
+  | 38 (* tag_VStuck *) ->
       let x0 = Memo.splits_1 t in
       VStuck (to_ocaml_stuck x0)
   | _ -> failwith "unreachable"
@@ -354,48 +354,48 @@ let rec to_ocaml_value x =
 and to_ocaml_vtype x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_VTInt -> VTInt
-  | c when c = tag_VTFunc -> VTFunc
-  | c when c = tag_VTBool -> VTBool
-  | c when c = tag_VTList -> VTList
-  | c when c = tag_VTPair -> VTPair
+  | 39 (* tag_VTInt *) -> VTInt
+  | 40 (* tag_VTFunc *) -> VTFunc
+  | 41 (* tag_VTBool *) -> VTBool
+  | 42 (* tag_VTList *) -> VTList
+  | 43 (* tag_VTPair *) -> VTPair
   | _ -> failwith "unreachable"
 
 and to_ocaml_stuck x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_SHole ->
+  | 44 (* tag_SHole *) ->
       let x0, x1 = Memo.splits_2 t in
       SHole (to_ocaml_option (fun x -> Word.get_value (Memo.to_word x)) x0, to_ocaml_list (fun x -> to_ocaml_value x) x1)
-  | c when c = tag_STypeError ->
+  | 45 (* tag_STypeError *) ->
       let x0, x1 = Memo.splits_2 t in
       STypeError (to_ocaml_value x0, to_ocaml_vtype x1)
-  | c when c = tag_SIndexError -> SIndexError
-  | c when c = tag_SApp ->
+  | 46 (* tag_SIndexError *) -> SIndexError
+  | 47 (* tag_SApp *) ->
       let x0, x1 = Memo.splits_2 t in
       SApp (to_ocaml_stuck x0, to_ocaml_expr x1)
-  | c when c = tag_SAdd0 ->
+  | 48 (* tag_SAdd0 *) ->
       let x0, x1 = Memo.splits_2 t in
       SAdd0 (to_ocaml_stuck x0, to_ocaml_expr x1)
-  | c when c = tag_SAdd1 ->
+  | 49 (* tag_SAdd1 *) ->
       let x0, x1 = Memo.splits_2 t in
       SAdd1 (to_ocaml_value x0, to_ocaml_stuck x1)
-  | c when c = tag_SGt0 ->
+  | 50 (* tag_SGt0 *) ->
       let x0, x1 = Memo.splits_2 t in
       SGt0 (to_ocaml_stuck x0, to_ocaml_expr x1)
-  | c when c = tag_SGt1 ->
+  | 51 (* tag_SGt1 *) ->
       let x0, x1 = Memo.splits_2 t in
       SGt1 (to_ocaml_value x0, to_ocaml_stuck x1)
-  | c when c = tag_SIf ->
+  | 52 (* tag_SIf *) ->
       let x0, x1, x2 = Memo.splits_3 t in
       SIf (to_ocaml_stuck x0, to_ocaml_expr x1, to_ocaml_expr x2)
-  | c when c = tag_SMatchList ->
+  | 53 (* tag_SMatchList *) ->
       let x0, x1, x2 = Memo.splits_3 t in
       SMatchList (to_ocaml_stuck x0, to_ocaml_expr x1, to_ocaml_expr x2)
-  | c when c = tag_SZro ->
+  | 54 (* tag_SZro *) ->
       let x0 = Memo.splits_1 t in
       SZro (to_ocaml_stuck x0)
-  | c when c = tag_SFst ->
+  | 55 (* tag_SFst *) ->
       let x0 = Memo.splits_1 t in
       SFst (to_ocaml_stuck x0)
   | _ -> failwith "unreachable"
