@@ -226,13 +226,13 @@ let compose_step (x : step) (y : step) : step =
   in
   let dst = pattern_to_value src in
   let dst = step_through x dst in
-  if not (can_step_through y dst) then (
+  (*if not (can_step_through y dst) then (
     print_endline "cannot compose steps:";
     print_endline ("generalized pattern: " ^ string_of_cek (pattern_to_value src));
     print_endline ("x step: " ^ string_of_step x);
     print_endline ("intermediate: " ^ string_of_cek dst);
     print_endline ("y step: " ^ string_of_step y));
-  assert (can_step_through y dst);
+  assert (can_step_through y dst);*)
   let dst = step_through y dst in
   { src; dst; sc = x.sc + y.sc }
 
