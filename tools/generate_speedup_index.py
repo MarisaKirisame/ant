@@ -10,6 +10,11 @@ from pathlib import Path
 from plot_speedup import SpeedupStats, generate_plot
 
 
+def _fmt(value: float) -> str:
+    """Format a speedup value with sensible precision for very small numbers."""
+    return f"{value:.4g}"
+
+
 def _image_src(plot_path: Path, output_dir: Path) -> str:
     """Return a relative path for the plot image."""
     return os.path.relpath(plot_path, output_dir)
@@ -109,15 +114,15 @@ def _render_html(stats: SpeedupStats, img_src: str, data_label: str) -> str:
       </div>
       <div class="stat">
         <span class="label">Mean speedup</span>
-        <span class="value">{stats.mean:.2f}x</span>
+        <span class="value">{_fmt(stats.mean)}x</span>
       </div>
       <div class="stat">
         <span class="label">Best speedup</span>
-        <span class="value">{stats.maximum:.2f}x</span>
+        <span class="value">{_fmt(stats.maximum)}x</span>
       </div>
       <div class="stat">
         <span class="label">Lowest speedup</span>
-        <span class="value">{stats.minimum:.2f}x</span>
+        <span class="value">{_fmt(stats.minimum)}x</span>
       </div>
     </section>
     <section class="plot">
@@ -159,8 +164,8 @@ def main() -> None:
     data_label = os.path.relpath(args.input, args.output.parent)
     args.output.write_text(_render_html(stats, img_src, data_label), encoding="utf-8")
     print(
-        f"wrote {args.output} (plot: {args.plot}, mean: {stats.mean:.2f}x, "
-        f"max: {stats.maximum:.2f}x, min: {stats.minimum:.2f}x)"
+        f"wrote {args.output} (plot: {args.plot}, mean: {_fmt(stats.mean)}x, "
+        f"max: {_fmt(stats.maximum)}x, min: {_fmt(stats.minimum)}x)"
     )
 
 
