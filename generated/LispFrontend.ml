@@ -2,7 +2,7 @@ module LC = LispCEK
 
 exception ParseError of string
 
-type token = LParen | RParen | Quote | Number of int | Symbol of string
+type token = LParen | RParen | Quote | Backquote | Comma | Number of int | Symbol of string
 type sexpr = SNumber of int | SSymbol of string | SList of sexpr list
 
 let is_symbol_char = function
@@ -19,6 +19,8 @@ let tokenize input =
       | '(' -> aux (i + 1) (LParen :: acc)
       | ')' -> aux (i + 1) (RParen :: acc)
       | '\'' -> aux (i + 1) (Quote :: acc)
+      | '`' -> aux (i + 1) (Backquote :: acc)
+      | ',' -> aux (i + 1) (Comma :: acc)
       | ';' ->
           let j = ref i in
           while !j < len && input.[!j] != '\n' do
@@ -63,6 +65,12 @@ let rec parse_sexpr tokens =
   | Quote :: rest ->
       let expr, rest' = parse_sexpr rest in
       (SList [ SSymbol "quote"; expr ], rest')
+  | Backquote :: rest ->
+      let expr, rest' = parse_sexpr rest in
+      (SList [ SSymbol "quasiquote"; expr ], rest')
+  | Comma :: rest ->
+      let expr, rest' = parse_sexpr rest in
+      (SList [ SSymbol "unquote"; expr ], rest')
   | Number n :: rest -> (SNumber n, rest)
   | Symbol sym :: rest -> (SSymbol sym, rest)
 
@@ -86,10 +94,32 @@ and parse_list acc tokens =
   let expr, rest = parse_sexpr tokens in
   match rest with [] -> [ expr ] | _ -> expr :: parse_core_exn rest *)
 
+let quote_nil = SList [ SSymbol "quote"; SList [] ]
+let make_quote expr = SList [ SSymbol "quote"; expr ]
+let make_cons left right = SList [ SSymbol "cons"; left; right ]
+
+let rec desugar_expr expr =
+  match expr with
+  | SList [ SSymbol "quasiquote"; inner ] -> expand_quasiquote inner
+  | SList (SSymbol "unquote" :: _) -> raise (ParseError "unquote outside of quasiquote")
+  | SList lst -> SList (List.map desugar_expr lst)
+  | _ -> expr
+
+and expand_quasiquote expr =
+  match expr with
+  | SList [ SSymbol "unquote"; inner ] -> desugar_expr inner
+  | SList (SSymbol "unquote" :: _) -> raise (ParseError "unquote expects one argument")
+  | SList lst -> expand_quasiquote_list lst
+  | other -> make_quote other
+
+and expand_quasiquote_list = function
+  | [] -> quote_nil
+  | x :: xs -> make_cons (expand_quasiquote x) (expand_quasiquote_list xs)
+
 let parse_exn input =
   let tokens = tokenize input in
   let expr, rest = parse_sexpr tokens in
-  match rest with [] -> expr | _ -> raise (ParseError "unexpected extra tokens")
+  match rest with [] -> desugar_expr expr | _ -> raise (ParseError "unexpected extra tokens")
 
 let rec list_to_expr = function [] -> LC.EAtom LC.ANIL | x :: xs -> LC.ECons (x, list_to_expr xs)
 
