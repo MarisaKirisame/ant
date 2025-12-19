@@ -2,7 +2,7 @@ module LC = LispCEK
 
 exception ParseError of string
 
-type token = LParen | RParen | Quote | Backquote | Comma | Number of int | Symbol of string
+type token = LParen | RParen | Quote | Backquote | Comma | Number of int | Symbol of string | VarRef of int
 type sexpr = SNumber of int | SSymbol of string | SList of sexpr list
 
 let is_symbol_char = function
@@ -27,6 +27,20 @@ let tokenize input =
             j := !j + 1
           done;
           aux (!j + 1) acc (* skip \n *)
+      | '#' ->
+          let j = ref (i + 1) in
+          while !j < len && input.[!j] >= '0' && input.[!j] <= '9' do
+            incr j
+          done;
+          if !j = i + 1 then raise (ParseError "expected digits after #");
+          let token = String.sub input (i + 1) (!j - (i + 1)) in
+          let value =
+            match int_of_string_opt token with
+            | Some v -> v
+            | None -> raise (ParseError "invalid number literal after #")
+          in
+          if value < 0 then raise (ParseError "# expects a non-negative number");
+          aux !j (VarRef value :: acc)
       | ch ->
           if (ch >= '0' && ch <= '9') || ch = '-' then (
             let j = ref i in
@@ -72,6 +86,7 @@ let rec parse_sexpr tokens =
       let expr, rest' = parse_sexpr rest in
       (SList [ SSymbol "unquote"; expr ], rest')
   | Number n :: rest -> (SNumber n, rest)
+  | VarRef n :: rest -> (SList [ SSymbol "var"; SNumber n ], rest)
   | Symbol sym :: rest -> (SSymbol sym, rest)
 
 and parse_list acc tokens =
