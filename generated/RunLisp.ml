@@ -39,13 +39,16 @@ let string_of_symbol = function
   | LC.SElse -> "else"
 
 let string_of_atom = function
-  | LC.AVar i -> Printf.sprintf "(var %d)" i
+  | LC.AVar i -> Printf.sprintf "#%d" i
   | LC.ANumber i -> Printf.sprintf "%d" i
   | LC.ASymbol sym -> Printf.sprintf "%s" (string_of_symbol sym)
   | LC.ANIL -> "()"
 
 let rec string_of_expr = function
   | LC.EAtom atom -> string_of_atom atom
+  | LC.ECons (LC.EAtom (LC.ASymbol LC.SQuote), LC.ECons (hd, tl)) when tl = LC.EAtom LC.ANIL ->
+      let l = string_of_expr hd in
+      Printf.sprintf "'%s" l
   | LC.ECons (hd, tl) ->
       let arr = Dynarray.create () in
       let t = ref tl in
