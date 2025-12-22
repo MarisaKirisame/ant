@@ -185,7 +185,9 @@
   (eval* (wrap code) '())
   )
 
-(eval* (wrap (wrap '(symbol 'symbol))) '())
+(eval* %CODE% '())
+
+;; (eval* (wrap (wrap '(symbol 'symbol))) '())
 
 ;; (eval_wrap '((define 0 (1) (var 1)) ((var 0) 42)))
 
