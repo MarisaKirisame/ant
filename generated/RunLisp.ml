@@ -2,6 +2,7 @@ module LC = LispCEK
 module Memo = Ant.Memo
 module Word = Ant.Word.Word
 module Frontend = LispFrontend
+module Json = Yojson.Safe
 
 let with_memo f =
   let memo = Memo.init_memo () in
@@ -72,6 +73,8 @@ let rec string_of_value = function
 let string_of_expr_list exprs = "[" ^ String.concat "; " (List.map string_of_expr exprs) ^ "]"
 let string_of_option show = function LC.None -> "None" | LC.Some value -> "Some " ^ show value
 
+type eval_details = { value : LC.value; runtime_seconds : float; steps_with_memo : int; steps_without_memo : int }
+
 let expect_equal ?(show = fun _ -> "<value>") label expected actual =
   if expected = actual then Printf.printf "[ok] %s\n" label
   else
@@ -81,16 +84,33 @@ let expect_equal ?(show = fun _ -> "<value>") label expected actual =
 let expect_value msg (x : LC.value) (y : LC.value) = expect_equal ~show:string_of_value msg x y
 let expr_of_int_list ints = List.map (fun n -> LC.EAtom (LC.ANumber n)) ints |> expr_list
 
-let eval_expr expr =
+let eval_expr_with_details expr =
   let seq = LC.from_ocaml_expr expr in
+  let start = Unix.gettimeofday () in
   let res = with_memo (fun memo -> LC.eval memo seq empty_env_seq) in
-  LC.to_ocaml_value res.words
+  let stop = Unix.gettimeofday () in
+  {
+    value = LC.to_ocaml_value res.words;
+    runtime_seconds = stop -. start;
+    steps_with_memo = res.step;
+    steps_without_memo = res.without_memo_step;
+  }
 
-let eval_string code =
+let eval_expr expr =
+  let details = eval_expr_with_details expr in
+  details.value
+
+let eval_string_with_details ?(print_compiled = true) code =
   let expr = Frontend.compile_string code in
-  Printf.printf "compiled: %s\n" (string_of_expr expr);
-  print_endline "";
-  eval_expr expr
+  if print_compiled then (
+    Printf.printf "compiled: %s\n" (string_of_expr expr);
+    print_endline "")
+  else ();
+  eval_expr_with_details expr
+
+let eval_string ?(print_compiled = true) code =
+  let details = eval_string_with_details ~print_compiled code in
+  details.value
 
 let expect_eval label code expected =
   let result = eval_string code in
@@ -112,6 +132,81 @@ let test_car_after_cons () =
   expect_eval "car unwraps the head of cons cells" code (LC.VNumber 5)
 
 let read_file_content filename = In_channel.with_open_text filename In_channel.input_all
+let wrap_tests_output_path = "eval_lisp_wrap.json"
+
+let replace_code_placeholder template replacement =
+  let placeholder = "%CODE%" in
+  let template_len = String.length template in
+  let placeholder_len = String.length placeholder in
+  let rec search idx =
+    if template_len < placeholder_len || idx > template_len - placeholder_len then None
+    else if String.sub template idx placeholder_len = placeholder then Some idx
+    else search (idx + 1)
+  in
+  match search 0 with
+  | None -> failwith "placeholder %CODE% not found in Lisp.lisp template"
+  | Some idx ->
+      let before = String.sub template 0 idx in
+      let after = String.sub template (idx + placeholder_len) (template_len - idx - placeholder_len) in
+      before ^ replacement ^ after
+
+let wrap_code_for_depth depth =
+  if depth < 0 then invalid_arg "wrap depth cannot be negative";
+  let base_expr = "((lambda (0) (var 0)) 99)" in
+  if depth = 0 then Printf.sprintf "'%s" base_expr
+  else
+    let rec aux remaining current_expr quoted =
+      if remaining = 0 then current_expr
+      else
+        let expr_to_wrap = if quoted then current_expr else Printf.sprintf "'%s" current_expr in
+        let wrapped = Printf.sprintf "(wrap %s)" expr_to_wrap in
+        aux (remaining - 1) wrapped true
+    in
+    aux depth base_expr false
+
+(* let write_json_file filename json =
+  Out_channel.with_open_text filename (fun oc ->
+      Json.pretty_to_channel oc json;
+      output_char oc '\n') *)
+
+let json_of_wrap_result depth code details =
+  `Assoc
+    [
+      ("wrap_depth", `Int depth);
+      ("code", `String code);
+      ("value", `String (string_of_value details.value));
+      ("runtime_seconds", `Float details.runtime_seconds);
+      ("step", `Int details.steps_with_memo);
+      ("without_memo_step", `Int details.steps_without_memo);
+    ]
+
+let run_wrap_code_tests () =
+  let template = read_file_content "./generated/Lisp.lisp" in
+  let wrap_depths = [ 1; 2; 3 ] in
+  let results =
+    List.map
+      (fun depth ->
+        let code_for_placeholder = wrap_code_for_depth depth in
+        let program = replace_code_placeholder template code_for_placeholder in
+        Printf.printf "Running wrap depth %d test...\n" depth;
+        let details = eval_string_with_details ~print_compiled:false program in
+        expect_value (Printf.sprintf "wrap depth %d returns 99" depth) (LC.VNumber 99) details.value;
+        (depth, code_for_placeholder, details))
+      wrap_depths
+  in
+  (* let json =
+    `Assoc [ ("tests", `List (List.map (fun (d, code, details) -> json_of_wrap_result d code details) results)) ]
+  in *)
+  (* write_json_file wrap_tests_output_path json; *)
+  let result =
+    List.map (fun (d, code, details) -> Json.to_string (json_of_wrap_result d code details)) results
+  in
+  Out_channel.with_open_text wrap_tests_output_path (fun oc ->
+      for i = 0 to List.length result - 1 do
+        Out_channel.output_string oc (List.nth result i);
+        output_char oc '\n'
+      done);
+  Printf.printf "Saved wrap test results to %s\n" wrap_tests_output_path
 
 let run () =
   test_atom_rejects_cons ();
@@ -119,8 +214,5 @@ let run () =
   test_eq_number_literals_false ();
   test_cond_short_circuits ();
   test_car_after_cons ();
-  (* ignore (eval_string "(cdr '(1 2 3))"); *)
-  let code = read_file_content "./generated/Lisp.lisp" in
-  let r = eval_string code in
-  print_endline (string_of_value r);
+  run_wrap_code_tests ();
   print_endline "LispCEK smoke tests completed."
