@@ -85,6 +85,11 @@ let string_of_cek (s : state) : string =
   ^ (", e: " ^ (Dynarray.to_list s.e |> List.map string_of_value |> String.concat ", "))
   ^ ", k: " ^ string_of_value s.k
 
+let string_of_cek_generic (string_of_a : 'a -> string) (s : 'a cek) : string =
+  "pc: " ^ string_of_int s.c.pc
+  ^ (", e: " ^ (Dynarray.to_list s.e |> List.map string_of_a |> String.concat ", "))
+  ^ ", k: " ^ string_of_a s.k
+
 let is_done (s : state) : bool =
   match Generic.front_exn s.k ~monoid:Value.monoid ~measure:Value.measure with
   | _, Word w -> ( match w with ConstructorTag ct when ct = 0 -> s.c.pc = 0 | _ -> false)

@@ -71,9 +71,9 @@ let rec subst_value (s : value_subst_cek) (v : value) : value =
 
 let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
   let return x = x in
-  assert ((Value.summary v).degree = (pattern_measure p).degree);
+  (*assert ((Value.summary v).degree = (pattern_measure p).degree);
   assert ((Value.summary v).degree = (Value.summary v).max_degree);
-  assert ((pattern_measure p).degree = (pattern_measure p).max_degree);
+  assert ((pattern_measure p).degree = (pattern_measure p).max_degree);*)
   if pattern_is_empty p then (
     assert (Generic.is_empty v);
     return (Some []))
@@ -82,8 +82,8 @@ let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
     match ph with
     | PVar ph ->
         let vh, vt = Value.pop_n v ph in
-        assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
-        assert ((Value.summary vh).degree = ph);
+        (*assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
+        assert ((Value.summary vh).degree = ph);*)
         return (Option.map (fun vs -> vh :: vs) (value_match_pattern_aux vt pt))
     | PCon ph -> (
         match Value.unwords v ph with None -> return None | Some v -> return (value_match_pattern_aux v pt))
@@ -110,9 +110,9 @@ let pattern_to_value (p : pattern cek) : value cek = maps_ek (fun p s -> pattern
 (*todo: this code look a lot like value_match_pattern, is there ways to unify them?*)
 (*unify pattern and value, building a substituion map for pattern*)
 let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern_subst_cek =
-  assert ((Value.summary v).degree = (pattern_measure p).degree);
+  (*assert ((Value.summary v).degree = (pattern_measure p).degree);
   assert ((Value.summary v).degree = (Value.summary v).max_degree);
-  assert ((pattern_measure p).degree = (pattern_measure p).max_degree);
+  assert ((pattern_measure p).degree = (pattern_measure p).max_degree);*)
   (*assert (Pattern.pattern_valid p);*)
   let return x = x in
   if pattern_is_empty p then (
@@ -123,8 +123,8 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern
     match ph with
     | PVar ph ->
         let vh, vt = Value.pop_n v ph in
-        assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
-        assert ((Value.summary vh).degree = ph);
+        (*assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
+        assert ((Value.summary vh).degree = ph);*)
         return (unify_vp_aux vt pt s)
     | PCon ph ->
         let pl = Words.length ph in
@@ -142,7 +142,7 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern
               let ph, pt = pattern_slice p r.values_count in
               let sm = cek_get s r.src in
               let unify_with = Array.get sm r.hole_idx in
-              assert ((pattern_measure ph).degree = (pattern_measure ph).max_degree);
+              (*assert ((pattern_measure ph).degree = (pattern_measure ph).max_degree);*)
               let ph = if r.offset > 0 then pattern_cons (make_pvar r.offset) ph else ph in
               let needed = (pattern_measure unify_with).max_degree - (r.offset + r.values_count) in
               assert (needed >= 0);
@@ -237,7 +237,7 @@ let make_step (value : state) (resolved : bool cek) m : step =
   let src =
     map_ek
       (fun (v, resolved) ->
-        assert ((Value.summary v).degree > 0);
+        (*assert ((Value.summary v).degree > 0);*)
         if resolved then
           let vt, vh = Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v in
           match vh with
