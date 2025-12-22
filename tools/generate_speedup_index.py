@@ -23,6 +23,21 @@ def _fmt(value: float) -> str:
     """Format a speedup value with sensible precision for very small numbers."""
     return f"{value:.4g}"
 
+@dataclass(frozen=True)
+class WrapResult:
+    """Single wrap test execution result."""
+
+    wrap_depth: int
+    code: str
+    value: str
+    runtime_seconds: float
+    step: int
+    without_memo_step: int
+
+    @property
+    def speedup(self) -> float:
+        return self.without_memo_step / self.step if self.step else float("inf")
+
 
 def _image_src(plot_path: Path, output_dir: Path) -> str:
     """Return a relative path for the plot image."""
@@ -211,6 +226,7 @@ def _render_html(
     <section class="profile">
       {profile_table}
     </section>
+    {wrap_section}
   </main>
 </body>
 </html>
@@ -242,6 +258,12 @@ def main() -> None:
         type=Path,
         default=Path("index.html"),
         help="where to write the HTML report (default: index.html)",
+    )
+    parser.add_argument(
+        "--wrap-results",
+        type=Path,
+        default=None,
+        help="path to wrap_tests_results.json; when provided adds a wrap section",
     )
     args = parser.parse_args()
 
