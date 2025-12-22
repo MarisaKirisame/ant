@@ -182,7 +182,7 @@ let json_of_wrap_result depth code details =
 
 let run_wrap_code_tests () =
   let template = read_file_content "./generated/Lisp.lisp" in
-  let wrap_depths = [ 1; 2; 3 ] in
+  let wrap_depths = [ 1; 2; 3; 4; 5 ] in
   let results =
     List.map
       (fun depth ->
@@ -198,9 +198,7 @@ let run_wrap_code_tests () =
     `Assoc [ ("tests", `List (List.map (fun (d, code, details) -> json_of_wrap_result d code details) results)) ]
   in *)
   (* write_json_file wrap_tests_output_path json; *)
-  let result =
-    List.map (fun (d, code, details) -> Json.to_string (json_of_wrap_result d code details)) results
-  in
+  let result = List.map (fun (d, code, details) -> Json.to_string (json_of_wrap_result d code details)) results in
   Out_channel.with_open_text wrap_tests_output_path (fun oc ->
       for i = 0 to List.length result - 1 do
         Out_channel.output_string oc (List.nth result i);

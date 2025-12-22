@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 
 # Toggle the metric being reported. When True, plot wall-clock time speedups;
 # when False, plot evaluation-step speedups.
-REPORT_WALL_CLOCK_TIME = True
+REPORT_WALL_CLOCK_TIME = False
 
 if REPORT_WALL_CLOCK_TIME:
     MEMO_KEY = "wall_time_ns"

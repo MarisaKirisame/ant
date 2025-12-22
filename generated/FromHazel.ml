@@ -1,4 +1,4 @@
-(* Reads the Hazel-generated mk_program JSON blob (list of s-expr strings)
+(* (* Reads the Hazel-generated mk_program JSON blob (list of s-expr strings)
    and parses it into OCaml S-expressions. *)
 
 open Yojson.Safe
@@ -358,10 +358,10 @@ let test = test_string |> parse_nexpr
 let parse_program () =
   read_program_strings ()
   |> List.map (fun s -> s |> Sexp.of_string |> process |> subst_deepest_hole test |> clean)
-  |> dedup NamedExpr.equal_nexpr
+  |> dedup NamedExpr.equal_nexpr *)
 
-let run () =
-  with_steps_writer steps_file (fun write_steps ->
+let run () = print_endline "commented out."
+(* with_steps_writer steps_file (fun write_steps ->
       let memo = Ant.Memo.init_memo () in
       let eval expr = eval_expression ~memo ~write_steps expr in
       parse_program ()
@@ -370,4 +370,4 @@ let run () =
           let expr = expr_of_nexpr nexpr in
           Format.printf "hazel candidate %d expr: %a@." i RunLiveCommon.pp_expr expr;
           let value = eval expr in
-          Printf.printf "hazel candidate %d value: %s\n" i (value_to_string value)))
+          Printf.printf "hazel candidate %d value: %s\n" i (value_to_string value))) *)

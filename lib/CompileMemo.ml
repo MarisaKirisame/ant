@@ -691,7 +691,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
       CompileType.compile_ty_binding ctx.ctag tb
   | Type (TBRec trs as tb) ->
       List.iter (fun (_, Enum { params = _; ctors }) -> register_constructors ctx ctors) trs;
-      CompileType.compile_ty_binding tb
+      CompileType.compile_ty_binding ctx.ctag tb
   | Term b -> compile_bindings ctx s b
 
 let generate_apply_cont ctx =
