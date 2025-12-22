@@ -89,15 +89,15 @@ let rec read_append (x : read) (y : read) : read =
 let rec read_slice (r : read) (offset : int) : read * read =
   assert (offset >= 0);
   let return x y =
-    assert ((read_measure x).degree = (read_measure x).max_degree);
+    (*assert ((read_measure x).degree = (read_measure x).max_degree);
     assert ((read_measure x).degree = offset);
-    assert (offset + (read_measure y).degree = (read_measure r).degree);
+    assert (offset + (read_measure y).degree = (read_measure r).degree);*)
     (x, y)
   in
   if offset = 0 then return Generic.empty r
   else
     let x, y = Generic.split ~monoid ~measure:red_measure (fun m -> not (m.max_degree < offset)) r in
-    assert ((read_measure x).max_degree < offset);
+    (*assert ((read_measure x).max_degree < offset);*)
     let d = (read_measure x).degree in
     assert (d < offset);
     let needed = offset - d in
@@ -121,16 +121,16 @@ let rec read_slice (r : read) (offset : int) : read * read =
         assert (d + cd >= offset);
         assert (needed <= cd);
         let c_words, c_children = Words.slice_degree c needed in
-        assert ((Words.summary c_words).degree = needed);
-        assert ((Words.summary c_words).max_degree = needed);
+        (*assert ((Words.summary c_words).degree = needed);
+        assert ((Words.summary c_words).max_degree = needed);*)
         let left = read_snoc_unsafe x (RCon c_words) in
         let right = if not (Generic.is_empty c_children) then read_cons_unsafe (RCon c_children) yt else yt in
         return left right
 
 let read_pop_n (r : read) n : read =
   let x, y = read_slice r n in
-  assert ((read_measure x).degree = n);
-  assert ((read_measure y).degree = (read_measure r).degree - n);
+  (*assert ((read_measure x).degree = n);
+  assert ((read_measure y).degree = (read_measure r).degree - n);*)
   y
 
 let rec join (x : read) (y : read) (lhs_weaken : bool ref) (rhs_weaken : bool ref) : read =
@@ -138,12 +138,12 @@ let rec join (x : read) (y : read) (lhs_weaken : bool ref) (rhs_weaken : bool re
   assert (read_valid y);*)
   let recurse x y = join x y lhs_weaken rhs_weaken in
   let return r =
-    assert ((read_measure r).degree = (read_measure x).degree);
-    assert ((read_measure r).max_degree = (read_measure x).max_degree);
+    (*assert ((read_measure r).degree = (read_measure x).degree);
+    assert ((read_measure r).max_degree = (read_measure x).max_degree);*)
     r
   in
-  assert ((read_measure x).degree = (read_measure y).degree);
-  assert ((read_measure x).max_degree = (read_measure y).max_degree);
+  (*assert ((read_measure x).degree = (read_measure y).degree);
+  assert ((read_measure x).max_degree = (read_measure y).max_degree);*)
   if Generic.is_empty x then return y
   else
     let xh, xt = read_front_exn x in

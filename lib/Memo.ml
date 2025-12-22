@@ -269,26 +269,41 @@ let patterns_hash (r : reads) (p : Pattern.pattern cek) : int option =
   in
   loop 0 (Dynarray.length r.e) acc
 
+let string_of_red (r : Read.red) : string =
+  match r with
+  | RRead n -> "RRead(" ^ string_of_int n ^ ")"
+  | RSkip n -> "RSkip(" ^ string_of_int n ^ ")"
+  | RCon w -> "RCon(" ^ Dependency.string_of_words w ^ ")"
+
+let string_of_read (r : Read.read) : string =
+  "[" ^ String.concat ~sep:";" (List.map ~f:string_of_red (Generic.to_list r)) ^ "]"
+
 let rec read_hash (r : Read.read) (x : Read.read) (hashacc : int) : int option =
-  if Generic.is_empty r then Some hashacc
+  let return ret =
+    (match ret with
+    | None -> print_endline ("reads_hash fail: " ^ string_of_read r ^ "; " ^ string_of_read x)
+    | Some _ -> ());
+    ret
+  in
+  if Generic.is_empty r then return (Some hashacc)
   else
     let rh, rt = Read.read_front_exn r in
     match rh with
     | RSkip n ->
         let x = Read.read_pop_n x n in
-        read_hash rt x hashacc
+        return (read_hash rt x hashacc)
     | RRead n ->
         let rec loop n x hashacc =
-          if n = 0 then read_hash rt x hashacc
+          if n = 0 then return (read_hash rt x hashacc)
           else
-            let xr, x = Read.read_front_exn x in
+            let xr, _ = Read.read_front_exn x in
             match xr with
             | RCon con ->
                 let w, _ = Words.words_front_exn con in
                 let x = Read.read_pop_n x 1 in
                 let hashacc = Read.hash hashacc (Word.hash w) in
                 loop (n - 1) x hashacc
-            | RRead _ | RSkip _ -> None
+            | RRead _ | RSkip _ -> return None
         in
         loop n x hashacc
     | RCon c -> (
@@ -296,11 +311,11 @@ let rec read_hash (r : Read.read) (x : Read.read) (hashacc : int) : int option =
         match xh with
         | RCon con -> (
             match Words.unwords con c with
-            | None -> None
+            | None -> return None
             | Some xrest ->
                 let x = if Generic.is_empty xrest then xt else Read.read_cons (RCon xrest) xt in
-                read_hash rt x hashacc)
-        | RRead _ | RSkip _ -> None)
+                return (read_hash rt x hashacc))
+        | RRead _ | RSkip _ -> return None)
 
 let reads_hash (r : reads) (x : reads) : int option =
   let acc = Some 0 in
@@ -339,15 +354,6 @@ let lookup_step (value : state) (m : memo) : step option =
   let pc = value.c.pc in
   match Array.get m pc with None -> None | Some trie -> lookup_step_aux value trie None
 
-let string_of_red (r : Read.red) : string =
-  match r with
-  | RRead n -> "RRead(" ^ string_of_int n ^ ")"
-  | RSkip n -> "RSkip(" ^ string_of_int n ^ ")"
-  | RCon w -> "RCon(" ^ Dependency.string_of_words w ^ ")"
-
-let string_of_read (r : Read.read) : string =
-  "[" ^ String.concat ~sep:";" (List.map ~f:string_of_red (Generic.to_list r)) ^ "]"
-
 type join_reads = { reads : reads; x_weaken : bool; y_weaken : bool }
 
 let join_reads (x : reads) (y : reads) : join_reads =
@@ -370,6 +376,11 @@ let reads_from_trie (t : trie) : reads =
   | Atom s -> reads_from_patterns s.src
   | Subsume (s, _) -> reads_from_patterns s.src
   | Split { reads; _ } -> reads
+
+let string_of_reads (r : reads) : string =
+  let k_str = "k: " ^ string_of_read r.k in
+  let e_str = "e: [" ^ String.concat ~sep:"; " (List.map ~f:string_of_read (Dynarray.to_list r.e)) ^ "]" in
+  "{" ^ k_str ^ "; " ^ e_str ^ "}"
 
 let rec merge (x : trie) (y : trie) : trie =
   match (x, y) with
@@ -402,6 +413,45 @@ let rec merge (x : trie) (y : trie) : trie =
           Hashtbl.set children y_key (Atom y);
           Split { reads = j.reads; children })
   | Atom x, Subsume (yp, yc) -> merge (Subsume (yp, yc)) (Atom x)
+  | Subsume (xp, xc), Subsume (yp, yc) -> (
+      let j = join_reads (reads_from_patterns xp.src) (reads_from_patterns yp.src) in
+      match (j.x_weaken, j.y_weaken) with
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          let x_key = Option.value_exn (patterns_hash j.reads xp.src) in
+          let y_key = Option.value_exn (patterns_hash j.reads yp.src) in
+          assert (x_key <> y_key);
+          Hashtbl.set children x_key (Subsume (xp, xc));
+          Hashtbl.set children y_key (Subsume (yp, yc));
+          Split { reads = j.reads; children }
+      | _ ->
+          failwith
+            ("merge not implemented yet for subsume/subsume:" ^ string_of_bool j.x_weaken ^ ","
+           ^ string_of_bool j.y_weaken))
+  | Subsume (xp, xc), Split { reads = yr; children = yc } -> (
+      let j = join_reads (reads_from_patterns xp.src) yr in
+      match (j.x_weaken, j.y_weaken) with
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          let x_key = Option.value_exn (patterns_hash j.reads xp.src) in
+          Hashtbl.update children x_key ~f:(merge_option (Subsume (xp, xc)));
+          Hashtbl.iter yc ~f:(fun y ->
+              let y_read = reads_hash j.reads (reads_from_trie y) in
+              if Option.is_none y_read then
+                print_endline
+                  ("merge: cannot get read hash for child:" ^ string_of_trie y ^ string_of_reads (reads_from_trie y));
+              let y_key = Option.value_exn y_read in
+              Hashtbl.update children y_key ~f:(merge_option y));
+          Split { reads = j.reads; children }
+      | true, false ->
+          Hashtbl.update yc (Option.value_exn (patterns_hash yr xp.src)) ~f:(merge_option (Subsume (xp, xc)));
+          Split { reads = yr; children = yc }
+      | _ ->
+          failwith
+            ("merge not implemented yet for subsume/split:" ^ string_of_bool j.x_weaken ^ ","
+           ^ string_of_bool j.y_weaken))
+  | Split { reads = xr; children = xc }, Subsume (yp, yc) ->
+      merge (Subsume (yp, yc)) (Split { reads = xr; children = xc })
   | Split { reads = xr; children = xc }, Atom y -> (
       let j = join_reads xr (reads_from_patterns y.src) in
       match (j.x_weaken, j.y_weaken) with
@@ -413,17 +463,43 @@ let rec merge (x : trie) (y : trie) : trie =
       | true, true ->
           let children = Hashtbl.create (module Int) in
           let y_key = Option.value_exn (patterns_hash j.reads y.src) in
-          (*Hashtbl.iter xc ~f:(fun x ->
-              let x_key = Option.value_exn (reads_hash j.reads (reads_from_trie x)) in
-              Hashtbl.update children x_key ~f:(merge_option x));*)
-          (*cannot reuse key*)
-          (*Hashtbl.iteri xc ~f:(fun ~key ~data -> Hashtbl.update children key ~f:(merge_option data));*)
+          Hashtbl.iter xc ~f:(fun x ->
+              let x_read = reads_hash j.reads (reads_from_trie x) in
+              if Option.is_none x_read then
+                print_endline
+                  ("merge: cannot get read hash for child:" ^ string_of_trie x ^ string_of_reads (reads_from_trie x));
+              let x_key = Option.value_exn x_read in
+              Hashtbl.update children x_key ~f:(merge_option x));
           Hashtbl.update children y_key ~f:(merge_option (Atom y));
           Split { reads = j.reads; children }
       | _ ->
           failwith
             ("merge not implemented for split/atom:" ^ string_of_bool j.x_weaken ^ "," ^ string_of_bool j.y_weaken))
   | Atom x, Split { reads = yr; children = yc } -> merge (Split { reads = yr; children = yc }) (Atom x)
+  | Split { reads = xr; children = xc }, Split { reads = yr; children = yc } -> (
+      let j = join_reads xr yr in
+      match (j.x_weaken, j.y_weaken) with
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          Hashtbl.iter xc ~f:(fun x ->
+              let x_read = reads_hash j.reads (reads_from_trie x) in
+              if Option.is_none x_read then
+                print_endline
+                  ("merge: cannot get read hash for child:" ^ string_of_trie x ^ string_of_reads (reads_from_trie x));
+              let x_key = Option.value_exn x_read in
+              Hashtbl.update children x_key ~f:(merge_option x));
+          Hashtbl.iter yc ~f:(fun y ->
+              let y_read = reads_hash j.reads (reads_from_trie y) in
+              if Option.is_none y_read then
+                print_endline
+                  ("merge: cannot get read hash for child:" ^ string_of_trie y ^ string_of_reads (reads_from_trie y));
+              let y_key = Option.value_exn y_read in
+              Hashtbl.update children y_key ~f:(merge_option y));
+          Split { reads = j.reads; children }
+      | _ ->
+          failwith
+            ("merge not implemented yet for split/split:" ^ string_of_bool j.x_weaken ^ "," ^ string_of_bool j.y_weaken)
+      )
   | _ -> failwith ("merge not implemented yet for: " ^ string_of_trie x ^ " and " ^ string_of_trie y)
 
 and merge_option (x : trie) (y : trie option) : trie = match y with None -> x | Some y -> merge x y

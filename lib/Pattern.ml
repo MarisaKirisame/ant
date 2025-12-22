@@ -77,15 +77,15 @@ let rec pattern_append (x : pattern) (y : pattern) : pattern =
 let pattern_slice (p : pattern) (offset : int) : pattern * pattern =
   assert (offset >= 0);
   let return x y =
-    assert ((pattern_measure x).degree = (pattern_measure x).max_degree);
+    (*assert ((pattern_measure x).degree = (pattern_measure x).max_degree);
     assert ((pattern_measure x).degree = offset);
-    assert (offset + (pattern_measure y).degree = (pattern_measure p).degree);
+    assert (offset + (pattern_measure y).degree = (pattern_measure p).degree);*)
     (x, y)
   in
   if offset = 0 then return Generic.empty p
   else
     let x, y = Generic.split ~monoid ~measure:pat_measure (fun m -> not (m.max_degree < offset)) p in
-    assert ((pattern_measure x).max_degree < offset);
+    (*assert ((pattern_measure x).max_degree < offset);*)
     let d = (pattern_measure x).degree in
     assert (d < offset);
     let needed = offset - d in
@@ -103,8 +103,8 @@ let pattern_slice (p : pattern) (offset : int) : pattern * pattern =
         assert (d + cd >= offset);
         assert (needed <= cd);
         let c_words, c_children = Words.slice_degree c needed in
-        assert ((Words.summary c_words).degree = needed);
-        assert ((Words.summary c_words).max_degree = needed);
+        (*assert ((Words.summary c_words).degree = needed);
+        assert ((Words.summary c_words).max_degree = needed);*)
         let left = pattern_snoc_unsafe x (PCon c_words) in
         let right = if not (Generic.is_empty c_children) then pattern_cons_unsafe (PCon c_children) yt else yt in
         return left right

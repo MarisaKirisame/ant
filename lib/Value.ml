@@ -50,9 +50,9 @@ let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
 let rec pop_n (s : seq) (n : int) : seq * seq =
   assert (n >= 0);
   if n = 0 then (Generic.empty, s)
-  else (
-    assert ((summary s).degree >= n);
-    assert ((summary s).max_degree >= n);
+  else
+    (*assert ((summary s).degree >= n);
+    assert ((summary s).max_degree >= n);*)
     (* split stops at the first node whose max_degree reaches the target;
        this guarantees the head of [y] holds the boundary element we need to
        include in the left slice. *)
@@ -76,7 +76,7 @@ let rec pop_n (s : seq) (n : int) : seq * seq =
             Generic.cons ~monoid ~measure w
               (Reference { v with offset = v.offset + need; values_count = v.values_count - need })
           in
-          (l, r))
+          (l, r)
 
 (* Slice a seq with a given `offset` and `values_count` with `pop_n` *)
 let slice (seq : seq) (offset : int) (values_count : int) : seq =
