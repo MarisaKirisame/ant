@@ -496,6 +496,16 @@ let rec merge (x : trie) (y : trie) : trie =
               let y_key = Option.value_exn y_read in
               Hashtbl.update children y_key ~f:(merge_option y));
           Split { reads = j.reads; children }
+      | true, false ->
+          Hashtbl.iter xc ~f:(fun x ->
+              let x_key = Option.value_exn (reads_hash yr (reads_from_trie x)) in
+              Hashtbl.update yc x_key ~f:(merge_option x));
+          Split { reads = yr; children = yc }
+      | false, true ->
+          Hashtbl.iter yc ~f:(fun y ->
+              let y_key = Option.value_exn (reads_hash xr (reads_from_trie y)) in
+              Hashtbl.update xc y_key ~f:(merge_option y));
+          Split { reads = xr; children = xc }
       | _ ->
           failwith
             ("merge not implemented yet for split/split:" ^ string_of_bool j.x_weaken ^ "," ^ string_of_bool j.y_weaken)
