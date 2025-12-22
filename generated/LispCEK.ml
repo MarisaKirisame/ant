@@ -163,8 +163,8 @@ let rec from_ocaml_list from_generic_a x =
 let rec to_ocaml_list to_generic_a x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_Nil -> Nil
-  | c when c = tag_Cons ->
+  | 1 (* tag_Nil *) -> Nil
+  | 2 (* tag_Cons *) ->
       let x0, x1 = Memo.splits_2 t in
       Cons (to_generic_a x0, to_ocaml_list (fun x -> to_generic_a x) x1)
   | _ -> failwith "unreachable"
@@ -185,8 +185,8 @@ let rec from_ocaml_option from_generic_a x =
 let rec to_ocaml_option to_generic_a x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_None -> None
-  | c when c = tag_Some ->
+  | 3 (* tag_None *) -> None
+  | 4 (* tag_Some *) ->
       let x0 = Memo.splits_1 t in
       Some (to_generic_a x0)
   | _ -> failwith "unreachable"
@@ -241,27 +241,27 @@ let rec from_ocaml_symbol x =
 let rec to_ocaml_symbol x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_SLambda -> SLambda
-  | c when c = tag_SDefine -> SDefine
-  | c when c = tag_SQuote -> SQuote
-  | c when c = tag_SEq -> SEq
-  | c when c = tag_SIf -> SIf
-  | c when c = tag_SDefvar -> SDefvar
-  | c when c = tag_SCons -> SCons
-  | c when c = tag_SCond -> SCond
-  | c when c = tag_SAtom -> SAtom
-  | c when c = tag_SPair -> SPair
-  | c when c = tag_SSymbol -> SSymbol
-  | c when c = tag_SCar -> SCar
-  | c when c = tag_SCdr -> SCdr
-  | c when c = tag_SNull -> SNull
-  | c when c = tag_STrue -> STrue
-  | c when c = tag_SFalse -> SFalse
-  | c when c = tag_SError -> SError
-  | c when c = tag_SNum -> SNum
-  | c when c = tag_SVar -> SVar
-  | c when c = tag_SAnd -> SAnd
-  | c when c = tag_SElse -> SElse
+  | 5 (* tag_SLambda *) -> SLambda
+  | 6 (* tag_SDefine *) -> SDefine
+  | 7 (* tag_SQuote *) -> SQuote
+  | 8 (* tag_SEq *) -> SEq
+  | 9 (* tag_SIf *) -> SIf
+  | 10 (* tag_SDefvar *) -> SDefvar
+  | 11 (* tag_SCons *) -> SCons
+  | 12 (* tag_SCond *) -> SCond
+  | 13 (* tag_SAtom *) -> SAtom
+  | 14 (* tag_SPair *) -> SPair
+  | 15 (* tag_SSymbol *) -> SSymbol
+  | 16 (* tag_SCar *) -> SCar
+  | 17 (* tag_SCdr *) -> SCdr
+  | 18 (* tag_SNull *) -> SNull
+  | 19 (* tag_STrue *) -> STrue
+  | 20 (* tag_SFalse *) -> SFalse
+  | 21 (* tag_SError *) -> SError
+  | 22 (* tag_SNum *) -> SNum
+  | 23 (* tag_SVar *) -> SVar
+  | 24 (* tag_SAnd *) -> SAnd
+  | 25 (* tag_SElse *) -> SElse
   | _ -> failwith "unreachable"
 
 type atom = AVar of int | ANumber of int | ASymbol of symbol | ANIL
@@ -276,16 +276,16 @@ let rec from_ocaml_atom x =
 let rec to_ocaml_atom x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_AVar ->
+  | 26 (* tag_AVar *) ->
       let x0 = Memo.splits_1 t in
       AVar (Word.get_value (Memo.to_word x0))
-  | c when c = tag_ANumber ->
+  | 27 (* tag_ANumber *) ->
       let x0 = Memo.splits_1 t in
       ANumber (Word.get_value (Memo.to_word x0))
-  | c when c = tag_ASymbol ->
+  | 28 (* tag_ASymbol *) ->
       let x0 = Memo.splits_1 t in
       ASymbol (to_ocaml_symbol x0)
-  | c when c = tag_ANIL -> ANIL
+  | 29 (* tag_ANIL *) -> ANIL
   | _ -> failwith "unreachable"
 
 type expr = EAtom of atom | ECons of expr * expr
@@ -298,10 +298,10 @@ let rec from_ocaml_expr x =
 let rec to_ocaml_expr x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_EAtom ->
+  | 30 (* tag_EAtom *) ->
       let x0 = Memo.splits_1 t in
       EAtom (to_ocaml_atom x0)
-  | c when c = tag_ECons ->
+  | 31 (* tag_ECons *) ->
       let x0, x1 = Memo.splits_2 t in
       ECons (to_ocaml_expr x0, to_ocaml_expr x1)
   | _ -> failwith "unreachable"
@@ -319,17 +319,17 @@ let rec from_ocaml_value x =
 let rec to_ocaml_value x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_VNumber ->
+  | 32 (* tag_VNumber *) ->
       let x0 = Memo.splits_1 t in
       VNumber (Word.get_value (Memo.to_word x0))
-  | c when c = tag_VSymbol ->
+  | 33 (* tag_VSymbol *) ->
       let x0 = Memo.splits_1 t in
       VSymbol (to_ocaml_symbol x0)
-  | c when c = tag_VNIL -> VNIL
-  | c when c = tag_VCons ->
+  | 34 (* tag_VNIL *) -> VNIL
+  | 35 (* tag_VCons *) ->
       let x0, x1 = Memo.splits_2 t in
       VCons (to_ocaml_value x0, to_ocaml_value x1)
-  | c when c = tag_VClosure ->
+  | 36 (* tag_VClosure *) ->
       let x0, x1 = Memo.splits_2 t in
       VClosure (Word.get_value (Memo.to_word x0), to_ocaml_expr x1)
   | _ -> failwith "unreachable"
@@ -343,7 +343,7 @@ let rec from_ocaml_env_entry x =
 let rec to_ocaml_env_entry x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | c when c = tag_EnvEntry ->
+  | 37 (* tag_EnvEntry *) ->
       let x0, x1 = Memo.splits_2 t in
       EnvEntry (Word.get_value (Memo.to_word x0), to_ocaml_value x1)
   | _ -> failwith "unreachable"
@@ -489,8 +489,7 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_34 = env_call w_119 [ 1 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_35; keep_vals_34; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 66);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 66)
       | c_86 when c_86 = tag_cont_2 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
@@ -626,15 +625,13 @@ let () =
       | c_86 when c_86 = tag_cont_22 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 120);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 120)
       | c_86 when c_86 = tag_cont_23 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
           assert_env_length w_119 4;
           push_env w_119 (Dynarray.get w_119.state.e 0);
-          w_119.state.c <- pc_to_exp (int_to_pc 122);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 122)
       | c_86 when c_86 = tag_cont_24 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -651,8 +648,7 @@ let () =
       | c_86 when c_86 = tag_cont_25 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 123);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 123)
       | c_86 when c_86 = tag_cont_26 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
@@ -671,8 +667,7 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_38 = env_call w_119 [ 1 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_39; keep_vals_38; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 109);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 109)
       | c_86 when c_86 = tag_cont_29 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -683,8 +678,7 @@ let () =
           assert_env_length w_119 5;
           let keep_vals_39 = env_call w_119 [ 2 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_40; keep_vals_39; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 112);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 112)
       | c_86 when c_86 = tag_cont_30 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
@@ -693,8 +687,7 @@ let () =
           assert_env_length w_119 5;
           let keep_vals_40 = env_call w_119 [ 0; 1; 2 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_41; keep_vals_40; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_31 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
@@ -728,13 +721,11 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_41 = env_call w_119 [ 0; 1 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_42; keep_vals_41; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 10);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 10)
       | c_86 when c_86 = tag_cont_35 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 124);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 124)
       | c_86 when c_86 = tag_cont_36 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
@@ -786,25 +777,21 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_42 = env_call w_119 [ 0; 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_43; keep_vals_42; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 29);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 29)
       | c_86 when c_86 = tag_cont_42 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 126);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 126)
       | c_86 when c_86 = tag_cont_43 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 127);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 127)
       | c_86 when c_86 = tag_cont_44 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
           assert_env_length w_119 1;
           ignore (env_call w_119 [] 1);
-          w_119.state.c <- pc_to_exp (int_to_pc 109);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 109)
       | c_86 when c_86 = tag_cont_45 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -813,8 +800,7 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_59 = env_call w_119 [] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_60; keep_vals_59; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_46 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -823,8 +809,7 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_60 = env_call w_119 [] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_61; keep_vals_60; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_47 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -833,8 +818,7 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_61 = env_call w_119 [] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_62; keep_vals_61; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_48 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -843,8 +827,7 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_62 = env_call w_119 [ 0; 1 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_63; keep_vals_62; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_49 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -853,8 +836,7 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_63 = env_call w_119 [] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_64; keep_vals_63; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_50 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -863,8 +845,7 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_64 = env_call w_119 [] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_65; keep_vals_64; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_51 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -873,8 +854,7 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_65 = env_call w_119 [ 0; 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_66; keep_vals_65; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 31);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 31)
       | c_86 when c_86 = tag_cont_52 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -883,8 +863,7 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_66 = env_call w_119 [ 0; 1 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_67; keep_vals_66; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_53 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -892,8 +871,7 @@ let () =
           push_env w_119 (Dynarray.get w_119.state.e 0);
           assert_env_length w_119 3;
           ignore (env_call w_119 [] 2);
-          w_119.state.c <- pc_to_exp (int_to_pc 113);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 113)
       | c_86 when c_86 = tag_cont_54 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -902,8 +880,7 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_67 = env_call w_119 [] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_68; keep_vals_67; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_55 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -912,8 +889,7 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_68 = env_call w_119 [] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_69; keep_vals_68; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_56 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -922,8 +898,7 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_69 = env_call w_119 [ 0; 1 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_70; keep_vals_69; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_57 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -932,13 +907,11 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_70 = env_call w_119 [] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_71; keep_vals_70; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_58 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 128);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 128)
       | c_86 when c_86 = tag_cont_59 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -946,29 +919,25 @@ let () =
           push_env w_119 (Dynarray.get w_119.state.e 0);
           assert_env_length w_119 3;
           ignore (env_call w_119 [] 2);
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_60 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
           assert_env_length w_119 1;
           ignore (env_call w_119 [] 1);
-          w_119.state.c <- pc_to_exp (int_to_pc 90);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 90)
       | c_86 when c_86 = tag_cont_61 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
           assert_env_length w_119 1;
           ignore (env_call w_119 [] 1);
-          w_119.state.c <- pc_to_exp (int_to_pc 94);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 94)
       | c_86 when c_86 = tag_cont_62 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
           assert_env_length w_119 1;
           ignore (env_call w_119 [] 1);
-          w_119.state.c <- pc_to_exp (int_to_pc 96);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 96)
       | c_86 when c_86 = tag_cont_63 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -977,22 +946,19 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_73 = env_call w_119 [ 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_74; keep_vals_73; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 31);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 31)
       | c_86 when c_86 = tag_cont_64 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
           assert_env_length w_119 1;
           ignore (env_call w_119 [] 1);
-          w_119.state.c <- pc_to_exp (int_to_pc 86);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 86)
       | c_86 when c_86 = tag_cont_65 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
           assert_env_length w_119 1;
           ignore (env_call w_119 [] 1);
-          w_119.state.c <- pc_to_exp (int_to_pc 88);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 88)
       | c_86 when c_86 = tag_cont_66 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
@@ -1001,8 +967,7 @@ let () =
           assert_env_length w_119 5;
           let keep_vals_74 = env_call w_119 [ 1; 2; 3 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_75; keep_vals_74; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 35);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 35)
       | c_86 when c_86 = tag_cont_67 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -1011,30 +976,26 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_75 = env_call w_119 [ 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_76; keep_vals_75; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 31);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 31)
       | c_86 when c_86 = tag_cont_68 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
           assert_env_length w_119 1;
           ignore (env_call w_119 [] 1);
-          w_119.state.c <- pc_to_exp (int_to_pc 107);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 107)
       | c_86 when c_86 = tag_cont_69 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
           assert_env_length w_119 1;
           ignore (env_call w_119 [] 1);
-          w_119.state.c <- pc_to_exp (int_to_pc 92);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 92)
       | c_86 when c_86 = tag_cont_70 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
           assert_env_length w_119 3;
           let keep_vals_76 = env_call w_119 [ 0; 1 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_77; keep_vals_76; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 29);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 29)
       | c_86 when c_86 = tag_cont_71 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
@@ -1043,24 +1004,21 @@ let () =
           assert_env_length w_119 2;
           let keep_vals_77 = env_call w_119 [] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_78; keep_vals_77; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 22);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 22)
       | c_86 when c_86 = tag_cont_72 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
           assert_env_length w_119 3;
           let keep_vals_78 = env_call w_119 [ 0; 1 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_79; keep_vals_78; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 10);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 10)
       | c_86 when c_86 = tag_cont_73 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
           assert_env_length w_119 3;
           let keep_vals_79 = env_call w_119 [ 0; 1 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_80; keep_vals_79; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 13);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 13)
       | c_86 when c_86 = tag_cont_74 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -1069,8 +1027,7 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_80 = env_call w_119 [ 1 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_81; keep_vals_80; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_75 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
@@ -1081,8 +1038,7 @@ let () =
           assert_env_length w_119 6;
           let keep_vals_81 = env_call w_119 [ 0; 2; 3 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_82; keep_vals_81; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_76 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -1091,35 +1047,29 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_82 = env_call w_119 [ 1 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_83; keep_vals_82; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_77 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 129);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 129)
       | c_86 when c_86 = tag_cont_78 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 131);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 131)
       | c_86 when c_86 = tag_cont_79 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 133);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 133)
       | c_86 when c_86 = tag_cont_80 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 134);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 134)
       | c_86 when c_86 = tag_cont_81 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
           assert_env_length w_119 2;
           ignore (env_call w_119 [] 2);
-          w_119.state.c <- pc_to_exp (int_to_pc 98);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 98)
       | c_86 when c_86 = tag_cont_82 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
@@ -1128,8 +1078,7 @@ let () =
           assert_env_length w_119 5;
           let keep_vals_91 = env_call w_119 [ 0; 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_92; keep_vals_91; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 29);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 29)
       | c_86 when c_86 = tag_cont_83 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -1160,16 +1109,14 @@ let () =
           assert_env_length w_119 3;
           let keep_vals_92 = env_call w_119 [] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_93; keep_vals_92; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_86 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
           assert_env_length w_119 3;
           let keep_vals_93 = env_call w_119 [ 0; 1 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_94; keep_vals_93; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 104);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 104)
       | c_86 when c_86 = tag_cont_87 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
@@ -1182,8 +1129,7 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_94 = env_call w_119 [ 0; 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_95; keep_vals_94; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 53);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 53)
       | c_86 when c_86 = tag_cont_88 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -1192,36 +1138,30 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_95 = env_call w_119 [ 0; 1 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_96; keep_vals_95; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_89 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 136);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 136)
       | c_86 when c_86 = tag_cont_90 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 137);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 137)
       | c_86 when c_86 = tag_cont_91 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 139);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 139)
       | c_86 when c_86 = tag_cont_92 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 140);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 140)
       | c_86 when c_86 = tag_cont_93 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
           assert_env_length w_119 1;
           let keep_vals_97 = env_call w_119 [] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_98; keep_vals_97; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 29);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 29)
       | c_86 when c_86 = tag_cont_94 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -1230,16 +1170,14 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_98 = env_call w_119 [ 0; 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_99; keep_vals_98; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 57);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 57)
       | c_86 when c_86 = tag_cont_95 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
           assert_env_length w_119 4;
           let keep_vals_99 = env_call w_119 [ 0; 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_100; keep_vals_99; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 16);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 16)
       | c_86 when c_86 = tag_cont_96 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -1248,8 +1186,7 @@ let () =
           assert_env_length w_119 4;
           let keep_vals_100 = env_call w_119 [ 0; 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_101; keep_vals_100; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 53);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 53)
       | c_86 when c_86 = tag_cont_97 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 2 tl_0;
@@ -1261,13 +1198,11 @@ let () =
           push_env w_119 (Dynarray.get w_119.state.e 0);
           assert_env_length w_119 3;
           ignore (env_call w_119 [] 2);
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_98 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 141);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 141)
       | c_86 when c_86 = tag_cont_99 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
@@ -1276,21 +1211,18 @@ let () =
           assert_env_length w_119 5;
           let keep_vals_103 = env_call w_119 [ 1; 2; 3 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_104; keep_vals_103; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 64);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 64)
       | c_86 when c_86 = tag_cont_100 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 142);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 142)
       | c_86 when c_86 = tag_cont_101 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
           assert_env_length w_119 4;
           let keep_vals_105 = env_call w_119 [ 0; 1; 2 ] 1 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_106; keep_vals_105; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 16);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 16)
       | c_86 when c_86 = tag_cont_102 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 0 tl_0;
@@ -1317,8 +1249,7 @@ let () =
           assert_env_length w_119 5;
           let keep_vals_106 = env_call w_119 [ 0; 1; 2 ] 2 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_107; keep_vals_106; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 112);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 112)
       | c_86 when c_86 = tag_cont_105 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -1328,13 +1259,11 @@ let () =
           push_env w_119 (Dynarray.get w_119.state.e 0);
           assert_env_length w_119 4;
           ignore (env_call w_119 [] 2);
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_106 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
-          w_119.state.c <- pc_to_exp (int_to_pc 143);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 143)
       | c_86 when c_86 = tag_cont_107 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 3 tl_0;
@@ -1347,8 +1276,7 @@ let () =
           assert_env_length w_119 7;
           let keep_vals_108 = env_call w_119 [ 2 ] 3 in
           w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_109; keep_vals_108; w_119.state.k ];
-          w_119.state.c <- pc_to_exp (int_to_pc 101);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 101)
       | c_86 when c_86 = tag_cont_108 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -1358,8 +1286,7 @@ let () =
           push_env w_119 (Dynarray.get w_119.state.e 0);
           assert_env_length w_119 4;
           ignore (env_call w_119 [] 2);
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | c_86 when c_86 = tag_cont_109 ->
           w_119.state.k <- get_next_cont tl_0;
           restore_env w_119 1 tl_0;
@@ -1369,8 +1296,7 @@ let () =
           push_env w_119 (Dynarray.get w_119.state.e 1);
           assert_env_length w_119 4;
           ignore (env_call w_119 [] 2);
-          w_119.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_119
+          w_119.state.c <- pc_to_exp (int_to_pc 114)
       | _ -> failwith "unreachable (0)")
     0
 
@@ -1379,8 +1305,7 @@ let () =
     (fun w_0 ->
       assert_env_length w_0 2;
       push_env w_0 (Dynarray.get w_0.state.e 0);
-      w_0.state.c <- pc_to_exp (int_to_pc 3);
-      stepped w_0)
+      w_0.state.c <- pc_to_exp (int_to_pc 3))
     1
 
 let () =
@@ -1394,8 +1319,7 @@ let () =
       push_env w_2 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
       assert_env_length w_2 6;
       ignore (env_call w_2 [] 2);
-      w_2.state.c <- pc_to_exp (int_to_pc 1);
-      stepped w_2)
+      w_2.state.c <- pc_to_exp (int_to_pc 1))
     2
 
 let () =
@@ -1424,8 +1348,7 @@ let () =
           push_env w_1 (Dynarray.get w_1.state.e 1);
           assert_env_length w_1 6;
           push_env w_1 (Memo.from_int 1);
-          w_1.state.c <- pc_to_exp (int_to_pc 2);
-          stepped w_1
+          w_1.state.c <- pc_to_exp (int_to_pc 2)
       | c_0 -> failwith ("unreachable:" ^ string_of_int c_0 ^ "(3)"))
     3
 
@@ -1438,8 +1361,7 @@ let () =
       push_env w_3 (Memo.from_int 0);
       assert_env_length w_3 3;
       ignore (env_call w_3 [] 2);
-      w_3.state.c <- pc_to_exp (int_to_pc 1);
-      stepped w_3)
+      w_3.state.c <- pc_to_exp (int_to_pc 1))
     4
 
 let () =
@@ -1477,8 +1399,7 @@ let () =
     (fun w_5 ->
       assert_env_length w_5 1;
       push_env w_5 (Dynarray.get w_5.state.e 0);
-      w_5.state.c <- pc_to_exp (int_to_pc 7);
-      stepped w_5)
+      w_5.state.c <- pc_to_exp (int_to_pc 7))
     6
 
 let () =
@@ -1509,8 +1430,7 @@ let () =
     (fun w_7 ->
       assert_env_length w_7 1;
       push_env w_7 (Dynarray.get w_7.state.e 0);
-      w_7.state.c <- pc_to_exp (int_to_pc 9);
-      stepped w_7)
+      w_7.state.c <- pc_to_exp (int_to_pc 9))
     8
 
 let () =
@@ -1541,8 +1461,7 @@ let () =
     (fun w_9 ->
       assert_env_length w_9 1;
       push_env w_9 (Dynarray.get w_9.state.e 0);
-      w_9.state.c <- pc_to_exp (int_to_pc 12);
-      stepped w_9)
+      w_9.state.c <- pc_to_exp (int_to_pc 12))
     10
 
 let () =
@@ -1593,8 +1512,7 @@ let () =
           push_env w_10 split0_3;
           assert_env_length w_10 2;
           push_env w_10 (Dynarray.get w_10.state.e 1);
-          w_10.state.c <- pc_to_exp (int_to_pc 11);
-          stepped w_10
+          w_10.state.c <- pc_to_exp (int_to_pc 11)
       | _ ->
           ignore (pop_env w_10);
           assert_env_length w_10 1;
@@ -1609,8 +1527,7 @@ let () =
     (fun w_12 ->
       assert_env_length w_12 1;
       push_env w_12 (Dynarray.get w_12.state.e 0);
-      w_12.state.c <- pc_to_exp (int_to_pc 15);
-      stepped w_12)
+      w_12.state.c <- pc_to_exp (int_to_pc 15))
     13
 
 let () =
@@ -1661,8 +1578,7 @@ let () =
           push_env w_13 split0_5;
           assert_env_length w_13 2;
           push_env w_13 (Dynarray.get w_13.state.e 1);
-          w_13.state.c <- pc_to_exp (int_to_pc 14);
-          stepped w_13
+          w_13.state.c <- pc_to_exp (int_to_pc 14)
       | _ ->
           ignore (pop_env w_13);
           assert_env_length w_13 1;
@@ -1677,8 +1593,7 @@ let () =
     (fun w_15 ->
       assert_env_length w_15 1;
       push_env w_15 (Dynarray.get w_15.state.e 0);
-      w_15.state.c <- pc_to_exp (int_to_pc 18);
-      stepped w_15)
+      w_15.state.c <- pc_to_exp (int_to_pc 18))
     16
 
 let () =
@@ -1742,8 +1657,7 @@ let () =
           push_env w_16 split0_8;
           assert_env_length w_16 2;
           push_env w_16 (Dynarray.get w_16.state.e 1);
-          w_16.state.c <- pc_to_exp (int_to_pc 17);
-          stepped w_16
+          w_16.state.c <- pc_to_exp (int_to_pc 17)
       | c_7 -> failwith ("unreachable:" ^ string_of_int c_7 ^ "(18)"))
     18
 
@@ -1752,8 +1666,7 @@ let () =
     (fun w_18 ->
       assert_env_length w_18 1;
       push_env w_18 (Dynarray.get w_18.state.e 0);
-      w_18.state.c <- pc_to_exp (int_to_pc 21);
-      stepped w_18)
+      w_18.state.c <- pc_to_exp (int_to_pc 21))
     19
 
 let () =
@@ -1809,8 +1722,7 @@ let () =
           push_env w_19 split0_11;
           assert_env_length w_19 2;
           push_env w_19 (Dynarray.get w_19.state.e 1);
-          w_19.state.c <- pc_to_exp (int_to_pc 20);
-          stepped w_19
+          w_19.state.c <- pc_to_exp (int_to_pc 20)
       | c_9 -> failwith ("unreachable:" ^ string_of_int c_9 ^ "(21)"))
     21
 
@@ -1819,8 +1731,7 @@ let () =
     (fun w_21 ->
       assert_env_length w_21 1;
       push_env w_21 (Dynarray.get w_21.state.e 0);
-      w_21.state.c <- pc_to_exp (int_to_pc 23);
-      stepped w_21)
+      w_21.state.c <- pc_to_exp (int_to_pc 23))
     22
 
 let () =
@@ -1879,8 +1790,7 @@ let () =
     (fun w_25 ->
       assert_env_length w_25 1;
       push_env w_25 (Dynarray.get w_25.state.e 0);
-      w_25.state.c <- pc_to_exp (int_to_pc 28);
-      stepped w_25)
+      w_25.state.c <- pc_to_exp (int_to_pc 28))
     26
 
 let () =
@@ -1923,8 +1833,7 @@ let () =
           push_env w_26 split0_13;
           assert_env_length w_26 2;
           push_env w_26 (Dynarray.get w_26.state.e 1);
-          w_26.state.c <- pc_to_exp (int_to_pc 27);
-          stepped w_26
+          w_26.state.c <- pc_to_exp (int_to_pc 27)
       | _ ->
           ignore (pop_env w_26);
           assert_env_length w_26 1;
@@ -1939,8 +1848,7 @@ let () =
     (fun w_28 ->
       assert_env_length w_28 1;
       push_env w_28 (Dynarray.get w_28.state.e 0);
-      w_28.state.c <- pc_to_exp (int_to_pc 30);
-      stepped w_28)
+      w_28.state.c <- pc_to_exp (int_to_pc 30))
     29
 
 let () =
@@ -1970,8 +1878,7 @@ let () =
     (fun w_30 ->
       assert_env_length w_30 1;
       push_env w_30 (Dynarray.get w_30.state.e 0);
-      w_30.state.c <- pc_to_exp (int_to_pc 34);
-      stepped w_30)
+      w_30.state.c <- pc_to_exp (int_to_pc 34))
     31
 
 let () =
@@ -2017,8 +1924,7 @@ let () =
           push_env w_32 split1_6;
           assert_env_length w_32 5;
           push_env w_32 (Dynarray.get w_32.state.e 4);
-          w_32.state.c <- pc_to_exp (int_to_pc 32);
-          stepped w_32
+          w_32.state.c <- pc_to_exp (int_to_pc 32)
       | c_16 -> failwith ("unreachable:" ^ string_of_int c_16 ^ "(33)"))
     33
 
@@ -2038,8 +1944,7 @@ let () =
           push_env w_31 split1_5;
           assert_env_length w_31 3;
           push_env w_31 (Dynarray.get w_31.state.e 2);
-          w_31.state.c <- pc_to_exp (int_to_pc 33);
-          stepped w_31
+          w_31.state.c <- pc_to_exp (int_to_pc 33)
       | c_15 -> failwith ("unreachable:" ^ string_of_int c_15 ^ "(34)"))
     34
 
@@ -2048,8 +1953,7 @@ let () =
     (fun w_34 ->
       assert_env_length w_34 1;
       push_env w_34 (Dynarray.get w_34.state.e 0);
-      w_34.state.c <- pc_to_exp (int_to_pc 39);
-      stepped w_34)
+      w_34.state.c <- pc_to_exp (int_to_pc 39))
     35
 
 let () =
@@ -2097,8 +2001,7 @@ let () =
           push_env w_37 split1_10;
           assert_env_length w_37 7;
           push_env w_37 (Dynarray.get w_37.state.e 6);
-          w_37.state.c <- pc_to_exp (int_to_pc 36);
-          stepped w_37
+          w_37.state.c <- pc_to_exp (int_to_pc 36)
       | c_20 -> failwith ("unreachable:" ^ string_of_int c_20 ^ "(37)"))
     37
 
@@ -2118,8 +2021,7 @@ let () =
           push_env w_36 split1_9;
           assert_env_length w_36 5;
           push_env w_36 (Dynarray.get w_36.state.e 4);
-          w_36.state.c <- pc_to_exp (int_to_pc 37);
-          stepped w_36
+          w_36.state.c <- pc_to_exp (int_to_pc 37)
       | c_19 -> failwith ("unreachable:" ^ string_of_int c_19 ^ "(38)"))
     38
 
@@ -2139,8 +2041,7 @@ let () =
           push_env w_35 split1_8;
           assert_env_length w_35 3;
           push_env w_35 (Dynarray.get w_35.state.e 2);
-          w_35.state.c <- pc_to_exp (int_to_pc 38);
-          stepped w_35
+          w_35.state.c <- pc_to_exp (int_to_pc 38)
       | c_18 -> failwith ("unreachable:" ^ string_of_int c_18 ^ "(39)"))
     39
 
@@ -2149,8 +2050,7 @@ let () =
     (fun w_39 ->
       assert_env_length w_39 1;
       push_env w_39 (Dynarray.get w_39.state.e 0);
-      w_39.state.c <- pc_to_exp (int_to_pc 42);
-      stepped w_39)
+      w_39.state.c <- pc_to_exp (int_to_pc 42))
     40
 
 let () =
@@ -2194,8 +2094,7 @@ let () =
           push_env w_40 split1_12;
           assert_env_length w_40 3;
           push_env w_40 (Dynarray.get w_40.state.e 2);
-          w_40.state.c <- pc_to_exp (int_to_pc 41);
-          stepped w_40
+          w_40.state.c <- pc_to_exp (int_to_pc 41)
       | c_22 -> failwith ("unreachable:" ^ string_of_int c_22 ^ "(42)"))
     42
 
@@ -2204,8 +2103,7 @@ let () =
     (fun w_42 ->
       assert_env_length w_42 1;
       push_env w_42 (Dynarray.get w_42.state.e 0);
-      w_42.state.c <- pc_to_exp (int_to_pc 45);
-      stepped w_42)
+      w_42.state.c <- pc_to_exp (int_to_pc 45))
     43
 
 let () =
@@ -2249,8 +2147,7 @@ let () =
           push_env w_43 split1_14;
           assert_env_length w_43 3;
           push_env w_43 (Dynarray.get w_43.state.e 1);
-          w_43.state.c <- pc_to_exp (int_to_pc 44);
-          stepped w_43
+          w_43.state.c <- pc_to_exp (int_to_pc 44)
       | c_24 -> failwith ("unreachable:" ^ string_of_int c_24 ^ "(45)"))
     45
 
@@ -2259,8 +2156,7 @@ let () =
     (fun w_45 ->
       assert_env_length w_45 1;
       push_env w_45 (Dynarray.get w_45.state.e 0);
-      w_45.state.c <- pc_to_exp (int_to_pc 48);
-      stepped w_45)
+      w_45.state.c <- pc_to_exp (int_to_pc 48))
     46
 
 let () =
@@ -2304,8 +2200,7 @@ let () =
           push_env w_46 split1_16;
           assert_env_length w_46 3;
           push_env w_46 (Dynarray.get w_46.state.e 1);
-          w_46.state.c <- pc_to_exp (int_to_pc 47);
-          stepped w_46
+          w_46.state.c <- pc_to_exp (int_to_pc 47)
       | c_26 -> failwith ("unreachable:" ^ string_of_int c_26 ^ "(48)"))
     48
 
@@ -2314,8 +2209,7 @@ let () =
     (fun w_48 ->
       assert_env_length w_48 1;
       push_env w_48 (Dynarray.get w_48.state.e 0);
-      w_48.state.c <- pc_to_exp (int_to_pc 52);
-      stepped w_48)
+      w_48.state.c <- pc_to_exp (int_to_pc 52))
     49
 
 let () =
@@ -2361,8 +2255,7 @@ let () =
           push_env w_50 split1_19;
           assert_env_length w_50 5;
           push_env w_50 (Dynarray.get w_50.state.e 4);
-          w_50.state.c <- pc_to_exp (int_to_pc 50);
-          stepped w_50
+          w_50.state.c <- pc_to_exp (int_to_pc 50)
       | c_29 -> failwith ("unreachable:" ^ string_of_int c_29 ^ "(51)"))
     51
 
@@ -2382,8 +2275,7 @@ let () =
           push_env w_49 split1_18;
           assert_env_length w_49 3;
           push_env w_49 (Dynarray.get w_49.state.e 1);
-          w_49.state.c <- pc_to_exp (int_to_pc 51);
-          stepped w_49
+          w_49.state.c <- pc_to_exp (int_to_pc 51)
       | c_28 -> failwith ("unreachable:" ^ string_of_int c_28 ^ "(52)"))
     52
 
@@ -2392,8 +2284,7 @@ let () =
     (fun w_52 ->
       assert_env_length w_52 1;
       push_env w_52 (Dynarray.get w_52.state.e 0);
-      w_52.state.c <- pc_to_exp (int_to_pc 56);
-      stepped w_52)
+      w_52.state.c <- pc_to_exp (int_to_pc 56))
     53
 
 let () =
@@ -2439,8 +2330,7 @@ let () =
           push_env w_54 split1_22;
           assert_env_length w_54 5;
           push_env w_54 (Dynarray.get w_54.state.e 4);
-          w_54.state.c <- pc_to_exp (int_to_pc 54);
-          stepped w_54
+          w_54.state.c <- pc_to_exp (int_to_pc 54)
       | c_32 -> failwith ("unreachable:" ^ string_of_int c_32 ^ "(55)"))
     55
 
@@ -2460,8 +2350,7 @@ let () =
           push_env w_53 split1_21;
           assert_env_length w_53 3;
           push_env w_53 (Dynarray.get w_53.state.e 1);
-          w_53.state.c <- pc_to_exp (int_to_pc 55);
-          stepped w_53
+          w_53.state.c <- pc_to_exp (int_to_pc 55)
       | c_31 -> failwith ("unreachable:" ^ string_of_int c_31 ^ "(56)"))
     56
 
@@ -2470,8 +2359,7 @@ let () =
     (fun w_56 ->
       assert_env_length w_56 1;
       push_env w_56 (Dynarray.get w_56.state.e 0);
-      w_56.state.c <- pc_to_exp (int_to_pc 61);
-      stepped w_56)
+      w_56.state.c <- pc_to_exp (int_to_pc 61))
     57
 
 let () =
@@ -2519,8 +2407,7 @@ let () =
           push_env w_59 split1_26;
           assert_env_length w_59 7;
           push_env w_59 (Dynarray.get w_59.state.e 6);
-          w_59.state.c <- pc_to_exp (int_to_pc 58);
-          stepped w_59
+          w_59.state.c <- pc_to_exp (int_to_pc 58)
       | c_36 -> failwith ("unreachable:" ^ string_of_int c_36 ^ "(59)"))
     59
 
@@ -2540,8 +2427,7 @@ let () =
           push_env w_58 split1_25;
           assert_env_length w_58 5;
           push_env w_58 (Dynarray.get w_58.state.e 4);
-          w_58.state.c <- pc_to_exp (int_to_pc 59);
-          stepped w_58
+          w_58.state.c <- pc_to_exp (int_to_pc 59)
       | c_35 -> failwith ("unreachable:" ^ string_of_int c_35 ^ "(60)"))
     60
 
@@ -2561,8 +2447,7 @@ let () =
           push_env w_57 split1_24;
           assert_env_length w_57 3;
           push_env w_57 (Dynarray.get w_57.state.e 1);
-          w_57.state.c <- pc_to_exp (int_to_pc 60);
-          stepped w_57
+          w_57.state.c <- pc_to_exp (int_to_pc 60)
       | c_34 -> failwith ("unreachable:" ^ string_of_int c_34 ^ "(61)"))
     61
 
@@ -2571,8 +2456,7 @@ let () =
     (fun w_61 ->
       assert_env_length w_61 1;
       push_env w_61 (Dynarray.get w_61.state.e 0);
-      w_61.state.c <- pc_to_exp (int_to_pc 63);
-      stepped w_61)
+      w_61.state.c <- pc_to_exp (int_to_pc 63))
     62
 
 let () =
@@ -2603,8 +2487,7 @@ let () =
     (fun w_63 ->
       assert_env_length w_63 1;
       push_env w_63 (Dynarray.get w_63.state.e 0);
-      w_63.state.c <- pc_to_exp (int_to_pc 65);
-      stepped w_63)
+      w_63.state.c <- pc_to_exp (int_to_pc 65))
     64
 
 let () =
@@ -2635,8 +2518,7 @@ let () =
     (fun w_65 ->
       assert_env_length w_65 1;
       push_env w_65 (Dynarray.get w_65.state.e 0);
-      w_65.state.c <- pc_to_exp (int_to_pc 67);
-      stepped w_65)
+      w_65.state.c <- pc_to_exp (int_to_pc 67))
     66
 
 let () =
@@ -2783,8 +2665,7 @@ let () =
       assert_env_length w_67 3;
       let keep_vals_0 = env_call w_67 [ 1 ] 1 in
       w_67.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_vals_0; w_67.state.k ];
-      w_67.state.c <- pc_to_exp (int_to_pc 66);
-      stepped w_67)
+      w_67.state.c <- pc_to_exp (int_to_pc 66))
     68
 
 let () =
@@ -2792,8 +2673,7 @@ let () =
     (fun w_68 ->
       assert_env_length w_68 2;
       push_env w_68 (Dynarray.get w_68.state.e 0);
-      w_68.state.c <- pc_to_exp (int_to_pc 76);
-      stepped w_68)
+      w_68.state.c <- pc_to_exp (int_to_pc 76))
     69
 
 let () =
@@ -2851,8 +2731,7 @@ let () =
           push_env w_71 (Dynarray.get w_71.state.e 2);
           assert_env_length w_71 5;
           push_env w_71 (Dynarray.get w_71.state.e 3);
-          w_71.state.c <- pc_to_exp (int_to_pc 71);
-          stepped w_71
+          w_71.state.c <- pc_to_exp (int_to_pc 71)
       | _ ->
           ignore (pop_env w_71);
           assert_env_length w_71 3;
@@ -2897,8 +2776,7 @@ let () =
           push_env w_73 (Dynarray.get w_73.state.e 2);
           assert_env_length w_73 5;
           push_env w_73 (Dynarray.get w_73.state.e 3);
-          w_73.state.c <- pc_to_exp (int_to_pc 73);
-          stepped w_73
+          w_73.state.c <- pc_to_exp (int_to_pc 73)
       | _ ->
           ignore (pop_env w_73);
           assert_env_length w_73 3;
@@ -2928,8 +2806,7 @@ let () =
           push_env w_75 (Dynarray.get w_75.state.e 3);
           assert_env_length w_75 6;
           ignore (env_call w_75 [] 2);
-          w_75.state.c <- pc_to_exp (int_to_pc 68);
-          stepped w_75
+          w_75.state.c <- pc_to_exp (int_to_pc 68)
       | _ ->
           ignore (pop_env w_75);
           assert_env_length w_75 3;
@@ -2952,8 +2829,7 @@ let () =
           ignore (pop_env w_69);
           assert_env_length w_69 2;
           push_env w_69 (Dynarray.get w_69.state.e 1);
-          w_69.state.c <- pc_to_exp (int_to_pc 70);
-          stepped w_69
+          w_69.state.c <- pc_to_exp (int_to_pc 70)
       | c_41 when c_41 = tag_AVar ->
           let splits_39 = Memo.splits (snd x_41) in
           let split0_39 = List.nth splits_39 0 in
@@ -2961,8 +2837,7 @@ let () =
           push_env w_69 split0_39;
           assert_env_length w_69 3;
           push_env w_69 (Dynarray.get w_69.state.e 1);
-          w_69.state.c <- pc_to_exp (int_to_pc 72);
-          stepped w_69
+          w_69.state.c <- pc_to_exp (int_to_pc 72)
       | c_41 when c_41 = tag_ANumber ->
           let splits_41 = Memo.splits (snd x_41) in
           let split0_41 = List.nth splits_41 0 in
@@ -2970,8 +2845,7 @@ let () =
           push_env w_69 split0_41;
           assert_env_length w_69 3;
           push_env w_69 (Dynarray.get w_69.state.e 1);
-          w_69.state.c <- pc_to_exp (int_to_pc 74);
-          stepped w_69
+          w_69.state.c <- pc_to_exp (int_to_pc 74)
       | c_41 when c_41 = tag_ASymbol ->
           let splits_43 = Memo.splits (snd x_41) in
           let split0_43 = List.nth splits_43 0 in
@@ -2979,8 +2853,7 @@ let () =
           push_env w_69 split0_43;
           assert_env_length w_69 3;
           push_env w_69 (Dynarray.get w_69.state.e 1);
-          w_69.state.c <- pc_to_exp (int_to_pc 75);
-          stepped w_69
+          w_69.state.c <- pc_to_exp (int_to_pc 75)
       | c_41 -> failwith ("unreachable:" ^ string_of_int c_41 ^ "(76)"))
     76
 
@@ -2989,8 +2862,7 @@ let () =
     (fun w_76 ->
       assert_env_length w_76 2;
       push_env w_76 (Dynarray.get w_76.state.e 0);
-      w_76.state.c <- pc_to_exp (int_to_pc 79);
-      stepped w_76)
+      w_76.state.c <- pc_to_exp (int_to_pc 79))
     77
 
 let () =
@@ -3011,8 +2883,7 @@ let () =
           push_env w_78 (Dynarray.get w_78.state.e 3);
           assert_env_length w_78 6;
           ignore (env_call w_78 [] 2);
-          w_78.state.c <- pc_to_exp (int_to_pc 69);
-          stepped w_78
+          w_78.state.c <- pc_to_exp (int_to_pc 69)
       | _ ->
           ignore (pop_env w_78);
           assert_env_length w_78 3;
@@ -3038,8 +2909,7 @@ let () =
           push_env w_77 split0_45;
           assert_env_length w_77 3;
           push_env w_77 (Dynarray.get w_77.state.e 1);
-          w_77.state.c <- pc_to_exp (int_to_pc 78);
-          stepped w_77
+          w_77.state.c <- pc_to_exp (int_to_pc 78)
       | c_46 when c_46 = tag_ECons ->
           let splits_47 = Memo.splits (snd x_46) in
           let split0_47 = List.nth splits_47 0 in
@@ -3061,8 +2931,7 @@ let () =
     (fun w_79 ->
       assert_env_length w_79 2;
       push_env w_79 (Dynarray.get w_79.state.e 0);
-      w_79.state.c <- pc_to_exp (int_to_pc 85);
-      stepped w_79)
+      w_79.state.c <- pc_to_exp (int_to_pc 85))
     80
 
 let () =
@@ -3098,8 +2967,7 @@ let () =
           push_env w_81 (Dynarray.get w_81.state.e 2);
           assert_env_length w_81 5;
           push_env w_81 (Dynarray.get w_81.state.e 3);
-          w_81.state.c <- pc_to_exp (int_to_pc 81);
-          stepped w_81
+          w_81.state.c <- pc_to_exp (int_to_pc 81)
       | _ ->
           ignore (pop_env w_81);
           assert_env_length w_81 3;
@@ -3151,8 +3019,7 @@ let () =
           push_env w_84 (Dynarray.get w_84.state.e 3);
           assert_env_length w_84 6;
           ignore (env_call w_84 [] 2);
-          w_84.state.c <- pc_to_exp (int_to_pc 68);
-          stepped w_84
+          w_84.state.c <- pc_to_exp (int_to_pc 68)
       | _ ->
           ignore (pop_env w_84);
           assert_env_length w_84 3;
@@ -3204,14 +3071,12 @@ let () =
           push_env w_80 split0_50;
           assert_env_length w_80 3;
           push_env w_80 (Dynarray.get w_80.state.e 1);
-          w_80.state.c <- pc_to_exp (int_to_pc 82);
-          stepped w_80
+          w_80.state.c <- pc_to_exp (int_to_pc 82)
       | c_48 when c_48 = tag_VNIL ->
           ignore (pop_env w_80);
           assert_env_length w_80 2;
           push_env w_80 (Dynarray.get w_80.state.e 1);
-          w_80.state.c <- pc_to_exp (int_to_pc 83);
-          stepped w_80
+          w_80.state.c <- pc_to_exp (int_to_pc 83)
       | c_48 when c_48 = tag_VSymbol ->
           let splits_52 = Memo.splits (snd x_48) in
           let split0_52 = List.nth splits_52 0 in
@@ -3219,8 +3084,7 @@ let () =
           push_env w_80 split0_52;
           assert_env_length w_80 3;
           push_env w_80 (Dynarray.get w_80.state.e 1);
-          w_80.state.c <- pc_to_exp (int_to_pc 84);
-          stepped w_80
+          w_80.state.c <- pc_to_exp (int_to_pc 84)
       | c_48 -> failwith ("unreachable:" ^ string_of_int c_48 ^ "(85)"))
     85
 
@@ -3229,8 +3093,7 @@ let () =
     (fun w_85 ->
       assert_env_length w_85 1;
       push_env w_85 (Dynarray.get w_85.state.e 0);
-      w_85.state.c <- pc_to_exp (int_to_pc 87);
-      stepped w_85)
+      w_85.state.c <- pc_to_exp (int_to_pc 87))
     86
 
 let () =
@@ -3284,8 +3147,7 @@ let () =
     (fun w_87 ->
       assert_env_length w_87 1;
       push_env w_87 (Dynarray.get w_87.state.e 0);
-      w_87.state.c <- pc_to_exp (int_to_pc 89);
-      stepped w_87)
+      w_87.state.c <- pc_to_exp (int_to_pc 89))
     88
 
 let () =
@@ -3339,8 +3201,7 @@ let () =
     (fun w_89 ->
       assert_env_length w_89 1;
       push_env w_89 (Dynarray.get w_89.state.e 0);
-      w_89.state.c <- pc_to_exp (int_to_pc 91);
-      stepped w_89)
+      w_89.state.c <- pc_to_exp (int_to_pc 91))
     90
 
 let () =
@@ -3358,8 +3219,7 @@ let () =
           assert_env_length w_90 2;
           let keep_vals_1 = env_call w_90 [] 0 in
           w_90.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; keep_vals_1; w_90.state.k ];
-          w_90.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_90
+          w_90.state.c <- pc_to_exp (int_to_pc 24)
       | c_54 when c_54 = tag_VSymbol ->
           let splits_63 = Memo.splits (snd x_54) in
           let split0_63 = List.nth splits_63 0 in
@@ -3368,15 +3228,13 @@ let () =
           assert_env_length w_90 2;
           let keep_vals_2 = env_call w_90 [] 0 in
           w_90.state.k <- Memo.appends [ Memo.from_constructor tag_cont_3; keep_vals_2; w_90.state.k ];
-          w_90.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_90
+          w_90.state.c <- pc_to_exp (int_to_pc 24)
       | c_54 when c_54 = tag_VNIL ->
           ignore (pop_env w_90);
           assert_env_length w_90 1;
           let keep_vals_3 = env_call w_90 [] 0 in
           w_90.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_vals_3; w_90.state.k ];
-          w_90.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_90
+          w_90.state.c <- pc_to_exp (int_to_pc 24)
       | c_54 when c_54 = tag_VCons ->
           let splits_64 = Memo.splits (snd x_54) in
           let split0_64 = List.nth splits_64 0 in
@@ -3387,8 +3245,7 @@ let () =
           assert_env_length w_90 3;
           let keep_vals_4 = env_call w_90 [] 0 in
           w_90.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_vals_4; w_90.state.k ];
-          w_90.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_90
+          w_90.state.c <- pc_to_exp (int_to_pc 25)
       | c_54 when c_54 = tag_VClosure ->
           let splits_65 = Memo.splits (snd x_54) in
           let split0_65 = List.nth splits_65 0 in
@@ -3399,8 +3256,7 @@ let () =
           assert_env_length w_90 3;
           let keep_vals_5 = env_call w_90 [] 0 in
           w_90.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_vals_5; w_90.state.k ];
-          w_90.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_90
+          w_90.state.c <- pc_to_exp (int_to_pc 24)
       | c_54 -> failwith ("unreachable:" ^ string_of_int c_54 ^ "(91)"))
     91
 
@@ -3409,8 +3265,7 @@ let () =
     (fun w_91 ->
       assert_env_length w_91 1;
       push_env w_91 (Dynarray.get w_91.state.e 0);
-      w_91.state.c <- pc_to_exp (int_to_pc 93);
-      stepped w_91)
+      w_91.state.c <- pc_to_exp (int_to_pc 93))
     92
 
 let () =
@@ -3428,8 +3283,7 @@ let () =
           assert_env_length w_92 2;
           let keep_vals_6 = env_call w_92 [] 0 in
           w_92.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_vals_6; w_92.state.k ];
-          w_92.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_92
+          w_92.state.c <- pc_to_exp (int_to_pc 24)
       | c_55 when c_55 = tag_VSymbol ->
           let splits_67 = Memo.splits (snd x_55) in
           let split0_67 = List.nth splits_67 0 in
@@ -3438,15 +3292,13 @@ let () =
           assert_env_length w_92 2;
           let keep_vals_7 = env_call w_92 [] 0 in
           w_92.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_vals_7; w_92.state.k ];
-          w_92.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_92
+          w_92.state.c <- pc_to_exp (int_to_pc 25)
       | c_55 when c_55 = tag_VNIL ->
           ignore (pop_env w_92);
           assert_env_length w_92 1;
           let keep_vals_8 = env_call w_92 [] 0 in
           w_92.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_vals_8; w_92.state.k ];
-          w_92.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_92
+          w_92.state.c <- pc_to_exp (int_to_pc 25)
       | c_55 when c_55 = tag_VCons ->
           let splits_68 = Memo.splits (snd x_55) in
           let split0_68 = List.nth splits_68 0 in
@@ -3457,8 +3309,7 @@ let () =
           assert_env_length w_92 3;
           let keep_vals_9 = env_call w_92 [] 0 in
           w_92.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_vals_9; w_92.state.k ];
-          w_92.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_92
+          w_92.state.c <- pc_to_exp (int_to_pc 25)
       | c_55 when c_55 = tag_VClosure ->
           let splits_69 = Memo.splits (snd x_55) in
           let split0_69 = List.nth splits_69 0 in
@@ -3469,8 +3320,7 @@ let () =
           assert_env_length w_92 3;
           let keep_vals_10 = env_call w_92 [] 0 in
           w_92.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_vals_10; w_92.state.k ];
-          w_92.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_92
+          w_92.state.c <- pc_to_exp (int_to_pc 25)
       | c_55 -> failwith ("unreachable:" ^ string_of_int c_55 ^ "(93)"))
     93
 
@@ -3479,8 +3329,7 @@ let () =
     (fun w_93 ->
       assert_env_length w_93 1;
       push_env w_93 (Dynarray.get w_93.state.e 0);
-      w_93.state.c <- pc_to_exp (int_to_pc 95);
-      stepped w_93)
+      w_93.state.c <- pc_to_exp (int_to_pc 95))
     94
 
 let () =
@@ -3498,8 +3347,7 @@ let () =
           assert_env_length w_94 2;
           let keep_vals_11 = env_call w_94 [] 0 in
           w_94.state.k <- Memo.appends [ Memo.from_constructor tag_cont_12; keep_vals_11; w_94.state.k ];
-          w_94.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_94
+          w_94.state.c <- pc_to_exp (int_to_pc 25)
       | c_56 when c_56 = tag_VSymbol ->
           let splits_71 = Memo.splits (snd x_56) in
           let split0_71 = List.nth splits_71 0 in
@@ -3508,15 +3356,13 @@ let () =
           assert_env_length w_94 2;
           let keep_vals_12 = env_call w_94 [] 0 in
           w_94.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; keep_vals_12; w_94.state.k ];
-          w_94.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_94
+          w_94.state.c <- pc_to_exp (int_to_pc 25)
       | c_56 when c_56 = tag_VNIL ->
           ignore (pop_env w_94);
           assert_env_length w_94 1;
           let keep_vals_13 = env_call w_94 [] 0 in
           w_94.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_vals_13; w_94.state.k ];
-          w_94.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_94
+          w_94.state.c <- pc_to_exp (int_to_pc 25)
       | c_56 when c_56 = tag_VCons ->
           let splits_72 = Memo.splits (snd x_56) in
           let split0_72 = List.nth splits_72 0 in
@@ -3527,8 +3373,7 @@ let () =
           assert_env_length w_94 3;
           let keep_vals_14 = env_call w_94 [] 0 in
           w_94.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; keep_vals_14; w_94.state.k ];
-          w_94.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_94
+          w_94.state.c <- pc_to_exp (int_to_pc 24)
       | c_56 when c_56 = tag_VClosure ->
           let splits_73 = Memo.splits (snd x_56) in
           let split0_73 = List.nth splits_73 0 in
@@ -3539,8 +3384,7 @@ let () =
           assert_env_length w_94 3;
           let keep_vals_15 = env_call w_94 [] 0 in
           w_94.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; keep_vals_15; w_94.state.k ];
-          w_94.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_94
+          w_94.state.c <- pc_to_exp (int_to_pc 25)
       | c_56 -> failwith ("unreachable:" ^ string_of_int c_56 ^ "(95)"))
     95
 
@@ -3549,8 +3393,7 @@ let () =
     (fun w_95 ->
       assert_env_length w_95 1;
       push_env w_95 (Dynarray.get w_95.state.e 0);
-      w_95.state.c <- pc_to_exp (int_to_pc 97);
-      stepped w_95)
+      w_95.state.c <- pc_to_exp (int_to_pc 97))
     96
 
 let () =
@@ -3568,8 +3411,7 @@ let () =
           assert_env_length w_96 2;
           let keep_vals_16 = env_call w_96 [] 0 in
           w_96.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; keep_vals_16; w_96.state.k ];
-          w_96.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_96
+          w_96.state.c <- pc_to_exp (int_to_pc 25)
       | c_57 when c_57 = tag_VSymbol ->
           let splits_75 = Memo.splits (snd x_57) in
           let split0_75 = List.nth splits_75 0 in
@@ -3578,15 +3420,13 @@ let () =
           assert_env_length w_96 2;
           let keep_vals_17 = env_call w_96 [] 0 in
           w_96.state.k <- Memo.appends [ Memo.from_constructor tag_cont_18; keep_vals_17; w_96.state.k ];
-          w_96.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_96
+          w_96.state.c <- pc_to_exp (int_to_pc 24)
       | c_57 when c_57 = tag_VNIL ->
           ignore (pop_env w_96);
           assert_env_length w_96 1;
           let keep_vals_18 = env_call w_96 [] 0 in
           w_96.state.k <- Memo.appends [ Memo.from_constructor tag_cont_19; keep_vals_18; w_96.state.k ];
-          w_96.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_96
+          w_96.state.c <- pc_to_exp (int_to_pc 25)
       | c_57 when c_57 = tag_VCons ->
           let splits_76 = Memo.splits (snd x_57) in
           let split0_76 = List.nth splits_76 0 in
@@ -3597,8 +3437,7 @@ let () =
           assert_env_length w_96 3;
           let keep_vals_19 = env_call w_96 [] 0 in
           w_96.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; keep_vals_19; w_96.state.k ];
-          w_96.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_96
+          w_96.state.c <- pc_to_exp (int_to_pc 25)
       | c_57 when c_57 = tag_VClosure ->
           let splits_77 = Memo.splits (snd x_57) in
           let split0_77 = List.nth splits_77 0 in
@@ -3609,8 +3448,7 @@ let () =
           assert_env_length w_96 3;
           let keep_vals_20 = env_call w_96 [] 0 in
           w_96.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; keep_vals_20; w_96.state.k ];
-          w_96.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_96
+          w_96.state.c <- pc_to_exp (int_to_pc 25)
       | c_57 -> failwith ("unreachable:" ^ string_of_int c_57 ^ "(97)"))
     97
 
@@ -3624,8 +3462,7 @@ let () =
       assert_env_length w_97 4;
       let keep_vals_21 = env_call w_97 [] 2 in
       w_97.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_vals_21; w_97.state.k ];
-      w_97.state.c <- pc_to_exp (int_to_pc 80);
-      stepped w_97)
+      w_97.state.c <- pc_to_exp (int_to_pc 80))
     98
 
 let () =
@@ -3633,8 +3470,7 @@ let () =
     (fun w_98 ->
       assert_env_length w_98 2;
       push_env w_98 (Dynarray.get w_98.state.e 1);
-      w_98.state.c <- pc_to_exp (int_to_pc 100);
-      stepped w_98)
+      w_98.state.c <- pc_to_exp (int_to_pc 100))
     99
 
 let () =
@@ -3659,8 +3495,7 @@ let () =
           assert_env_length w_99 5;
           let keep_vals_22 = env_call w_99 [ 0; 2; 3 ] 1 in
           w_99.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; keep_vals_22; w_99.state.k ];
-          w_99.state.c <- pc_to_exp (int_to_pc 6);
-          stepped w_99
+          w_99.state.c <- pc_to_exp (int_to_pc 6)
       | c_58 -> failwith ("unreachable:" ^ string_of_int c_58 ^ "(100)"))
     100
 
@@ -3669,8 +3504,7 @@ let () =
     (fun w_100 ->
       assert_env_length w_100 3;
       push_env w_100 (Dynarray.get w_100.state.e 0);
-      w_100.state.c <- pc_to_exp (int_to_pc 103);
-      stepped w_100)
+      w_100.state.c <- pc_to_exp (int_to_pc 103))
     101
 
 let () =
@@ -3707,8 +3541,7 @@ let () =
           assert_env_length w_102 11;
           let keep_vals_23 = env_call w_102 [ 7 ] 3 in
           w_102.state.k <- Memo.appends [ Memo.from_constructor tag_cont_24; keep_vals_23; w_102.state.k ];
-          w_102.state.c <- pc_to_exp (int_to_pc 101);
-          stepped w_102
+          w_102.state.c <- pc_to_exp (int_to_pc 101)
       | c_60 -> failwith ("unreachable:" ^ string_of_int c_60 ^ "(102)"))
     102
 
@@ -3734,8 +3567,7 @@ let () =
           push_env w_101 split1_46;
           assert_env_length w_101 5;
           push_env w_101 (Dynarray.get w_101.state.e 1);
-          w_101.state.c <- pc_to_exp (int_to_pc 102);
-          stepped w_101
+          w_101.state.c <- pc_to_exp (int_to_pc 102)
       | c_59 -> failwith ("unreachable:" ^ string_of_int c_59 ^ "(103)"))
     103
 
@@ -3744,8 +3576,7 @@ let () =
     (fun w_103 ->
       assert_env_length w_103 1;
       push_env w_103 (Dynarray.get w_103.state.e 0);
-      w_103.state.c <- pc_to_exp (int_to_pc 106);
-      stepped w_103)
+      w_103.state.c <- pc_to_exp (int_to_pc 106))
     104
 
 let () =
@@ -3788,8 +3619,7 @@ let () =
           assert_env_length w_104 4;
           let keep_vals_24 = env_call w_104 [ 2 ] 1 in
           w_104.state.k <- Memo.appends [ Memo.from_constructor tag_cont_25; keep_vals_24; w_104.state.k ];
-          w_104.state.c <- pc_to_exp (int_to_pc 16);
-          stepped w_104
+          w_104.state.c <- pc_to_exp (int_to_pc 16)
       | c_61 when c_61 = tag_EAtom ->
           let splits_82 = Memo.splits (snd x_61) in
           let split0_82 = List.nth splits_82 0 in
@@ -3797,8 +3627,7 @@ let () =
           push_env w_104 split0_82;
           assert_env_length w_104 2;
           push_env w_104 (Dynarray.get w_104.state.e 1);
-          w_104.state.c <- pc_to_exp (int_to_pc 105);
-          stepped w_104
+          w_104.state.c <- pc_to_exp (int_to_pc 105)
       | c_61 -> failwith ("unreachable:" ^ string_of_int c_61 ^ "(106)"))
     106
 
@@ -3807,8 +3636,7 @@ let () =
     (fun w_106 ->
       assert_env_length w_106 1;
       push_env w_106 (Dynarray.get w_106.state.e 0);
-      w_106.state.c <- pc_to_exp (int_to_pc 108);
-      stepped w_106)
+      w_106.state.c <- pc_to_exp (int_to_pc 108))
     107
 
 let () =
@@ -3823,15 +3651,13 @@ let () =
           assert_env_length w_107 1;
           let keep_vals_25 = env_call w_107 [] 0 in
           w_107.state.k <- Memo.appends [ Memo.from_constructor tag_cont_26; keep_vals_25; w_107.state.k ];
-          w_107.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_107
+          w_107.state.c <- pc_to_exp (int_to_pc 24)
       | _ ->
           ignore (pop_env w_107);
           assert_env_length w_107 1;
           let keep_vals_26 = env_call w_107 [] 0 in
           w_107.state.k <- Memo.appends [ Memo.from_constructor tag_cont_27; keep_vals_26; w_107.state.k ];
-          w_107.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_107
+          w_107.state.c <- pc_to_exp (int_to_pc 25)
       | c_63 -> failwith ("unreachable:" ^ string_of_int c_63 ^ "(108)"))
     108
 
@@ -3840,8 +3666,7 @@ let () =
     (fun w_108 ->
       assert_env_length w_108 1;
       push_env w_108 (Dynarray.get w_108.state.e 0);
-      w_108.state.c <- pc_to_exp (int_to_pc 111);
-      stepped w_108)
+      w_108.state.c <- pc_to_exp (int_to_pc 111))
     109
 
 let () =
@@ -3939,8 +3764,7 @@ let () =
           push_env w_109 split0_83;
           assert_env_length w_109 2;
           push_env w_109 (Dynarray.get w_109.state.e 1);
-          w_109.state.c <- pc_to_exp (int_to_pc 110);
-          stepped w_109
+          w_109.state.c <- pc_to_exp (int_to_pc 110)
       | c_64 when c_64 = tag_ECons ->
           let splits_87 = Memo.splits (snd x_64) in
           let split0_87 = List.nth splits_87 0 in
@@ -3953,8 +3777,7 @@ let () =
           assert_env_length w_109 4;
           let keep_vals_27 = env_call w_109 [ 2 ] 1 in
           w_109.state.k <- Memo.appends [ Memo.from_constructor tag_cont_28; keep_vals_27; w_109.state.k ];
-          w_109.state.c <- pc_to_exp (int_to_pc 109);
-          stepped w_109
+          w_109.state.c <- pc_to_exp (int_to_pc 109)
       | c_64 -> failwith ("unreachable:" ^ string_of_int c_64 ^ "(111)"))
     111
 
@@ -3963,8 +3786,7 @@ let () =
     (fun w_111 ->
       assert_env_length w_111 2;
       push_env w_111 (Dynarray.get w_111.state.e 0);
-      w_111.state.c <- pc_to_exp (int_to_pc 115);
-      stepped w_111)
+      w_111.state.c <- pc_to_exp (int_to_pc 115))
     112
 
 let () =
@@ -3972,8 +3794,7 @@ let () =
     (fun w_113 ->
       assert_env_length w_113 2;
       push_env w_113 (Dynarray.get w_113.state.e 0);
-      w_113.state.c <- pc_to_exp (int_to_pc 116);
-      stepped w_113)
+      w_113.state.c <- pc_to_exp (int_to_pc 116))
     113
 
 let () =
@@ -3981,8 +3802,7 @@ let () =
     (fun w_115 ->
       assert_env_length w_115 2;
       push_env w_115 (Dynarray.get w_115.state.e 0);
-      w_115.state.c <- pc_to_exp (int_to_pc 119);
-      stepped w_115)
+      w_115.state.c <- pc_to_exp (int_to_pc 119))
     114
 
 let () =
@@ -4006,8 +3826,7 @@ let () =
           assert_env_length w_112 6;
           let keep_vals_28 = env_call w_112 [ 1; 3 ] 2 in
           w_112.state.k <- Memo.appends [ Memo.from_constructor tag_cont_29; keep_vals_28; w_112.state.k ];
-          w_112.state.c <- pc_to_exp (int_to_pc 114);
-          stepped w_112
+          w_112.state.c <- pc_to_exp (int_to_pc 114)
       | _ ->
           ignore (pop_env w_112);
           assert_env_length w_112 2;
@@ -4036,8 +3855,7 @@ let () =
           assert_env_length w_114 5;
           let keep_vals_29 = env_call w_114 [ 1; 2; 3 ] 1 in
           w_114.state.k <- Memo.appends [ Memo.from_constructor tag_cont_30; keep_vals_29; w_114.state.k ];
-          w_114.state.c <- pc_to_exp (int_to_pc 62);
-          stepped w_114
+          w_114.state.c <- pc_to_exp (int_to_pc 62)
       | _ ->
           ignore (pop_env w_114);
           failwith "no cond clause matched"
@@ -4056,22 +3874,19 @@ let () =
           assert_env_length w_118 4;
           let keep_vals_30 = env_call w_118 [] 0 in
           w_118.state.k <- Memo.appends [ Memo.from_constructor tag_cont_31; keep_vals_30; w_118.state.k ];
-          w_118.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_118
+          w_118.state.c <- pc_to_exp (int_to_pc 24)
       | c_70 when c_70 = tag_STrue ->
           ignore (pop_env w_118);
           assert_env_length w_118 4;
           let keep_vals_31 = env_call w_118 [] 0 in
           w_118.state.k <- Memo.appends [ Memo.from_constructor tag_cont_32; keep_vals_31; w_118.state.k ];
-          w_118.state.c <- pc_to_exp (int_to_pc 24);
-          stepped w_118
+          w_118.state.c <- pc_to_exp (int_to_pc 24)
       | c_70 when c_70 = tag_SFalse ->
           ignore (pop_env w_118);
           assert_env_length w_118 4;
           let keep_vals_32 = env_call w_118 [] 0 in
           w_118.state.k <- Memo.appends [ Memo.from_constructor tag_cont_33; keep_vals_32; w_118.state.k ];
-          w_118.state.c <- pc_to_exp (int_to_pc 25);
-          stepped w_118
+          w_118.state.c <- pc_to_exp (int_to_pc 25)
       | _ ->
           ignore (pop_env w_118);
           failwith "cannot directly evaluate this symbol"
@@ -4096,8 +3911,7 @@ let () =
           push_env w_117 (Dynarray.get w_117.state.e 1);
           assert_env_length w_117 6;
           ignore (env_call w_117 [] 2);
-          w_117.state.c <- pc_to_exp (int_to_pc 99);
-          stepped w_117
+          w_117.state.c <- pc_to_exp (int_to_pc 99)
       | c_69 when c_69 = tag_ANumber ->
           let splits_92 = Memo.splits (snd x_69) in
           let split0_92 = List.nth splits_92 0 in
@@ -4121,8 +3935,7 @@ let () =
           push_env w_117 split0_93;
           assert_env_length w_117 4;
           push_env w_117 (Dynarray.get w_117.state.e 3);
-          w_117.state.c <- pc_to_exp (int_to_pc 117);
-          stepped w_117
+          w_117.state.c <- pc_to_exp (int_to_pc 117)
       | c_69 when c_69 = tag_ANIL ->
           ignore (pop_env w_117);
           failwith "ill-formed expression: NIL"
@@ -4143,8 +3956,7 @@ let () =
           push_env w_116 split0_90;
           assert_env_length w_116 3;
           push_env w_116 (Dynarray.get w_116.state.e 2);
-          w_116.state.c <- pc_to_exp (int_to_pc 118);
-          stepped w_116
+          w_116.state.c <- pc_to_exp (int_to_pc 118)
       | c_68 when c_68 = tag_ECons ->
           let splits_94 = Memo.splits (snd x_68) in
           let split0_94 = List.nth splits_94 0 in
@@ -4157,8 +3969,7 @@ let () =
           assert_env_length w_116 5;
           let keep_vals_33 = env_call w_116 [ 0; 1 ] 1 in
           w_116.state.k <- Memo.appends [ Memo.from_constructor tag_cont_34; keep_vals_33; w_116.state.k ];
-          w_116.state.c <- pc_to_exp (int_to_pc 62);
-          stepped w_116
+          w_116.state.c <- pc_to_exp (int_to_pc 62)
       | c_68 -> failwith ("unreachable:" ^ string_of_int c_68 ^ "(119)"))
     119
 
@@ -4172,14 +3983,12 @@ let () =
         assert_env_length w_120 0;
         let keep_vals_36 = env_call w_120 [] 0 in
         w_120.state.k <- Memo.appends [ Memo.from_constructor tag_cont_36; keep_vals_36; w_120.state.k ];
-        w_120.state.c <- pc_to_exp (int_to_pc 24);
-        stepped w_120)
+        w_120.state.c <- pc_to_exp (int_to_pc 24))
       else (
         assert_env_length w_120 0;
         let keep_vals_35 = env_call w_120 [] 0 in
         w_120.state.k <- Memo.appends [ Memo.from_constructor tag_cont_37; keep_vals_35; w_120.state.k ];
-        w_120.state.c <- pc_to_exp (int_to_pc 25);
-        stepped w_120))
+        w_120.state.c <- pc_to_exp (int_to_pc 25)))
     120
 
 let () =
@@ -4193,8 +4002,7 @@ let () =
         push_env w_122 (Dynarray.get w_122.state.e 1);
         assert_env_length w_122 4;
         ignore (env_call w_122 [] 1);
-        w_122.state.c <- pc_to_exp (int_to_pc 8);
-        stepped w_122)
+        w_122.state.c <- pc_to_exp (int_to_pc 8))
       else (
         assert_env_length w_122 3;
         push_env w_122 (Dynarray.get w_122.state.e 0);
@@ -4202,8 +4010,7 @@ let () =
         push_env w_122 (Dynarray.get w_122.state.e 2);
         assert_env_length w_122 5;
         ignore (env_call w_122 [] 2);
-        w_122.state.c <- pc_to_exp (int_to_pc 99);
-        stepped w_122))
+        w_122.state.c <- pc_to_exp (int_to_pc 99)))
     121
 
 let () =
@@ -4215,8 +4022,7 @@ let () =
       ignore (pop_env w_121);
       ignore (pop_env w_121);
       push_env w_121 (Memo.from_int (if Word.get_value (fst x0_4) = Word.get_value (fst x1_4) then 1 else 0));
-      w_121.state.c <- pc_to_exp (int_to_pc 121);
-      stepped w_121)
+      w_121.state.c <- pc_to_exp (int_to_pc 121))
     122
 
 let () =
@@ -4238,8 +4044,7 @@ let () =
           assert_env_length w_123 4;
           let keep_vals_37 = env_call w_123 [ 2 ] 1 in
           w_123.state.k <- Memo.appends [ Memo.from_constructor tag_cont_38; keep_vals_37; w_123.state.k ];
-          w_123.state.c <- pc_to_exp (int_to_pc 104);
-          stepped w_123
+          w_123.state.c <- pc_to_exp (int_to_pc 104)
       | _ ->
           ignore (pop_env w_123);
           failwith "destruct_names: impossible, names must be int literals"
@@ -4273,8 +4078,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_43 = env_call w_126 [] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_44; keep_vals_43; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SAtom ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4282,8 +4086,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_44 = env_call w_126 [ 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_45; keep_vals_44; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SPair ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4291,8 +4094,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_45 = env_call w_126 [ 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_46; keep_vals_45; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SSymbol ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4300,8 +4102,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_46 = env_call w_126 [ 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_47; keep_vals_46; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SEq ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4309,8 +4110,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_47 = env_call w_126 [ 0; 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_48; keep_vals_47; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SCar ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4318,8 +4118,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_48 = env_call w_126 [ 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_49; keep_vals_48; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SCdr ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4327,8 +4126,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_49 = env_call w_126 [ 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_50; keep_vals_49; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SIf ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4336,8 +4134,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_50 = env_call w_126 [ 0; 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_51; keep_vals_50; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SCons ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4345,8 +4142,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_51 = env_call w_126 [ 0; 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_52; keep_vals_51; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SCond ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4354,8 +4150,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_52 = env_call w_126 [ 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_53; keep_vals_52; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 64);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 64)
       | c_73 when c_73 = tag_SNull ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4363,8 +4158,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_53 = env_call w_126 [ 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_54; keep_vals_53; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SElse ->
           ignore (pop_env w_126);
           failwith "else is not PROCEDURE"
@@ -4384,8 +4178,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_54 = env_call w_126 [ 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_55; keep_vals_54; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SAnd ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4393,8 +4186,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_55 = env_call w_126 [ 0; 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_56; keep_vals_55; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | c_73 when c_73 = tag_SError ->
           ignore (pop_env w_126);
           assert_env_length w_126 3;
@@ -4402,8 +4194,7 @@ let () =
           assert_env_length w_126 4;
           let keep_vals_56 = env_call w_126 [ 1 ] 1 in
           w_126.state.k <- Memo.appends [ Memo.from_constructor tag_cont_57; keep_vals_56; w_126.state.k ];
-          w_126.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_126
+          w_126.state.c <- pc_to_exp (int_to_pc 40)
       | _ ->
           ignore (pop_env w_126);
           failwith "invalid symbol here1"
@@ -4424,8 +4215,7 @@ let () =
           push_env w_125 split0_96;
           assert_env_length w_125 3;
           push_env w_125 (Dynarray.get w_125.state.e 2);
-          w_125.state.c <- pc_to_exp (int_to_pc 125);
-          stepped w_125
+          w_125.state.c <- pc_to_exp (int_to_pc 125)
       | c_72 when c_72 = tag_None ->
           ignore (pop_env w_125);
           assert_env_length w_125 2;
@@ -4433,8 +4223,7 @@ let () =
           assert_env_length w_125 3;
           let keep_vals_57 = env_call w_125 [ 0; 1 ] 1 in
           w_125.state.k <- Memo.appends [ Memo.from_constructor tag_cont_58; keep_vals_57; w_125.state.k ];
-          w_125.state.c <- pc_to_exp (int_to_pc 62);
-          stepped w_125
+          w_125.state.c <- pc_to_exp (int_to_pc 62)
       | c_72 -> failwith ("unreachable:" ^ string_of_int c_72 ^ "(126)"))
     126
 
@@ -4451,16 +4240,14 @@ let () =
         push_env w_127 (Dynarray.get w_127.state.e 0);
         assert_env_length w_127 5;
         ignore (env_call w_127 [] 2);
-        w_127.state.c <- pc_to_exp (int_to_pc 113);
-        stepped w_127)
+        w_127.state.c <- pc_to_exp (int_to_pc 113))
       else (
         assert_env_length w_127 3;
         push_env w_127 (Dynarray.get w_127.state.e 1);
         assert_env_length w_127 4;
         let keep_vals_58 = env_call w_127 [ 0 ] 1 in
         w_127.state.k <- Memo.appends [ Memo.from_constructor tag_cont_59; keep_vals_58; w_127.state.k ];
-        w_127.state.c <- pc_to_exp (int_to_pc 40);
-        stepped w_127))
+        w_127.state.c <- pc_to_exp (int_to_pc 40)))
     127
 
 let () =
@@ -4482,8 +4269,7 @@ let () =
           assert_env_length w_128 5;
           let keep_vals_71 = env_call w_128 [ 0; 1 ] 1 in
           w_128.state.k <- Memo.appends [ Memo.from_constructor tag_cont_72; keep_vals_71; w_128.state.k ];
-          w_128.state.c <- pc_to_exp (int_to_pc 43);
-          stepped w_128
+          w_128.state.c <- pc_to_exp (int_to_pc 43)
       | _ ->
           ignore (pop_env w_128);
           assert_env_length w_128 2;
@@ -4491,8 +4277,7 @@ let () =
           assert_env_length w_128 3;
           let keep_vals_72 = env_call w_128 [ 0; 1 ] 1 in
           w_128.state.k <- Memo.appends [ Memo.from_constructor tag_cont_73; keep_vals_72; w_128.state.k ];
-          w_128.state.c <- pc_to_exp (int_to_pc 62);
-          stepped w_128
+          w_128.state.c <- pc_to_exp (int_to_pc 62)
       | c_74 -> failwith ("unreachable:" ^ string_of_int c_74 ^ "(128)"))
     128
 
@@ -4506,16 +4291,14 @@ let () =
         assert_env_length w_129 2;
         let keep_vals_84 = env_call w_129 [] 0 in
         w_129.state.k <- Memo.appends [ Memo.from_constructor tag_cont_84; keep_vals_84; w_129.state.k ];
-        w_129.state.c <- pc_to_exp (int_to_pc 25);
-        stepped w_129)
+        w_129.state.c <- pc_to_exp (int_to_pc 25))
       else (
         assert_env_length w_129 2;
         push_env w_129 (Dynarray.get w_129.state.e 0);
         assert_env_length w_129 3;
         let keep_vals_83 = env_call w_129 [ 1 ] 1 in
         w_129.state.k <- Memo.appends [ Memo.from_constructor tag_cont_85; keep_vals_83; w_129.state.k ];
-        w_129.state.c <- pc_to_exp (int_to_pc 31);
-        stepped w_129))
+        w_129.state.c <- pc_to_exp (int_to_pc 31)))
     129
 
 let () =
@@ -4547,8 +4330,7 @@ let () =
           drop_n w_130 2 1;
           assert_env_length w_130 1;
           push_env w_130 (Dynarray.get w_130.state.e 0);
-          w_130.state.c <- pc_to_exp (int_to_pc 130);
-          stepped w_130
+          w_130.state.c <- pc_to_exp (int_to_pc 130)
       | c_75 -> failwith ("unreachable:" ^ string_of_int c_75 ^ "(131)"))
     131
 
@@ -4566,8 +4348,7 @@ let () =
           assert_env_length w_133 4;
           let keep_vals_85 = env_call w_133 [ 0; 1 ] 1 in
           w_133.state.k <- Memo.appends [ Memo.from_constructor tag_cont_86; keep_vals_85; w_133.state.k ];
-          w_133.state.c <- pc_to_exp (int_to_pc 53);
-          stepped w_133
+          w_133.state.c <- pc_to_exp (int_to_pc 53)
       | c_77 when c_77 = tag_SDefine ->
           ignore (pop_env w_133);
           assert_env_length w_133 3;
@@ -4583,8 +4364,7 @@ let () =
           assert_env_length w_133 5;
           let keep_vals_86 = env_call w_133 [ 0; 1; 3 ] 1 in
           w_133.state.k <- Memo.appends [ Memo.from_constructor tag_cont_87; keep_vals_86; w_133.state.k ];
-          w_133.state.c <- pc_to_exp (int_to_pc 49);
-          stepped w_133
+          w_133.state.c <- pc_to_exp (int_to_pc 49)
       | c_77 when c_77 = tag_SDefvar ->
           ignore (pop_env w_133);
           assert_env_length w_133 3;
@@ -4592,8 +4372,7 @@ let () =
           assert_env_length w_133 4;
           let keep_vals_87 = env_call w_133 [ 0; 1 ] 1 in
           w_133.state.k <- Memo.appends [ Memo.from_constructor tag_cont_88; keep_vals_87; w_133.state.k ];
-          w_133.state.c <- pc_to_exp (int_to_pc 57);
-          stepped w_133
+          w_133.state.c <- pc_to_exp (int_to_pc 57)
       | c_77 when c_77 = tag_SQuote ->
           ignore (pop_env w_133);
           failwith "unexpected function quote"
@@ -4668,8 +4447,7 @@ let () =
           push_env w_132 split0_99;
           assert_env_length w_132 3;
           push_env w_132 (Dynarray.get w_132.state.e 2);
-          w_132.state.c <- pc_to_exp (int_to_pc 132);
-          stepped w_132
+          w_132.state.c <- pc_to_exp (int_to_pc 132)
       | c_76 when c_76 = tag_None ->
           ignore (pop_env w_132);
           assert_env_length w_132 2;
@@ -4677,8 +4455,7 @@ let () =
           assert_env_length w_132 3;
           let keep_vals_88 = env_call w_132 [] 1 in
           w_132.state.k <- Memo.appends [ Memo.from_constructor tag_cont_89; keep_vals_88; w_132.state.k ];
-          w_132.state.c <- pc_to_exp (int_to_pc 43);
-          stepped w_132
+          w_132.state.c <- pc_to_exp (int_to_pc 43)
       | c_76 -> failwith ("unreachable:" ^ string_of_int c_76 ^ "(133)"))
     133
 
@@ -4701,8 +4478,7 @@ let () =
           assert_env_length w_134 5;
           let keep_vals_89 = env_call w_134 [ 0; 1 ] 2 in
           w_134.state.k <- Memo.appends [ Memo.from_constructor tag_cont_90; keep_vals_89; w_134.state.k ];
-          w_134.state.c <- pc_to_exp (int_to_pc 99);
-          stepped w_134
+          w_134.state.c <- pc_to_exp (int_to_pc 99)
       | c_78 when c_78 = tag_None ->
           ignore (pop_env w_134);
           assert_env_length w_134 2;
@@ -4710,8 +4486,7 @@ let () =
           assert_env_length w_134 3;
           let keep_vals_90 = env_call w_134 [] 1 in
           w_134.state.k <- Memo.appends [ Memo.from_constructor tag_cont_91; keep_vals_90; w_134.state.k ];
-          w_134.state.c <- pc_to_exp (int_to_pc 62);
-          stepped w_134
+          w_134.state.c <- pc_to_exp (int_to_pc 62)
       | c_78 -> failwith ("unreachable:" ^ string_of_int c_78 ^ "(134)"))
     134
 
@@ -4760,8 +4535,7 @@ let () =
           push_env w_135 split0_101;
           assert_env_length w_135 1;
           push_env w_135 (Dynarray.get w_135.state.e 0);
-          w_135.state.c <- pc_to_exp (int_to_pc 135);
-          stepped w_135
+          w_135.state.c <- pc_to_exp (int_to_pc 135)
       | c_79 when c_79 = tag_ECons ->
           let splits_105 = Memo.splits (snd x_79) in
           let split0_105 = List.nth splits_105 0 in
@@ -4817,8 +4591,7 @@ let () =
           assert_env_length w_137 6;
           let keep_vals_96 = env_call w_137 [ 1; 4 ] 1 in
           w_137.state.k <- Memo.appends [ Memo.from_constructor tag_cont_97; keep_vals_96; w_137.state.k ];
-          w_137.state.c <- pc_to_exp (int_to_pc 64);
-          stepped w_137
+          w_137.state.c <- pc_to_exp (int_to_pc 64)
       | c_81 -> failwith ("unreachable:" ^ string_of_int c_81 ^ "(137)"))
     137
 
@@ -4858,8 +4631,7 @@ let () =
           push_env w_138 split0_110;
           assert_env_length w_138 1;
           push_env w_138 (Dynarray.get w_138.state.e 0);
-          w_138.state.c <- pc_to_exp (int_to_pc 138);
-          stepped w_138
+          w_138.state.c <- pc_to_exp (int_to_pc 138)
       | _ ->
           ignore (pop_env w_138);
           failwith "impossible"
@@ -4879,8 +4651,7 @@ let () =
         push_env w_140 (Dynarray.get w_140.state.e 0);
         assert_env_length w_140 5;
         ignore (env_call w_140 [] 2);
-        w_140.state.c <- pc_to_exp (int_to_pc 114);
-        stepped w_140)
+        w_140.state.c <- pc_to_exp (int_to_pc 114))
       else (
         assert_env_length w_140 3;
         push_env w_140 (Dynarray.get w_140.state.e 1);
@@ -4888,8 +4659,7 @@ let () =
         push_env w_140 (Dynarray.get w_140.state.e 0);
         assert_env_length w_140 5;
         ignore (env_call w_140 [] 2);
-        w_140.state.c <- pc_to_exp (int_to_pc 114);
-        stepped w_140))
+        w_140.state.c <- pc_to_exp (int_to_pc 114)))
     140
 
 let () =
@@ -4902,14 +4672,12 @@ let () =
         assert_env_length w_141 0;
         let keep_vals_102 = env_call w_141 [] 0 in
         w_141.state.k <- Memo.appends [ Memo.from_constructor tag_cont_102; keep_vals_102; w_141.state.k ];
-        w_141.state.c <- pc_to_exp (int_to_pc 25);
-        stepped w_141)
+        w_141.state.c <- pc_to_exp (int_to_pc 25))
       else (
         assert_env_length w_141 0;
         let keep_vals_101 = env_call w_141 [] 0 in
         w_141.state.k <- Memo.appends [ Memo.from_constructor tag_cont_103; keep_vals_101; w_141.state.k ];
-        w_141.state.c <- pc_to_exp (int_to_pc 24);
-        stepped w_141))
+        w_141.state.c <- pc_to_exp (int_to_pc 24)))
     141
 
 let () =
@@ -4958,8 +4726,7 @@ let () =
           assert_env_length w_142 7;
           let keep_vals_104 = env_call w_142 [ 5 ] 1 in
           w_142.state.k <- Memo.appends [ Memo.from_constructor tag_cont_105; keep_vals_104; w_142.state.k ];
-          w_142.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_142
+          w_142.state.c <- pc_to_exp (int_to_pc 40)
       | c_84 -> failwith ("unreachable:" ^ string_of_int c_84 ^ "(142)"))
     142
 
@@ -5001,8 +4768,7 @@ let () =
           assert_env_length w_143 6;
           let keep_vals_107 = env_call w_143 [ 4 ] 1 in
           w_143.state.k <- Memo.appends [ Memo.from_constructor tag_cont_108; keep_vals_107; w_143.state.k ];
-          w_143.state.c <- pc_to_exp (int_to_pc 40);
-          stepped w_143
+          w_143.state.c <- pc_to_exp (int_to_pc 40)
       | c_85 -> failwith ("unreachable:" ^ string_of_int c_85 ^ "(143)"))
     143
 
