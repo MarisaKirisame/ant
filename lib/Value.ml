@@ -34,12 +34,12 @@ let measure (et : fg_et) : measure_t =
       let degree =
         match w with Int _ -> 1 | ConstructorTag value -> Dynarray.get Words.constructor_degree_table value
       in
-      let w_repr_tag, w_repr_value = Word.raw_repr w in
+      let whash = Word.hash w in
       {
         degree;
-        (*todo: this should be 0. fix and rerun.*)
+        (*todo: this should be max(0, degree). fix and rerun.*)
         max_degree = degree;
-        full = Some { length = 1; hash = Hasher.mul (Hasher.from_int w_repr_tag) (Hasher.from_int w_repr_value) };
+        full = Some { length = 1; hash = Hasher.from_int whash };
       }
   | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
 
@@ -109,3 +109,19 @@ let rec string_of_value_aux (v : value) : string =
     string_of_fg_et w ^ string_of_value_aux v
 
 let string_of_value (v : value) : string = string_of_value_aux v ^ "(degree=" ^ string_of_int (summary v).degree ^ ")"
+
+let front_exn (v : value) : fg_et * value =
+  let w, v = Generic.front_exn ~monoid ~measure v in
+  (v, w)
+
+let unwords (v : value) (w : Words.words) : value option =
+  let wl = Words.length w in
+  let vh, vt =
+    Generic.split ~monoid ~measure (fun m -> not (match m.full with Some f -> f.length <= wl | None -> false)) v
+  in
+  let m = summary vh in
+  let f = Option.get m.full in
+  if f.length < wl then None
+  else (
+    assert (f.length = wl);
+    if f.hash = (Words.summary w).hash then Some vt else None)

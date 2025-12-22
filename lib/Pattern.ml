@@ -108,3 +108,22 @@ let pattern_slice (p : pattern) (offset : int) : pattern * pattern =
         let left = pattern_snoc_unsafe x (PCon c_words) in
         let right = if not (Generic.is_empty c_children) then pattern_cons_unsafe (PCon c_children) yt else yt in
         return left right
+
+(*todo: rename all pop_n to drop_n*)
+let pattern_pop_n (p : pattern) (n : int) : pattern =
+  let _, x = pattern_slice p n in
+  x
+
+(*let rec pattern_valid x : bool =
+  match Generic.front x ~monoid ~measure:pat_measure with
+  | None -> true
+  | Some (rest, y) -> (
+      match Generic.front rest ~monoid ~measure:pat_measure with
+      | None -> true
+      | Some (_, z) ->
+          (match (y, z) with
+            | PCon _, PCon _ -> false
+            | PCon _, _ -> true
+            | PVar _, PVar _ -> false
+            | PVar _, _ -> true)
+          && pattern_valid rest)*)

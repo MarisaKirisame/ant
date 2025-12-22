@@ -39,15 +39,15 @@ let rec unify (x : pattern) (y : pattern) : pattern =
         if xl < yl then (
           let yhh, yht = Words.slice_length yh xl in
           assert (Words.equal xh yhh);
-          return (pattern_cons_unsafe (PCon xh) (unify xt (pattern_cons_unsafe (PCon yht) yt))))
+          return (pattern_cons (PCon xh) (unify xt (pattern_cons_unsafe (PCon yht) yt))))
         else if xl > yl then (
           let xhh, xht = Words.slice_length xh yl in
           assert (Words.equal xhh yh);
-          return (pattern_cons_unsafe (PCon xhh) (unify (pattern_cons_unsafe (PCon xht) xt) yt)))
+          return (pattern_cons (PCon xhh) (unify (pattern_cons_unsafe (PCon xht) xt) yt)))
         else (
           assert (xl = yl);
           assert (Words.equal xh yh);
-          return (pattern_cons_unsafe (PCon xh) (unify xt yt))))
+          return (pattern_cons (PCon xh) (unify xt yt))))
 
 let rec compose_pattern p s =
   if pattern_is_empty p then match s with [] -> Generic.empty | _ -> failwith "hole count mismatch"
@@ -85,19 +85,8 @@ let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
         assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
         assert ((Value.summary vh).degree = ph);
         return (Option.map (fun vs -> vh :: vs) (value_match_pattern_aux vt pt))
-    | PCon ph ->
-        let pl = Words.length ph in
-        let vh, vt =
-          Generic.split ~monoid:Value.monoid ~measure:Value.measure
-            (fun m -> not (match m.full with Some f -> f.length <= pl | None -> false))
-            v
-        in
-        let m = Value.summary vh in
-        let f = Option.get m.full in
-        if f.length < pl then return None
-        else (
-          assert (f.length = pl);
-          if f.hash = (Words.summary ph).hash then return (value_match_pattern_aux vt pt) else return None)
+    | PCon ph -> (
+        match Value.unwords v ph with None -> return None | Some v -> return (value_match_pattern_aux v pt))
 
 let value_match_pattern (v : value) (p : pattern) : value_subst_map option =
   let return x = x in
@@ -124,6 +113,7 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern
   assert ((Value.summary v).degree = (pattern_measure p).degree);
   assert ((Value.summary v).degree = (Value.summary v).max_degree);
   assert ((pattern_measure p).degree = (pattern_measure p).max_degree);
+  (*assert (Pattern.pattern_valid p);*)
   let return x = x in
   if pattern_is_empty p then (
     assert (Generic.is_empty v);
@@ -157,7 +147,11 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern
               let needed = (pattern_measure unify_with).max_degree - (r.offset + r.values_count) in
               assert (needed >= 0);
               let ph = if needed > 0 then pattern_snoc ph (make_pvar needed) else ph in
-              Array.set sm r.hole_idx (unify unify_with ph);
+              let hole_value = unify unify_with ph in
+              (*assert (Pattern.pattern_valid unify_with);
+              assert (Pattern.pattern_valid ph);
+              assert (Pattern.pattern_valid hole_value);*)
+              Array.set sm r.hole_idx hole_value;
               return (unify_vp_aux rest pt s)
           | Word _ -> failwith "impossible in unify_vp_aux: get word"
         else if f.length < pl then (
@@ -220,8 +214,11 @@ let compose_step (x : step) (y : step) : step =
   let src =
     map_ek
       (fun (p, s) ->
-        let s = Array.to_list s in
-        compose_pattern p s)
+        (*assert (Pattern.pattern_valid p);
+        Array.iter (fun sp -> assert (Pattern.pattern_valid sp)) s;*)
+        let ret = compose_pattern p (Array.to_list s) in
+        (*assert (Pattern.pattern_valid ret);*)
+        ret)
       (Option.get (zip_ek x.src s))
   in
   let dst = pattern_to_value src in

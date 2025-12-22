@@ -187,20 +187,250 @@ let assert_env_length (w : world) (e : int) : unit =
   if l <> e then print_endline ("env_length should be " ^ string_of_int e ^ " but is " ^ string_of_int l);
   assert (l = e)
 
-let init_memo () : memo = ref []
+let init_memo () : memo = Array.create ~len:(Dynarray.length pc_map) None
+
+let rec value_hash (r : Read.read) (v : Value.value) (hashacc : int) : int option =
+  if Generic.is_empty r then Some hashacc
+  else
+    let rh, rt = Read.read_front_exn r in
+    match rh with
+    | RSkip n ->
+        let _, v = Value.pop_n v n in
+        value_hash rt v hashacc
+    | RRead n ->
+        let rec loop n v hashacc =
+          if n = 0 then value_hash rt v hashacc
+          else
+            let Word w, _ = Value.front_exn v in
+            let _, v = Value.pop_n v 1 in
+            let hashacc = Read.hash hashacc (Word.hash w) in
+            loop (n - 1) v hashacc
+        in
+        loop n v hashacc
+    | RCon c -> ( match Value.unwords v c with None -> None | Some v -> value_hash rt v hashacc)
+
+let values_hash (r : reads) (v : State.state) : int option =
+  let acc = Some 0 in
+  let acc = Option.bind acc (fun acc -> value_hash r.k v.k acc) in
+  assert (Dynarray.length r.e = Dynarray.length v.e);
+  let rec loop i j acc =
+    if i < j then
+      let r_e = Dynarray.get r.e i in
+      let v_e = Dynarray.get v.e i in
+      let acc = Option.bind acc (fun acc -> value_hash r_e v_e acc) in
+      loop (i + 1) j acc
+    else acc
+  in
+  loop 0 (Dynarray.length r.e) acc
+
+let rec pattern_hash (r : Read.read) (p : Pattern.pattern) (hashacc : int) : int option =
+  if Generic.is_empty r then Some hashacc
+  else
+    let rh, rt = Read.read_front_exn r in
+    match rh with
+    | RSkip n ->
+        let _, p = Pattern.pattern_slice p n in
+        pattern_hash rt p hashacc
+    | RRead n ->
+        let rec loop n p hashacc =
+          if n = 0 then pattern_hash rt p hashacc
+          else
+            let pat, _ = Pattern.pattern_front_exn p in
+            match pat with
+            | PCon con ->
+                let w, _ = Words.words_front_exn con in
+                let _, p = Pattern.pattern_slice p 1 in
+                loop (n - 1) p (Read.hash hashacc (Word.hash w))
+            | PVar _ -> None
+        in
+        loop n p hashacc
+    | RCon c -> (
+        let ph, pt = Pattern.pattern_front_exn p in
+        match ph with
+        | PCon con -> (
+            match Words.unwords con c with
+            | None -> None
+            | Some prest ->
+                let p = if Generic.is_empty prest then pt else Pattern.pattern_cons (PCon prest) pt in
+                pattern_hash rt p hashacc)
+        | PVar _ -> None)
+
+let patterns_hash (r : reads) (p : Pattern.pattern cek) : int option =
+  let acc = Some 0 in
+  let acc = Option.bind acc (fun acc -> pattern_hash r.k p.k acc) in
+  assert (Dynarray.length r.e = Dynarray.length p.e);
+  let rec loop i j acc =
+    if i < j then
+      let r_e = Dynarray.get r.e i in
+      let p_e = Dynarray.get p.e i in
+      let acc = Option.bind acc (fun acc -> pattern_hash r_e p_e acc) in
+      loop (i + 1) j acc
+    else acc
+  in
+  loop 0 (Dynarray.length r.e) acc
+
+let rec read_hash (r : Read.read) (x : Read.read) (hashacc : int) : int option =
+  if Generic.is_empty r then Some hashacc
+  else
+    let rh, rt = Read.read_front_exn r in
+    match rh with
+    | RSkip n ->
+        let x = Read.read_pop_n x n in
+        read_hash rt x hashacc
+    | RRead n ->
+        let rec loop n x hashacc =
+          if n = 0 then read_hash rt x hashacc
+          else
+            let xr, x = Read.read_front_exn x in
+            match xr with
+            | RCon con ->
+                let w, _ = Words.words_front_exn con in
+                let x = Read.read_pop_n x 1 in
+                let hashacc = Read.hash hashacc (Word.hash w) in
+                loop (n - 1) x hashacc
+            | RRead _ | RSkip _ -> None
+        in
+        loop n x hashacc
+    | RCon c -> (
+        let xh, xt = Read.read_front_exn x in
+        match xh with
+        | RCon con -> (
+            match Words.unwords con c with
+            | None -> None
+            | Some xrest ->
+                let x = if Generic.is_empty xrest then xt else Read.read_cons (RCon xrest) xt in
+                read_hash rt x hashacc)
+        | RRead _ | RSkip _ -> None)
+
+let reads_hash (r : reads) (x : reads) : int option =
+  let acc = Some 0 in
+  let acc = Option.bind acc (fun acc -> read_hash r.k x.k acc) in
+  assert (Dynarray.length r.e = Dynarray.length x.e);
+  let rec loop i j acc =
+    if i < j then
+      let r_e = Dynarray.get r.e i in
+      let x_e = Dynarray.get x.e i in
+      let acc = Option.bind acc (fun acc -> read_hash r_e x_e acc) in
+      loop (i + 1) j acc
+    else acc
+  in
+  loop 0 (Dynarray.length r.e) acc
+
+let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step option =
+  match trie with
+  | Atom step ->
+      if Dependency.can_step_through step value then
+        match acc with None -> Some step | Some step' -> if step.sc > step'.sc then Some step else Some step'
+      else acc
+  | Subsume (parent, children) ->
+      if Dependency.can_step_through parent value then
+        let acc =
+          match acc with None -> Some parent | Some step' -> if parent.sc > step'.sc then Some parent else Some step'
+        in
+        lookup_step_aux value children acc
+      else acc
+  | Split { reads; children } -> (
+      match values_hash reads value with
+      | None -> acc
+      | Some key -> (
+          match Hashtbl.find children key with None -> acc | Some child_trie -> lookup_step_aux value child_trie acc))
 
 let lookup_step (value : state) (m : memo) : step option =
-  let rec aux acc = function
-    | [] -> acc
-    | step :: rest ->
-        let acc =
-          if Dependency.can_step_through step value then
-            match acc with None -> Some step | Some step' -> if step.sc > step'.sc then Some step else Some step'
-          else acc
-        in
-        aux acc rest
+  let pc = value.c.pc in
+  match Array.get m pc with None -> None | Some trie -> lookup_step_aux value trie None
+
+let string_of_red (r : Read.red) : string =
+  match r with
+  | RRead n -> "RRead(" ^ string_of_int n ^ ")"
+  | RSkip n -> "RSkip(" ^ string_of_int n ^ ")"
+  | RCon w -> "RCon(" ^ Dependency.string_of_words w ^ ")"
+
+let string_of_read (r : Read.read) : string =
+  "[" ^ String.concat ~sep:";" (List.map ~f:string_of_red (Generic.to_list r)) ^ "]"
+
+type join_reads = { reads : reads; x_weaken : bool; y_weaken : bool }
+
+let join_reads (x : reads) (y : reads) : join_reads =
+  (*print_endline "calling joining reads:";*)
+  let x_weaken = ref false in
+  let y_weaken = ref false in
+  let join (a, b) =
+    let ret = Read.join a b x_weaken y_weaken in
+    (*print_endline ("join reads:\n  " ^ string_of_read a ^ "\n  " ^ string_of_read b ^ "\n= " ^ string_of_read ret);*)
+    ret
   in
-  aux None !m
+  let reads = zip_ek x y |> Option.value_exn |> map_ek join in
+  { reads; x_weaken = !x_weaken; y_weaken = !y_weaken }
+
+let reads_from_patterns (p : Pattern.pattern cek) : reads = map_ek Read.read_from_pattern p
+let string_of_trie (t : trie) : string = match t with Atom _ -> "Atom" | Subsume _ -> "Subsume" | Split _ -> "Split"
+
+let reads_from_trie (t : trie) : reads =
+  match t with
+  | Atom s -> reads_from_patterns s.src
+  | Subsume (s, _) -> reads_from_patterns s.src
+  | Split { reads; _ } -> reads
+
+let rec merge (x : trie) (y : trie) : trie =
+  match (x, y) with
+  | Atom x, Atom y -> (
+      let j = join_reads (reads_from_patterns x.src) (reads_from_patterns y.src) in
+      match (j.x_weaken, j.y_weaken) with
+      | false, true -> Subsume (x, Atom y)
+      | true, false -> Subsume (y, Atom x)
+      | false, false -> if x.sc >= y.sc then Atom x else Atom y
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          let x_key = Option.value_exn (patterns_hash j.reads x.src) in
+          let y_key = Option.value_exn (patterns_hash j.reads y.src) in
+          assert (x_key <> y_key);
+          Hashtbl.set children x_key (Atom x);
+          Hashtbl.set children y_key (Atom y);
+          Split { reads = j.reads; children })
+  | Subsume (xp, xc), Atom y -> (
+      let j = join_reads (reads_from_patterns xp.src) (reads_from_patterns y.src) in
+      match (j.x_weaken, j.y_weaken) with
+      | false, false -> Subsume ((if xp.sc >= y.sc then xp else y), xc)
+      | false, true -> Subsume (xp, merge xc (Atom y))
+      | true, false -> Subsume (y, Subsume (xp, xc))
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          let x_key = Option.value_exn (patterns_hash j.reads xp.src) in
+          let y_key = Option.value_exn (patterns_hash j.reads y.src) in
+          assert (x_key <> y_key);
+          Hashtbl.set children x_key (Subsume (xp, xc));
+          Hashtbl.set children y_key (Atom y);
+          Split { reads = j.reads; children })
+  | Atom x, Subsume (yp, yc) -> merge (Subsume (yp, yc)) (Atom x)
+  | Split { reads = xr; children = xc }, Atom y -> (
+      let j = join_reads xr (reads_from_patterns y.src) in
+      match (j.x_weaken, j.y_weaken) with
+      | false, true ->
+          let y_key = Option.value_exn (patterns_hash xr y.src) in
+          Hashtbl.update xc y_key ~f:(merge_option (Atom y));
+          Split { reads = xr; children = xc }
+      | true, false -> Subsume (y, Split { reads = xr; children = xc })
+      | true, true ->
+          print_endline "here";
+          let children = Hashtbl.create (module Int) in
+          let y_key = Option.value_exn (patterns_hash j.reads y.src) in
+          (*Hashtbl.iter xc ~f:(fun x ->
+              let x_key = Option.value_exn (reads_hash j.reads (reads_from_trie x)) in
+              Hashtbl.update children x_key ~f:(merge_option x));*)
+          (*cannot reuse key*)
+          (*Hashtbl.iteri xc ~f:(fun ~key ~data -> Hashtbl.update children key ~f:(merge_option data));*)
+          Hashtbl.update children y_key ~f:(merge_option (Atom y));
+          Split { reads = j.reads; children }
+      | _ ->
+          failwith
+            ("merge not implemented for split/atom:" ^ string_of_bool j.x_weaken ^ "," ^ string_of_bool j.y_weaken))
+  | Atom x, Split { reads = yr; children = yc } -> merge (Split { reads = yr; children = yc }) (Atom x)
+  | _ -> failwith ("merge not implemented yet for: " ^ string_of_trie x ^ " and " ^ string_of_trie y)
+
+and merge_option (x : trie) (y : trie option) : trie = match y with None -> x | Some y -> merge x y
+
+let insert_step (m : memo) (step : step) : unit =
+  Array.set m step.src.c.pc (Some (merge_option (Atom step) (Array.get m step.src.c.pc)))
 
 type 'a bin = 'a digit list
 and 'a digit = Zero | One of 'a
@@ -250,7 +480,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
      reversed so the newest slice sits on the right-hand side during carry. *)
   let compose_slice (y : slice) (x : slice) =
     let step = Dependency.compose_step x.step y.step in
-    m := step :: !m;
+    insert_step m step;
     { state = x.state; step }
   in
   let rec exec state =
@@ -269,7 +499,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
           state.c.step w;
           let step = Dependency.make_step old w.resolved m in
           sc := !sc + step.sc;
-          m := step :: !m;
+          insert_step m step;
           hist := inc compose_slice { state = old; step } !hist;
           let st = dbg_step_through step old in
           exec st)
