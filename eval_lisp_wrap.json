@@ -1,3 +1,5 @@
-{"wrap_depth":1,"code":"(wrap '((lambda (0) (var 0)) 99))","value":"99","runtime_seconds":56.174983978271484,"step":3700,"without_memo_step":460425}
-{"wrap_depth":2,"code":"(wrap (wrap '((lambda (0) (var 0)) 99)))","value":"99","runtime_seconds":214.22862219810486,"step":5074,"without_memo_step":1281553}
-{"wrap_depth":3,"code":"(wrap (wrap (wrap '((lambda (0) (var 0)) 99))))","value":"99","runtime_seconds":599.4987218379974,"step":6240,"without_memo_step":2475389}
+{"wrap_depth":1,"code":"(wrap '((lambda (0) (var 0)) 99))","value":"99","runtime_seconds":3.23728609085083,"step":4035,"without_memo_step":460425}
+{"wrap_depth":2,"code":"(wrap (wrap '((lambda (0) (var 0)) 99)))","value":"99","runtime_seconds":11.174514055252075,"step":5420,"without_memo_step":1281553}
+{"wrap_depth":3,"code":"(wrap (wrap (wrap '((lambda (0) (var 0)) 99))))","value":"99","runtime_seconds":21.78860306739807,"step":6428,"without_memo_step":2475389}
+{"wrap_depth":4,"code":"(wrap (wrap (wrap (wrap '((lambda (0) (var 0)) 99)))))","value":"99","runtime_seconds":35.32194209098816,"step":7537,"without_memo_step":4041933}
+{"wrap_depth":5,"code":"(wrap (wrap (wrap (wrap (wrap '((lambda (0) (var 0)) 99))))))","value":"99","runtime_seconds":81.42424988746643,"step":8911,"without_memo_step":5981185}
