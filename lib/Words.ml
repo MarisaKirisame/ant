@@ -38,13 +38,8 @@ let set_constructor_degree (ctag : int) (degree : int) : unit =
 
 let measure (w : Word.t) : measure =
   let degree = match w with Int _ -> 1 | ConstructorTag value -> Dynarray.get constructor_degree_table value in
-  let w_repr_tag, w_repr_value = Word.raw_repr w in
-  {
-    length = 1;
-    degree;
-    max_degree = degree;
-    hash = Hasher.mul (Hasher.from_int w_repr_tag) (Hasher.from_int w_repr_value);
-  }
+  let whash = Word.hash w in
+  { length = 1; degree; max_degree = degree; hash = Hasher.from_int whash }
 
 type words = (Word.t, measure) Generic.fg
 
@@ -111,3 +106,16 @@ let lca_length (x : words) (y : words) : int =
       if equal x_prefix y_prefix then search mid hi else search lo (mid - 1)
   in
   return (search 0 max_common_len)
+
+let words_front_exn (s : words) : Word.t * words =
+  let w, v = Generic.front_exn ~monoid ~measure s in
+  (v, w)
+
+let unwords (v : words) (w : words) : words option =
+  let wl = length w in
+  let vh, vt = Generic.split ~monoid ~measure (fun m -> not (m.length <= wl)) v in
+  let m = summary vh in
+  if m.length < wl then None
+  else (
+    assert (m.length = wl);
+    if m.hash = (summary w).hash then Some vt else None)
