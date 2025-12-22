@@ -1,0 +1,3 @@
+{"wrap_depth":1,"code":"(wrap '((lambda (0) (var 0)) 99))","value":"99","runtime_seconds":56.174983978271484,"step":3700,"without_memo_step":460425}
+{"wrap_depth":2,"code":"(wrap (wrap '((lambda (0) (var 0)) 99)))","value":"99","runtime_seconds":214.22862219810486,"step":5074,"without_memo_step":1281553}
+{"wrap_depth":3,"code":"(wrap (wrap (wrap '((lambda (0) (var 0)) 99))))","value":"99","runtime_seconds":599.4987218379974,"step":6240,"without_memo_step":2475389}
