@@ -411,7 +411,6 @@ let rec merge (x : trie) (y : trie) : trie =
           Split { reads = xr; children = xc }
       | true, false -> Subsume (y, Split { reads = xr; children = xc })
       | true, true ->
-          print_endline "here";
           let children = Hashtbl.create (module Int) in
           let y_key = Option.value_exn (patterns_hash j.reads y.src) in
           (*Hashtbl.iter xc ~f:(fun x ->
