@@ -1,5 +1,8 @@
-{"wrap_depth":1,"code":"(wrap '((lambda (0) (var 0)) 99))","value":"99","runtime_seconds":3.23728609085083,"step":4035,"without_memo_step":460425}
-{"wrap_depth":2,"code":"(wrap (wrap '((lambda (0) (var 0)) 99)))","value":"99","runtime_seconds":11.174514055252075,"step":5420,"without_memo_step":1281553}
-{"wrap_depth":3,"code":"(wrap (wrap (wrap '((lambda (0) (var 0)) 99))))","value":"99","runtime_seconds":21.78860306739807,"step":6428,"without_memo_step":2475389}
-{"wrap_depth":4,"code":"(wrap (wrap (wrap (wrap '((lambda (0) (var 0)) 99)))))","value":"99","runtime_seconds":35.32194209098816,"step":7537,"without_memo_step":4041933}
-{"wrap_depth":5,"code":"(wrap (wrap (wrap (wrap (wrap '((lambda (0) (var 0)) 99))))))","value":"99","runtime_seconds":81.42424988746643,"step":8911,"without_memo_step":5981185}
+{"wrap_depth":1,"code":"(wrap '((lambda (0) (var 0)) 99))","value":"99","runtime_seconds":3.5625529289245605,"step":3700,"without_memo_step":460425}
+{"wrap_depth":2,"code":"(wrap (wrap '((lambda (0) (var 0)) 99)))","value":"99","runtime_seconds":12.878659963607788,"step":5074,"without_memo_step":1281553}
+{"wrap_depth":3,"code":"(wrap (wrap (wrap '((lambda (0) (var 0)) 99))))","value":"99","runtime_seconds":25.86371088027954,"step":6240,"without_memo_step":2475389}
+{"wrap_depth":4,"code":"(wrap (wrap (wrap (wrap '((lambda (0) (var 0)) 99)))))","value":"99","runtime_seconds":48.01454401016235,"step":7274,"without_memo_step":4041933}
+{"wrap_depth":5,"code":"(wrap (wrap (wrap (wrap (wrap '((lambda (0) (var 0)) 99))))))","value":"99","runtime_seconds":64.66732382774353,"step":8411,"without_memo_step":5981185}
+{"wrap_depth":6,"code":"(wrap (wrap (wrap (wrap (wrap (wrap '((lambda (0) (var 0)) 99)))))))","value":"99","runtime_seconds":251.25350403785706,"step":9267,"without_memo_step":8293145}
+{"wrap_depth":7,"code":"(wrap (wrap (wrap (wrap (wrap (wrap (wrap '((lambda (0) (var 0)) 99))))))))","value":"99","runtime_seconds":941.3324019908905,"step":10269,"without_memo_step":10977813}
+{"wrap_depth":8,"code":"(wrap (wrap (wrap (wrap (wrap (wrap (wrap (wrap '((lambda (0) (var 0)) 99)))))))))","value":"99","runtime_seconds":1509.814833164215,"step":11371,"without_memo_step":14035189}
