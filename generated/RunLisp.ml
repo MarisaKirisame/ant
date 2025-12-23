@@ -182,7 +182,7 @@ let json_of_wrap_result depth code details =
 
 let run_wrap_code_tests () =
   let template = read_file_content "./generated/Lisp.lisp" in
-  let wrap_depths = [ 1; 2; 3; 4; 5 ] in
+  let wrap_depths = [ 1; 2; 3; 4; 5; 6; 7; 8 ] in
   let results =
     List.map
       (fun depth ->
