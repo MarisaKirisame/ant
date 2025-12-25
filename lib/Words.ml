@@ -14,19 +14,19 @@ type measure = {
   Sadly that is non-monotonic, so searching is not log time.
   But max_degree < 1 is, and the following character constitute the shortest string with degree = 1*)
   max_degree : int;
-  hash : Hasher.t;
+  hash : Hasher.t Lazy.t;
 }
 
 let monoid : measure monoid =
   {
-    zero = { length = 0; degree = 0; max_degree = 0; hash = Hasher.unit };
+    zero = { length = 0; degree = 0; max_degree = 0; hash = lazy Hasher.unit };
     combine =
       (fun x y ->
         {
           length = x.length + y.length;
           degree = x.degree + y.degree;
           max_degree = max x.max_degree (x.degree + y.max_degree);
-          hash = Hasher.mul x.hash y.hash;
+          hash = lazy (Hasher.mul (Lazy.force x.hash) (Lazy.force y.hash));
         });
   }
 
@@ -38,8 +38,7 @@ let set_constructor_degree (ctag : int) (degree : int) : unit =
 
 let measure (w : Word.t) : measure =
   let degree = match w with Int _ -> 1 | ConstructorTag value -> Dynarray.get constructor_degree_table value in
-  let whash = Word.hash w in
-  { length = 1; degree; max_degree = degree; hash = Hasher.from_int whash }
+  { length = 1; degree; max_degree = degree; hash = lazy (Hasher.from_int (Word.hash w)) }
 
 type words = (Word.t, measure) Generic.fg
 
@@ -54,6 +53,7 @@ let summary (s : words) : measure = Generic.measure ~monoid ~measure s
 let length (s : words) : int = (summary s).length
 let degree (s : words) : int = (summary s).degree
 let max_degree (s : words) : int = (summary s).max_degree
+let hash (s : words) : Hasher.t = Lazy.force (summary s).hash
 let is_empty (s : words) = Generic.is_empty s
 let empty : words = Generic.empty
 let append (x : words) (y : words) : words = Generic.append ~monoid ~measure x y
@@ -70,7 +70,7 @@ let pop_n (s : words) (n : int) : words * words =
   (l, r)
 
 let slice_degree (s : words) (n : int) : words * words = pop_n s n
-let equal_words (x : words) (y : words) : bool = (summary x).hash = (summary y).hash
+let equal_words (x : words) (y : words) : bool = hash x = hash y
 let pop (s : words) = pop_n s 1
 
 let slice_length (s : words) (l : int) : words * words =
@@ -118,6 +118,6 @@ let unwords (v : words) (w : words) : words option =
   if m.length < wl then None
   else (
     assert (m.length = wl);
-    if m.hash = (summary w).hash then Some vt else None)
+    if Lazy.force m.hash = hash w then Some vt else None)
 
 let string_of_words (w : words) : string = Generic.to_list w |> List.map Word.to_string |> String.concat ""

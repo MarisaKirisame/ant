@@ -132,10 +132,10 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern
             let m = Words.summary w in
             if m.length < pl then (
               let phh, pht = Words.slice_length ph m.length in
-              if not (m.hash = (Words.summary phh).hash) then (
+              if not (Lazy.force m.hash = Words.hash phh) then (
                 print_endline "should not happens:";
                 print_endline ("phh: " ^ string_of_words phh));
-              assert (m.hash = (Words.summary phh).hash);
+              assert (Lazy.force m.hash = Words.hash phh);
               return (unify_vp_aux rest (pattern_cons_unsafe (PCon pht) pt) s))
             else (
               assert (m.length >= pl);
