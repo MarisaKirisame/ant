@@ -81,18 +81,6 @@ def opam_exec(
     run(["opam", "exec", "--switch", SWITCH, "--", *args], env=env, **kwargs)
 
 
-def opam_exec_output(
-    args: Iterable[str], *, env: Optional[Mapping[str, str]] = None, **kwargs
-) -> str:
-    """Run a command inside the configured opam switch and return stdout."""
-
-    result = run(
-        ["opam", "exec", "--switch", SWITCH, "--", *args],
-        env=env,
-        **kwargs,
-    )
-    return (result.stdout or "").strip()
-
 def install_dependencies() -> None:
     ensure_switch()
     run(["opam", "update"])
@@ -222,7 +210,7 @@ def profile_project() -> None:
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
     opam_exec(["dune", "build", "generated/GeneratedMain.exe"], env=env)
-    binary = opam_exec_output(["dune", "exec", "--which", "GeneratedMain"], env=env)
+    binary = os.path.join("_build", "default", "generated", "GeneratedMain.exe")
     for mode in ("live-simple", "live-left-to-right", "live-demand-driven", "hazel"):
         opam_exec(
             ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
