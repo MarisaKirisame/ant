@@ -6,48 +6,64 @@ include Reference
 (* Values extend the word finger tree with References so we can represent
  * partially materialised environments/continuations.
  *)
-type fg_et = Word of Word.t | Reference of reference [@@deriving eq]
+type fg_et = Words of Words.words | Reference of reference [@@deriving eq]
 
 type value = (fg_et, measure_t) Generic.fg
 and seq = value
-and measure_t = { degree : int; max_degree : int; full : full_measure_t option }
+and measure_t = { degree : int; max_degree : int }
 and full_measure_t = { length : int; hash : Hasher.t }
 
 let monoid : measure_t monoid =
   {
-    zero = { degree = 0; max_degree = 0; full = Some { length = 0; hash = Hasher.unit } };
-    combine =
-      (fun x y ->
-        {
-          degree = x.degree + y.degree;
-          max_degree = max x.max_degree (x.degree + y.max_degree);
-          full =
-            (match (x.full, y.full) with
-            | Some fx, Some fy -> Some { length = fx.length + fy.length; hash = Hasher.mul fx.hash fy.hash }
-            | _ -> None);
-        });
+    zero = { degree = 0; max_degree = 0 };
+    combine = (fun x y -> { degree = x.degree + y.degree; max_degree = max x.max_degree (x.degree + y.max_degree) });
   }
 
 let measure (et : fg_et) : measure_t =
   match et with
-  | Word w ->
-      let degree =
-        match w with Int _ -> 1 | ConstructorTag value -> Dynarray.get Words.constructor_degree_table value
-      in
-      let whash = Word.hash w in
-      {
-        degree;
-        (*todo: this should be max(0, degree). fix and rerun.*)
-        max_degree = degree;
-        full = Some { length = 1; hash = Hasher.from_int whash };
-      }
-  | Reference r -> { degree = r.values_count; max_degree = r.values_count; full = None }
+  | Words w ->
+      let m = Words.summary w in
+      { degree = m.degree; max_degree = m.max_degree }
+  | Reference r -> { degree = r.values_count; max_degree = r.values_count }
+
+(*let rec value_valid x : bool =
+  match Generic.front x ~monoid ~measure with
+  | None -> true
+  | Some (rest, x) -> (
+      match Generic.front rest ~monoid ~measure with
+      | None -> true
+      | Some (_, y) ->
+          (match (x, y) with
+            | Reference _, Reference _ -> true
+            | Reference _, Words _ -> true
+            | Words _, Words _ -> false
+            | Words _, Reference _ -> true)
+          && value_valid rest)*)
 
 let summary x = Generic.measure ~monoid ~measure x
-let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
+
+let append (x : seq) (y : seq) : seq =
+  if Generic.is_empty x then y
+  else if Generic.is_empty y then x
+  else
+    let xh, xt = Generic.rear_exn ~monoid ~measure x in
+    let yt, yh = Generic.front_exn ~monoid ~measure y in
+    match (xt, yh) with
+    | Words xt, Words yh ->
+        Generic.append ~monoid ~measure xh (Generic.cons ~monoid ~measure yt (Words (Words.append xt yh)))
+    | _ -> Generic.append ~monoid ~measure x y
+
+let value_cons (et : fg_et) (v : seq) : seq =
+  if Generic.is_empty v then Generic.singleton et
+  else
+    let vt, vh = Generic.front_exn ~monoid ~measure v in
+    match (et, vh) with
+    | Words et, Words vh -> Generic.cons ~monoid ~measure vt (Words (Words.append et vh))
+    | _ -> Generic.cons ~monoid ~measure v et
 
 (* pop_n semantics are documented in docs/internal.md#value-slicing-semantics-valueml. *)
 let rec pop_n (s : seq) (n : int) : seq * seq =
+  (*assert (value_valid s);*)
   assert (n >= 0);
   if n = 0 then (Generic.empty, s)
   else
@@ -57,14 +73,16 @@ let rec pop_n (s : seq) (n : int) : seq * seq =
        this guarantees the head of [y] holds the boundary element we need to
        include in the left slice. *)
     let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
-    let w, v = Generic.front_exn ~monoid ~measure y in
     let m = summary x in
     assert (m.degree < n);
+    let w, v = Generic.front_exn ~monoid ~measure y in
     match v with
-    | Word v ->
-        assert (m.degree + 1 = n);
-        let l = Generic.snoc ~monoid ~measure x (Word v) in
-        (l, w)
+    | Words v ->
+        assert (m.degree + (Words.summary v).max_degree >= n);
+        let vh, vt = Words.slice_degree v (n - m.degree) in
+        let l = Generic.snoc ~monoid ~measure x (Words vh) in
+        let r = if Words.is_empty vt then w else value_cons (Words vt) w in
+        (l, r)
     | Reference v ->
         assert (m.degree < n);
         assert (m.degree + v.values_count >= n);
@@ -100,7 +118,7 @@ let string_of_reference (r : reference) : string =
   str
 
 let string_of_fg_et (et : fg_et) : string =
-  match et with Word w -> Word.to_string w | Reference r -> string_of_reference r
+  match et with Words w -> Words.string_of_words w | Reference r -> string_of_reference r
 
 let rec string_of_value_aux (v : value) : string =
   if Generic.is_empty v then ""
@@ -115,13 +133,15 @@ let front_exn (v : value) : fg_et * value =
   (v, w)
 
 let unwords (v : value) (w : Words.words) : value option =
-  let wl = Words.length w in
-  let vh, vt =
-    Generic.split ~monoid ~measure (fun m -> not (match m.full with Some f -> f.length <= wl | None -> false)) v
-  in
-  let m = summary vh in
-  let f = Option.get m.full in
-  if f.length < wl then None
-  else (
-    assert (f.length = wl);
-    if f.hash = (Words.summary w).hash then Some vt else None)
+  (*assert (value_valid v);*)
+  let vt, vh = Generic.front_exn ~monoid ~measure v in
+  match vh with
+  | Words x -> (
+      let xrest = Words.unwords x w in
+      match xrest with
+      | Some xrest ->
+          let ret = if Generic.is_empty xrest then vt else Generic.cons ~monoid ~measure vt (Words xrest) in
+          (*assert (value_valid ret);*)
+          Some ret
+      | None -> None)
+  | Reference _ -> None

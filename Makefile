@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := all
 
-.PHONY: dependency build run compile-generated nightly all report
+.PHONY: dependency build run profile compile-generated nightly all report
 
 dependency:
 	chmod +x ./nightly.py
@@ -17,6 +17,10 @@ compile-generated:
 run:
 	chmod +x ./nightly.py
 	./nightly.py run
+
+profile:
+	chmod +x ./nightly.py
+	./nightly.py profile
 
 # Run the full pipeline and produce the HTML speedup report into output/.
 report: run

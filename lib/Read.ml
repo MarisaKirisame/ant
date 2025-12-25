@@ -177,7 +177,7 @@ let rec join (x : read) (y : read) (lhs_weaken : bool ref) (rhs_weaken : bool re
         else
           let xhh, xht = Words.slice_length xh lca_length in
           let yhh, yht = Words.slice_length yh lca_length in
-          assert (Words.equal xhh yhh);
+          assert (Words.equal_words xhh yhh);
           let x = if Generic.is_empty xht then xt else read_cons (RCon xht) xt in
           let y = if Generic.is_empty yht then yt else read_cons (RCon yht) yt in
           return (read_cons (RCon xhh) (recurse x y))

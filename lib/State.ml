@@ -92,5 +92,7 @@ let string_of_cek_generic (string_of_a : 'a -> string) (s : 'a cek) : string =
 
 let is_done (s : state) : bool =
   match Generic.front_exn s.k ~monoid:Value.monoid ~measure:Value.measure with
-  | _, Word w -> ( match w with ConstructorTag ct when ct = 0 -> s.c.pc = 0 | _ -> false)
+  | _, Words w -> (
+      let wt, wh = Generic.front_exn ~monoid:Words.monoid ~measure:Words.measure w in
+      match wh with ConstructorTag ct when ct = 0 -> s.c.pc = 0 | _ -> false)
   | _ -> failwith "unreachable"

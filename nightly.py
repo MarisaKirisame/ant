@@ -81,6 +81,18 @@ def opam_exec(
     run(["opam", "exec", "--switch", SWITCH, "--", *args], env=env, **kwargs)
 
 
+def opam_exec_output(
+    args: Iterable[str], *, env: Optional[Mapping[str, str]] = None, **kwargs
+) -> str:
+    """Run a command inside the configured opam switch and return stdout."""
+
+    result = run(
+        ["opam", "exec", "--switch", SWITCH, "--", *args],
+        env=env,
+        **kwargs,
+    )
+    return (result.stdout or "").strip()
+
 def install_dependencies() -> None:
     ensure_switch()
     run(["opam", "update"])
@@ -90,7 +102,8 @@ def install_dependencies() -> None:
 
 def build_project() -> None:
     ensure_switch()
-    opam_exec(["dune", "build"])
+    env = _opam_env_with_ocamlrunparam()
+    opam_exec(["dune", "build"], env=env)
 
 
 def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
@@ -204,6 +217,19 @@ def run_project() -> None:
         opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
 
 
+def profile_project() -> None:
+    ensure_switch()
+    env = _opam_env_with_ocamlrunparam()
+    generate_ml_files(env=env)
+    opam_exec(["dune", "build", "generated/GeneratedMain.exe"], env=env)
+    binary = opam_exec_output(["dune", "exec", "--which", "GeneratedMain"], env=env)
+    for mode in ("live-simple", "live-left-to-right", "live-demand-driven", "hazel"):
+        opam_exec(
+            ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
+            env=env,
+        )
+
+
 def compile_generated() -> None:
     ensure_switch()
     env = _opam_env_with_ocamlrunparam()
@@ -213,6 +239,7 @@ def compile_generated() -> None:
 def _opam_env_with_ocamlrunparam() -> MutableMapping[str, str]:
     env: MutableMapping[str, str] = os.environ.copy()
     env["OCAMLRUNPARAM"] = "b"
+    env["DUNE_PROFILE"] = "release"
     return env
 
 
@@ -221,7 +248,7 @@ def main(argv: Iterable[str]) -> int:
     if len(args) > 1:
         print("Only a single stage argument is supported.", file=sys.stderr)
         print(
-            "Usage: nightly.py [dependency|build|run|compile-generated|all]",
+            "Usage: nightly.py [dependency|build|run|profile|compile-generated|all]",
             file=sys.stderr,
         )
         return 1
@@ -234,6 +261,8 @@ def main(argv: Iterable[str]) -> int:
         build_project()
     elif stage == "run":
         run_project()
+    elif stage == "profile":
+        profile_project()
     elif stage == "compile-generated":
         compile_generated()
     elif stage == "all":
@@ -243,7 +272,7 @@ def main(argv: Iterable[str]) -> int:
     else:
         print(f"Unknown stage: {stage}", file=sys.stderr)
         print(
-            "Usage: nightly.py [dependency|build|run|compile-generated|all]",
+            "Usage: nightly.py [dependency|build|run|profile|compile-generated|all]",
             file=sys.stderr,
         )
         return 1
