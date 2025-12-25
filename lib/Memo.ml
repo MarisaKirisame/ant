@@ -37,13 +37,12 @@ let set_value (state : 'a cek) (src : source) (v : 'a) : unit =
   | K -> state.k <- v
 
 let rec subst (resolve : source -> seq option) (x : seq) : seq =
-  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
-  assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
-  match Generic.front rhs ~monoid ~measure with
-  | None -> lhs
-  | Some (rest, Reference r) ->
-      Generic.append ~monoid ~measure lhs
-        (Generic.append ~monoid ~measure (subst_reference resolve r) (subst resolve rest))
+  if Generic.is_empty x then x
+  else
+    let xt, xh = Generic.front_exn ~monoid ~measure x in
+    match xh with
+    | Words xh -> Value.value_cons (Words xh) (subst resolve xt)
+    | Reference r -> Value.append (subst_reference resolve r) (subst resolve xt)
 
 and subst_reference (resolve : source -> seq option) (r : reference) : seq =
   match resolve r.src with Some seq -> slice seq r.offset r.values_count | None -> Generic.singleton (Reference r)
@@ -67,9 +66,10 @@ let dyn_array_rev_update (f : 'a -> 'a) (arr : 'a Dynarray.t) : unit =
   done
 
 let rec val_refs_aux (x : value) (rs : reference list) : reference list =
-  let lhs, rhs = Generic.split ~monoid ~measure (fun m -> Option.is_none m.full) x in
-  assert (Option.is_some (Generic.measure ~monoid ~measure lhs).full);
-  match Generic.front rhs ~monoid ~measure with None -> rs | Some (rest, Reference r) -> val_refs_aux rest (r :: rs)
+  match Generic.front ~monoid ~measure x with
+  | None -> rs
+  | Some (rest, Words w) -> val_refs_aux rest rs
+  | Some (rest, Reference r) -> val_refs_aux rest (r :: rs)
 
 let state_refs (state : state) : reference list =
   let e = Dynarray.fold_left (fun rs x -> val_refs_aux x rs) [] state.e in
@@ -80,7 +80,12 @@ let rec resolve (w : world) (src : source) : Word.t * seq =
   set_value w.resolved src true;
   let v = get_value w.state src in
   let vt, vh = Generic.front_exn ~monoid ~measure v in
-  match vh with Word vh -> (vh, vt) | _ -> failwith "cannot resolve reference"
+  match vh with
+  | Words vh ->
+      let vht, vhh = Generic.front_exn ~monoid:Words.monoid ~measure:Words.measure vh in
+      let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
+      (vhh, vt)
+  | _ -> failwith "cannot resolve reference"
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
 
@@ -90,16 +95,21 @@ let add_exp (f : world -> unit) (pc_ : int) : unit =
   Dynarray.add_last pc_map { step = f; pc }
 
 let pc_to_exp (Pc pc) : exp = Dynarray.get pc_map pc
-let from_constructor (ctag : int) : seq = Generic.singleton (Word (Word.ConstructorTag ctag))
-let from_int (i : int) : seq = Generic.singleton (Word (Word.Int i))
+let from_constructor (ctag : int) : seq = Generic.singleton (Words (Generic.singleton (Word.ConstructorTag ctag)))
+let from_int (i : int) : seq = Generic.singleton (Words (Generic.singleton (Word.Int i)))
 
 let to_word (s : seq) : Word.t =
   assert ((Generic.measure ~monoid ~measure s).degree = 1);
   assert ((Generic.measure ~monoid ~measure s).max_degree = 1);
   assert (Generic.size s = 1);
-  match Generic.head_exn s with Word w -> w | Reference _ -> failwith "conveting reference to_int"
+  match Generic.head_exn s with
+  | Words w ->
+      let wh, wt = Words.words_front_exn w in
+      assert (Generic.is_empty wt);
+      wh
+  | Reference _ -> failwith "conveting reference to_int"
 
-let append (x : seq) (y : seq) : seq = Generic.append ~monoid ~measure x y
+let append (x : seq) (y : seq) : seq = Value.append x y
 let appends (x : seq list) : seq = List.fold_right x ~init:empty ~f:append
 let pop (s : seq) = pop_n s 1
 
@@ -132,7 +142,12 @@ let rec splits_4 x =
   (h, h2, h3, h4)
 
 let list_match (x : seq) : (Word.t * seq) option =
-  Option.map (Generic.front ~monoid ~measure x) ~f:(fun (x, Word y) -> (y, x))
+  match Generic.front ~monoid ~measure x with
+  | None -> None
+  | Some (rest, Words w) ->
+      let wh, wt = Words.words_front_exn w in
+      Some (wh, if Words.is_empty wt then rest else Generic.cons ~monoid ~measure rest (Words wt))
+  | Some (rest, Reference r) -> failwith "list_match on Reference"
 
 let push_env (w : world) (v : value) : unit =
   assert ((Generic.measure ~monoid ~measure v).degree = 1);
@@ -201,9 +216,10 @@ let rec value_hash (r : Read.read) (v : Value.value) (hashacc : int) : int optio
         let rec loop n v hashacc =
           if n = 0 then value_hash rt v hashacc
           else
-            let Word w, _ = Value.front_exn v in
+            let Words w, _ = Value.front_exn v in
+            let wh, wt = Words.words_front_exn w in
             let _, v = Value.pop_n v 1 in
-            let hashacc = Read.hash hashacc (Word.hash w) in
+            let hashacc = Read.hash hashacc (Word.hash wh) in
             loop (n - 1) v hashacc
         in
         loop n v hashacc
@@ -273,7 +289,7 @@ let string_of_red (r : Read.red) : string =
   match r with
   | RRead n -> "RRead(" ^ string_of_int n ^ ")"
   | RSkip n -> "RSkip(" ^ string_of_int n ^ ")"
-  | RCon w -> "RCon(" ^ Dependency.string_of_words w ^ ")"
+  | RCon w -> "RCon(" ^ Words.string_of_words w ^ ")"
 
 let string_of_read (r : Read.read) : string =
   "[" ^ String.concat ~sep:";" (List.map ~f:string_of_red (Generic.to_list r)) ^ "]"
@@ -571,6 +587,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   let rec exec state =
     if is_done state then state
     else (
+      (*let _ = map_ek (fun v -> assert (value_valid v)) state in*)
       log ("step " ^ string_of_int !i ^ ": " ^ string_of_int !sc);
       i := !i + 1;
       match lookup_step state m with
