@@ -264,7 +264,6 @@ let make_step (value : state) (resolved : bool cek) m : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) w.state in*)
   w.state.c.step w;
   let dst = w.state in
-  print_endline ("made step: " ^ string_of_step { src; dst; sc = 1 });
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
   { src; dst; sc = 1 }
 
