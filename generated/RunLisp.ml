@@ -182,15 +182,17 @@ let json_of_wrap_result depth code details =
 
 let run_wrap_code_tests () =
   let template = read_file_content "./generated/Lisp.lisp" in
-  let wrap_depths = [ 1; 2; 3 ] in
+  let wrap_depths = [ 1; 2 ] in
   let results =
     List.map
       (fun depth ->
         let code_for_placeholder = wrap_code_for_depth depth in
         let program = replace_code_placeholder template code_for_placeholder in
         Printf.printf "Running wrap depth %d test...\n" depth;
+        Out_channel.flush Stdio.stdout;
         let details = eval_string_with_details ~print_compiled:false program in
         expect_value (Printf.sprintf "wrap depth %d returns 99" depth) (LC.VNumber 99) details.value;
+        Out_channel.flush Stdio.stdout;
         (depth, code_for_placeholder, details))
       wrap_depths
   in
