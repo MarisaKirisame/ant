@@ -275,11 +275,12 @@ let register_constructors (e : ctx) ctors =
 let apply_cont : pc = add_code None
 
 type env = int StrMap.t
+type value_loc = StackIndex of int
 
 let new_env () : env = StrMap.empty
 
 type scope = {
-  meta_env : int option StrMap.t;
+  meta_env : value_loc option StrMap.t;
   (* Note: env_length is not the amount of entries in meta_env above! 
    * It is the length of the environment when executing the cek machine.
    *)
@@ -293,7 +294,7 @@ let check_scope s =
     (fun key data ->
       match data with
       | None -> ()
-      | Some i ->
+      | Some (StackIndex i) ->
           if not (i < s.env_length) then
             failwith
               ("check_scope: variable " ^ key ^ " mapped to invalid index " ^ string_of_int i ^ " with env_length "
@@ -311,7 +312,7 @@ let extend_s s name =
   let meta_env = s.meta_env in
 
   (* Hashtbl.add_exn meta_env ~key:name ~data:(Some s.env_length); *)
-  let meta_env = StrMap.add_exn name (Some s.env_length) meta_env in
+  let meta_env = StrMap.add_exn name (Some (StackIndex s.env_length)) meta_env in
 
   let ret = { s with meta_env; env_length = s.env_length + 1 } in
   check_scope ret;
@@ -334,6 +335,12 @@ let pop_n s n =
 let pop_s s = pop_n s 1
 
 type kont = scope -> world code -> unit code
+type kont_with_loc = value_loc * scope -> world code -> unit code
+type kont_with_locs = value_loc list * scope -> world code -> unit code
+
+let with_loc (loc : value_loc) (k : kont_with_loc) : kont = fun s w -> k (loc, s) w
+
+let with_locs (locs : value_loc list) (k : kont_with_locs) : kont = fun s w -> k (locs, s) w
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
   let new_s, n =
@@ -357,12 +364,15 @@ let keep_only (s : scope) (fv : unit StrMap.t) : int Dynarray.t * scope =
   check_scope s;
   let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
   StrMap.iter
-    (fun key data -> match data with None -> () | Some i -> Dynarray.set keep i { keep = false; source = Some key })
+    (fun key data ->
+      match data with None -> () | Some (StackIndex i) -> Dynarray.set keep i { keep = false; source = Some key })
     s.meta_env;
   StrMap.iter
     (fun v _ ->
       let i =
-        match StrMap.find_opt v s.meta_env with Some (Some i) -> i | _ -> failwith ("keep_only not found:" ^ v)
+        match StrMap.find_opt v s.meta_env with
+        | Some (Some (StackIndex i)) -> i
+        | _ -> failwith ("keep_only not found:" ^ v)
       in
       (Dynarray.get keep i).keep <- true)
     fv;
@@ -374,7 +384,7 @@ let keep_only (s : scope) (fv : unit StrMap.t) : int Dynarray.t * scope =
           let ret =
             match k.source with
             | None -> (i + 1, acc)
-            | Some v -> (i + 1, StrMap.add_exn v (Some (Dynarray.length keep_idx)) acc)
+            | Some v -> (i + 1, StrMap.add_exn v (Some (StackIndex (Dynarray.length keep_idx))) acc)
           in
           Dynarray.add_last keep_idx i;
           ret)
