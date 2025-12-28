@@ -24,6 +24,7 @@
   Hash
   Intmap
   Common
+  Profile
   batFingerTree
   Ir
   SynInfo

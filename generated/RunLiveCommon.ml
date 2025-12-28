@@ -336,37 +336,58 @@ let with_steps_writer steps_path f =
     ~finally:(fun () -> close_out_noerr oc)
     (fun () ->
       let write_steps_json (r : Memo.exec_result) : unit =
-        Printf.fprintf oc
-          "{\"step\":%d,\"without_memo_step\":%d,\"wall_time_ns\":%d,\"without_memo_wall_time_ns\":%d}\n" r.step
-          r.without_memo_step r.wall_time r.without_memo_wall_time;
+        let escape_json s =
+          let buf = Buffer.create (String.length s) in
+          String.iter
+            (function
+              | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
+            s;
+          Buffer.contents buf
+        in
+        let json_of_profile entries =
+          let buf = Buffer.create 64 in
+          Buffer.add_char buf '[';
+          let rec loop first = function
+            | [] -> ()
+            | (name, time) :: rest ->
+                if not first then Buffer.add_char buf ',';
+                Buffer.add_char buf '[';
+                Buffer.add_char buf '"';
+                Buffer.add_string buf (escape_json name);
+                Buffer.add_char buf '"';
+                Buffer.add_char buf ',';
+                Buffer.add_string buf (string_of_int time);
+                Buffer.add_char buf ']';
+                loop false rest
+          in
+          loop true entries;
+          Buffer.add_char buf ']';
+          Buffer.contents buf
+        in
+        let memo_profile = Profile.dump_profile Profile.memo_profile |> json_of_profile in
+        let plain_profile = Profile.dump_profile Profile.plain_profile |> json_of_profile in
+        Printf.fprintf oc "{\"step\":%d,\"without_memo_step\":%d,\"memo_profile\":%s,\"plain_profile\":%s}\n" r.step
+          r.without_memo_step memo_profile plain_profile;
         flush oc
       in
       f write_steps_json)
 
 (* Evaluate using the direct (non-CEK) interpreter defined in LivePlain.  We expose
    the same LC.value interface by converting the input expression and environment
-   to LivePlain, running it, then converting the resulting value back.  We also
-   measure wall-clock time with the same monotonic counter used by LC.eval and
-   return it (ns) for without-memo comparisons. *)
-let eval_plain (expr : LC.expr) : LC.value * int =
+   to LivePlain, running it, then converting the resulting value back.  Timing is
+   recorded via the shared profiler and consumed by write_steps_json. *)
+let eval_plain_slot = Profile.register_slot Profile.plain_profile "eval_plain"
+
+let eval_plain (expr : LC.expr) : LC.value =
   let env = LC.Nil in
   let lp_expr = lp_expr_of_lc expr in
   let lp_env = lp_list_of_lc lp_value_of_lc env in
-  let open Core in
-  let start_time = Time_stamp_counter.now () in
-  let calibrator = Lazy.force Time_stamp_counter.calibrator in
-  let lp_result = LP.eval lp_expr lp_env in
-  let without_memo_wall_time =
-    Time_stamp_counter.diff (Time_stamp_counter.now ()) start_time
-    |> Time_stamp_counter.Span.to_time_ns_span ~calibrator
-    |> Time_ns.Span.to_int63_ns |> Int63.to_int_exn
-  in
-  (lc_value_of_lp lp_result, without_memo_wall_time)
+  let lp_result = Profile.with_slot Profile.plain_profile eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
+  lc_value_of_lp lp_result
 
 let eval_expression ~memo ~write_steps x =
   let exec_res = LC.eval memo (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
-  let _, plain_wall = eval_plain x in
-  let exec_res = { exec_res with without_memo_wall_time = plain_wall } in
+  let _ = eval_plain x in
   write_steps exec_res;
   LC.to_ocaml_value exec_res.words
 
