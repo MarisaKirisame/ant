@@ -88,6 +88,9 @@ let assert_env_length_ (w : world code) (e : int code) : unit code = app2_ (from
 let return_n_ (w : world code) (n : int code) (exp : exp code) : unit code =
   app3_ (from_ir $ Function "return_n") w n exp
 
+let return_n_with_ (w : world code) (n : int code) (v : Value.seq code) (exp : exp code) : unit code =
+  app4_ (from_ir $ Function "return_n_with") w n v exp
+
 let drop_n_ (w : world code) (e : int code) (n : int code) : unit code = app3_ (from_ir $ Function "drop_n") w e n
 let pc_to_int_ (pc : int code) : int code = app_ (from_ir $ Function "pc_to_int") pc
 let int_to_pc_ (int : int code) : pc code = app_ (from_ir $ Function "int_to_pc") int
