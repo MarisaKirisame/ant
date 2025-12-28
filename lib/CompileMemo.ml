@@ -339,13 +339,24 @@ type kont_with_loc = value_loc * scope -> world code -> unit code
 type kont_with_locs = value_loc list * scope -> world code -> unit code
 
 let with_loc (loc : value_loc) (k : kont_with_loc) : kont = fun s w -> k (loc, s) w
-
 let with_locs (locs : value_loc list) (k : kont_with_locs) : kont = fun s w -> k (locs, s) w
 
+let check_loc_inbounds (loc : value_loc) (s : scope) (top_n : int) : unit =
+  match loc with
+  | StackIndex i ->
+      if i >= s.env_length || i < s.env_length - top_n then
+        failwith ("check_loc_inbounds: index out of bounds: " ^ string_of_int i ^ " >= " ^ string_of_int s.env_length)
+
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
+  let top_n = List.length vars in
   let new_s, n =
     List.fold_left
-      (fun (s, n) var -> match StrMap.find var s.meta_env with None -> (s, n) | Some _ -> (drop_s s var, n + 1))
+      (fun (s, n) var ->
+        match StrMap.find var s.meta_env with
+        | None -> (s, n)
+        | Some (StackIndex i) ->
+            check_loc_inbounds (StackIndex i) s top_n;
+            (drop_s s var, n + 1))
       (s, 0) vars
   in
   [%seqs
