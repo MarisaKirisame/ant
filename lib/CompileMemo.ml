@@ -173,7 +173,7 @@ module Liveness = struct
     | TBOne (name, kind) -> TBOne (name, annotate_ty_kind kind)
     | TBRec defs -> TBRec (List.map (fun (name, kind) -> (name, annotate_ty_kind kind)) defs)
 
-  let rec annotate_stmt (stmt : bool stmt) (fv_after : unit StrMap.t) : stx_info stmt * unit StrMap.t =
+  let annotate_stmt (stmt : bool stmt) (fv_after : unit StrMap.t) : stx_info stmt * unit StrMap.t =
     match stmt with
     | Type binding -> (Type (annotate_ty_binding binding), fv_after)
     | Term binding ->
@@ -318,6 +318,16 @@ let extend_s s name =
   check_scope ret;
   ret
 
+let extend_s_by_loc (name : string) (loc : value_loc) (s : scope) : scope =
+  match loc with
+  | StackIndex i ->
+      check_scope s;
+      let meta_env = s.meta_env in
+      let meta_env = StrMap.add_exn name (Some (StackIndex i)) meta_env in
+      let ret = { s with meta_env; env_length = s.env_length } in
+      check_scope ret;
+      ret
+
 let drop_s s name =
   assert (Option.is_some (StrMap.find name s.meta_env));
   let meta_env = s.meta_env in
@@ -338,6 +348,7 @@ type kont = scope -> world code -> unit code
 type kont_with_loc = value_loc * scope -> world code -> unit code
 type kont_with_locs = value_loc list * scope -> world code -> unit code
 
+let dummy_loc : value_loc = StackIndex Int.max_int
 let with_loc (loc : value_loc) (k : kont_with_loc) : kont = fun s w -> k (loc, s) w
 let with_locs (locs : value_loc list) (k : kont_with_locs) : kont = fun s w -> k (locs, s) w
 
@@ -352,11 +363,12 @@ let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit cod
   let new_s, n =
     List.fold_left
       (fun (s, n) var ->
-        match StrMap.find var s.meta_env with
-        | None -> (s, n)
-        | Some (StackIndex i) ->
+        match StrMap.find_opt var s.meta_env with
+        | Some None -> (s, n)
+        | Some (Some (StackIndex i)) ->
             check_loc_inbounds (StackIndex i) s top_n;
-            (drop_s s var, n + 1))
+            (drop_s s var, n + 1)
+        | None -> failwith [%string "drop: %{var} not found"])
       (s, 0) vars
   in
   [%seqs
@@ -368,6 +380,11 @@ let return (s : scope) (w : world code) : unit code =
   [%seqs
     assert_env_length_ w (int_ s.env_length);
     return_n_ w (int_ s.env_length) (pc_to_exp_ (pc_ apply_cont))]
+
+let return_with (s : scope) (v : Value.seq code) (w : world code) : unit code =
+  [%seqs
+    assert_env_length_ w (int_ s.env_length);
+    return_n_with_ w (int_ s.env_length) v (pc_to_exp_ (pc_ apply_cont))]
 
 type keep_t = { mutable keep : bool; mutable source : string option }
 
@@ -383,7 +400,7 @@ let keep_only (s : scope) (fv : unit StrMap.t) : int Dynarray.t * scope =
       let i =
         match StrMap.find_opt v s.meta_env with
         | Some (Some (StackIndex i)) -> i
-        | _ -> failwith ("keep_only not found:" ^ v)
+        | _ -> failwith [%string "keep_only: %{v} not found"]
       in
       (Dynarray.get keep i).keep <- true)
     fv;
@@ -408,13 +425,37 @@ let keep_only (s : scope) (fv : unit StrMap.t) : int Dynarray.t * scope =
   check_scope s;
   (keep_idx, s)
 
-let reading (s : scope) (f : scope -> world code -> unit code) (w : world code) : unit code =
+let reading (s : scope) (f : kont) (w : world code) : unit code =
   let make_code w = f { s with progressed = false } w in
   if s.progressed then goto_ w (add_code $ Some (lam_ "w" make_code)) else make_code w
 
 let ( let* ) e f = e f
+let current_stack_top (s : scope) : value_loc = StackIndex (s.env_length - 1)
+let future_stack_top (s : scope) : value_loc = StackIndex s.env_length
+let is_current_stack_top (loc : value_loc) (s : scope) : bool = match loc with StackIndex i -> i == s.env_length - 1
+let get_loc (loc : value_loc) (w : world code) : words code = match loc with StackIndex i -> get_env_ w (int_ i)
 
-let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world code -> unit code =
+let resolve_loc (loc : value_loc) (w : world code) : (Word.Word.t * words) code =
+  match loc with StackIndex i -> resolve_ w (src_E_ i)
+
+let pop_env_by_loc (loc : value_loc) (s : scope) (w : world code) : unit code =
+  match loc with StackIndex i when i == s.env_length - 1 -> to_unit_ $ pop_env_ w | _ -> unit_
+
+let pop_s_by_loc (loc : value_loc) (s : scope) : scope =
+  match loc with StackIndex i when i == s.env_length - 1 -> pop_s s | _ -> s
+
+let force_loc_top_n (ls : value_loc list) (s : scope) (w : world code) : scope * unit code =
+  let already_top_n () =
+    Core.List.foldi
+      ~f:(fun i acc loc -> match loc with StackIndex j -> j + i == s.env_length - 1 && acc)
+      ~init:true ls
+  in
+  let push_n s n = { s with env_length = s.env_length + n } in
+  if not (already_top_n ()) then
+    (push_n s (List.length ls), seqs_ (List.map (fun loc -> fun _ -> push_env_ w (get_loc loc w)) ls))
+  else (s, unit_)
+
+let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont_with_loc) : world code -> unit code =
   match c with
   | Var (name, _) ->
       let loc =
@@ -425,36 +466,36 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
       fun w ->
         [%seqs
           assert_env_length_ w (int_ s.env_length);
-          push_env_ w (get_env_ w (int_ loc));
-          k (push_s s) w]
+          k (loc, s) w]
   | Match (value, cases, _) ->
-      let* s = compile_pp_expr ctx s value in
-      reading s $ fun s w -> compile_pp_cases ctx s cases k w
+      let* l, s = compile_pp_expr ctx s value in
+      let* s = reading s in
+      fun w -> compile_pp_cases ctx s l cases k w
   | Ctor (cname, _) ->
       fun w ->
         [%seqs
           assert_env_length_ w (int_ s.env_length);
           push_env_ w (from_constructor_ (ctor_tag_name ctx cname));
-          k (push_s s) w]
+          let loc = future_stack_top s in
+          k (loc, push_s s) w]
   | App (Ctor (cname, _), xs, _) ->
-      let* s = compile_pp_exprs ctx s xs in
+      let* l, s = compile_pp_exprs ctx s xs in
       fun w ->
-        let length = List.length xs in
-        let rec aux =
-         fun n acc ->
-          match n with
-          | 0 ->
+        let rec aux acc s = function
+          | [] ->
               [%seqs
                 push_env_ w (memo_appends_ (from_constructor_ (ctor_tag_name ctx cname) :: acc));
-                k (push_s (List.fold_left (fun s _ -> pop_s s) s (List.init length (fun i -> i)))) w]
-          | n ->
+                let loc = future_stack_top s in
+                k (loc, push_s s) w]
+          | x :: xs ->
               [%seqs
-                let$ ctor_arg = pop_env_ w in
-                aux (n - 1) (ctor_arg :: acc)]
+                let$ ctor_arg = if is_current_stack_top x s then get_loc x w else pop_env_ w in
+                aux (ctor_arg :: acc) s xs]
         in
         [%seqs
           assert_env_length_ w (int_ s.env_length);
-          aux (List.length xs) []]
+          (* handle the arguments from right to left to allow elements on the top of the stack to be popped *)
+          aux [] s (List.rev l)]
   | App (GVar (f, _), xs, info) ->
       let at_tail_pos = info.tail in
       check_scope s;
@@ -464,9 +505,12 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
       if at_tail_pos then (
         assert (keep_length = 0);
         (* a tail call cannot keep anything *)
-        let* s = compile_pp_exprs ctx s xs in
+        let* l, s = compile_pp_exprs ctx s xs in
         fun w ->
+          let s, push_envs = force_loc_top_n l s w in
           [%seqs
+            assert_env_length_ w (int_ s.env_length);
+            push_envs;
             assert_env_length_ w (int_ s.env_length);
             to_unit_ $ env_call_ w (list_literal_of_ int_ []) (int_ xs_length);
             goto_ w (Hashtbl.find_exn ctx.func_pc f)])
@@ -477,30 +521,47 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
             [%seqs
               set_k_ w (get_next_cont_ tl);
               restore_env_ w (int_ keep_length) tl;
-              k (push_s keep_s) w]);
-        let* s = compile_pp_exprs ctx s xs in
+              let loc = future_stack_top keep_s in
+              k (loc, push_s keep_s) w]);
+        let* l, s = compile_pp_exprs ctx s xs in
         fun w ->
+          let s, push_envs = force_loc_top_n l s w in
           [%seqs
+            assert_env_length_ w (int_ s.env_length);
+            push_envs;
             assert_env_length_ w (int_ s.env_length);
             (let$ keep = env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ xs_length) in
              set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ w ]));
             goto_ w (Hashtbl.find_exn ctx.func_pc f)]
   | If (cond, thn, els, _) ->
-      let* s = compile_pp_expr ctx s cond in
+      let* l, s = compile_pp_expr ctx s cond in
       fun w ->
         let cond_name = gensym "cond" in
         [%seqs
           assert_env_length_ w (int_ s.env_length);
-          let_pat_in_ (var_pat_ cond_name)
-            (resolve_ w (src_E_ (s.env_length - 1)))
+          let_pat_in_ (var_pat_ cond_name) (resolve_loc l w)
             [%seqs
-              to_unit_ $ pop_env_ w;
-              let$ if_kont = paren (lam_unit_ (fun _ -> k s w)) in
-              let k = fun _ _ -> app_ if_kont unit_ in
-              let cond_bool = code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0") in
-              let then_branch = compile_pp_expr ctx (pop_s s) thn k in
-              let else_branch = compile_pp_expr ctx (pop_s s) els k in
-              if_ cond_bool (then_branch w) (else_branch w)]]
+              pop_env_by_loc l s w;
+              let s = pop_s_by_loc l s in
+              [%seqs
+                let$ if_kont =
+                  paren
+                    (lam_unit_ (fun _ ->
+                         k
+                           (let l = future_stack_top s in
+                            (l, push_s s))
+                           w))
+                in
+                let k : kont_with_loc =
+                 fun (l, _s) w ->
+                  [%seqs
+                    push_env_ w (get_loc l w);
+                    app_ if_kont unit_]
+                in
+                let cond_bool = code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0") in
+                let then_branch = compile_pp_expr ctx s thn k in
+                let else_branch = compile_pp_expr ctx s els k in
+                if_ cond_bool (then_branch w) (else_branch w)]]]
   | Op (op, x0, x1, _) ->
       let op_code =
         match op with
@@ -511,41 +572,50 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
         | ">=" -> ge_
         | _ -> failwith ("compile_pp_expr: unsupported op " ^ op)
       in
-      let* s = compile_pp_expr ctx s x0 in
-      let* s = compile_pp_expr ctx s x1 in
-      reading s $ fun s w ->
-      [%seqs
-        assert_env_length_ w (int_ s.env_length);
-        let$ x0 = resolve_ w (src_E_ (s.env_length - 2)) in
-        let$ x1 = resolve_ w (src_E_ (s.env_length - 1)) in
-        to_unit_ $ pop_env_ w;
-        to_unit_ $ pop_env_ w;
-        push_env_ w (memo_from_int_ (op_code (int_from_word_ (zro_ x0)) (int_from_word_ (zro_ x1))));
-        k (push_s (pop_s (pop_s s))) w]
+      let* l0, s = compile_pp_expr ctx s x0 in
+      let* l1, s = compile_pp_expr ctx s x1 in
+      let* s = reading s in
+      fun w ->
+        [%seqs
+          assert_env_length_ w (int_ s.env_length);
+          let$ x0 = resolve_loc l0 w in
+          let$ x1 = resolve_loc l1 w in
+          pop_env_by_loc l1 s w;
+          pop_env_by_loc l0 s w;
+          push_env_ w (memo_from_int_ (op_code (int_from_word_ (zro_ x0)) (int_from_word_ (zro_ x1))));
+          let loc = future_stack_top s in
+          k (loc, push_s (pop_s_by_loc l0 (pop_s_by_loc l1 s))) w]
   | Int i ->
       fun w ->
         [%seqs
           assert_env_length_ w (int_ s.env_length);
           push_env_ w (memo_from_int_ (int_ i));
-          k (push_s s) w]
-  | Let (BOne (PVar (l, _), v, _), r, _) ->
+          let loc = future_stack_top s in
+          k (loc, push_s s) w]
+  | Let (BOne (PVar (x, _), v, _), r, _) ->
       check_scope s;
-      let* s = compile_pp_expr ctx s v in
+      let* l_e0, s = compile_pp_expr ctx s v in
       check_scope s;
-      let* s = compile_pp_expr ctx (extend_s (pop_s s) l) r in
-      fun w -> drop s [ l ] w k
+      let* _l_x, s = compile_pp_expr ctx (extend_s_by_loc x l_e0 s) r in
+      fun w -> drop s [ x ] w (with_loc dummy_loc k)
   | _ -> failwith ("compile_pp_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr c)
 
-and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (k : kont) : world code -> unit code =
-  match cs with [] -> fun w -> k s w | c :: cs -> compile_pp_expr ctx s c (fun s w -> compile_pp_exprs ctx s cs k w)
+and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (k : kont_with_locs) : world code -> unit code =
+  let rec aux acc s = function
+    | [] -> fun w -> k (List.rev acc, s) w
+    | c :: cs ->
+        let* l, s = compile_pp_expr ctx s c in
+        aux (l :: acc) s cs
+  in
+  aux [] s cs
 
-and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : kont) : world code -> unit code =
+and compile_pp_cases (ctx : ctx) (s : scope) (l : value_loc) (MatchPattern c : 'a cases) (k : kont_with_loc) :
+    world code -> unit code =
  fun w ->
   [%seqs
     assert_env_length_ w (int_ s.env_length);
-    let$ last = src_E_ (s.env_length - 1) in
-    let$ x = resolve_ w last in
-    let s = pop_s s in
+    let$ x = resolve_loc l w in
+    let new_s = pop_s_by_loc l s in
     let dummy = gensym "c" in
     let g cname =
       string dummy ^^ string " when " ^^ string dummy ^^ string " = " ^^ string (Hashtbl.find_exn ctx.ctag_name cname)
@@ -558,8 +628,8 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
           | PCtorApp (cname, None, _) ->
               ( g cname,
                 [%seqs
-                  to_unit_ $ pop_env_ w;
-                  compile_pp_expr ctx s expr k w] )
+                  to_unit_ $ pop_env_by_loc l s w;
+                  compile_pp_expr ctx new_s expr k w] )
           | PCtorApp (cname, Some (PVar (x0, _)), _) ->
               ( g cname,
                 with_splits 1
@@ -567,9 +637,11 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                   (function
                     | [ x0_v ] ->
                         [%seqs
-                          to_unit_ $ pop_env_ w;
+                          to_unit_ $ pop_env_by_loc l s w;
                           push_env_ w x0_v;
-                          compile_pp_expr ctx (extend_s s x0) expr (fun s w -> drop s [ x0 ] w k) w]
+                          compile_pp_expr ctx (extend_s new_s x0) expr
+                            (fun (_l, s) w -> drop s [ x0 ] w (with_loc dummy_loc k))
+                            w]
                     | _ -> failwith "with_splits: unexpected arity") )
           | PCtorApp (cname, Some (PTup (xs, _)), _) when List.for_all (function PVar _ -> true | _ -> false) xs ->
               let xs = List.map (function PVar (name, _) -> name | _ -> failwith "impossible") xs in
@@ -580,26 +652,25 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                   (function
                     | ys when List.length ys == n ->
                         [%seqs
-                          to_unit_ $ pop_env_ w;
+                          to_unit_ $ pop_env_by_loc l s w;
                           seqs_ (List.map (fun y -> fun _ -> [%seqs push_env_ w y]) ys);
                           compile_pp_expr ctx
                             (List.fold_left (fun s x -> extend_s s x) s xs)
                             expr
-                            (fun s w -> drop s (List.rev xs) w k)
+                            (fun (_l, s) w -> drop s (List.rev xs) w (with_loc dummy_loc k))
                             w]
                     | _ -> failwith "with_splits: unexpected arity") )
           | PAny ->
               ( string "_",
                 [%seqs
-                  to_unit_ $ pop_env_ w;
-                  compile_pp_expr ctx s expr k w] )
+                  to_unit_ $ pop_env_by_loc l s w;
+                  compile_pp_expr ctx new_s expr k w] )
           | PVar (x_, _) ->
               ( string x_,
                 [%seqs
-                  (*note that we are not -1ing because s is already popped.*)
-                  push_env_ w (get_env_ w (int_ s.env_length));
-                  to_unit_ $ pop_env_ w;
-                  compile_pp_expr ctx (extend_s s x_) expr (fun s w -> drop s [ x_ ] w k) w] )
+                  compile_pp_expr ctx (extend_s_by_loc x_ l new_s) expr
+                    (fun (_l, s) w -> drop s [ x_ ] w (with_loc dummy_loc k))
+                    w] )
           | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
         c
     in
@@ -629,7 +700,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
       add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
           let r =
-            ( lam_ "w" (fun w -> compile_pp_expr ctx s term (fun s w -> return s w) w),
+            ( lam_ "w" (fun w -> compile_pp_expr ctx s term (fun (l, s) w -> return_with s (get_loc l w) w) w),
               string "let rec" ^^ space ^^ string name ^^ space ^^ string "memo" ^^ space
               ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
               ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "

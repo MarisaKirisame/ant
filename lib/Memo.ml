@@ -185,6 +185,11 @@ let return_n (w : world) (n : int) (return_exp : exp) : unit =
   w.state.e <- Dynarray.of_list [ Dynarray.get_last w.state.e ];
   w.state.c <- return_exp
 
+let return_n_with (w : world) (n : int) (v : value) (return_exp : exp) : unit =
+  assert (Dynarray.length w.state.e = n);
+  w.state.e <- Dynarray.of_list [ v ];
+  w.state.c <- return_exp
+
 let drop_n (w : world) (e : int) (n : int) : unit =
   assert (Dynarray.length w.state.e = e);
   let last = Dynarray.pop_last w.state.e in
