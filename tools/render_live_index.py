@@ -2,7 +2,7 @@
 """Render a small index.html that links to multiple benchmark reports.
 
 If the underlying data files are available, the page also shows a combined
-speedup summary (samples, geometric mean, best, lowest) across all entries.
+speedup summary (samples, geometric mean, end-to-end, best, lowest) across all entries.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
-from plot_speedup import SpeedupStats, compute_stats, load_records
+from plot_speedup import SpeedupStats, compare_stats, load_records
 
 
 def _parse_entry(raw: str) -> Tuple[str, Path]:
@@ -51,8 +51,12 @@ def _render_html(
         <span class="value">{summary.samples}</span>
       </div>
       <div class="stat">
-        <span class="label">Mean speedup</span>
-        <span class="value">{_fmt(summary.mean)}x</span>
+        <span class="label">Geometric mean</span>
+        <span class="value">{_fmt(summary.geo_mean)}x</span>
+      </div>
+      <div class="stat">
+        <span class="label">End-to-end speedup</span>
+        <span class="value">{_fmt(summary.end_to_end)}x</span>
       </div>
       <div class="stat">
         <span class="label">Best speedup</span>
@@ -198,11 +202,11 @@ def _extract_data_path(report_path: Path) -> Path | None:
     return (report_path.parent / rel).resolve()
 
 
-def _collect_ratios(data_paths: Iterable[Path]) -> list[float]:
-    ratios: list[float] = []
+def _collect_pairs(data_paths: Iterable[Path]) -> list[tuple[float, float]]:
+    pairs: list[tuple[float, float]] = []
     for path in data_paths:
-        ratios.extend(load_records(path))
-    return ratios
+        pairs.extend(load_records(path))
+    return pairs
 
 
 def main() -> None:
@@ -244,9 +248,9 @@ def main() -> None:
 
     summary: SpeedupStats | None = None
     if data_paths:
-        ratios = _collect_ratios(data_paths)
-        if ratios:
-            summary = compute_stats(ratios)
+        pairs = _collect_pairs(data_paths)
+        if pairs:
+            _, summary = compare_stats(pairs)
 
     args.output.write_text(
         _render_html(args.title, entries_with_rel, summary), encoding="utf-8"
@@ -255,7 +259,8 @@ def main() -> None:
     if summary:
         msg += (
             f" (combined samples: {summary.samples}, "
-            f"mean: {_fmt(summary.mean)}x, "
+            f"geo mean: {_fmt(summary.geo_mean)}x, "
+            f"end-to-end: {_fmt(summary.end_to_end)}x, "
             f"max: {_fmt(summary.maximum)}x, "
             f"min: {_fmt(summary.minimum)}x)"
         )

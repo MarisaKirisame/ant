@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import glob
 import os
 import shlex
 import subprocess
@@ -206,6 +207,7 @@ def run_project() -> None:
 
 
 def profile_project() -> None:
+    _remove_perf_data_files()
     ensure_switch()
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
@@ -216,6 +218,78 @@ def profile_project() -> None:
             ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
             env=env,
         )
+
+
+def report_project() -> None:
+    run_project()
+    generate_report()
+
+
+def generate_report() -> None:
+    run(
+        [
+            "python3",
+            "tools/generate_speedup_index.py",
+            "--input",
+            "eval_steps_simple.json",
+            "--plot",
+            "output/live-simple/speedup.png",
+            "--output",
+            "output/live-simple/index.html",
+        ]
+    )
+    run(
+        [
+            "python3",
+            "tools/generate_speedup_index.py",
+            "--input",
+            "eval_steps_left_to_right.json",
+            "--plot",
+            "output/live-left-to-right/speedup.png",
+            "--output",
+            "output/live-left-to-right/index.html",
+        ]
+    )
+    run(
+        [
+            "python3",
+            "tools/generate_speedup_index.py",
+            "--input",
+            "eval_steps_demand_driven.json",
+            "--plot",
+            "output/live-demand-driven/speedup.png",
+            "--output",
+            "output/live-demand-driven/index.html",
+        ]
+    )
+    run(
+        [
+            "python3",
+            "tools/generate_speedup_index.py",
+            "--input",
+            "eval_steps_from_hazel.json",
+            "--plot",
+            "output/hazel/speedup.png",
+            "--output",
+            "output/hazel/index.html",
+        ]
+    )
+    run(
+        [
+            "python3",
+            "tools/render_live_index.py",
+            "--output",
+            "output/index.html",
+            "--entry",
+            "Simple Benchmark=output/live-simple/index.html",
+            "--entry",
+            "Left-to-right Benchmark=output/live-left-to-right/index.html",
+            "--entry",
+            "Demand-driven Benchmark=output/live-demand-driven/index.html",
+            "--entry",
+            "Hazel Benchmark=output/hazel/index.html",
+        ]
+    )
 
 
 def compile_generated() -> None:
@@ -231,12 +305,20 @@ def _opam_env_with_ocamlrunparam() -> MutableMapping[str, str]:
     return env
 
 
+def _remove_perf_data_files() -> None:
+    for path in glob.glob("perf-*.data") + glob.glob("perf-*.data.old"):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            continue
+
+
 def main(argv: Iterable[str]) -> int:
     args = list(argv)
     if len(args) > 1:
         print("Only a single stage argument is supported.", file=sys.stderr)
         print(
-            "Usage: nightly.py [dependency|build|run|profile|compile-generated|all]",
+            "Usage: nightly.py [dependency|build|run|profile|report|compile-generated|all]",
             file=sys.stderr,
         )
         return 1
@@ -251,16 +333,19 @@ def main(argv: Iterable[str]) -> int:
         run_project()
     elif stage == "profile":
         profile_project()
+    elif stage == "report":
+        report_project()
     elif stage == "compile-generated":
         compile_generated()
     elif stage == "all":
         install_dependencies()
         build_project()
         run_project()
+        generate_report()
     else:
         print(f"Unknown stage: {stage}", file=sys.stderr)
         print(
-            "Usage: nightly.py [dependency|build|run|profile|compile-generated|all]",
+            "Usage: nightly.py [dependency|build|run|profile|report|compile-generated|all]",
             file=sys.stderr,
         )
         return 1

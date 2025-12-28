@@ -66,7 +66,7 @@ def _render_html(stats: SpeedupStats, img_src: str, data_label: str) -> str:
     }}
     .stats {{
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 12px;
       margin-bottom: 20px;
     }}
@@ -113,8 +113,12 @@ def _render_html(stats: SpeedupStats, img_src: str, data_label: str) -> str:
         <span class="value">{stats.samples}</span>
       </div>
       <div class="stat">
-        <span class="label">Mean speedup</span>
-        <span class="value">{_fmt(stats.mean)}x</span>
+        <span class="label">Geometric mean</span>
+        <span class="value">{_fmt(stats.geo_mean)}x</span>
+      </div>
+      <div class="stat">
+        <span class="label">End-to-end speedup</span>
+        <span class="value">{_fmt(stats.end_to_end)}x</span>
       </div>
       <div class="stat">
         <span class="label">Best speedup</span>
@@ -164,8 +168,9 @@ def main() -> None:
     data_label = os.path.relpath(args.input, args.output.parent)
     args.output.write_text(_render_html(stats, img_src, data_label), encoding="utf-8")
     print(
-        f"wrote {args.output} (plot: {args.plot}, mean: {_fmt(stats.mean)}x, "
-        f"max: {_fmt(stats.maximum)}x, min: {_fmt(stats.minimum)}x)"
+        f"wrote {args.output} (plot: {args.plot}, geo mean: {_fmt(stats.geo_mean)}x, "
+        f"end-to-end: {_fmt(stats.end_to_end)}x, max: {_fmt(stats.maximum)}x, "
+        f"min: {_fmt(stats.minimum)}x)"
     )
 
 
