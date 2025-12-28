@@ -10,9 +10,9 @@ The metric plotted (wall-clock time vs evaluation steps) is controlled by
       * "step": memoized step count
       * "without_memo_step": baseline step count
 
-The script computes speedup statistics and plots baseline vs memoized values
-as a scatter plot on log-log axes. The resulting plot is saved to
-``speedup.png`` in the current working directory.
+The script computes speedup statistics and writes two plots: a baseline vs
+memoized scatter plot on log-log axes, and a speedup-over-run line plot. The
+plots are saved to ``speedup.png`` and ``scatter.png`` by default.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import math
 import statistics
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 import matplotlib.pyplot as plt
 
@@ -95,11 +95,11 @@ def compare_stats(
     return ratios, stats
 
 
-def plot_speedup(pairs: Iterable[tuple[float, float]], output: Path):
+def plot_scatter(pairs: Iterable[tuple[float, float]], output: Path) -> None:
     pairs_list = list(pairs)
     baselines = [baseline for baseline, _ in pairs_list]
     memos = [memo for _, memo in pairs_list]
-    plt.figure(figsize=(8, 4.5))
+    plt.figure(figsize=(6, 4.5))
     plt.scatter(baselines, memos, alpha=0.75)
     plt.xscale("log")
     plt.yscale("log")
@@ -112,11 +112,29 @@ def plot_speedup(pairs: Iterable[tuple[float, float]], output: Path):
     plt.close()
 
 
-def generate_plot(input_path: Path, output_path: Path) -> tuple[list[float], SpeedupStats]:
-    """Load ratios from input_path, write the plot, and return ratios and stats."""
+def plot_speedup_line(ratios: Sequence[float], output: Path) -> None:
+    xs = list(range(1, len(ratios) + 1))
+    plt.figure(figsize=(6, 4.5))
+    plt.plot(xs, ratios, marker="o", linewidth=1.5)
+    plt.yscale("log")
+    plt.xlabel("Execution number (nth run)")
+    plt.ylabel(f"Speedup ({METRIC_LABEL}, baseline / memoized, log scale)")
+    plt.title(f"Speedup per Execution ({METRIC_LABEL}, log scale)")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(output)
+    plt.close()
+
+
+def generate_plot(
+    input_path: Path, line_output: Path, scatter_output: Optional[Path] = None
+) -> tuple[list[float], SpeedupStats]:
+    """Load pairs from input_path, write plots, and return ratios and stats."""
     pairs = load_records(input_path)
     ratios, stats = compare_stats(pairs)
-    plot_speedup(pairs, output_path)
+    plot_speedup_line(ratios, line_output)
+    if scatter_output is not None:
+        plot_scatter(pairs, scatter_output)
     return ratios, stats
 
 
@@ -132,13 +150,19 @@ def main():
         "--output",
         type=Path,
         default=Path("speedup.png"),
-        help="path to save the generated plot (default: speedup.png)",
+        help="path to save the speedup line plot (default: speedup.png)",
+    )
+    parser.add_argument(
+        "--scatter",
+        type=Path,
+        default=Path("scatter.png"),
+        help="path to save the scatter plot (default: scatter.png)",
     )
     args = parser.parse_args()
 
-    ratios, stats = generate_plot(args.input, args.output)
+    ratios, stats = generate_plot(args.input, args.output, args.scatter)
     print(
-        f"plotted {stats.samples} samples to {args.output} "
+        f"plotted {stats.samples} samples to {args.output} and {args.scatter} "
         f"(geo mean: {stats.geo_mean:.2f}x, end-to-end: {stats.end_to_end:.2f}x, "
         f"min: {stats.minimum:.2f}x, max: {stats.maximum:.2f}x)"
     )

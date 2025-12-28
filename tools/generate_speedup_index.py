@@ -20,7 +20,7 @@ def _image_src(plot_path: Path, output_dir: Path) -> str:
     return os.path.relpath(plot_path, output_dir)
 
 
-def _render_html(stats: SpeedupStats, img_src: str, data_label: str) -> str:
+def _render_html(stats: SpeedupStats, line_src: str, scatter_src: str, data_label: str) -> str:
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -95,6 +95,7 @@ def _render_html(stats: SpeedupStats, img_src: str, data_label: str) -> str:
       border-radius: 12px;
       background: #0b1324;
       padding: 12px;
+      margin-bottom: 16px;
     }}
     .plot img {{
       width: 100%;
@@ -130,7 +131,10 @@ def _render_html(stats: SpeedupStats, img_src: str, data_label: str) -> str:
       </div>
     </section>
     <section class="plot">
-      <img src="{img_src}" alt="Speedup plot">
+      <img src="{line_src}" alt="Speedup per run plot">
+    </section>
+    <section class="plot">
+      <img src="{scatter_src}" alt="Their vs our scatter plot">
     </section>
   </main>
 </body>
@@ -153,6 +157,12 @@ def main() -> None:
         help="where to write the plot image (default: speedup.png)",
     )
     parser.add_argument(
+        "--scatter",
+        type=Path,
+        default=None,
+        help="where to write the scatter image (default: scatter.png next to plot)",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path("index.html"),
@@ -162,13 +172,18 @@ def main() -> None:
 
     args.plot.parent.mkdir(parents=True, exist_ok=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    scatter_path = args.scatter or args.plot.with_name("scatter.png")
 
-    _, stats = generate_plot(args.input, args.plot)
-    img_src = _image_src(args.plot, args.output.parent)
+    _, stats = generate_plot(args.input, args.plot, scatter_path)
+    line_src = _image_src(args.plot, args.output.parent)
+    scatter_src = _image_src(scatter_path, args.output.parent)
     data_label = os.path.relpath(args.input, args.output.parent)
-    args.output.write_text(_render_html(stats, img_src, data_label), encoding="utf-8")
+    args.output.write_text(
+        _render_html(stats, line_src, scatter_src, data_label), encoding="utf-8"
+    )
     print(
-        f"wrote {args.output} (plot: {args.plot}, geo mean: {_fmt(stats.geo_mean)}x, "
+        f"wrote {args.output} (plot: {args.plot}, scatter: {scatter_path}, "
+        f"geo mean: {_fmt(stats.geo_mean)}x, "
         f"end-to-end: {_fmt(stats.end_to_end)}x, max: {_fmt(stats.maximum)}x, "
         f"min: {_fmt(stats.minimum)}x)"
     )
