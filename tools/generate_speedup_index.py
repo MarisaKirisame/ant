@@ -7,7 +7,7 @@ import argparse
 import os
 from pathlib import Path
 
-from plot_speedup import SpeedupStats, generate_plot
+from plot_speedup import SpeedupStats, generate_plot, load_profile_totals, render_profile_table
 
 
 def _fmt(value: float) -> str:
@@ -20,7 +20,9 @@ def _image_src(plot_path: Path, output_dir: Path) -> str:
     return os.path.relpath(plot_path, output_dir)
 
 
-def _render_html(stats: SpeedupStats, line_src: str, scatter_src: str, data_label: str) -> str:
+def _render_html(
+    stats: SpeedupStats, line_src: str, scatter_src: str, data_label: str, profile_table: str
+) -> str:
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -102,6 +104,33 @@ def _render_html(stats: SpeedupStats, line_src: str, scatter_src: str, data_labe
       display: block;
       border-radius: 8px;
     }}
+    .profile {{
+      margin-top: 8px;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      background: #0b1324;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 13px;
+    }}
+    th, td {{
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid #1f2937;
+    }}
+    thead {{
+      background: #0f1a30;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-size: 11px;
+    }}
+    tbody tr:last-child td {{
+      border-bottom: none;
+    }}
   </style>
 </head>
 <body>
@@ -135,6 +164,9 @@ def _render_html(stats: SpeedupStats, line_src: str, scatter_src: str, data_labe
     </section>
     <section class="plot">
       <img src="{scatter_src}" alt="Their vs our scatter plot">
+    </section>
+    <section class="profile">
+      {profile_table}
     </section>
   </main>
 </body>
@@ -175,11 +207,14 @@ def main() -> None:
     scatter_path = args.scatter or args.plot.with_name("scatter.png")
 
     _, stats = generate_plot(args.input, args.plot, scatter_path)
+    profile_totals, profile_total_time = load_profile_totals(args.input)
+    profile_table = render_profile_table(profile_totals, profile_total_time)
     line_src = _image_src(args.plot, args.output.parent)
     scatter_src = _image_src(scatter_path, args.output.parent)
     data_label = os.path.relpath(args.input, args.output.parent)
     args.output.write_text(
-        _render_html(stats, line_src, scatter_src, data_label), encoding="utf-8"
+        _render_html(stats, line_src, scatter_src, data_label, profile_table),
+        encoding="utf-8",
     )
     print(
         f"wrote {args.output} (plot: {args.plot}, scatter: {scatter_path}, "
