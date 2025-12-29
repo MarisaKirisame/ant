@@ -352,11 +352,14 @@ let dummy_loc : value_loc = StackIndex Int.max_int
 let with_loc (loc : value_loc) (k : kont_with_loc) : kont = fun s w -> k (loc, s) w
 let with_locs (locs : value_loc list) (k : kont_with_locs) : kont = fun s w -> k (locs, s) w
 
-let check_loc_inbounds (loc : value_loc) (s : scope) (top_n : int) : unit =
+let check_loc_inbounds (var : string) (loc : value_loc) (s : scope) (top_n : int) : unit =
   match loc with
   | StackIndex i ->
       if i >= s.env_length || i < s.env_length - top_n then
-        failwith ("check_loc_inbounds: index out of bounds: " ^ string_of_int i ^ " >= " ^ string_of_int s.env_length)
+        failwith
+          [%string
+            "check_loc_inbounds: %{var} index out of bounds: env_length: %{string_of_int s.env_length}, top_n: \
+             %{string_of_int top_n}, index: %{string_of_int i}"]
 
 let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit code =
   let top_n = List.length vars in
@@ -366,7 +369,7 @@ let drop (s : scope) (vars : string list) (w : world code) (k : kont) : unit cod
         match StrMap.find_opt var s.meta_env with
         | Some None -> (s, n)
         | Some (Some (StackIndex i)) ->
-            check_loc_inbounds (StackIndex i) s top_n;
+            check_loc_inbounds var (StackIndex i) s top_n;
             (drop_s s var, n + 1)
         | None -> failwith [%string "drop: %{var} not found"])
       (s, 0) vars
@@ -541,27 +544,24 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont_with_loc
           assert_env_length_ w (int_ s.env_length);
           let_pat_in_ (var_pat_ cond_name) (resolve_loc l w)
             [%seqs
-              pop_env_by_loc l s w;
-              let s = pop_s_by_loc l s in
-              [%seqs
-                let$ if_kont =
-                  paren
-                    (lam_unit_ (fun _ ->
-                         k
-                           (let l = future_stack_top s in
-                            (l, push_s s))
-                           w))
-                in
-                let k : kont_with_loc =
-                 fun (l, _s) w ->
-                  [%seqs
-                    push_env_ w (get_loc l w);
-                    app_ if_kont unit_]
-                in
-                let cond_bool = code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0") in
-                let then_branch = compile_pp_expr ctx s thn k in
-                let else_branch = compile_pp_expr ctx s els k in
-                if_ cond_bool (then_branch w) (else_branch w)]]]
+              let$ if_kont =
+                paren
+                  (lam_unit_ (fun _ ->
+                       k
+                         (let l = future_stack_top s in
+                          (l, push_s s))
+                         w))
+              in
+              let k : kont_with_loc =
+               fun (l, _s) w ->
+                [%seqs
+                  push_env_ w (get_loc l w);
+                  app_ if_kont unit_]
+              in
+              let cond_bool = code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0") in
+              let then_branch = compile_pp_expr ctx s thn k in
+              let else_branch = compile_pp_expr ctx s els k in
+              if_ cond_bool (then_branch w) (else_branch w)]]
   | Op (op, x0, x1, _) ->
       let op_code =
         match op with
@@ -580,11 +580,10 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont_with_loc
           assert_env_length_ w (int_ s.env_length);
           let$ x0 = resolve_loc l0 w in
           let$ x1 = resolve_loc l1 w in
-          pop_env_by_loc l1 s w;
-          pop_env_by_loc l0 s w;
-          push_env_ w (memo_from_int_ (op_code (int_from_word_ (zro_ x0)) (int_from_word_ (zro_ x1))));
+          let$ r = memo_from_int_ (op_code (int_from_word_ (zro_ x0)) (int_from_word_ (zro_ x1))) in
+          push_env_ w r;
           let loc = future_stack_top s in
-          k (loc, push_s (pop_s_by_loc l0 (pop_s_by_loc l1 s))) w]
+          k (loc, push_s s) w]
   | Int i ->
       fun w ->
         [%seqs
@@ -596,8 +595,9 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont_with_loc
       check_scope s;
       let* l_e0, s = compile_pp_expr ctx s v in
       check_scope s;
-      let* _l_x, s = compile_pp_expr ctx (extend_s_by_loc x l_e0 s) r in
-      fun w -> drop s [ x ] w (with_loc dummy_loc k)
+      let s = extend_s_by_loc x l_e0 s in
+      let* l_x, s = compile_pp_expr ctx s r in
+      fun w -> drop s [ x ] w (with_loc l_x k)
   | _ -> failwith ("compile_pp_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr c)
 
 and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (k : kont_with_locs) : world code -> unit code =

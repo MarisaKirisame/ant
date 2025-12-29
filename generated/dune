@@ -2,6 +2,7 @@
  (name runmodes)
  (modules
   FromHazel
+  TestCEK
   LiveCEK
   LivePlain
   LiveLexer
