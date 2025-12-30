@@ -357,7 +357,7 @@ let join_reads (x : reads) (y : reads) : join_reads =
       let x_weaken = ref false in
       let y_weaken = ref false in
       let join (a, b) =
-        let ret = Read.join a b x_weaken y_weaken in
+        let ret = Read.join a x_weaken b y_weaken in
         (*print_endline ("join reads:\n  " ^ string_of_read a ^ "\n  " ^ string_of_read b ^ "\n= " ^ string_of_read ret);*)
         ret
       in
