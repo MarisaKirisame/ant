@@ -503,7 +503,6 @@ let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step
         lookup_step_aux value children acc
       else acc
   | Split sp -> (
-      sp.merging <- [];
       sp.merging <-
         List.filter_map sp.merging ~f:(fun m ->
             let merge m_trie =
