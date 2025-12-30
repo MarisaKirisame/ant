@@ -20,28 +20,25 @@ let () =
 let () =
   add_exp
     (fun w_0 ->
-      assert_env_length w_0 1;
-      push_env w_0 (Dynarray.get w_0.state.e 0);
-      assert_env_length w_0 2;
-      push_env w_0 (Memo.from_int 1);
+      grow_env (* program return value *) w_0 1;
+      grow_env (* let *) w_0 1;
+      grow_env (* op *) w_0 2;
+      set_env w_0 4 (Memo.from_int 1);
       w_0.state.c <- pc_to_exp (int_to_pc 2))
     1
 
 let () =
   add_exp
     (fun w_1 ->
-      assert_env_length w_1 3;
-      let x0_0 = resolve w_1 (Source.E 1) in
-      let x1_0 = resolve w_1 (Source.E 2) in
-      ignore (pop_env w_1);
-      ignore (pop_env w_1);
-      push_env w_1 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
-      assert_env_length w_1 2;
-      push_env w_1 (Dynarray.get w_1.state.e 1);
-      assert_env_length w_1 3;
-      drop_n w_1 3 1;
-      assert_env_length w_1 2;
-      return_n w_1 2 (pc_to_exp (int_to_pc 0)))
+      let x0_0 = resolve w_1 (Source.E 0) in
+      let x1_0 = resolve w_1 (Source.E 4) in
+      let r_0 = Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)) in
+      set_env w_1 2 r_0;
+      shrink_env w_1 2;
+      set_env w_1 2 (Dynarray.get w_1.state.e 2);
+      set_env w_1 1 (Dynarray.get w_1.state.e 2);
+      shrink_env w_1 1;
+      return_n_with w_1 2 (Dynarray.get w_1.state.e 1) (pc_to_exp (int_to_pc 0)))
     2
 
 let () = Words.set_constructor_degree 0 1

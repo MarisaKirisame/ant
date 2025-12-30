@@ -160,6 +160,22 @@ let pop_env (w : world) : value =
   assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
   v
 
+let set_env (w : world) (i : int) (v : seq) : unit =
+  assert ((Generic.measure ~monoid ~measure v).degree = 1);
+  assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
+  Dynarray.set w.state.e i v
+
+let grow_env (w : world) (n : int) : unit =
+  let rec aux f n =
+    if n < 0 then () else f (from_int 0);
+    aux f (n - 1)
+  in
+  Dynarray.append_iter w.state.e aux n
+
+let shrink_env (w : world) (n : int) : unit =
+  assert (Dynarray.length w.state.e >= n);
+  Dynarray.truncate w.state.e (Dynarray.length w.state.e - n)
+
 let env_call (w : world) (keep : int list) (nargs : int) : seq =
   let l = Dynarray.length w.state.e in
   let ret = appends (List.map keep ~f:(fun i -> Dynarray.get w.state.e i)) in
