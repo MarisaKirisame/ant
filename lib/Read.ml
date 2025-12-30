@@ -133,12 +133,9 @@ let read_pop_n (r : read) n : read =
   assert ((read_measure y).degree = (read_measure r).degree - n);*)
   y
 
-  type join = {
-    result : read;
-    stripped_x : read;
-    stripped_y : read;
-  }
-let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) : read =
+type join = { result : read; x_rest : read; y_rest : read }
+
+let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) : join =
   (*assert (read_valid x);
   assert (read_valid y);*)
   let recurse x y = join x x_weaken y y_weaken in
@@ -149,28 +146,41 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) :
   in
   (*assert ((read_measure x).degree = (read_measure y).degree);
   assert ((read_measure x).max_degree = (read_measure y).max_degree);*)
-  if Generic.is_empty x then return y
+  if Generic.is_empty x then (
+    assert (Generic.is_empty y);
+    return { result = Generic.empty; x_rest = Generic.empty; y_rest = Generic.empty })
   else
     let xh, xt = read_front_exn x in
     let yh, yt = read_front_exn y in
+    let slice slice_length slice_reason =
+      let xh, xt = read_slice x slice_length in
+      let yh, yt = read_slice y slice_length in
+      let res = recurse xt yt in
+
+      {
+        result = read_cons slice_reason res.result;
+        x_rest = read_append xh res.x_rest;
+        y_rest = read_append yh res.y_rest;
+      }
+    in
     match (xh, yh) with
     (* We have to pop them off one of a time, because a small chunk might be masking a larger chunk.
      * A more principled approach would be to calculate the lca.
      *)
-    | RSkip _, RSkip _ -> read_cons (RSkip 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
+    | RSkip _, RSkip _ -> return (slice 1 (RSkip 1))
     | RSkip _, (RRead _ | RCon _) ->
         y_weaken := true;
-        read_cons (RSkip 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
+        return (slice 1 (RSkip 1))
     | (RRead _ | RCon _), RSkip _ ->
         x_weaken := true;
-        read_cons (RSkip 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
-    | RRead _, RRead _ -> read_cons (RRead 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
+        return (slice 1 (RSkip 1))
+    | RRead _, RRead _ -> return (slice 1 (RRead 1))
     | RRead _, RCon _ ->
         y_weaken := true;
-        read_cons (RRead 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
+        return (slice 1 (RRead 1))
     | RCon _, RRead _ ->
         x_weaken := true;
-        read_cons (RRead 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
+        return (slice 1 (RRead 1))
     | RCon xh, RCon yh ->
         let lca_length = Words.lca_length xh yh in
         if lca_length = 0 then (
@@ -178,14 +188,15 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) :
           assert (not (Generic.is_empty yh));
           x_weaken := true;
           y_weaken := true;
-          return (read_cons (RRead 1) (recurse (read_pop_n x 1) (read_pop_n y 1))))
+          return (slice 1 (RRead 1)))
         else
           let xhh, xht = Words.slice_length xh lca_length in
           let yhh, yht = Words.slice_length yh lca_length in
           assert (Words.equal_words xhh yhh);
           let x = if Generic.is_empty xht then xt else read_cons (RCon xht) xt in
           let y = if Generic.is_empty yht then yt else read_cons (RCon yht) yt in
-          return (read_cons (RCon xhh) (recurse x y))
+          let res = recurse x y in
+          return { result = read_cons (RCon xhh) res.result; x_rest = res.x_rest; y_rest = res.y_rest }
 
 let hash (x : int) (y : int) : int =
   let hash = Hashtbl.hash (x, y) in
