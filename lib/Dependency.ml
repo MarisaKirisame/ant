@@ -197,6 +197,8 @@ let string_of_step (step : step) : string =
   let dst = step.dst in
   "(" ^ string_of_cek src ^ " -> " ^ string_of_cek dst ^ ")"
 
+let max_hc = ref 0
+
 let compose_step (x : step) (y : step) : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x.dst in*)
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) y.dst in*)
@@ -228,6 +230,10 @@ let compose_step (x : step) (y : step) : step =
         ret)
       (Option.get (zip_ek x.src s))
   in
+  (*let hc = fold_ek src 0 (fun acc src -> acc + (pattern_measure src).hole_count) in
+  if hc > !max_hc then (
+    print_endline ("new max hole count: " ^ string_of_int hc ^ " , sc:" ^ string_of_int (x.sc + y.sc) ^ ")");
+    max_hc := hc);*)
   let dst = pattern_to_value src in
   let dst = step_through x dst in
   (*if not (can_step_through y dst) then (
