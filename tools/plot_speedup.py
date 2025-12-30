@@ -173,12 +173,21 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output: Path) -> None:
     baselines = [baseline for baseline, _ in pairs_list]
     memos = [memo for _, memo in pairs_list]
     plt.figure(figsize=(6, 4.5))
-    plt.scatter(baselines, memos, alpha=0.75)
+    plt.scatter(memos, baselines, alpha=0.75)
+    min_time = min(min(baselines), min(memos))
+    max_time = max(max(baselines), max(memos))
+    plt.plot(
+        [min_time, max_time],
+        [min_time, max_time],
+        color="black",
+        linestyle="--",
+        linewidth=1,
+    )
     plt.xscale("log")
     plt.yscale("log")
-    plt.xlabel(f"Their ({METRIC_LABEL})")
-    plt.ylabel(f"Our ({METRIC_LABEL})")
-    plt.title(f"Their vs Our ({METRIC_LABEL}, log-log)")
+    plt.xlabel(f"Our ({METRIC_LABEL})")
+    plt.ylabel(f"Their ({METRIC_LABEL})")
+    plt.title(f"Our vs Their ({METRIC_LABEL}, log-log)")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.tight_layout()
     plt.savefig(output)
