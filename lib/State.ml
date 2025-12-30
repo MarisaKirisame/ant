@@ -21,9 +21,8 @@ and memo = trie option Array.t
 and reads = Read.read cek
 
 and trie =
-  | Atom of step
-  | Subsume of (step * trie)
-  | Split of { reads : reads; children : (int, trie) Hashtbl.t; mutable merging : merging list }
+  | Stem of (step * trie option)
+  | Branch of { reads : reads; children : (int, trie) Hashtbl.t; mutable merging : merging list }
 
 and merging = { reads : reads; children : (int, trie) Hashtbl.t; mutable miss_count : int }
 and world = { state : state; memo : memo; resolved : bool cek }
