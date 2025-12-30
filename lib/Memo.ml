@@ -347,19 +347,22 @@ let reads_hash (r : reads) (x : reads) : int option =
   in
   loop 0 (Dynarray.length r.e) acc
 
+let join_reads_slot = Profile.register_slot Profile.memo_profile "join_reads"
+
 type join_reads = { reads : reads; x_weaken : bool; y_weaken : bool }
 
 let join_reads (x : reads) (y : reads) : join_reads =
-  (*print_endline "calling joining reads:";*)
-  let x_weaken = ref false in
-  let y_weaken = ref false in
-  let join (a, b) =
-    let ret = Read.join a b x_weaken y_weaken in
-    (*print_endline ("join reads:\n  " ^ string_of_read a ^ "\n  " ^ string_of_read b ^ "\n= " ^ string_of_read ret);*)
-    ret
-  in
-  let reads = zip_ek x y |> Option.value_exn |> map_ek join in
-  { reads; x_weaken = !x_weaken; y_weaken = !y_weaken }
+  Profile.with_slot join_reads_slot (fun () ->
+      (*print_endline "calling joining reads:";*)
+      let x_weaken = ref false in
+      let y_weaken = ref false in
+      let join (a, b) =
+        let ret = Read.join a b x_weaken y_weaken in
+        (*print_endline ("join reads:\n  " ^ string_of_read a ^ "\n  " ^ string_of_read b ^ "\n= " ^ string_of_read ret);*)
+        ret
+      in
+      let reads = zip_ek x y |> Option.value_exn |> map_ek join in
+      { reads; x_weaken = !x_weaken; y_weaken = !y_weaken })
 
 let reads_from_patterns (p : Pattern.pattern cek) : reads = map_ek Read.read_from_pattern p
 let string_of_trie (t : trie) : string = match t with Atom _ -> "Atom" | Subsume _ -> "Subsume" | Split _ -> "Split"
@@ -500,6 +503,7 @@ let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step
         lookup_step_aux value children acc
       else acc
   | Split sp -> (
+      sp.merging <- [];
       sp.merging <-
         List.filter_map sp.merging ~f:(fun m ->
             let merge m_trie =
@@ -566,7 +570,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     let rec raw_step_n s n = if n = 0 then s else raw_step_n (raw_step s) (n - 1) in
     let dbg_step_through step state =
       assert (step.sc > 0);
-      let x = Profile.with_slot Profile.memo_profile step_through_slot (fun () -> Dependency.step_through step state) in
+      let x = Profile.with_slot step_through_slot (fun () -> Dependency.step_through step state) in
       (*let y = raw_step_n state step.sc in
       if not (Dependency.state_equal x y) then (
         print_endline "state before step:";
@@ -585,10 +589,8 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     (* Binary counter that incrementally composes adjacent slices; arguments are
        reversed so the newest slice sits on the right-hand side during carry. *)
     let compose_slice (y : slice) (x : slice) =
-      let step =
-        Profile.with_slot Profile.memo_profile compose_step_slot (fun () -> Dependency.compose_step x.step y.step)
-      in
-      Profile.with_slot Profile.memo_profile insert_step_slot (fun () -> insert_step m step);
+      let step = Profile.with_slot compose_step_slot (fun () -> Dependency.compose_step x.step y.step) in
+      Profile.with_slot insert_step_slot (fun () -> insert_step m step);
       { state = x.state; step }
     in
     let rec exec state =
@@ -597,7 +599,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
         (*let _ = map_ek (fun v -> assert (value_valid v)) state in*)
         log ("step " ^ string_of_int !i ^ ": " ^ string_of_int !sc);
         i := !i + 1;
-        match Profile.with_slot Profile.memo_profile lookup_step_slot (fun () -> lookup_step state m) with
+        match Profile.with_slot lookup_step_slot (fun () -> lookup_step state m) with
         | Some step ->
             hist := inc compose_slice { state; step } !hist;
             sc := !sc + step.sc;
@@ -619,7 +621,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int !sc ^ " step.");
     { words = Dynarray.get_last state.e; step = !i; without_memo_step = !sc }
   in
-  let result = Profile.with_slot Profile.memo_profile exec_cek_slot run in
+  let result = Profile.with_slot exec_cek_slot run in
   result
 
 let exec_done _ = failwith "exec is done, should not call step anymore"
