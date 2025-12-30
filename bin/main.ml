@@ -59,6 +59,7 @@ let backend =
   let cdds =
     [
       ("memo", (module CompileMemo.Backend : Compile.Backend));
+      ("reg-memo", (module CompileRegMemo.Backend : Compile.Backend));
       ("seq", (module CompileSeq.Backend : Compile.Backend));
       ("plain", (module CompilePlain.Backend));
     ]

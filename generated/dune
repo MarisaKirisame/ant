@@ -3,6 +3,7 @@
  (modules
   FromHazel
   TestCEK
+  TestRegCEK
   LiveCEK
   LivePlain
   LiveLexer
