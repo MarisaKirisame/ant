@@ -1,22 +1,22 @@
-type profile_slot = { mutable total_time : int; name : string }
-type profile_index = int option
-type timer_bot = { index : int }
-type timer_top = { index : int; start_time : Time_stamp_counter.t; stack : timer_bot list }
 type profile = { slots : profile_slot Dynarray.t; mutable timer : timer_top option }
+and profile_slot = { mutable total_time : int; name : string }
+and profile_index = (profile * int) option
+and timer_bot = { index : int }
+and timer_top = { index : int; start_time : Time_stamp_counter.t; stack : timer_bot list }
 
 let create_profile () : profile = { slots = Dynarray.create (); timer = None }
 
 let register_slot (p : profile) (name : string) : profile_index =
   let index = Dynarray.length p.slots in
   Dynarray.add_last p.slots { total_time = 0; name };
-  Some index
+  Some (p, index)
 
-let with_slot (p : profile) (index : profile_index) (f : unit -> 'a) : 'a =
-  let start_timer index stack =
+let with_slot (index : profile_index) (f : unit -> 'a) : 'a =
+  let start_timer p index stack =
     let start_time = Time_stamp_counter.now () in
     p.timer <- Some { index; start_time; stack }
   in
-  let stop_timer timer =
+  let stop_timer p timer =
     let end_time = Time_stamp_counter.now () in
     let calibrator = Lazy.force Time_stamp_counter.calibrator in
     let elapsed_time =
@@ -29,19 +29,19 @@ let with_slot (p : profile) (index : profile_index) (f : unit -> 'a) : 'a =
   in
   match index with
   | None -> f ()
-  | Some i ->
+  | Some (p, i) ->
       (match p.timer with
-      | None -> start_timer i []
+      | None -> start_timer p i []
       | Some timer ->
-          stop_timer timer;
-          start_timer i ({ index = timer.index } :: timer.stack));
+          stop_timer p timer;
+          start_timer p i ({ index = timer.index } :: timer.stack));
       let ret = f () in
       (match p.timer with
       | None -> failwith "unreachable"
       | Some timer -> (
-          stop_timer timer;
+          stop_timer p timer;
           assert (timer.index = i);
-          match timer.stack with [] -> p.timer <- None | bot :: rest -> start_timer bot.index rest));
+          match timer.stack with [] -> p.timer <- None | bot :: rest -> start_timer p bot.index rest));
       ret
 
 let dump_profile (p : profile) : (string * int) list =

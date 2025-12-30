@@ -382,7 +382,7 @@ let eval_plain (expr : LC.expr) : LC.value =
   let env = LC.Nil in
   let lp_expr = lp_expr_of_lc expr in
   let lp_env = lp_list_of_lc lp_value_of_lc env in
-  let lp_result = Profile.with_slot Profile.plain_profile eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
+  let lp_result = Profile.with_slot eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
   lc_value_of_lp lp_result
 
 let eval_expression ~memo ~write_steps x =
