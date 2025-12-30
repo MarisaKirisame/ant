@@ -133,10 +133,15 @@ let read_pop_n (r : read) n : read =
   assert ((read_measure y).degree = (read_measure r).degree - n);*)
   y
 
-let rec join (x : read) (y : read) (lhs_weaken : bool ref) (rhs_weaken : bool ref) : read =
+  type join = {
+    result : read;
+    stripped_x : read;
+    stripped_y : read;
+  }
+let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) : read =
   (*assert (read_valid x);
   assert (read_valid y);*)
-  let recurse x y = join x y lhs_weaken rhs_weaken in
+  let recurse x y = join x x_weaken y y_weaken in
   let return r =
     (*assert ((read_measure r).degree = (read_measure x).degree);
     assert ((read_measure r).max_degree = (read_measure x).max_degree);*)
@@ -154,25 +159,25 @@ let rec join (x : read) (y : read) (lhs_weaken : bool ref) (rhs_weaken : bool re
      *)
     | RSkip _, RSkip _ -> read_cons (RSkip 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
     | RSkip _, (RRead _ | RCon _) ->
-        rhs_weaken := true;
+        y_weaken := true;
         read_cons (RSkip 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
     | (RRead _ | RCon _), RSkip _ ->
-        lhs_weaken := true;
+        x_weaken := true;
         read_cons (RSkip 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
     | RRead _, RRead _ -> read_cons (RRead 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
     | RRead _, RCon _ ->
-        rhs_weaken := true;
+        y_weaken := true;
         read_cons (RRead 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
     | RCon _, RRead _ ->
-        lhs_weaken := true;
+        x_weaken := true;
         read_cons (RRead 1) (recurse (read_pop_n x 1) (read_pop_n y 1))
     | RCon xh, RCon yh ->
         let lca_length = Words.lca_length xh yh in
         if lca_length = 0 then (
           assert (not (Generic.is_empty xh));
           assert (not (Generic.is_empty yh));
-          lhs_weaken := true;
-          rhs_weaken := true;
+          x_weaken := true;
+          y_weaken := true;
           return (read_cons (RRead 1) (recurse (read_pop_n x 1) (read_pop_n y 1))))
         else
           let xhh, xht = Words.slice_length xh lca_length in

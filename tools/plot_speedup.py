@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 # Toggle the metric being reported. When True, plot wall-clock time speedups;
 # when False, plot evaluation-step speedups.
@@ -176,6 +177,12 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output: Path) -> None:
     plt.scatter(memos, baselines, alpha=0.75)
     min_time = min(min(baselines), min(memos))
     max_time = max(max(baselines), max(memos))
+    log_memos = np.log10(memos)
+    log_baselines = np.log10(baselines)
+    slope, intercept = np.polyfit(log_memos, log_baselines, 1)
+    reg_x = np.array([min_time, max_time])
+    reg_y = 10 ** (slope * np.log10(reg_x) + intercept)
+    plt.plot(reg_x, reg_y, color="tab:blue", linewidth=1.5, label="Linear fit")
     plt.plot(
         [min_time, max_time],
         [min_time, max_time],
@@ -189,6 +196,7 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output: Path) -> None:
     plt.ylabel(f"Their ({METRIC_LABEL})")
     plt.title(f"Our vs Their ({METRIC_LABEL}, log-log)")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.legend()
     plt.tight_layout()
     plt.savefig(output)
     plt.close()
