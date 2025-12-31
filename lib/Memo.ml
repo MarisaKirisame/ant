@@ -418,13 +418,18 @@ let rec merge (x : trie) (y : trie) : trie =
           let children = Hashtbl.create (module Int) in
           let x_key, x_reads = Option.value_exn (reads_hash j.reads x.reads) in
           Hashtbl.set children x_key (Stem { x with reads = j.x_rest });
+          Hashtbl.iter y.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
           Branch
             {
               reads = j.reads;
               children;
-              merging =
-                { reads = y.reads; children = y.children; miss_count = 0 }
-                :: [] (*List.map y.merging ~f:(rebase_merging y.reads);*);
+              merging = [];
+              (*{ reads = y.reads; children = y.children; miss_count = 0 }
+                :: List.map y.merging ~f:(rebase_merging y.reads);*)
             }
       | false, true -> Stem { x with next = merge_option x.next (Some (Branch { y with reads = j.y_rest })) }
       | true, false ->
@@ -441,6 +446,16 @@ let rec merge (x : trie) (y : trie) : trie =
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
           let children = Hashtbl.create (module Int) in
+          Hashtbl.iter x.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
+          Hashtbl.iter y.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
           Branch
             {
               reads = j.reads;
@@ -453,22 +468,32 @@ let rec merge (x : trie) (y : trie) : trie =
                   :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
             }
       | true, false ->
+          Hashtbl.iter x.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update y.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
           Branch
             {
               reads = y.reads;
               children = y.children;
-              merging = y.merging;
+              merging = [];
               (*merging =
                 { reads = j.x_rest; children = x.children; miss_count = 0 }
                 :: List.map x.merging ~f:(rebase_merging j.x_rest)
                 @ y.merging;*)
             }
       | false, true ->
+          Hashtbl.iter y.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update x.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
           Branch
             {
               reads = x.reads;
               children = x.children;
-              merging = x.merging;
+              merging = [];
               (*merging =
                 x.merging
                 @ { reads = j.y_rest; children = y.children; miss_count = 0 }
