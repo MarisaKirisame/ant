@@ -418,8 +418,7 @@ let rec merge (x : trie) (y : trie) : trie =
           Branch
             {
               reads = j.reads;
-              children;
-              merging = [];
+              children; merging = [];
               (*merging =
                 { reads = j.y_rest; children = y.children; miss_count = 0 }
                 :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
