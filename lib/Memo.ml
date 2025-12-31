@@ -357,7 +357,7 @@ let join_reads (x : reads) (y : reads) : join_reads =
       let x_weaken = ref false in
       let y_weaken = ref false in
       let join (a, b) =
-        let ret = Read.join a x_weaken b y_weaken in
+        let ret = Read.join a x_weaken Generic.empty b y_weaken Generic.empty Generic.empty in
         (*print_endline ("join reads:\n  " ^ string_of_read a ^ "\n  " ^ string_of_read b ^ "\n= " ^ string_of_read ret);*)
         ret
       in
@@ -446,7 +446,7 @@ let rec merge (x : trie) (y : trie) : trie =
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
           let children = Hashtbl.create (module Int) in
-        (*
+          (*
           Hashtbl.iter x.children ~f:(fun child_trie ->
               let child_key, child_reads =
                 Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
@@ -469,7 +469,7 @@ let rec merge (x : trie) (y : trie) : trie =
                   :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
             }
       | true, false ->
-        (*
+          (*
           Hashtbl.iter x.children ~f:(fun child_trie ->
               let child_key, child_reads =
                 Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
@@ -486,8 +486,7 @@ let rec merge (x : trie) (y : trie) : trie =
                 @ y.merging;*)
             }
       | false, true ->
-        (*
-          Hashtbl.iter y.children ~f:(fun child_trie ->
+          (*Hashtbl.iter y.children ~f:(fun child_trie ->
               let child_key, child_reads =
                 Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
               in
