@@ -206,13 +206,15 @@ let init_memo () : memo = Array.create ~len:(Dynarray.length pc_map) None
 
 let rec value_hash (r : Read.read) (v : Value.value) (hash_acc : int) (value_acc : Value.value) :
     (int * Value.value) option =
+  (*assert (Read.read_valid r);
+  assert (Value.value_valid v);*)
   if Generic.is_empty r then Some (hash_acc, value_acc)
   else
     let rh, rt = Read.read_front_exn r in
     match rh with
     | RSkip n ->
         let vh, vt = Value.pop_n v n in
-        value_hash rt vt hash_acc (Value.append vh value_acc)
+        value_hash rt vt hash_acc (Value.append value_acc vh)
     | RRead n ->
         let rec loop n v hash_acc value_acc =
           if n = 0 then value_hash rt v hash_acc value_acc
@@ -226,27 +228,6 @@ let rec value_hash (r : Read.read) (v : Value.value) (hash_acc : int) (value_acc
         loop n v hash_acc value_acc
     | RCon c -> ( match Value.unwords v c with None -> None | Some v -> value_hash rt v hash_acc value_acc)
 
-let values_hash (r : reads) (v : State.state) : (int * State.state) option =
-  assert (Dynarray.length r.e = Dynarray.length v.e);
-  let acc = value_hash r.k v.k 0 Generic.empty in
-  match acc with
-  | None -> None
-  | Some (k_hash, k_rest) ->
-      let e = Dynarray.create () in
-      Dynarray.set_capacity e (Dynarray.length v.e);
-      let rec loop i j acc =
-        if i < j then (
-          let r_e = Dynarray.get r.e i in
-          let v_e = Dynarray.get v.e i in
-          match value_hash r_e v_e acc Generic.empty with
-          | None -> None
-          | Some (r_e_hash, r_e_rest) ->
-              Dynarray.add_last e r_e_rest;
-              loop (i + 1) j r_e_hash)
-        else Some (acc, { c = v.c; e; k = k_rest })
-      in
-      loop 0 (Dynarray.length r.e) k_hash
-
 let string_of_red (r : Read.red) : string =
   match r with
   | RRead n -> "RRead(" ^ string_of_int n ^ ")"
@@ -256,7 +237,46 @@ let string_of_red (r : Read.red) : string =
 let string_of_read (r : Read.read) : string =
   "[" ^ String.concat ~sep:";" (List.map ~f:string_of_red (Generic.to_list r)) ^ "]"
 
+let string_of_reads (r : reads) : string =
+  let k_str = "k: " ^ string_of_read r.k in
+  let e_str = "e: [" ^ String.concat ~sep:"; " (List.map ~f:string_of_read (Dynarray.to_list r.e)) ^ "]" in
+  "{" ^ e_str ^ k_str ^ "; " ^ "}"
+
+let values_hash (r : reads) (v : State.state) : (int * State.state) option =
+  assert (Dynarray.length r.e = Dynarray.length v.e);
+  let acc = value_hash r.k v.k 0 Generic.empty in
+  let ret result =
+    (*(match result with
+    | None ->
+        print_endline
+          ("calling value_hash on\n" ^ string_of_reads r ^ " and state\n" ^ string_of_cek v ^ " returned None")
+    | Some (_, rest) ->
+        print_endline
+          ("calling value_hash on\n" ^ string_of_reads r ^ " and state\n" ^ string_of_cek v
+         ^ " returned Some with rest\n" ^ string_of_cek rest));*)
+    result
+  in
+  match acc with
+  | None -> ret None
+  | Some (k_hash, k_rest) ->
+      let e = Dynarray.create () in
+      Dynarray.set_capacity e (Dynarray.length v.e);
+      let rec loop i j acc =
+        if i < j then (
+          let r_e = Dynarray.get r.e i in
+          let v_e = Dynarray.get v.e i in
+          match value_hash r_e v_e acc Generic.empty with
+          | None -> ret None
+          | Some (r_e_hash, r_e_rest) ->
+              Dynarray.add_last e r_e_rest;
+              loop (i + 1) j r_e_hash)
+        else ret (Some (acc, { c = v.c; e; k = k_rest }))
+      in
+      loop 0 (Dynarray.length r.e) k_hash
+
 let rec read_hash (r : Read.read) (x : Read.read) (hash_acc : int) (read_acc : Read.read) : (int * Read.read) option =
+  (*assert (Read.read_valid r);
+  assert (Read.read_valid x);*)
   let return ret = ret in
   if Generic.is_empty r then (
     assert (Generic.is_empty x);
@@ -292,11 +312,25 @@ let rec read_hash (r : Read.read) (x : Read.read) (hash_acc : int) (read_acc : R
                 return (read_hash rt x hash_acc read_acc))
         | RRead _ | RSkip _ -> return None)
 
+let reads_equal (x : reads) (y : reads) : bool =
+  x.c.pc = y.c.pc && List.equal Read.read_equal (Dynarray.to_list x.e) (Dynarray.to_list y.e) && Read.read_equal x.k y.k
+
+let unmatch_reads (x : reads) (y : reads) : reads =
+  zip_ek x y |> Option.value_exn |> map_ek (fun (a, b) -> Read.unmatch_read a b)
+
 let reads_hash (r : reads) (x : reads) : (int * reads) option =
   assert (Dynarray.length r.e = Dynarray.length x.e);
+  let ret re =
+    re
+    (*match re with
+    | None -> None
+    | Some ((_, re) as full_re) ->
+        assert (reads_equal x (unmatch_reads r re));
+        Some full_re*)
+  in
   let acc = read_hash r.k x.k 0 Generic.empty in
   match acc with
-  | None -> None
+  | None -> ret None
   | Some (k_hash, k_rest) ->
       let e = Dynarray.create () in
       Dynarray.set_capacity e (Dynarray.length r.e);
@@ -309,7 +343,7 @@ let reads_hash (r : reads) (x : reads) : (int * reads) option =
           | Some (r_e_hash, r_e_rest) ->
               Dynarray.add_last e r_e_rest;
               loop (i + 1) j r_e_hash)
-        else Some (acc, { c = x.c; e; k = k_rest })
+        else ret (Some (acc, { c = x.c; e; k = k_rest }))
       in
       loop 0 (Dynarray.length r.e) k_hash
 
@@ -328,62 +362,81 @@ let join_reads (x : reads) (y : reads) : join_reads =
         ret
       in
       let reads = zip_ek x y |> Option.value_exn |> map_ek join in
-      {
-        reads = map_ek (fun (x : Read.join) -> x.result) reads;
-        x_weaken = !x_weaken;
-        x_rest = map_ek (fun (x : Read.join) -> x.x_rest) reads;
-        y_weaken = !y_weaken;
-        y_rest = map_ek (fun (x : Read.join) -> x.y_rest) reads;
-      })
+      let ret =
+        {
+          reads = map_ek (fun (x : Read.join) -> x.result) reads;
+          x_weaken = !x_weaken;
+          x_rest = map_ek (fun (x : Read.join) -> x.x_rest) reads;
+          y_weaken = !y_weaken;
+          y_rest = map_ek (fun (x : Read.join) -> x.y_rest) reads;
+        }
+      in
+      (*assert (reads_equal x (unmatch_reads ret.reads ret.x_rest));
+      assert (reads_equal y (unmatch_reads ret.reads ret.y_rest));*)
+      ret)
 
 let reads_from_patterns (p : Pattern.pattern cek) : reads = map_ek Read.read_from_pattern p
 let string_of_trie (t : trie) : string = match t with Stem _ -> "Stem" | Branch _ -> "Branch"
-
-let reads_from_trie (t : trie) : reads =
-  match t with Stem (s, _) -> reads_from_patterns s.src | Branch { reads; _ } -> reads
-
-let string_of_reads (r : reads) : string =
-  let k_str = "k: " ^ string_of_read r.k in
-  let e_str = "e: [" ^ String.concat ~sep:"; " (List.map ~f:string_of_read (Dynarray.to_list r.e)) ^ "]" in
-  "{" ^ k_str ^ "; " ^ e_str ^ "}"
+let reads_from_trie (t : trie) : reads = match t with Stem { reads; _ } -> reads | Branch { reads; _ } -> reads
 
 let rec merge (x : trie) (y : trie) : trie =
+  let rebase_merging (delta : reads) (m : merging) : merging =
+    { reads = unmatch_reads delta m.reads; children = m.children; miss_count = 0 }
+  in
   match (x, y) with
-  | Stem (xp, xc), Stem (yp, yc) -> (
-      let j = join_reads (reads_from_patterns xp.src) (reads_from_patterns yp.src) in
+  | Stem x, Stem y -> (
+      let j = join_reads x.reads y.reads in
+      (*print_endline
+        ("Merging Stem/Stem:\n  x reads: " ^ string_of_reads x.reads ^ "\n  y reads: " ^ string_of_reads y.reads
+       ^ "\n  result:  " ^ string_of_reads j.reads ^ "\n  x_rest:  " ^ string_of_reads j.x_rest ^ "\n  y_rest:  "
+       ^ string_of_reads j.y_rest);*)
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
           let children = Hashtbl.create (module Int) in
-          let x_key, _ = Option.value_exn (reads_hash j.reads (reads_from_patterns xp.src)) in
-          let y_key, _ = Option.value_exn (reads_hash j.reads (reads_from_patterns yp.src)) in
+          let x_key, x_reads = Option.value_exn (reads_hash j.reads x.reads) in
+          let y_key, y_reads = Option.value_exn (reads_hash j.reads y.reads) in
           assert (x_key <> y_key);
-          Hashtbl.set children x_key (Stem (xp, xc));
-          Hashtbl.set children y_key (Stem (yp, yc));
+          Hashtbl.set children x_key (Stem { x with reads = j.x_rest });
+          Hashtbl.set children y_key (Stem { y with reads = j.y_rest });
           Branch { reads = j.reads; children; merging = [] }
-      | false, true -> Stem (xp, merge_option xc (Some y))
-      | true, false -> Stem (yp, merge_option yc (Some x))
-      | false, false -> if xp.sc >= yp.sc then Stem (xp, merge_option xc yc) else Stem (yp, merge_option xc yc))
-  | Stem (xp, xc), Branch { reads = yr; children = yc; merging = ym } -> (
-      let j = join_reads (reads_from_patterns xp.src) yr in
+      | false, true -> Stem { x with next = merge_option x.next (Some (Stem { y with reads = j.y_rest })) }
+      | true, false -> Stem { y with next = merge_option y.next (Some (Stem { x with reads = j.x_rest })) }
+      | false, false ->
+          let next = merge_option x.next y.next in
+          if x.step.sc >= y.step.sc then Stem { x with next } else Stem { y with next })
+  | Stem x, Branch y -> (
+      let j = join_reads x.reads y.reads in
+      (*print_endline
+        ("Merging Stem/Branch:\n  x reads: " ^ string_of_reads x.reads ^ "\n  y reads: " ^ string_of_reads y.reads
+       ^ "\n  result:  " ^ string_of_reads j.reads ^ "\n  x_rest:  " ^ string_of_reads j.x_rest ^ "\n  y_rest:  "
+       ^ string_of_reads j.y_rest);*)
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
           let children = Hashtbl.create (module Int) in
-          let x_key, _ = Option.value_exn (reads_hash j.reads (reads_from_patterns xp.src)) in
-          Hashtbl.set children x_key (Stem (xp, xc));
-          Branch { reads = j.reads; children; merging = [ { reads = yr; children = yc; miss_count = 0 } ] }
+          let x_key, x_reads = Option.value_exn (reads_hash j.reads x.reads) in
+          Hashtbl.set children x_key (Stem { x with reads = j.x_rest });
+          Branch
+            {
+              reads = j.reads;
+              children;
+              merging = [];
+              (*merging =
+                { reads = j.y_rest; children = y.children; miss_count = 0 }
+                :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
+            }
+      | false, true -> Stem { x with next = merge_option x.next (Some (Branch { y with reads = j.y_rest })) }
       | true, false ->
-          let x_key, _ = Option.value_exn (reads_hash yr (reads_from_patterns xp.src)) in
-          Hashtbl.update yc x_key ~f:(insert_option (Stem (xp, xc)));
-          Branch { reads = yr; children = yc; merging = ym }
-      | false, true -> Stem (xp, merge_option xc (Some y))
+          let x_key, x_reads = Option.value_exn (reads_hash j.reads x.reads) in
+          Hashtbl.update y.children x_key ~f:(insert_option (Stem { x with reads = x_reads }));
+          Branch y
       | _ ->
           failwith
-            ("merge not implemented yet for Stem/Branch:" ^ string_of_bool j.x_weaken ^ ","
-           ^ string_of_bool j.y_weaken))
-  | Branch { reads = xr; children = xc; merging = xm }, Stem (yp, yc) ->
-      merge (Stem (yp, yc)) (Branch { reads = xr; children = xc; merging = xm })
-  | Branch { reads = xr; children = xc; merging = xm }, Branch { reads = yr; children = yc; merging = ym } -> (
-      let j = join_reads xr yr in
+            ("merge not implemented yet for Stem/Branch:" ^ string_of_bool j.x_weaken ^ "," ^ string_of_bool j.y_weaken)
+      )
+  | Branch x, Stem y -> merge (Stem y) (Branch x)
+  | Branch x, Branch y -> (
+      failwith "meow";
+      let j = join_reads x.reads y.reads in
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
           let children = Hashtbl.create (module Int) in
@@ -391,19 +444,40 @@ let rec merge (x : trie) (y : trie) : trie =
             {
               reads = j.reads;
               children;
-              merging =
-                ({ reads = xr; children = xc; miss_count = 0 } :: xm)
-                @ ({ reads = yr; children = yc; miss_count = 0 } :: ym);
+              merging = [];
+              (*merging =
+                { reads = j.x_rest; children = x.children; miss_count = 0 }
+                :: List.map x.merging ~f:(rebase_merging j.x_rest)
+                @ { reads = j.y_rest; children = y.children; miss_count = 0 }
+                  :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
             }
       | true, false ->
-          Branch { reads = yr; children = yc; merging = ({ reads = xr; children = xc; miss_count = 0 } :: xm) @ ym }
+          Branch
+            {
+              reads = y.reads;
+              children = y.children;
+              merging =
+                []
+                (*merging =
+                { reads = j.x_rest; children = x.children; miss_count = 0 }
+                :: List.map x.merging ~f:(rebase_merging j.x_rest)
+                @ y.merging;*);
+            }
       | false, true ->
-          Branch { reads = xr; children = xc; merging = xm @ ({ reads = yr; children = yc; miss_count = 0 } :: ym) }
+          Branch
+            {
+              reads = x.reads;
+              children = x.children;
+              merging = [];
+              (*merging =
+                x.merging
+                @ { reads = j.y_rest; children = y.children; miss_count = 0 }
+                  :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
+            }
       | _ ->
           failwith
             ("merge not implemented yet for Branch/Branch:" ^ string_of_bool j.x_weaken ^ ","
            ^ string_of_bool j.y_weaken))
-  | _ -> failwith ("merge not implemented yet for: " ^ string_of_trie x ^ " and " ^ string_of_trie y)
 
 and merge_option (x : trie option) (y : trie option) : trie option =
   match (x, y) with None, _ -> y | _, None -> x | Some x, Some y -> Some (merge x y)
@@ -411,22 +485,29 @@ and merge_option (x : trie option) (y : trie option) : trie option =
 and insert_option (x : trie) (y : trie option) : trie = match y with None -> x | Some y -> merge x y
 
 let insert_step (m : memo) (step : step) : unit =
-  Array.set m step.src.c.pc (Some (insert_option (Stem (step, None)) (Array.get m step.src.c.pc)))
+  Array.set m step.src.c.pc
+    (Some (insert_option (Stem { reads = reads_from_patterns step.src; step; next = None }) (Array.get m step.src.c.pc)))
 
 let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step option =
   match trie with
-  | Stem (parent, child) ->
-      if Dependency.can_step_through parent value then
-        let acc =
-          match acc with None -> Some parent | Some step' -> if parent.sc > step'.sc then Some parent else Some step'
-        in
-        match child with None -> acc | Some child -> lookup_step_aux value child acc
-      else acc
+  | Stem st -> (
+      match values_hash st.reads value with
+      | None -> acc
+      | Some (_, value) -> (
+          let acc =
+            match acc with
+            | None -> Some st.step
+            | Some step' -> if st.step.sc > step'.sc then Some st.step else Some step'
+          in
+          match st.next with None -> acc | Some child -> lookup_step_aux value child acc))
   | Branch br -> (
+      br.merging <- [];
       br.merging <-
         List.filter_map br.merging ~f:(fun m ->
             let merge m_trie =
-              let m_hash, _ = reads_hash br.reads (reads_from_trie m_trie) |> Option.value_exn in
+              let m_hash, _ =
+                reads_hash br.reads (unmatch_reads m.reads (reads_from_trie m_trie)) |> Option.value_exn
+              in
               Hashtbl.update br.children m_hash ~f:(insert_option m_trie)
             in
             let on_miss () =
@@ -447,7 +528,7 @@ let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step
                     Some m));
       match values_hash br.reads value with
       | None -> acc
-      | Some (key, _) -> (
+      | Some (key, value) -> (
           match Hashtbl.find br.children key with
           | None -> acc
           | Some child_trie -> lookup_step_aux value child_trie acc))
@@ -489,6 +570,8 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     let rec raw_step_n s n = if n = 0 then s else raw_step_n (raw_step s) (n - 1) in
     let dbg_step_through step state =
       assert (step.sc > 0);
+      if not (Dependency.can_step_through step state) then
+        print_endline ("cannot step through: " ^ Dependency.string_of_step step);
       let x = Profile.with_slot step_through_slot (fun () -> Dependency.step_through step state) in
       (*let y = raw_step_n state step.sc in
       if not (Dependency.state_equal x y) then (
@@ -510,6 +593,11 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     let compose_slice (y : slice) (x : slice) =
       let step = Profile.with_slot compose_step_slot (fun () -> Dependency.compose_step x.step y.step) in
       Profile.with_slot insert_step_slot (fun () -> insert_step m step);
+      (*let lookuped = lookup_step x.state m |> Option.value_exn in
+      if lookuped != step then
+        failwith
+          ("composed step is different from looked up step:" ^ Dependency.string_of_step step ^ "lookuped: "
+         ^ Dependency.string_of_step lookuped);*)
       { state = x.state; step }
     in
     let rec exec state =

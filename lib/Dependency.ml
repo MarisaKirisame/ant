@@ -278,7 +278,7 @@ let bracket x = "(" ^ x ^ ")"
 let string_of_step (step : step) : string =
   let src = pattern_to_value step.src in
   let dst = step.dst in
-  bracket (string_of_cek src ^ " => " ^ string_of_cek dst)
+  bracket (string_of_cek src ^ " =>" ^ string_of_int step.sc ^ " " ^ string_of_cek dst)
 
 let value_equal (x : value) (y : value) : bool = Generic.equal equal_fg_et x y
 
