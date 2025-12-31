@@ -596,8 +596,8 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     let rec raw_step_n s n = if n = 0 then s else raw_step_n (raw_step s) (n - 1) in
     let dbg_step_through step state =
       assert (step.sc > 0);
-      if not (Dependency.can_step_through step state) then
-        print_endline ("cannot step through: " ^ Dependency.string_of_step step);
+      (*if not (Dependency.can_step_through step state) then
+        print_endline ("cannot step through: " ^ Dependency.string_of_step step);*)
       let x = Profile.with_slot step_through_slot (fun () -> Dependency.step_through step state) in
       (*let y = raw_step_n state step.sc in
       if not (Dependency.state_equal x y) then (
