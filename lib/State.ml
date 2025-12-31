@@ -21,7 +21,7 @@ and memo = trie option Array.t
 and reads = Read.read cek
 
 and trie =
-  | Stem of (step * trie option)
+  | Stem of { reads : reads; step : step; next : trie option }
   | Branch of { reads : reads; children : (int, trie) Hashtbl.t; mutable merging : merging list }
 
 and merging = { reads : reads; children : (int, trie) Hashtbl.t; mutable miss_count : int }

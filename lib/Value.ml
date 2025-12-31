@@ -26,7 +26,7 @@ let measure (et : fg_et) : measure_t =
       { degree = m.degree; max_degree = m.max_degree }
   | Reference r -> { degree = r.values_count; max_degree = r.values_count }
 
-(*let rec value_valid x : bool =
+let rec value_valid x : bool =
   match Generic.front x ~monoid ~measure with
   | None -> true
   | Some (rest, x) -> (
@@ -38,7 +38,7 @@ let measure (et : fg_et) : measure_t =
             | Reference _, Words _ -> true
             | Words _, Words _ -> false
             | Words _, Reference _ -> true)
-          && value_valid rest)*)
+          && value_valid rest)
 
 let summary x = Generic.measure ~monoid ~measure x
 

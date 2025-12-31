@@ -25,7 +25,7 @@ let red_measure (r : red) : Pattern.measure =
   | RSkip n -> { degree = n; max_degree = n; hole_count = 1 }
   | RCon c -> { degree = (Words.summary c).degree; max_degree = (Words.summary c).max_degree; hole_count = 0 }
 
-(*let rec read_valid x : bool =
+let rec read_valid x : bool =
   match Generic.front x ~monoid ~measure:red_measure with
   | None -> true
   | Some (rest, x) -> (
@@ -39,7 +39,7 @@ let red_measure (r : red) : Pattern.measure =
             | RRead _, _ -> true
             | RSkip _, RSkip _ -> false
             | RSkip _, _ -> true)
-          && read_valid rest)*)
+          && read_valid rest)
 
 let read_measure (r : read) : Pattern.measure = Generic.measure ~monoid ~measure:red_measure r
 let read_is_empty (r : read) : bool = Generic.is_empty r
@@ -133,6 +133,18 @@ let read_pop_n (r : read) n : read =
   assert ((read_measure y).degree = (read_measure r).degree - n);*)
   y
 
+let rec unmatch_read (x : read) (y : read) : read =
+  if Generic.is_empty x then (
+    assert (Generic.is_empty y);
+    Generic.empty)
+  else
+    let xh, xt = read_front_exn x in
+    match xh with
+    | RSkip n | RRead n ->
+        let yh, yt = read_slice y n in
+        read_append yh (unmatch_read xt yt)
+    | RCon c -> read_cons (RCon c) (unmatch_read xt y)
+
 type join = { result : read; x_rest : read; y_rest : read }
 
 let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) : join =
@@ -156,7 +168,6 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) :
       let xh, xt = read_slice x slice_length in
       let yh, yt = read_slice y slice_length in
       let res = recurse xt yt in
-
       {
         result = read_cons slice_reason res.result;
         x_rest = read_append xh res.x_rest;
@@ -209,3 +220,13 @@ let read_from_pattern (p : Pattern.pattern) : read =
   Generic.map ~monoid ~measure:red_measure
     (fun pat -> match pat with Pattern.PVar n -> make_rskip n | Pattern.PCon c -> RCon c)
     p
+
+let read_equal (x : read) (y : read) : bool =
+  Generic.equal
+    (fun a b ->
+      match (a, b) with
+      | RRead n1, RRead n2 -> n1 = n2
+      | RSkip n1, RSkip n2 -> n1 = n2
+      | RCon c1, RCon c2 -> Words.equal_words c1 c2
+      | _ -> false)
+    x y
