@@ -178,14 +178,26 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) :
     (* We have to pop them off one of a time, because a small chunk might be masking a larger chunk.
      * A more principled approach would be to calculate the lca.
      *)
-    | RSkip _, RSkip _ -> return (slice 1 (RSkip 1))
-    | RSkip _, (RRead _ | RCon _) ->
+    | RSkip x, RSkip y ->
+        let m = min x y in
+        return (slice m (RSkip m))
+    | RSkip x, RRead y ->
+        let m = min x y in
+        y_weaken := true;
+        return (slice m (RSkip m))
+    | RSkip _, RCon _ ->
         y_weaken := true;
         return (slice 1 (RSkip 1))
-    | (RRead _ | RCon _), RSkip _ ->
+    | RRead x, RSkip y ->
+        let m = min x y in
+        x_weaken := true;
+        return (slice m (RSkip m))
+    | RCon _, RSkip _ ->
         x_weaken := true;
         return (slice 1 (RSkip 1))
-    | RRead _, RRead _ -> return (slice 1 (RRead 1))
+    | RRead x, RRead y ->
+        let m = min x y in
+        return (slice m (RRead m))
     | RRead _, RCon _ ->
         y_weaken := true;
         return (slice 1 (RRead 1))
