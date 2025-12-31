@@ -379,6 +379,9 @@ let reads_from_patterns (p : Pattern.pattern cek) : reads = map_ek Read.read_fro
 let string_of_trie (t : trie) : string = match t with Stem _ -> "Stem" | Branch _ -> "Branch"
 let reads_from_trie (t : trie) : reads = match t with Stem { reads; _ } -> reads | Branch { reads; _ } -> reads
 
+let set_reads_of_trie (t : trie) (r : reads) : trie =
+  match t with Stem x -> Stem { x with reads = r } | Branch x -> Branch { x with reads = r }
+
 let rec merge (x : trie) (y : trie) : trie =
   let rebase_merging (delta : reads) (m : merging) : merging =
     { reads = unmatch_reads delta m.reads; children = m.children; miss_count = 0 }
@@ -418,10 +421,10 @@ let rec merge (x : trie) (y : trie) : trie =
           Branch
             {
               reads = j.reads;
-              children; merging = [];
-              (*merging =
-                { reads = j.y_rest; children = y.children; miss_count = 0 }
-                :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
+              children;
+              merging =
+                { reads = y.reads; children = y.children; miss_count = 0 }
+                :: [] (*List.map y.merging ~f:(rebase_merging y.reads);*);
             }
       | false, true -> Stem { x with next = merge_option x.next (Some (Branch { y with reads = j.y_rest })) }
       | true, false ->
@@ -434,7 +437,6 @@ let rec merge (x : trie) (y : trie) : trie =
       )
   | Branch x, Stem y -> merge (Stem y) (Branch x)
   | Branch x, Branch y -> (
-      failwith "meow";
       let j = join_reads x.reads y.reads in
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
@@ -455,19 +457,18 @@ let rec merge (x : trie) (y : trie) : trie =
             {
               reads = y.reads;
               children = y.children;
-              merging =
-                []
-                (*merging =
+              merging = y.merging;
+              (*merging =
                 { reads = j.x_rest; children = x.children; miss_count = 0 }
                 :: List.map x.merging ~f:(rebase_merging j.x_rest)
-                @ y.merging;*);
+                @ y.merging;*)
             }
       | false, true ->
           Branch
             {
               reads = x.reads;
               children = x.children;
-              merging = [];
+              merging = x.merging;
               (*merging =
                 x.merging
                 @ { reads = j.y_rest; children = y.children; miss_count = 0 }
@@ -500,14 +501,13 @@ let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step
           in
           match st.next with None -> acc | Some child -> lookup_step_aux value child acc))
   | Branch br -> (
-      br.merging <- [];
       br.merging <-
         List.filter_map br.merging ~f:(fun m ->
             let merge m_trie =
-              let m_hash, _ =
+              let m_hash, m_reads =
                 reads_hash br.reads (unmatch_reads m.reads (reads_from_trie m_trie)) |> Option.value_exn
               in
-              Hashtbl.update br.children m_hash ~f:(insert_option m_trie)
+              Hashtbl.update br.children m_hash ~f:(insert_option (set_reads_of_trie m_trie m_reads))
             in
             let on_miss () =
               m.miss_count <- m.miss_count + 1;
