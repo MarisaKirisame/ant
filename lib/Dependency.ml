@@ -205,6 +205,7 @@ let string_of_step (step : step) : string =
   "(" ^ string_of_cek src ^ " -> " ^ string_of_cek dst ^ ")"
 
 let compose_step_step_through_slot = Profile.register_slot Profile.memo_profile "compose_step.step_through"
+let unify_vp_slot = Profile.register_slot Profile.memo_profile "unify_vp"
 
 let compose_step (x : step) (y : step) : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x.dst in*)
@@ -226,7 +227,8 @@ let compose_step (x : step) (y : step) : step =
     in
     Array.of_list (loop p)
   in
-  let s = unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src) in
+  let s = 
+    Profile.with_slot unify_vp_slot (fun _ -> unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src)) in
   let src =
     zipwith_ek
       (fun p s ->
