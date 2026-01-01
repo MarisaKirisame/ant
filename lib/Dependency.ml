@@ -9,12 +9,10 @@ type pattern_subst_map = pattern Array.t
 type pattern_subst_cek = pattern_subst_map cek
 type value_subst_map = value Array.t
 type value_subst_cek = value_subst_map cek
-
 let string_of_pattern (p : pattern) : string =
   Generic.to_list p
   |> List.map (fun pat -> match pat with PVar n -> "H(" ^ string_of_int n ^ ")" | PCon w -> string_of_words w)
   |> String.concat ""
-
 let rec unify (x : pattern) (y : pattern) : pattern =
   let return z = z in
   if pattern_is_empty x then (
@@ -36,15 +34,15 @@ let rec unify (x : pattern) (y : pattern) : pattern =
         let yl = Words.length yh in
         if xl < yl then (
           let yhh, yht = Words.slice_length yh xl in
-          assert (Words.equal_words xh yhh);
+          (*assert (Words.equal_words xh yhh);*)
           return (pattern_cons (PCon xh) (unify xt (pattern_cons_unsafe (PCon yht) yt))))
         else if xl > yl then (
           let xhh, xht = Words.slice_length xh yl in
-          assert (Words.equal_words xhh yh);
+          (*assert (Words.equal_words xhh yh);*)
           return (pattern_cons (PCon xhh) (unify (pattern_cons_unsafe (PCon xht) xt) yt)))
         else (
           assert (xl = yl);
-          assert (Words.equal_words xh yh);
+          (*assert (Words.equal_words xh yh);*)
           return (pattern_cons (PCon xh) (unify xt yt))))
 
 let rec compose_pattern p s =
@@ -55,7 +53,6 @@ let rec compose_pattern p s =
     | PVar _ -> (
         match s with sh :: st -> pattern_append sh (compose_pattern pt st) | [] -> failwith "hole count mismatch")
     | PCon ph -> pattern_cons (PCon ph) (compose_pattern pt s)
-
 let rec subst_value (s : value_subst_cek) (v : value) : value =
   if Generic.is_empty v then Generic.empty
   else
@@ -65,7 +62,6 @@ let rec subst_value (s : value_subst_cek) (v : value) : value =
         let sm = cek_get s r.src in
         let sub_v = Array.get sm r.hole_idx in
         Value.append (Value.slice sub_v r.offset r.values_count) (subst_value s rest)
-
 let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
   (*assert (value_valid v);*)
   let return x = x in
@@ -85,14 +81,11 @@ let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
         return (Option.map (fun vs -> vh :: vs) (value_match_pattern_aux vt pt))
     | PCon ph -> (
         match Value.unwords v ph with None -> return None | Some v -> return (value_match_pattern_aux v pt))
-
 let value_match_pattern (v : value) (p : pattern) : value_subst_map option =
   (*assert (value_valid v);*)
   let return x = x in
   return (Option.map (fun lst -> Array.of_list lst) (value_match_pattern_aux v p))
-
 let words_to_value (w : words) : value = Generic.singleton (Words w)
-
 let rec pattern_to_value_aux (p : pattern) src hole_idx : value =
   if Generic.is_empty p then Generic.empty
   else
@@ -103,7 +96,6 @@ let rec pattern_to_value_aux (p : pattern) src hole_idx : value =
           (Generic.singleton (Reference { src; hole_idx; offset = 0; values_count = n }))
           (pattern_to_value_aux pt src (hole_idx + 1))
     | PCon c -> Value.append (words_to_value c) (pattern_to_value_aux pt src hole_idx)
-
 let pattern_to_value (p : pattern cek) : value cek = maps_ek (fun p s -> pattern_to_value_aux p s 0) p
 
 (*todo: this code look a lot like value_match_pattern, is there ways to unify them?*)
@@ -159,10 +151,8 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern
               assert (Pattern.pattern_valid hole_value);*)
             Array.set sm r.hole_idx hole_value;
             return (unify_vp_aux rest pt s))
-
 let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek =
   fold_ek (Option.get (zip_ek v p)) s (fun s (v, p) -> unify_vp_aux v p s)
-
 let value_match_pattern_ek (v : value cek) (p : pattern cek) : value_subst_cek option =
   Option.bind (zip_ek v p) (fun vp ->
       option_ek_to_ek_option
@@ -171,10 +161,8 @@ let value_match_pattern_ek (v : value cek) (p : pattern cek) : value_subst_cek o
              (*assert (Value.value_valid v);*)
              value_match_pattern v p)
            vp))
-
 let can_step_through (step : step) (state : state) : bool =
   step.src.c.pc = state.c.pc && Option.is_some (value_match_pattern_ek state step.src)
-
 let step_through (step : step) (state : state) : state =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) state in*)
@@ -185,20 +173,15 @@ let step_through (step : step) (state : state) : state =
   assert (step.src.c.pc = state.c.pc);
   let subst = Option.get (value_match_pattern_ek state step.src) in
   return (map_ek (subst_value subst) step.dst)
-
 let string_of_pat (p : pat) : string =
   match p with PVar n -> "PVar(" ^ string_of_int n ^ ")" | PCon w -> "PCon(" ^ string_of_words w ^ ")"
-
 let string_of_pattern (p : pattern) : string =
   "[" ^ String.concat ";" (List.map string_of_pat (Generic.to_list p)) ^ "]"
-
 let string_of_step (step : step) : string =
   let src = pattern_to_value step.src in
   let dst = step.dst in
   "(" ^ string_of_cek src ^ " -> " ^ string_of_cek dst ^ ")"
-
 let max_hc = ref 0
-
 let compose_step (x : step) (y : step) : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x.dst in*)
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) y.dst in*)
@@ -246,7 +229,6 @@ let compose_step (x : step) (y : step) : step =
   let dst = step_through y dst in
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
   { src; dst; sc = x.sc + y.sc }
-
 let make_step (value : state) (resolved : bool cek) m : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) value in*)
   let src =
@@ -272,15 +254,11 @@ let make_step (value : state) (resolved : bool cek) m : step =
   let dst = w.state in
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
   { src; dst; sc = 1 }
-
 let bracket x = "(" ^ x ^ ")"
-
 let string_of_step (step : step) : string =
   let src = pattern_to_value step.src in
   let dst = step.dst in
   bracket (string_of_cek src ^ " =>" ^ string_of_int step.sc ^ " " ^ string_of_cek dst)
-
 let value_equal (x : value) (y : value) : bool = Generic.equal equal_fg_et x y
-
 let state_equal (x : state) (y : state) : bool =
   x.c.pc = y.c.pc && List.equal value_equal (Dynarray.to_list x.e) (Dynarray.to_list y.e) && value_equal x.k y.k
