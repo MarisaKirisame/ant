@@ -25,6 +25,13 @@ let rec unify (x : pattern) (y : pattern) : pattern =
     let xh, xt = pattern_front_exn x in
     let yh, yt = pattern_front_exn y in
     match (xh, yh) with
+    | PVar xh, PVar yh ->
+        let m = min xh yh in
+        let xl = xh - m in
+        let yl = yh - m in
+        let xt = if xl > 0 then pattern_cons (PVar xl) xt else xt in
+        let yt = if yl > 0 then pattern_cons (PVar yl) yt else yt in
+        return (pattern_cons (PVar m) (unify xt yt))
     | PVar xh, _ ->
         let yl, yr = pattern_slice y xh in
         return (pattern_append yl (unify xt yr))
