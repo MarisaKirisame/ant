@@ -54,14 +54,16 @@ let rec unify (x : pattern) (y : pattern) : pattern =
           (*assert (Words.equal_words xh yh);*)
           return (pattern_cons (PCon xh) (unify xt yt))))
 
-let rec compose_pattern p s =
-  if pattern_is_empty p then match s with [] -> Generic.empty | _ -> failwith "hole count mismatch"
+let rec compose_pattern p s i j =
+  if pattern_is_empty p then (
+    assert (i = j);
+    Generic.empty)
   else
     let ph, pt = pattern_front_exn p in
     match ph with
     | PVar _ -> (
-        match s with sh :: st -> pattern_append sh (compose_pattern pt st) | [] -> failwith "hole count mismatch")
-    | PCon ph -> pattern_cons (PCon ph) (compose_pattern pt s)
+        pattern_append (Array.get s i) (compose_pattern pt s (i + 1) j))
+    | PCon ph -> pattern_cons (PCon ph) (compose_pattern pt s i j)
 
 let rec subst_value (s : value_subst_cek) (v : value) : value =
   if Generic.is_empty v then Generic.empty
@@ -232,7 +234,7 @@ let compose_step (x : step) (y : step) : step =
       (fun p s ->
         (*assert (Pattern.pattern_valid p);
         Array.iter (fun sp -> assert (Pattern.pattern_valid sp)) s;*)
-        let ret = compose_pattern p (Array.to_list s) in
+        let ret = compose_pattern p ( s) in
         (*assert (Pattern.pattern_valid ret);*)
         ret)
       x.src s
