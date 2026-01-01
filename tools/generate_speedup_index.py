@@ -13,6 +13,7 @@ from plot_speedup import (
     load_profile_totals,
     load_records,
     plot_memo_stats,
+    plot_memo_stats_cdf,
     render_profile_table,
 )
 
@@ -34,6 +35,7 @@ def _render_html(
     data_label: str,
     profile_table: str,
     memo_src: str | None,
+    memo_cdf_src: str | None,
 ) -> str:
     memo_section = (
         f"""
@@ -41,6 +43,14 @@ def _render_html(
       <img src="{memo_src}" alt="Memo stats depth vs node count plot">
     </section>"""
         if memo_src
+        else ""
+    )
+    memo_cdf_section = (
+        f"""
+    <section class="plot">
+      <img src="{memo_cdf_src}" alt="Memo stats CDF plot">
+    </section>"""
+        if memo_cdf_src
         else ""
     )
     return f"""<!doctype html>
@@ -186,6 +196,7 @@ def _render_html(
       <img src="{scatter_src}" alt="Their vs our scatter plot">
     </section>
 {memo_section}
+{memo_cdf_section}
     <section class="profile">
       {profile_table}
     </section>
@@ -229,18 +240,30 @@ def main() -> None:
 
     _, stats = generate_plot(args.input, args.plot, scatter_path)
     memo_src = None
+    memo_cdf_src = None
     records = load_records(args.input)
     if records.memo_stats:
         memo_plot = args.plot.with_name("memo_stats.png")
         plot_memo_stats(records.memo_stats, memo_plot)
         memo_src = _image_src(memo_plot, args.output.parent)
+        memo_cdf_plot = args.plot.with_name("memo_stats_cdf.png")
+        plot_memo_stats_cdf(records.memo_stats, memo_cdf_plot)
+        memo_cdf_src = _image_src(memo_cdf_plot, args.output.parent)
     profile_totals, profile_total_time = load_profile_totals(args.input)
     profile_table = render_profile_table(profile_totals, profile_total_time)
     line_src = _image_src(args.plot, args.output.parent)
     scatter_src = _image_src(scatter_path, args.output.parent)
     data_label = os.path.relpath(args.input, args.output.parent)
     args.output.write_text(
-        _render_html(stats, line_src, scatter_src, data_label, profile_table, memo_src),
+        _render_html(
+            stats,
+            line_src,
+            scatter_src,
+            data_label,
+            profile_table,
+            memo_src,
+            memo_cdf_src,
+        ),
         encoding="utf-8",
     )
     print(

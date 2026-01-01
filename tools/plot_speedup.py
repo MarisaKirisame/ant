@@ -275,6 +275,39 @@ def plot_memo_stats(
     plt.close()
 
 
+def plot_memo_stats_cdf(
+    memo_stats: Sequence[Sequence[MemoStatsNode]], output: Path
+) -> None:
+    if not memo_stats:
+        raise ValueError("memo_stats is empty")
+    plt.figure(figsize=(6, 4.5))
+    for idx, nodes in enumerate(memo_stats, 1):
+        if not nodes:
+            continue
+        nodes_sorted = sorted(nodes, key=lambda node: node.depth)
+        total = sum(node.node_count for node in nodes_sorted)
+        if total <= 0:
+            continue
+        depths: list[int] = []
+        cdf: list[float] = []
+        cumulative = 0
+        for node in nodes_sorted:
+            cumulative += node.node_count
+            depths.append(node.depth)
+            cdf.append(100.0 * cumulative / total)
+        label = f"run {idx}" if len(memo_stats) > 1 else None
+        plt.plot(depths, cdf, marker="o", linewidth=1.5, label=label)
+    plt.xlabel("Depth")
+    plt.ylabel("Nodes <= depth (%)")
+    plt.title("Memo stats CDF")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    if len(memo_stats) > 1:
+        plt.legend()
+    plt.tight_layout()
+    plt.savefig(output)
+    plt.close()
+
+
 def generate_plot(
     input_path: Path, line_output: Path, scatter_output: Optional[Path] = None
 ) -> tuple[list[float], SpeedupStats]:
