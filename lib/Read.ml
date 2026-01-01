@@ -62,11 +62,11 @@ let read_cons (p : red) (q : read) : read =
 let read_snoc (p : read) (q : red) : read =
   if Generic.is_empty p then Generic.singleton q
   else
-    let ph, pt = read_front_exn p in
-    match (ph, q) with
-    | RRead ph, RRead q -> Generic.snoc ~monoid ~measure:red_measure pt (RRead (ph + q))
-    | RSkip ph, RSkip q -> Generic.snoc ~monoid ~measure:red_measure pt (RSkip (ph + q))
-    | RCon ph, RCon q -> Generic.snoc ~monoid ~measure:red_measure pt (RCon (Words.append ph q))
+    let ph, pt = read_rear_exn p in
+    match (pt, q) with
+    | RRead pt, RRead q -> Generic.snoc ~monoid ~measure:red_measure ph (RRead (pt + q))
+    | RSkip pt, RSkip q -> Generic.snoc ~monoid ~measure:red_measure ph (RSkip (pt + q))
+    | RCon pt, RCon q -> Generic.snoc ~monoid ~measure:red_measure ph (RCon (Words.append pt q))
     | _ -> Generic.snoc ~monoid ~measure:red_measure p q
 
 let read_append_unsafe (x : read) (y : read) : read = Generic.append ~monoid ~measure:red_measure x y
@@ -168,7 +168,7 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
     let slice slice_length slice_reason =
       let xh, xt = read_slice x slice_length in
       let yh, yt = read_slice y slice_length in
-      recurse xt yt (lazy (read_append (Lazy.force result_acc) (Generic.singleton slice_reason)))
+      recurse xt yt (lazy (read_snoc (Lazy.force result_acc) slice_reason))
     in
     match (xh, yh) with
     (* We have to pop them off one of a time, because a small chunk might be masking a larger chunk.
@@ -176,24 +176,32 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
      *)
     | RSkip x, RSkip y ->
         let m = min x y in
-        return (slice m (RSkip m))
+        let xt = if x = m then xt else read_cons_unsafe (RSkip (x - m)) xt in
+        let yt = if y = m then yt else read_cons_unsafe (RSkip (y - m)) yt in
+        return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RSkip m))))
     | RSkip x, RRead y ->
-        let m = min x y in
         y_weaken := true;
-        return (slice m (RSkip m))
+        let m = min x y in
+        let xt = if x = m then xt else read_cons_unsafe (RSkip (x - m)) xt in
+        let yt = if y = m then yt else read_cons_unsafe (RRead (y - m)) yt in
+        return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RSkip m))))
     | RSkip _, RCon _ ->
         y_weaken := true;
         return (slice 1 (RSkip 1))
     | RRead x, RSkip y ->
-        let m = min x y in
         x_weaken := true;
-        return (slice m (RSkip m))
+        let m = min x y in
+        let xt = if x = m then xt else read_cons_unsafe (RRead (x - m)) xt in
+        let yt = if y = m then yt else read_cons_unsafe (RSkip (y - m)) yt in
+        return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RSkip m))))
     | RCon _, RSkip _ ->
         x_weaken := true;
         return (slice 1 (RSkip 1))
     | RRead x, RRead y ->
         let m = min x y in
-        return (slice m (RRead m))
+        let xt = if x = m then xt else read_cons_unsafe (RRead (x - m)) xt in
+        let yt = if y = m then yt else read_cons_unsafe (RRead (y - m)) yt in
+        return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RRead m))))
     | RRead _, RCon _ ->
         y_weaken := true;
         return (slice 1 (RRead 1))
@@ -212,9 +220,9 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
           let xhh, xht = Words.slice_length xh lca_length in
           let yhh, yht = Words.slice_length yh lca_length in
           assert (Words.equal_words xhh yhh);
-          let x = if Generic.is_empty xht then xt else read_cons (RCon xht) xt in
-          let y = if Generic.is_empty yht then yt else read_cons (RCon yht) yt in
-          return (recurse x y (lazy (read_append (Lazy.force result_acc) (Generic.singleton (RCon xhh)))))
+          let x = if Generic.is_empty xht then xt else read_cons_unsafe (RCon xht) xt in
+          let y = if Generic.is_empty yht then yt else read_cons_unsafe (RCon yht) yt in
+          return (recurse x y (lazy (read_snoc (Lazy.force result_acc) (RCon xhh))))
 
 let hash (x : int) (y : int) : int =
   let hash = Hashtbl.hash (x, y) in

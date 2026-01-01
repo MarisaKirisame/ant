@@ -227,8 +227,7 @@ let compose_step (x : step) (y : step) : step =
     in
     Array.of_list (loop p)
   in
-  let s = 
-    Profile.with_slot unify_vp_slot (fun _ -> unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src)) in
+  let s = Profile.with_slot unify_vp_slot (fun _ -> unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src)) in
   let src =
     zipwith_ek
       (fun p s ->
