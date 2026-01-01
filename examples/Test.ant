@@ -1,3 +1,35 @@
-let f = fun x ->
-  let y = x + 1 in
+type list 'a =
+  | Nil
+  | Cons of 'a * list 'a;;
+
+let nil = fun _ -> Nil;;
+
+let cons = fun a b -> Cons a b;;
+
+let test_op = fun a b -> a + b;;
+
+let test_const_op = fun _ ->
+  let x = 1 + 2 in
+  x;;
+
+let test_nested_let = fun x ->
+  let y = (let z = 1 + 2 in z) in
   y;;
+
+let test_if = fun x ->
+  if x then 1 else 2;;
+
+let test_nested_if = fun x ->
+  if (if x then 1 else 0) < 1 then 1 else 2;;
+
+(*
+let test_all = fun _ ->
+  let a = nil in
+  let _ = cons (a, a) in
+  let _ = test_op 1 2 in
+  let _ = test_const_op 0 in
+  let _ = test_nested_let 0 in
+  let _ = test_if 0 in
+  let _ = test_nested_if 0 in
+  0;;
+*)
