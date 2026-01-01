@@ -108,6 +108,18 @@ let lca_length (x : words) (y : words) : int =
   in
   return (search 0 max_common_len)
 
+let lca (x : words) (y : words) : words * words * words =
+  let rec search lo hi common x_rest y_rest =
+    if lo = hi then (common, x_rest, y_rest)
+    else
+      let mid = (lo + hi + 1) / 2 in
+      let x_prefix, x_rest_ = slice_length x mid in
+      let y_prefix, y_rest_ = slice_length y mid in
+      if equal_words x_prefix y_prefix then search mid hi x_prefix x_rest_ y_rest_
+      else search lo (mid - 1) common x_rest y_rest
+  in
+  search 0 (min (length x) (length y)) Generic.empty x y
+
 let words_front_exn (s : words) : Word.t * words =
   let w, v = Generic.front_exn ~monoid ~measure s in
   (v, w)
