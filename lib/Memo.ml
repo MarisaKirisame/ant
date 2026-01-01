@@ -731,6 +731,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int !sc ^ " step.");
     { words = Dynarray.get_last state.e; step = !i; without_memo_step = !sc }
   in
+  Gc.full_major ();
   let result = Profile.with_slot exec_cek_slot run in
   result
 
