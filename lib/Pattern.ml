@@ -5,7 +5,7 @@ open BatFingerTree
 (* Design notes on the pattern/value/word relationship now live in
    docs/internal.md#patterns-as-finger-trees-patternml. *)
 (*todo: do we actually need hole_count?*)
-type measure = { degree : int; max_degree : int; hole_count : int }
+type measure = { degree : int; max_degree : int }
 
 (*Invariant: consecutive constructors should be fused*)
 type pattern = (pat, measure) Generic.fg
@@ -17,20 +17,14 @@ let make_pvar n =
 
 let monoid : measure monoid =
   {
-    zero = { degree = 0; max_degree = 0; hole_count = 0 };
-    combine =
-      (fun x y ->
-        {
-          degree = x.degree + y.degree;
-          max_degree = max x.max_degree (x.degree + y.max_degree);
-          hole_count = x.hole_count + y.hole_count;
-        });
+    zero = { degree = 0; max_degree = 0 };
+    combine = (fun x y -> { degree = x.degree + y.degree; max_degree = max x.max_degree (x.degree + y.max_degree) });
   }
 
 let pat_measure (p : pat) : measure =
   match p with
-  | PVar n -> { degree = n; max_degree = n; hole_count = 1 }
-  | PCon c -> { degree = (Words.summary c).degree; max_degree = (Words.summary c).max_degree; hole_count = 0 }
+  | PVar n -> { degree = n; max_degree = n }
+  | PCon c -> { degree = (Words.summary c).degree; max_degree = (Words.summary c).max_degree }
 
 let pattern_measure (p : pattern) : measure = Generic.measure ~monoid ~measure:pat_measure p
 let pattern_is_empty (x : pattern) : bool = Generic.is_empty x

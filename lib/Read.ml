@@ -21,9 +21,9 @@ let make_rskip n =
 
 let red_measure (r : red) : Pattern.measure =
   match r with
-  | RRead n -> { degree = n; max_degree = n; hole_count = 1 }
-  | RSkip n -> { degree = n; max_degree = n; hole_count = 1 }
-  | RCon c -> { degree = (Words.summary c).degree; max_degree = (Words.summary c).max_degree; hole_count = 0 }
+  | RRead n -> { degree = n; max_degree = n }
+  | RSkip n -> { degree = n; max_degree = n }
+  | RCon c -> { degree = (Words.summary c).degree; max_degree = (Words.summary c).max_degree }
 
 let rec read_valid x : bool =
   match Generic.front x ~monoid ~measure:red_measure with
