@@ -268,11 +268,19 @@ and compile_expr (ctx : ctx) (s : scope) (dst : loc) (c : 'a expr) (k : kont_wit
       let a, s = alloc_slot s in
       let b, s = alloc_slot s in
       let cond_name = gensym "cond" in
-      let if_k if_cont (_l, _s) w =
+      let _if_k if_cont (_l, _s) w =
         assert (equal_loc b _l);
         [%seqs
           set_loc dst (get_loc b w) w;
           app_ if_cont unit_]
+      in
+      let if_k if_cont (_l, _s) w =
+        assert (equal_loc b _l);
+        [%seqs
+          set_loc dst (get_loc b w) w;
+          assert_env_length_ w (int_ s.env_length);
+          shrink_env_ w (int_ 2);
+          k (dst, free_n_slots s 2) w]
       in
       let cond_k (_l, s) w =
         assert (equal_loc a _l);
@@ -280,17 +288,17 @@ and compile_expr (ctx : ctx) (s : scope) (dst : loc) (c : 'a expr) (k : kont_wit
           assert_env_length_ w (int_ s.env_length);
           let_pat_in_ (var_pat_ cond_name) (resolve_loc a w)
             [%seqs
-              let$ if_cont =
+              (* let$ if_cont =
                 paren @@ lam_unit_
                 @@ fun _ ->
                 [%seqs
                   assert_env_length_ w (int_ s.env_length);
                   shrink_env_ w (int_ 2);
                   k (dst, free_n_slots s 2) w]
-              in
+              in *)
               let cond_bool = code @@ parens @@ uncode (int_from_word_ @@ zro_ @@ var_ cond_name) ^^ string " <> 0" in
-              let then_branch = compile_expr ctx s b t (if_k if_cont) w in
-              let else_branch = compile_expr ctx s b f (if_k if_cont) w in
+              let then_branch = compile_expr ctx s b t (if_k ()) w in
+              let else_branch = compile_expr ctx s b f (if_k ()) w in
               if_ cond_bool then_branch else_branch]]
       in
       fun w ->
