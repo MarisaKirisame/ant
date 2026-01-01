@@ -213,16 +213,23 @@ let join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (resu
     | RCon _, RRead _ ->
         x_weaken := true;
         return (slice 1 (RRead 1))
-    | RCon xh, RCon yh ->
-        let lcp, xht, yht = Profile.with_slot join_words_lcp_slot (fun () -> Words.lcp xh yh) in
+    | RCon xh, RCon yh -> (
+        let lcp, xh, yh = Profile.with_slot join_words_lcp_slot (fun () -> Words.lcp xh yh) in
         if Generic.is_empty lcp then (
           x_weaken := true;
           y_weaken := true;
           return (slice 1 (RRead 1)))
         else
-          let x = if Generic.is_empty xht then xt else read_cons_unsafe (RCon xht) xt in
-          let y = if Generic.is_empty yht then yt else read_cons_unsafe (RCon yht) yt in
-          return (recurse x y (lazy (read_snoc (Lazy.force result_acc) (RCon lcp))))
+          match (Generic.is_empty xh, Generic.is_empty yh) with
+          | true, true -> return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RCon lcp))))
+          | true, false ->
+              let xh, xt = read_front_exn xt in
+              return (loop xh xt (RCon yh) yt (lazy (read_snoc (Lazy.force result_acc) (RCon lcp))))
+          | false, true ->
+              let yh, yt = read_front_exn yt in
+              return (loop (RCon xh) xt yh yt (lazy (read_snoc (Lazy.force result_acc) (RCon lcp))))
+          | false, false ->
+              return (loop (RCon xh) xt (RCon yh) yt (lazy (read_snoc (Lazy.force result_acc) (RCon lcp)))))
   and recurse x y result_acc =
     if Generic.is_empty x then (
       assert (Generic.is_empty y);
