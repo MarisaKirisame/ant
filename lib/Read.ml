@@ -211,15 +211,15 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
         x_weaken := true;
         return (slice 1 (RRead 1))
     | RCon xh, RCon yh ->
-        let lca, xht, yht = Words.lcp xh yh in
-        if Generic.is_empty lca then (
+        let lcp, xht, yht = Profile.with_slot join_words_lcp_slot (fun () -> Words.lcp xh yh) in
+        if Generic.is_empty lcp then (
           x_weaken := true;
           y_weaken := true;
           return (slice 1 (RRead 1)))
         else
           let x = if Generic.is_empty xht then xt else read_cons_unsafe (RCon xht) xt in
           let y = if Generic.is_empty yht then yt else read_cons_unsafe (RCon yht) yt in
-          return (recurse x y (lazy (read_snoc (Lazy.force result_acc) (RCon lca))))
+          return (recurse x y (lazy (read_snoc (Lazy.force result_acc) (RCon lcp))))
 
 let hash (x : int) (y : int) : int =
   let hash = Hashtbl.hash (x, y) in
