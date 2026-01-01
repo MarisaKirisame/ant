@@ -147,11 +147,10 @@ let rec unmatch_read (x : read) (y : read) : read =
 
 type join = { result : read; x_rest : read; y_rest : read }
 
-let rec join (x : read) (x_weaken : bool ref) (x_acc : read) (y : read) (y_weaken : bool ref) (y_acc : read)
-    (result_acc : read) : join =
+let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (result_acc : read) : read =
   (*assert (read_valid x);
   assert (read_valid y);*)
-  let recurse x x_acc y y_acc result_acc = join x x_weaken x_acc y y_weaken y_acc result_acc in
+  let recurse x y result_acc = join x x_weaken y y_weaken result_acc in
   let return r =
     (*assert ((read_measure r).degree = (read_measure x).degree);
     assert ((read_measure r).max_degree = (read_measure x).max_degree);*)
@@ -161,15 +160,14 @@ let rec join (x : read) (x_weaken : bool ref) (x_acc : read) (y : read) (y_weake
   assert ((read_measure x).max_degree = (read_measure y).max_degree);*)
   if Generic.is_empty x then (
     assert (Generic.is_empty y);
-    return { result = result_acc; x_rest = x_acc; y_rest = y_acc })
+    return result_acc)
   else
     let xh, xt = read_front_exn x in
     let yh, yt = read_front_exn y in
     let slice slice_length slice_reason =
       let xh, xt = read_slice x slice_length in
       let yh, yt = read_slice y slice_length in
-      recurse xt (read_append x_acc xh) yt (read_append y_acc yh)
-        (read_append result_acc (Generic.singleton slice_reason))
+      recurse xt yt (read_append result_acc (Generic.singleton slice_reason))
     in
     match (xh, yh) with
     (* We have to pop them off one of a time, because a small chunk might be masking a larger chunk.
@@ -215,7 +213,7 @@ let rec join (x : read) (x_weaken : bool ref) (x_acc : read) (y : read) (y_weake
           assert (Words.equal_words xhh yhh);
           let x = if Generic.is_empty xht then xt else read_cons (RCon xht) xt in
           let y = if Generic.is_empty yht then yt else read_cons (RCon yht) yt in
-          return (recurse x x_acc y y_acc (read_append result_acc (Generic.singleton (RCon xhh))))
+          return (recurse x y (read_append result_acc (Generic.singleton (RCon xhh))))
 
 let hash (x : int) (y : int) : int =
   let hash = Hashtbl.hash (x, y) in
