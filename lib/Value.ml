@@ -71,6 +71,9 @@ let value_snoc (v : seq) (et : fg_et) : seq =
 
 let value_snoc_unsafe (v : seq) (et : fg_et) : seq = Generic.snoc ~monoid ~measure v et
 let value_cons_unsafe (et : fg_et) (v : seq) : seq = Generic.cons ~monoid ~measure v et
+let front_exn (v : value) : fg_et * value =
+  let w, v = Generic.front_exn ~monoid ~measure v in
+  (v, w)
 
 (* pop_n semantics are documented in docs/internal.md#value-slicing-semantics-valueml. *)
 let rec pop_n (s : seq) (n : int) : seq * seq =
@@ -86,7 +89,7 @@ let rec pop_n (s : seq) (n : int) : seq * seq =
     let x, y = Generic.split ~monoid ~measure (fun m -> m.max_degree >= n) s in
     let m = summary x in
     assert (m.degree < n);
-    let w, v = Generic.front_exn ~monoid ~measure y in
+    let v, w = front_exn y in
     match v with
     | Words v ->
         assert (m.degree + (Words.summary v).max_degree >= n);
@@ -133,24 +136,20 @@ let string_of_fg_et (et : fg_et) : string =
 let rec string_of_value_aux (v : value) : string =
   if Generic.is_empty v then ""
   else
-    let v, w = Generic.front_exn ~monoid ~measure v in
+    let w, v = front_exn v in
     string_of_fg_et w ^ string_of_value_aux v
 
 let string_of_value (v : value) : string = string_of_value_aux v ^ "(degree=" ^ string_of_int (summary v).degree ^ ")"
 
-let front_exn (v : value) : fg_et * value =
-  let w, v = Generic.front_exn ~monoid ~measure v in
-  (v, w)
-
 let unwords (v : value) (w : Words.words) : value option =
   (*assert (value_valid v);*)
-  let vt, vh = Generic.front_exn ~monoid ~measure v in
+  let vh, vt = front_exn v in
   match vh with
   | Words x -> (
       let xrest = Words.unwords x w in
       match xrest with
       | Some xrest ->
-          let ret = if Generic.is_empty xrest then vt else Generic.cons ~monoid ~measure vt (Words xrest) in
+          let ret = if Generic.is_empty xrest then vt else value_cons_unsafe (Words xrest) vt in
           (*assert (value_valid ret);*)
           Some ret
       | None -> None)
