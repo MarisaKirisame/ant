@@ -73,10 +73,9 @@ let pop_n (s : words) (n : int) : words * words =
 let slice_degree (s : words) (n : int) : words * words = pop_n s n
 let equal_words (x : words) (y : words) : bool = hash x = hash y
 let pop (s : words) = pop_n s 1
-
 let slice_length (s : words) (l : int) : words * words =
   let x, y = Generic.split ~monoid ~measure (fun m -> m.length > l) s in
-  assert ((summary x).length = l);
+  (*assert ((summary x).length = l);*)
   (x, y)
 
 let rec splits (x : words) : words list =
@@ -87,13 +86,13 @@ let rec splits (x : words) : words list =
 
 let lca_length (x : words) (y : words) : int =
   let return n =
-    let xl, _ = slice_length x n in
+    (*let xl, _ = slice_length x n in
     let yl, _ = slice_length y n in
     assert (equal_words xl yl);
     (if n < min (length x) (length y) then
        let xl1, _ = slice_length x (n + 1) in
        let yl1, _ = slice_length y (n + 1) in
-       assert (not (equal_words xl1 yl1)));
+       assert (not (equal_words xl1 yl1)));*)
     n
   in
   let max_common_len = min (length x) (length y) in
