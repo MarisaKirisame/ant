@@ -184,6 +184,7 @@ let step_through (step : step) (state : state) : state =
   in
   assert (step.src.c.pc = state.c.pc);
   let subst = Option.get (value_match_pattern_ek state step.src) in
+  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
   return (map_ek (subst_value subst) step.dst)
 
 let string_of_pat (p : pat) : string =
@@ -221,14 +222,14 @@ let compose_step (x : step) (y : step) : step =
   in
   let s = unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src) in
   let src =
-    map_ek
-      (fun (p, s) ->
+    zipwith_ek
+      (fun p s ->
         (*assert (Pattern.pattern_valid p);
         Array.iter (fun sp -> assert (Pattern.pattern_valid sp)) s;*)
         let ret = compose_pattern p (Array.to_list s) in
         (*assert (Pattern.pattern_valid ret);*)
         ret)
-      (Option.get (zip_ek x.src s))
+      x.src s
   in
   (*let hc = fold_ek src 0 (fun acc src -> acc + (pattern_measure src).hole_count) in
   if hc > !max_hc then (
@@ -250,8 +251,8 @@ let compose_step (x : step) (y : step) : step =
 let make_step (value : state) (resolved : bool cek) m : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) value in*)
   let src =
-    map_ek
-      (fun (v, resolved) ->
+    zipwith_ek
+      (fun v resolved ->
         (*assert ((Value.summary v).degree > 0);*)
         if resolved then
           let vt, vh = Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v in
@@ -264,7 +265,7 @@ let make_step (value : state) (resolved : bool cek) m : step =
                  else [ PCon (Generic.singleton vhh); make_pvar (Value.summary vt).degree ])
           | _ -> failwith "cannot make step"
         else Generic.singleton (make_pvar (Value.summary v).degree))
-      (Option.get (zip_ek value resolved))
+      value resolved
   in
   let w = make_world (pattern_to_value src) m in
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) w.state in*)
