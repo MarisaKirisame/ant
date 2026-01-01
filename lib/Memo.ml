@@ -322,7 +322,7 @@ let reads_equal (x : reads) (y : reads) : bool =
 
 let unmatch_reads (x : reads) (y : reads) : reads = zipwith_ek Read.unmatch_read x y
 
-let reads_hash (r : reads) (x : reads) : (int * reads) option =
+let reads_hash_aux (r : reads) (x : reads) : (int * reads) option =
   assert (Dynarray.length r.e = Dynarray.length x.e);
   let ret re =
     re
@@ -350,7 +350,9 @@ let reads_hash (r : reads) (x : reads) : (int * reads) option =
         else ret (Some (acc, { c = x.c; e; k = k_rest }))
       in
       loop 0 (Dynarray.length r.e) k_hash
-
+let reads_hash_slot = Profile.register_slot Profile.memo_profile "reads_hash"
+let reads_hash (r : reads) (x : reads) : (int * reads) option =
+  Profile.with_slot reads_hash_slot (fun () -> reads_hash_aux r x)
 let join_reads_slot = Profile.register_slot Profile.memo_profile "join_reads"
 
 type join_reads = { reads : reads Lazy.t; x_weaken : bool; y_weaken : bool }
