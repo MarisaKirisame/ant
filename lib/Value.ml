@@ -18,12 +18,14 @@ let monoid : measure_t monoid =
     zero = { degree = 0; max_degree = 0 };
     combine = (fun x y -> { degree = x.degree + y.degree; max_degree = max x.max_degree (x.degree + y.max_degree) });
   }
+
 let measure (et : fg_et) : measure_t =
   match et with
   | Words w ->
       let m = Words.summary w in
       { degree = m.degree; max_degree = m.max_degree }
   | Reference r -> { degree = r.values_count; max_degree = r.values_count }
+
 (*let rec value_valid x : bool =
   match Generic.front x ~monoid ~measure with
   | None -> true
@@ -38,6 +40,7 @@ let measure (et : fg_et) : measure_t =
             | Words _, Reference _ -> true)
           && value_valid rest)*)
 let summary x = Generic.measure ~monoid ~measure x
+
 let append (x : seq) (y : seq) : seq =
   if Generic.is_empty x then y
   else if Generic.is_empty y then x
@@ -105,14 +108,17 @@ let slice (seq : seq) (offset : int) (values_count : int) : seq =
 
 let string_of_src (src : source) : string =
   match src with Source.E i -> "E(" ^ string_of_int i ^ ")" | Source.K -> "K"
+
 let string_of_reference (r : reference) : string =
   let str = string_of_src r.src in
   let str = if r.hole_idx = 0 then str else str ^ "@" ^ string_of_int r.hole_idx in
   let str = if r.offset = 0 then str else str ^ "+" ^ string_of_int r.offset in
   let str = if r.values_count = 1 then str else str ^ ":" ^ string_of_int r.values_count in
   str
+
 let string_of_fg_et (et : fg_et) : string =
   match et with Words w -> Words.string_of_words w | Reference r -> string_of_reference r
+
 let rec string_of_value_aux (v : value) : string =
   if Generic.is_empty v then ""
   else
@@ -120,9 +126,11 @@ let rec string_of_value_aux (v : value) : string =
     string_of_fg_et w ^ string_of_value_aux v
 
 let string_of_value (v : value) : string = string_of_value_aux v ^ "(degree=" ^ string_of_int (summary v).degree ^ ")"
+
 let front_exn (v : value) : fg_et * value =
   let w, v = Generic.front_exn ~monoid ~measure v in
   (v, w)
+
 let unwords (v : value) (w : Words.words) : value option =
   (*assert (value_valid v);*)
   let vt, vh = Generic.front_exn ~monoid ~measure v in

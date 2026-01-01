@@ -73,6 +73,7 @@ let pop_n (s : words) (n : int) : words * words =
 let slice_degree (s : words) (n : int) : words * words = pop_n s n
 let equal_words (x : words) (y : words) : bool = hash x = hash y
 let pop (s : words) = pop_n s 1
+
 let slice_length (s : words) (l : int) : words * words =
   let x, y = Generic.split ~monoid ~measure (fun m -> m.length > l) s in
   (*assert ((summary x).length = l);*)

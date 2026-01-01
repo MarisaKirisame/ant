@@ -658,3 +658,21 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   result
 
 let exec_done _ = failwith "exec is done, should not call step anymore"
+
+type memo_stats = memo_stats_node Dynarray.t
+and memo_stats_node = { depth : int; mutable node_count : int }
+
+let memo_stats (m : memo) : memo_stats =
+  let stats = Dynarray.create () in
+  let rec aux (t : trie) (depth : int) : unit =
+    if Dynarray.length stats <= depth then Dynarray.add_last stats { depth; node_count = 0 };
+    let node_stat = Dynarray.get stats depth in
+    node_stat.node_count <- node_stat.node_count + 1;
+    match t with
+    | Stem st -> ( match st.next with None -> () | Some child -> aux child (depth + 1))
+    | Branch br ->
+        Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1));
+        List.iter br.merging ~f:(fun m -> Hashtbl.iter m.children ~f:(fun child -> aux child (depth + 1)))
+  in
+  Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
+  stats

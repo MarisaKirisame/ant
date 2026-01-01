@@ -56,6 +56,18 @@ class SpeedupStats:
     maximum: float
 
 
+@dataclass(frozen=True)
+class MemoStatsNode:
+    depth: int
+    node_count: int
+
+
+@dataclass(frozen=True)
+class Result:
+    pairs: list[tuple[float, float]]
+    memo_stats: list[list[MemoStatsNode]]
+
+
 def _sum_profile(entries: object, *, key_name: str) -> float:
     if not isinstance(entries, list):
         raise ValueError(f"{key_name} must be a list")
@@ -79,6 +91,8 @@ def load_profile_totals(path: Path) -> tuple[dict[str, float], float]:
                 continue
             try:
                 rec = json.loads(line)
+                if rec.get("name") != "exec_time":
+                    continue
                 entries = rec[MEMO_KEY]
                 if not isinstance(entries, list):
                     raise ValueError(f"{MEMO_KEY} must be a list")
@@ -122,31 +136,52 @@ def write_profile_table(input_path: Path, output_path: Path) -> None:
     output_path.write_text(table, encoding="utf-8")
 
 
-def load_records(path: Path) -> list[tuple[float, float]]:
-    """Return (baseline, memoized) metric pairs from a JSONL file."""
+def load_records(path: Path) -> Result:
+    """Return parsed records from a JSONL file."""
     pairs: list[tuple[float, float]] = []
+    memo_stats: list[list[MemoStatsNode]] = []
     with path.open() as f:
         for line_no, line in enumerate(f, 1):
             if not line.strip():
                 continue
             try:
                 rec = json.loads(line)
-                if REPORT_WALL_CLOCK_TIME:
-                    memo_value = _sum_profile(rec[MEMO_KEY], key_name=MEMO_KEY)
-                    baseline_value = _sum_profile(rec[BASELINE_KEY], key_name=BASELINE_KEY)
+                name = rec.get("name")
+                if name == "exec_time":
+                    if REPORT_WALL_CLOCK_TIME:
+                        memo_value = _sum_profile(rec[MEMO_KEY], key_name=MEMO_KEY)
+                        baseline_value = _sum_profile(rec[BASELINE_KEY], key_name=BASELINE_KEY)
+                    else:
+                        memo_value = rec[MEMO_KEY]
+                        baseline_value = rec[BASELINE_KEY]
+                    if memo_value <= 0:
+                        raise ValueError(f"{MEMO_KEY} must be positive")
+                    if baseline_value <= 0:
+                        raise ValueError(f"{BASELINE_KEY} must be positive")
+                    pairs.append((baseline_value, memo_value))
+                elif name == "memo_stats":
+                    stats = rec.get("depth_breakdown")
+                    if not isinstance(stats, list):
+                        raise ValueError("depth_breakdown must be a list")
+                    nodes: list[MemoStatsNode] = []
+                    for idx, entry in enumerate(stats):
+                        if not isinstance(entry, dict):
+                            raise ValueError(f"depth_breakdown[{idx}] must be an object")
+                        depth = entry.get("depth")
+                        node_count = entry.get("node_count")
+                        if not isinstance(depth, int):
+                            raise ValueError(f"depth_breakdown[{idx}].depth must be an int")
+                        if not isinstance(node_count, int):
+                            raise ValueError(f"depth_breakdown[{idx}].node_count must be an int")
+                        nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
+                    memo_stats.append(nodes)
                 else:
-                    memo_value = rec[MEMO_KEY]
-                    baseline_value = rec[BASELINE_KEY]
-                if memo_value <= 0:
-                    raise ValueError(f"{MEMO_KEY} must be positive")
-                if baseline_value <= 0:
-                    raise ValueError(f"{BASELINE_KEY} must be positive")
-                pairs.append((baseline_value, memo_value))
+                    raise ValueError(f"unexpected record name: {name}")
             except Exception as exc:  # pylint: disable=broad-except
                 raise RuntimeError(f"failed to parse line {line_no}") from exc
     if not pairs:
         raise RuntimeError("no records found in file")
-    return pairs
+    return Result(pairs=pairs, memo_stats=memo_stats)
 
 
 def compare_stats(
@@ -216,15 +251,39 @@ def plot_speedup_line(ratios: Sequence[float], output: Path) -> None:
     plt.close()
 
 
+def plot_memo_stats(
+    memo_stats: Sequence[Sequence[MemoStatsNode]], output: Path
+) -> None:
+    if not memo_stats:
+        raise ValueError("memo_stats is empty")
+    plt.figure(figsize=(6, 4.5))
+    for idx, nodes in enumerate(memo_stats, 1):
+        if not nodes:
+            continue
+        depths = [node.depth for node in nodes]
+        counts = [node.node_count for node in nodes]
+        label = f"run {idx}" if len(memo_stats) > 1 else None
+        plt.plot(depths, counts, marker="o", linewidth=1.5, label=label)
+    plt.xlabel("Depth")
+    plt.ylabel("Node count")
+    plt.title("Memo stats by depth")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    if len(memo_stats) > 1:
+        plt.legend()
+    plt.tight_layout()
+    plt.savefig(output)
+    plt.close()
+
+
 def generate_plot(
     input_path: Path, line_output: Path, scatter_output: Optional[Path] = None
 ) -> tuple[list[float], SpeedupStats]:
     """Load pairs from input_path, write plots, and return ratios and stats."""
-    pairs = load_records(input_path)
-    ratios, stats = compare_stats(pairs)
+    result = load_records(input_path)
+    ratios, stats = compare_stats(result.pairs)
     plot_speedup_line(ratios, line_output)
     if scatter_output is not None:
-        plot_scatter(pairs, scatter_output)
+        plot_scatter(result.pairs, scatter_output)
     return ratios, stats
 
 

@@ -142,7 +142,8 @@ end
 let demanded_interactive = DemandedExpansion.interactive
 
 let run () =
-  Common.with_steps_writer steps_file (fun write_steps ->
+  Common.with_outchannel steps_file (fun oc ->
+      let write_steps = Common.write_steps_json oc in
       let memo = Ant.Memo.init_memo () in
       let eval expr = Common.eval_expression ~memo ~write_steps expr in
       print_endline "demanded_interactive quicksort (list fixed):";
@@ -151,4 +152,5 @@ let run () =
           let applied = LC.EApp (e, Common.random_list_expr) in
           let value = eval applied in
           Printf.printf "step %d value: %s\n" i (Common.value_to_string value);
-          value))
+          value);
+      Common.write_memo_stats_json oc memo)
