@@ -374,9 +374,9 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
   let stats = Memo.memo_stats memo in
   let buf = Buffer.create 64 in
   Buffer.add_string buf "{\"name\":\"memo_stats\",\"depth_breakdown\":[";
-  let len = Stdlib.Dynarray.length stats in
+  let len = Stdlib.Dynarray.length stats.by_depth in
   for i = 0 to len - 1 do
-    let node = Stdlib.Dynarray.get stats i in
+    let node = Stdlib.Dynarray.get stats.by_depth i in
     if i > 0 then Buffer.add_char buf ',';
     Buffer.add_string buf "{\"depth\":";
     Buffer.add_string buf (string_of_int node.depth);
@@ -384,6 +384,16 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
     Buffer.add_string buf (string_of_int node.node_count);
     Buffer.add_char buf '}'
   done;
+  Buffer.add_string buf "],\"size_vs_sc\":[";
+  List.iteri
+    (fun i (entry : Memo.size_vs_sc) ->
+      if i > 0 then Buffer.add_char buf ',';
+      Buffer.add_string buf "{\"size\":";
+      Buffer.add_string buf (string_of_int entry.size);
+      Buffer.add_string buf ",\"sc\":";
+      Buffer.add_string buf (string_of_int entry.sc);
+      Buffer.add_char buf '}')
+    stats.size_vs_sc;
   Buffer.add_string buf "]}\n";
   Buffer.output_buffer oc buf;
   flush oc

@@ -14,6 +14,7 @@ from plot_speedup import (
     load_records,
     plot_memo_stats,
     plot_memo_stats_cdf,
+    plot_size_vs_sc,
     render_profile_table,
 )
 
@@ -36,6 +37,7 @@ def _render_html(
     profile_table: str,
     memo_src: str | None,
     memo_cdf_src: str | None,
+    size_scatter_src: str | None,
 ) -> str:
     memo_section = (
         f"""
@@ -51,6 +53,14 @@ def _render_html(
       <img src="{memo_cdf_src}" alt="Memo stats CDF plot">
     </section>"""
         if memo_cdf_src
+        else ""
+    )
+    size_scatter_section = (
+        f"""
+    <section class="plot">
+      <img src="{size_scatter_src}" alt="Memo size vs sc scatter plot">
+    </section>"""
+        if size_scatter_src
         else ""
     )
     return f"""<!doctype html>
@@ -197,6 +207,7 @@ def _render_html(
     </section>
 {memo_section}
 {memo_cdf_section}
+{size_scatter_section}
     <section class="profile">
       {profile_table}
     </section>
@@ -241,6 +252,7 @@ def main() -> None:
     _, stats = generate_plot(args.input, args.plot, scatter_path)
     memo_src = None
     memo_cdf_src = None
+    size_scatter_src = None
     records = load_records(args.input)
     if records.memo_stats:
         memo_plot = args.plot.with_name("memo_stats.png")
@@ -249,6 +261,10 @@ def main() -> None:
         memo_cdf_plot = args.plot.with_name("memo_stats_cdf.png")
         plot_memo_stats_cdf(records.memo_stats, memo_cdf_plot)
         memo_cdf_src = _image_src(memo_cdf_plot, args.output.parent)
+    if any(records.size_vs_sc):
+        size_scatter_plot = args.plot.with_name("size_vs_sc.png")
+        plot_size_vs_sc(records.size_vs_sc, size_scatter_plot)
+        size_scatter_src = _image_src(size_scatter_plot, args.output.parent)
     profile_totals, profile_total_time = load_profile_totals(args.input)
     profile_table = render_profile_table(profile_totals, profile_total_time)
     line_src = _image_src(args.plot, args.output.parent)
@@ -263,6 +279,7 @@ def main() -> None:
             profile_table,
             memo_src,
             memo_cdf_src,
+            size_scatter_src,
         ),
         encoding="utf-8",
     )
