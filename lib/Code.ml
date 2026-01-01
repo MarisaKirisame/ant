@@ -173,6 +173,9 @@ let memo_from_int_ (i : int code) : Value.seq code = app_ (from_ir $ Function "M
 let int_from_word_ (w : Word.t code) : int code = app_ (from_ir $ Function "Word.get_value") w
 let memo_splits_ (seq : Value.seq code) : Value.seq list code = app_ (from_ir $ Function "Memo.splits") seq
 
+let debug_ (s : string) : unit code =
+  app_ (from_ir $ Function "print_endline") (code @@ dquotes @@ string @@ String.escaped s)
+
 (* NOTE: this number should be modified w.r.t the definition of Memo.splits_* in Memo.ml *)
 let n_max_specialized_arity = 4
 

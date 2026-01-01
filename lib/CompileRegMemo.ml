@@ -71,7 +71,7 @@ let drop_s s name =
 let init_params s (params : string list) =
   check_scope s;
   let i, meta_env =
-    List.fold_right params ~init:(0, s.meta_env) ~f:(fun name (i, meta_env) ->
+    List.fold_left params ~init:(0, s.meta_env) ~f:(fun (i, meta_env) name ->
         (i + 1, Map.add_exn ~key:name ~data:(Some (Slot i)) meta_env))
   in
   let r = { s with meta_env; env_length = s.env_length + i } in
@@ -145,6 +145,12 @@ let register_constructors (e : ctx) ctors =
   List.iter ~f:(fun (con_name, types, _) -> register_constructor e con_name types) ctors
 
 let apply_cont : pc = add_code None
+
+let ensure_trivial_patterns (pats : 'a pattern list) : string list =
+  List.map pats ~f:(fun p ->
+      match p with
+      | PVar (n, _) -> n
+      | _ -> failwith [%string "unsupported nested patterns: %{Syntax.string_of_document @@ Syntax.pp_pattern p}"])
 
 let entry_code (entry_pc : pc) (arg_num : int) (name : string) (cont_done_tag : int code) : document =
   string "let rec" ^^ space ^^ string name ^^ space ^^ string "memo" ^^ space
@@ -248,34 +254,40 @@ and compile_expr (ctx : ctx) (s : scope) (dst : loc) (c : 'a expr) (k : kont_wit
           compile_exprs compile_expr_no_move ctx s slots xs
             (fun (l, s) w ->
               [%seqs
-                let$ ct =
+                let ct =
                   memo_appends_ (from_constructor_ (ctor_tag_name ctx cname) :: List.map l ~f:(fun l -> get_loc l w))
                 in
-                set_loc dst ct w;
-                assert_env_length_ w (int_ s.env_length);
-                shrink_env_ w (int_ @@ n_args);
-                k (dst, free_n_slots s n_args) w])
+                [%seqs
+                  set_loc dst ct w;
+                  assert_env_length_ w (int_ s.env_length);
+                  shrink_env_ w (int_ @@ n_args);
+                  k (dst, free_n_slots s n_args) w]])
             w]
   | If (c, t, f, _) ->
       check_scope s;
       let a, s = alloc_slot s in
       let b, s = alloc_slot s in
       let cond_name = gensym "cond" in
-      let if_k if_cont =
-       fun (_l, s) w ->
+      let if_k if_cont (_l, _s) w =
+        assert (equal_loc b _l);
         [%seqs
           set_loc dst (get_loc b w) w;
-          assert_env_length_ w (int_ s.env_length);
-          shrink_env_ w (int_ 2);
           app_ if_cont unit_]
       in
-      let cond_k =
-       fun (_l, s) w ->
+      let cond_k (_l, s) w =
+        assert (equal_loc a _l);
         [%seqs
           assert_env_length_ w (int_ s.env_length);
           let_pat_in_ (var_pat_ cond_name) (resolve_loc a w)
             [%seqs
-              let$ if_cont = paren @@ lam_unit_ @@ fun _ -> k (dst, free_n_slots s 2) w in
+              let$ if_cont =
+                paren @@ lam_unit_
+                @@ fun _ ->
+                [%seqs
+                  assert_env_length_ w (int_ s.env_length);
+                  shrink_env_ w (int_ 2);
+                  k (dst, free_n_slots s 2) w]
+              in
               let cond_bool = code @@ parens @@ uncode (int_from_word_ @@ zro_ @@ var_ cond_name) ^^ string " <> 0" in
               let then_branch = compile_expr ctx s b t (if_k if_cont) w in
               let else_branch = compile_expr ctx s b f (if_k if_cont) w in
@@ -286,6 +298,7 @@ and compile_expr (ctx : ctx) (s : scope) (dst : loc) (c : 'a expr) (k : kont_wit
           assert_env_length_ w (int_ @@ (s.env_length - 2));
           grow_env_ ~comment:"if" w (int_ 2);
           compile_expr ctx s a c cond_k w]
+  | Match (scrut, cases, _) -> fun w -> compile_cases ctx s dst scrut cases k w
   | Op (op, x0, x1, _) ->
       check_scope s;
       let op_code =
@@ -353,6 +366,98 @@ and compile_exprs f (ctx : ctx) (s : scope) (dsts : loc list) (cs : 'a expr list
   in
   aux [] s cs dsts
 
+and compile_cases (ctx : ctx) (s : scope) (dst : loc) (scrut : 'a expr) (MatchPattern c : 'a cases) (k : kont_with_loc)
+    : world code -> unit code =
+  let a, s = alloc_slot s in
+  let b, s = alloc_slot s in
+  let match_k match_cont (_l, _s) w =
+    assert (equal_loc b _l);
+    [%seqs
+      set_loc dst (get_loc b w) w;
+      app_ match_cont unit_]
+  in
+  let scrut_k (_l, s) w =
+    assert (equal_loc a _l);
+    [%seqs
+      assert_env_length_ w (int_ s.env_length);
+      let$ x = resolve_loc a w in
+      let$ match_cont =
+        paren @@ lam_unit_
+        @@ fun _ ->
+        [%seqs
+          assert_env_length_ w (int_ s.env_length);
+          shrink_env_ w (int_ 2);
+          k (dst, free_n_slots s 2) w]
+      in
+      let case cname =
+        string (string_of_int @@ Hashtbl.find_exn ctx.ctag cname)
+        ^^ space ^^ string "(*" ^^ space
+        ^^ string (Hashtbl.find_exn ctx.ctag_name cname)
+        ^^ space ^^ string "*)"
+      in
+      let t =
+        List.map
+          ~f:(fun (pat, expr) ->
+            match pat with
+            | PAny -> (string "_", compile_expr ctx s b expr (match_k match_cont) w)
+            | PVar (x, _) -> (string x, compile_expr ctx (add_s s x a) b expr (match_k match_cont) w)
+            | PCtorApp (cname, None, _) -> (case cname, compile_expr ctx s b expr (match_k match_cont) w)
+            | PCtorApp (cname, Some (PVar (x0, _)), _) ->
+                let c =
+                  with_splits 1
+                    (memo_splits_ @@ pair_value_ x)
+                    (function
+                      | [ x0_v ] ->
+                          let slot, s = alloc_slot s in
+                          [%seqs
+                            assert_env_length_ w (int_ @@ (s.env_length - 1));
+                            push_env_ w x0_v;
+                            let clean_k =
+                             fun (l, s) w ->
+                              [%seqs
+                                to_unit_ @@ pop_env_ w;
+                                match_k match_cont (l, s) w]
+                            in
+                            compile_expr ctx (add_s s x0 slot) b expr clean_k w]
+                      | _ -> failwith "with_splits: unexpected arity")
+                in
+                (case cname, c)
+            | PCtorApp (cname, Some (PTup (xs, _)), _) ->
+                let xs = ensure_trivial_patterns xs in
+                let n = List.length xs in
+                let c =
+                  with_splits n
+                    (memo_splits_ @@ pair_value_ x)
+                    (function
+                      | ys when List.length ys = n ->
+                          let slots, s = alloc_n_slots s n in
+                          [%seqs
+                            assert_env_length_ w (int_ @@ (s.env_length - n));
+                            seqs_ (List.map ys ~f:(fun y -> fun _ -> [%seqs push_env_ w y]));
+                            let clean_k =
+                             fun (l, s) w ->
+                              [%seqs
+                                assert_env_length_ w (int_ s.env_length);
+                                shrink_env_ w (int_ n);
+                                match_k match_cont (l, s) w]
+                            in
+                            let s = List.fold2_exn ~f:add_s ~init:s xs slots in
+                            compile_expr ctx s b expr clean_k w]
+                      | _ -> failwith "with_splits: unexpected arity")
+                in
+                (case cname, c)
+            | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
+          c
+      in
+      let default_case = (string "_", unreachable_ (Dynarray.length codes)) in
+      paren $ match_raw_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])]
+  in
+  fun w ->
+    [%seqs
+      assert_env_length_ w (int_ @@ (s.env_length - 2));
+      grow_env_ ~comment:"match" w (int_ 2);
+      compile_expr ctx s a scrut scrut_k w]
+
 let compile_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with
   | Type (TBOne (_, Enum { params = _; ctors }) as tb) ->
@@ -362,14 +467,7 @@ let compile_stmt (ctx : ctx) (s : 'a stmt) : document =
       List.iter trs ~f:(fun (_, Enum { params = _; ctors }) -> register_constructors ctx ctors);
       CompileType.compile_ty_binding ctx.ctag tb
   | Term (BOne (x, Lam (ps, term, _), _) | BRec [ (x, Lam (ps, term, _), _) ]) ->
-      let params =
-        List.map ps ~f:(fun p ->
-            match p with
-            | PVar (n, _) -> n
-            | _ ->
-                failwith
-                  [%string "unsupported pattern in parameters: %{Syntax.string_of_document @@ Syntax.pp_pattern p}"])
-      in
+      let params = ensure_trivial_patterns ps in
       let s = init_params (new_scope ()) params in
       let arg_num = s.env_length in
       let name = match x with PVar (x, _) -> x | _ -> failwith "unsupported pattern at top level term" in
@@ -381,7 +479,7 @@ let compile_stmt (ctx : ctx) (s : 'a stmt) : document =
                   let r, s = alloc_slot s in
                   [%seqs
                     assert_env_length_ w (int_ @@ (s.env_length - 1));
-                    grow_env_ ~comment:"program return value" w (int_ 1);
+                    grow_env_ ~comment:"return value" w (int_ 1);
                     compile_expr ctx s r term (fun (l, s) w -> return_with s (get_loc l w) w) w]),
               entry_code entry_pc arg_num name cont_done_tag )
           in
