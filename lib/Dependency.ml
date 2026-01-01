@@ -168,7 +168,8 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern
             return (unify_vp_aux rest pt s))
 
 let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek =
-  fold_ek (Option.get (zip_ek v p)) s (fun s (v, p) -> unify_vp_aux v p s)
+  let _ = zipwith_ek (fun v p -> unify_vp_aux v p s) v p in
+  s
 
 let value_match_pattern_ek (v : value cek) (p : pattern cek) : value_subst_cek option =
   Option.bind (zip_ek v p) (fun vp ->
@@ -205,7 +206,7 @@ let string_of_step (step : step) : string =
   let dst = step.dst in
   "(" ^ string_of_cek src ^ " -> " ^ string_of_cek dst ^ ")"
 
-let max_hc = ref 0
+let compose_step_step_through_slot = Profile.register_slot Profile.memo_profile "compose_step.step_through"
 
 let compose_step (x : step) (y : step) : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x.dst in*)
@@ -238,12 +239,8 @@ let compose_step (x : step) (y : step) : step =
         ret)
       x.src s
   in
-  (*let hc = fold_ek src 0 (fun acc src -> acc + (pattern_measure src).hole_count) in
-  if hc > !max_hc then (
-    print_endline ("new max hole count: " ^ string_of_int hc ^ " , sc:" ^ string_of_int (x.sc + y.sc) ^ ")");
-    max_hc := hc);*)
   let dst = pattern_to_value src in
-  let dst = step_through x dst in
+  let dst = Profile.with_slot compose_step_step_through_slot (fun _ -> step_through x dst) in
   (*if not (can_step_through y dst) then (
     print_endline "cannot compose steps:";
     print_endline ("generalized pattern: " ^ string_of_cek (pattern_to_value src));
@@ -251,7 +248,7 @@ let compose_step (x : step) (y : step) : step =
     print_endline ("intermediate: " ^ string_of_cek dst);
     print_endline ("y step: " ^ string_of_step y));
   assert (can_step_through y dst);*)
-  let dst = step_through y dst in
+  let dst = Profile.with_slot compose_step_step_through_slot (fun _ -> step_through y dst) in
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
   { src; dst; sc = x.sc + y.sc }
 
