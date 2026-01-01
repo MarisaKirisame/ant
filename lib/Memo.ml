@@ -350,9 +350,82 @@ let reads_hash_aux (r : reads) (x : reads) : (int * reads) option =
         else ret (Some (acc, { c = x.c; e; k = k_rest }))
       in
       loop 0 (Dynarray.length r.e) k_hash
+
 let reads_hash_slot = Profile.register_slot Profile.memo_profile "reads_hash"
+
 let reads_hash (r : reads) (x : reads) : (int * reads) option =
   Profile.with_slot reads_hash_slot (fun () -> reads_hash_aux r x)
+
+let rec match_read (r : Read.read) (x : Read.read) (read_acc : Read.read) : Read.read option =
+  (*assert (Read.read_valid r);
+  assert (Read.read_valid x);*)
+  let return ret = ret in
+  if Generic.is_empty r then (
+    assert (Generic.is_empty x);
+    return (Some read_acc))
+  else
+    let rh, rt = Read.read_front_exn r in
+    match rh with
+    | RSkip n ->
+        let xh, xt = Read.read_slice x n in
+        return (match_read rt xt (Read.read_append read_acc xh))
+    | RRead n ->
+        let rec loop n x read_acc =
+          if n = 0 then return (match_read rt x read_acc)
+          else
+            let xr, _ = Read.read_front_exn x in
+            match xr with
+            | RCon con ->
+                let xh, xt = Read.read_slice x 1 in
+                loop (n - 1) xt (Read.read_append read_acc xh)
+            | RRead _ | RSkip _ -> return None
+        in
+        loop n x read_acc
+    | RCon c -> (
+        let xh, xt = Read.read_front_exn x in
+        match xh with
+        | RCon con -> (
+            match Words.unwords con c with
+            | None -> return None
+            | Some xrest ->
+                let x = if Generic.is_empty xrest then xt else Read.read_cons (RCon xrest) xt in
+                return (match_read rt x read_acc))
+        | RRead _ | RSkip _ -> return None)
+
+let match_reads_aux (r : reads) (x : reads) : reads option =
+  assert (Dynarray.length r.e = Dynarray.length x.e);
+  let ret re =
+    re
+    (*match re with
+    | None -> None
+    | Some ((_, re) as full_re) ->
+        assert (reads_equal x (unmatch_reads r re));
+        Some full_re*)
+  in
+  let acc = match_read r.k x.k Generic.empty in
+  match acc with
+  | None -> ret None
+  | Some k_rest ->
+      let e = Dynarray.create () in
+      Dynarray.set_capacity e (Dynarray.length r.e);
+      let rec loop i j =
+        if i < j then (
+          let r_e = Dynarray.get r.e i in
+          let x_e = Dynarray.get x.e i in
+          match match_read r_e x_e Generic.empty with
+          | None -> None
+          | Some r_e_rest ->
+              Dynarray.add_last e r_e_rest;
+              loop (i + 1) j)
+        else ret (Some { c = x.c; e; k = k_rest })
+      in
+      loop 0 (Dynarray.length r.e)
+
+let match_reads_slot = Profile.register_slot Profile.memo_profile "match_reads"
+
+let match_reads (r : reads) (x : reads) : reads option =
+  Profile.with_slot match_reads_slot (fun () -> match_reads_aux r x)
+
 let join_reads_slot = Profile.register_slot Profile.memo_profile "join_reads"
 
 type join_reads = { reads : reads Lazy.t; x_weaken : bool; y_weaken : bool }
@@ -401,10 +474,10 @@ let rec merge (x : trie) (y : trie) : trie =
           Hashtbl.set children y_key (Stem { y with reads = y_reads });
           Branch { reads = Lazy.force j.reads; children; merging = [] }
       | false, true ->
-          let y_key, y_reads = Option.value_exn (reads_hash x.reads y.reads) in
+          let y_reads = Option.value_exn (match_reads x.reads y.reads) in
           Stem { x with next = merge_option x.next (Some (Stem { y with reads = y_reads })) }
       | true, false ->
-          let x_key, x_reads = Option.value_exn (reads_hash y.reads x.reads) in
+          let x_reads = Option.value_exn (match_reads y.reads x.reads) in
           Stem { y with next = merge_option y.next (Some (Stem { x with reads = x_reads })) }
       | false, false ->
           let next = merge_option x.next y.next in
@@ -434,7 +507,7 @@ let rec merge (x : trie) (y : trie) : trie =
                 :: List.map y.merging ~f:(rebase_merging y.reads);*)
             }
       | false, true ->
-          let y_key, y_reads = Option.value_exn (reads_hash x.reads y.reads) in
+          let y_reads = Option.value_exn (match_reads x.reads y.reads) in
           Stem { x with next = merge_option x.next (Some (Branch { y with reads = y_reads })) }
       | true, false ->
           let x_key, x_reads = Option.value_exn (reads_hash y.reads x.reads) in
