@@ -242,7 +242,9 @@ let string_of_reads (r : reads) : string =
   let e_str = "e: [" ^ String.concat ~sep:"; " (List.map ~f:string_of_read (Dynarray.to_list r.e)) ^ "]" in
   "{" ^ e_str ^ k_str ^ "; " ^ "}"
 
-let values_hash (r : reads) (v : State.state) : (int * State.state) option =
+let values_hash_slot = Profile.register_slot Profile.memo_profile "values_hash"
+
+let values_hash_aux (r : reads) (v : State.state) : (int * State.state) option =
   assert (Dynarray.length r.e = Dynarray.length v.e);
   let acc = value_hash r.k v.k 0 Generic.empty in
   let ret result =
@@ -273,6 +275,9 @@ let values_hash (r : reads) (v : State.state) : (int * State.state) option =
         else ret (Some (acc, { c = v.c; e; k = k_rest }))
       in
       loop 0 (Dynarray.length r.e) k_hash
+
+let values_hash (r : reads) (v : State.state) : (int * State.state) option =
+  Profile.with_slot values_hash_slot (fun () -> values_hash_aux r v)
 
 let rec read_hash (r : Read.read) (x : Read.read) (hash_acc : int) (read_acc : Read.read) : (int * Read.read) option =
   (*assert (Read.read_valid r);
