@@ -5,9 +5,9 @@ open BatFingerTree
 open State
 open Pattern
 
-type pattern_subst_map = pattern Array.t
+type pattern_subst_map = pattern Dynarray.t
 type pattern_subst_cek = pattern_subst_map cek
-type value_subst_map = value Array.t
+type value_subst_map = value Dynarray.t
 type value_subst_cek = value_subst_map cek
 
 let string_of_pattern (p : pattern) : string =
@@ -62,7 +62,7 @@ let rec compose_pattern p s i j =
     let ph, pt = pattern_front_exn p in
     match ph with
     | PVar _ ->
-        let x = Array.get s i in
+        let x = Dynarray.get s i in
         pattern_append x (compose_pattern pt s (i + 1) j)
     | PCon ph -> pattern_cons (PCon ph) (compose_pattern pt s i j)
 
@@ -73,7 +73,7 @@ let rec subst_value (s : value_subst_cek) (v : value) : value =
     | rest, Words w -> Value.value_cons (Words w) (subst_value s rest)
     | rest, Reference r ->
         let sm = cek_get s r.src in
-        let sub_v = Array.get sm r.hole_idx in
+        let sub_v = Dynarray.get sm r.hole_idx in
         Value.append (Value.slice sub_v r.offset r.values_count) (subst_value s rest)
 
 let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
@@ -99,7 +99,7 @@ let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
 let value_match_pattern (v : value) (p : pattern) : value_subst_map option =
   (*assert (value_valid v);*)
   let return x = x in
-  return (Option.map (fun lst -> Array.of_list lst) (value_match_pattern_aux v p))
+  return (Option.map (fun lst -> Dynarray.of_list lst) (value_match_pattern_aux v p))
 
 let rec pattern_to_value_aux (p : pattern) src (hole_idx : int ref) : value =
   if Generic.is_empty p then Generic.empty
@@ -155,7 +155,7 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
         | rest, Reference r ->
             let ph, pt = pattern_slice p r.values_count in
             let sm = cek_get s r.src in
-            let unify_with = Array.get sm r.hole_idx in
+            let unify_with = Dynarray.get sm r.hole_idx in
             (*assert ((pattern_measure ph).degree = (pattern_measure ph).max_degree);*)
             let ph = if r.offset > 0 then pattern_cons (make_pvar r.offset) ph else ph in
             let needed = (pattern_measure unify_with).max_degree - (r.offset + r.values_count) in
@@ -165,7 +165,7 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
             (*assert (Pattern.pattern_valid unify_with);
               assert (Pattern.pattern_valid ph);
               assert (Pattern.pattern_valid hole_value);*)
-            Array.set sm r.hole_idx hole_value;
+            Dynarray.set sm r.hole_idx hole_value;
             return (unify_vp_aux rest pt s))
 
 let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek =
@@ -221,13 +221,19 @@ let compose_step (x : step) (y : step) : step =
     print_endline ("y step: " ^ string_of_step y));
   assert (x.dst.c.pc = y.src.c.pc);
   let pattern_to_subst_map (p : pattern) : pattern_subst_map =
+    let da = Dynarray.create () in
     let rec loop p =
-      if Generic.is_empty p then []
+      if Generic.is_empty p then ()
       else
         let ph, pt = pattern_front_exn p in
-        match ph with PVar n -> Generic.singleton (make_pvar n) :: loop pt | PCon _ -> loop pt
+        match ph with
+        | PVar n ->
+            Dynarray.add_last da (Generic.singleton (make_pvar n));
+            loop pt
+        | PCon _ -> loop pt
     in
-    Array.of_list (loop p)
+    loop p;
+    da
   in
   let s = unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src) in
   let src =
@@ -235,7 +241,7 @@ let compose_step (x : step) (y : step) : step =
       (fun p s ->
         (*assert (Pattern.pattern_valid p);
         Array.iter (fun sp -> assert (Pattern.pattern_valid sp)) s;*)
-        let ret = compose_pattern p s 0 (Array.length s) in
+        let ret = compose_pattern p s 0 (Dynarray.length s) in
         (*assert (Pattern.pattern_valid ret);*)
         ret)
       x.src s
@@ -243,8 +249,8 @@ let compose_step (x : step) (y : step) : step =
   let subst : value_subst_cek =
     maps_ek
       (fun p s ->
-        let hold_idx = ref 0 in
-        Array.map (fun p -> pattern_to_value_aux p s hold_idx) p)
+        let hole_idx = ref 0 in
+        Dynarray.map (fun p -> pattern_to_value_aux p s hole_idx) p)
       s
   in
   let dst = Profile.with_slot compose_step_step_through_slot (fun _ -> map_ek (subst_value subst) x.dst) in
