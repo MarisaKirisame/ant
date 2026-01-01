@@ -148,7 +148,6 @@ let rec unmatch_read (x : read) (y : read) : read =
 type join = { result : read; x_rest : read; y_rest : read }
 
 let join_words_lca_slot = Profile.register_slot Profile.memo_profile "join.words_lca"
-let join_words_slice_slot = Profile.register_slot Profile.memo_profile "join.words_slice"
 
 let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (result_acc : read Lazy.t) : read Lazy.t
     =
@@ -212,7 +211,7 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
         x_weaken := true;
         return (slice 1 (RRead 1))
     | RCon xh, RCon yh ->
-        let lca, xht, yht = Words.lca xh yh in
+        let lca, xht, yht = Profile.with_slot join_words_lca_slot (fun () -> Words.lca xh yh) in
         if Generic.is_empty lca then (
           x_weaken := true;
           y_weaken := true;
