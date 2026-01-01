@@ -71,6 +71,7 @@ let value_snoc (v : seq) (et : fg_et) : seq =
 
 let value_snoc_unsafe (v : seq) (et : fg_et) : seq = Generic.snoc ~monoid ~measure v et
 let value_cons_unsafe (et : fg_et) (v : seq) : seq = Generic.cons ~monoid ~measure v et
+
 let front_exn (v : value) : fg_et * value =
   let w, v = Generic.front_exn ~monoid ~measure v in
   (v, w)
