@@ -348,7 +348,7 @@ let reads_hash (r : reads) (x : reads) : (int * reads) option =
 
 let join_reads_slot = Profile.register_slot Profile.memo_profile "join_reads"
 
-type join_reads = { reads : reads; x_weaken : bool; y_weaken : bool }
+type join_reads = { reads : reads Lazy.t; x_weaken : bool; y_weaken : bool }
 
 let join_reads (x : reads) (y : reads) : join_reads =
   Profile.with_slot join_reads_slot (fun () ->
@@ -356,12 +356,12 @@ let join_reads (x : reads) (y : reads) : join_reads =
       let x_weaken = ref false in
       let y_weaken = ref false in
       let join a b =
-        let ret = Read.join a x_weaken b y_weaken Generic.empty in
+        let ret = Read.join a x_weaken b y_weaken (lazy Generic.empty) in
         (*print_endline ("join reads:\n  " ^ string_of_read a ^ "\n  " ^ string_of_read b ^ "\n= " ^ string_of_read ret);*)
         ret
       in
       let reads = zipwith_ek join x y in
-      let ret = { reads; x_weaken = !x_weaken; y_weaken = !y_weaken } in
+      let ret = { reads = lazy (map_ek Lazy.force reads); x_weaken = !x_weaken; y_weaken = !y_weaken } in
       (*assert (reads_equal x (unmatch_reads ret.reads ret.x_rest));
       assert (reads_equal y (unmatch_reads ret.reads ret.y_rest));*)
       ret)
@@ -387,17 +387,17 @@ let rec merge (x : trie) (y : trie) : trie =
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
           let children = Hashtbl.create (module Int) in
-          let x_key, x_reads = Option.value_exn (reads_hash j.reads x.reads) in
-          let y_key, y_reads = Option.value_exn (reads_hash j.reads y.reads) in
+          let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
+          let y_key, y_reads = Option.value_exn (reads_hash (Lazy.force j.reads) y.reads) in
           assert (x_key <> y_key);
           Hashtbl.set children x_key (Stem { x with reads = x_reads });
           Hashtbl.set children y_key (Stem { y with reads = y_reads });
-          Branch { reads = j.reads; children; merging = [] }
+          Branch { reads = Lazy.force j.reads; children; merging = [] }
       | false, true ->
-          let y_key, y_reads = Option.value_exn (reads_hash j.reads y.reads) in
+          let y_key, y_reads = Option.value_exn (reads_hash x.reads y.reads) in
           Stem { x with next = merge_option x.next (Some (Stem { y with reads = y_reads })) }
       | true, false ->
-          let x_key, x_reads = Option.value_exn (reads_hash j.reads x.reads) in
+          let x_key, x_reads = Option.value_exn (reads_hash y.reads x.reads) in
           Stem { y with next = merge_option y.next (Some (Stem { x with reads = x_reads })) }
       | false, false ->
           let next = merge_option x.next y.next in
@@ -411,26 +411,26 @@ let rec merge (x : trie) (y : trie) : trie =
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
           let children = Hashtbl.create (module Int) in
-          let x_key, x_reads = Option.value_exn (reads_hash j.reads x.reads) in
+          let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
           Hashtbl.set children x_key (Stem { x with reads = x_reads });
           (*Hashtbl.iter y.children ~f:(fun child_trie ->
               let child_key, child_reads =
-                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
+                Option.value_exn (reads_hash (Lazy.force j.reads) (unmatch_reads y.reads (reads_from_trie child_trie)))
               in
               Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
           Branch
             {
-              reads = j.reads;
+              reads = Lazy.force j.reads;
               children;
               merging = [];
               (*{ reads = y.reads; children = y.children; miss_count = 0 }
                 :: List.map y.merging ~f:(rebase_merging y.reads);*)
             }
       | false, true ->
-          let y_key, y_reads = Option.value_exn (reads_hash j.reads y.reads) in
+          let y_key, y_reads = Option.value_exn (reads_hash x.reads y.reads) in
           Stem { x with next = merge_option x.next (Some (Branch { y with reads = y_reads })) }
       | true, false ->
-          let x_key, x_reads = Option.value_exn (reads_hash j.reads x.reads) in
+          let x_key, x_reads = Option.value_exn (reads_hash y.reads x.reads) in
           Hashtbl.update y.children x_key ~f:(insert_option (Stem { x with reads = x_reads }));
           Branch y
       | _ ->
@@ -456,7 +456,7 @@ let rec merge (x : trie) (y : trie) : trie =
               Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
           Branch
             {
-              reads = j.reads;
+              reads = Lazy.force j.reads;
               children;
               merging = [];
               (*merging =

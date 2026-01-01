@@ -147,7 +147,8 @@ let rec unmatch_read (x : read) (y : read) : read =
 
 type join = { result : read; x_rest : read; y_rest : read }
 
-let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (result_acc : read) : read =
+let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (result_acc : read Lazy.t) : read Lazy.t
+    =
   (*assert (read_valid x);
   assert (read_valid y);*)
   let recurse x y result_acc = join x x_weaken y y_weaken result_acc in
@@ -167,7 +168,7 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
     let slice slice_length slice_reason =
       let xh, xt = read_slice x slice_length in
       let yh, yt = read_slice y slice_length in
-      recurse xt yt (read_append result_acc (Generic.singleton slice_reason))
+      recurse xt yt (lazy (read_append (Lazy.force result_acc) (Generic.singleton slice_reason)))
     in
     match (xh, yh) with
     (* We have to pop them off one of a time, because a small chunk might be masking a larger chunk.
@@ -213,7 +214,7 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
           assert (Words.equal_words xhh yhh);
           let x = if Generic.is_empty xht then xt else read_cons (RCon xht) xt in
           let y = if Generic.is_empty yht then yt else read_cons (RCon yht) yt in
-          return (recurse x y (read_append result_acc (Generic.singleton (RCon xhh))))
+          return (recurse x y (lazy (read_append (Lazy.force result_acc) (Generic.singleton (RCon xhh)))))
 
 let hash (x : int) (y : int) : int =
   let hash = Hashtbl.hash (x, y) in
