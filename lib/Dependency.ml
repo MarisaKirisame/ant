@@ -98,24 +98,22 @@ let value_match_pattern (v : value) (p : pattern) : value_subst_map option =
   let return x = x in
   return (Option.map (fun lst -> Array.of_list lst) (value_match_pattern_aux v p))
 
-let words_to_value (w : words) : value = Generic.singleton (Words w)
-
-let rec pattern_to_value_aux (p : pattern) src hole_idx : value =
+let rec pattern_to_value_aux (p : pattern) src (hole_idx : int ref) : value =
   if Generic.is_empty p then Generic.empty
   else
     let ph, pt = pattern_front_exn p in
     match ph with
     | PVar n ->
-        Value.append
-          (Generic.singleton (Reference { src; hole_idx; offset = 0; values_count = n }))
-          (pattern_to_value_aux pt src (hole_idx + 1))
-    | PCon c -> Value.append (words_to_value c) (pattern_to_value_aux pt src hole_idx)
+        let r = Reference { src; hole_idx = !hole_idx; offset = 0; values_count = n } in
+        hole_idx := !hole_idx + 1;
+        Value.value_cons r (pattern_to_value_aux pt src hole_idx)
+    | PCon c -> Value.value_cons (Words c) (pattern_to_value_aux pt src hole_idx)
 
-let pattern_to_value (p : pattern cek) : value cek = maps_ek (fun p s -> pattern_to_value_aux p s 0) p
+let pattern_to_value (p : pattern cek) : value cek = maps_ek (fun p s -> pattern_to_value_aux p s (ref 0)) p
 
 (*todo: this code look a lot like value_match_pattern, is there ways to unify them?*)
 (*unify pattern and value, building a substituion map for pattern*)
-let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern_subst_cek =
+let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
   (*assert ((Value.summary v).degree = (pattern_measure p).degree);
   assert ((Value.summary v).degree = (Value.summary v).max_degree);
   assert ((pattern_measure p).degree = (pattern_measure p).max_degree);*)
@@ -123,7 +121,7 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : pattern
   let return x = x in
   if pattern_is_empty p then (
     assert (Generic.is_empty v);
-    return s)
+    return ())
   else
     let ph, pt = pattern_front_exn p in
     match ph with
@@ -239,8 +237,14 @@ let compose_step (x : step) (y : step) : step =
         ret)
       x.src s
   in
-  let dst = pattern_to_value src in
-  let dst = Profile.with_slot compose_step_step_through_slot (fun _ -> step_through x dst) in
+  let subst : value_subst_cek =
+    maps_ek
+      (fun p s ->
+        let hold_idx = ref 0 in
+        Array.map (fun p -> pattern_to_value_aux p s hold_idx) p)
+      s
+  in
+  let dst = Profile.with_slot compose_step_step_through_slot (fun _ -> map_ek (subst_value subst) x.dst) in
   (*if not (can_step_through y dst) then (
     print_endline "cannot compose steps:";
     print_endline ("generalized pattern: " ^ string_of_cek (pattern_to_value src));
