@@ -7,7 +7,14 @@ import argparse
 import os
 from pathlib import Path
 
-from plot_speedup import SpeedupStats, generate_plot, load_profile_totals, render_profile_table
+from plot_speedup import (
+    SpeedupStats,
+    generate_plot,
+    load_profile_totals,
+    load_records,
+    plot_memo_stats,
+    render_profile_table,
+)
 
 
 def _fmt(value: float) -> str:
@@ -21,8 +28,21 @@ def _image_src(plot_path: Path, output_dir: Path) -> str:
 
 
 def _render_html(
-    stats: SpeedupStats, line_src: str, scatter_src: str, data_label: str, profile_table: str
+    stats: SpeedupStats,
+    line_src: str,
+    scatter_src: str,
+    data_label: str,
+    profile_table: str,
+    memo_src: str | None,
 ) -> str:
+    memo_section = (
+        f"""
+    <section class="plot">
+      <img src="{memo_src}" alt="Memo stats depth vs node count plot">
+    </section>"""
+        if memo_src
+        else ""
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -165,6 +185,7 @@ def _render_html(
     <section class="plot">
       <img src="{scatter_src}" alt="Their vs our scatter plot">
     </section>
+{memo_section}
     <section class="profile">
       {profile_table}
     </section>
@@ -207,13 +228,19 @@ def main() -> None:
     scatter_path = args.scatter or args.plot.with_name("scatter.png")
 
     _, stats = generate_plot(args.input, args.plot, scatter_path)
+    memo_src = None
+    records = load_records(args.input)
+    if records.memo_stats:
+        memo_plot = args.plot.with_name("memo_stats.png")
+        plot_memo_stats(records.memo_stats, memo_plot)
+        memo_src = _image_src(memo_plot, args.output.parent)
     profile_totals, profile_total_time = load_profile_totals(args.input)
     profile_table = render_profile_table(profile_totals, profile_total_time)
     line_src = _image_src(args.plot, args.output.parent)
     scatter_src = _image_src(scatter_path, args.output.parent)
     data_label = os.path.relpath(args.input, args.output.parent)
     args.output.write_text(
-        _render_html(stats, line_src, scatter_src, data_label, profile_table),
+        _render_html(stats, line_src, scatter_src, data_label, profile_table, memo_src),
         encoding="utf-8",
     )
     print(

@@ -330,47 +330,63 @@ let value_to_string value = Format.asprintf "%a" pp_value value
 
 type step_writer = Memo.exec_result -> unit
 
-let with_steps_writer steps_path f =
+let with_outchannel steps_path f =
   let oc = open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_path in
-  Fun.protect
-    ~finally:(fun () -> close_out_noerr oc)
-    (fun () ->
-      let write_steps_json (r : Memo.exec_result) : unit =
-        let escape_json s =
-          let buf = Buffer.create (String.length s) in
-          String.iter
-            (function
-              | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
-            s;
-          Buffer.contents buf
-        in
-        let json_of_profile entries =
-          let buf = Buffer.create 64 in
+  Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
+
+let write_steps_json oc (r : Memo.exec_result) : unit =
+  let escape_json s =
+    let buf = Buffer.create (String.length s) in
+    String.iter
+      (function
+        | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
+      s;
+    Buffer.contents buf
+  in
+  let json_of_profile entries =
+    let buf = Buffer.create 64 in
+    Buffer.add_char buf '[';
+    let rec loop first = function
+      | [] -> ()
+      | (name, time) :: rest ->
+          if not first then Buffer.add_char buf ',';
           Buffer.add_char buf '[';
-          let rec loop first = function
-            | [] -> ()
-            | (name, time) :: rest ->
-                if not first then Buffer.add_char buf ',';
-                Buffer.add_char buf '[';
-                Buffer.add_char buf '"';
-                Buffer.add_string buf (escape_json name);
-                Buffer.add_char buf '"';
-                Buffer.add_char buf ',';
-                Buffer.add_string buf (string_of_int time);
-                Buffer.add_char buf ']';
-                loop false rest
-          in
-          loop true entries;
+          Buffer.add_char buf '"';
+          Buffer.add_string buf (escape_json name);
+          Buffer.add_char buf '"';
+          Buffer.add_char buf ',';
+          Buffer.add_string buf (string_of_int time);
           Buffer.add_char buf ']';
-          Buffer.contents buf
-        in
-        let memo_profile = Profile.dump_profile Profile.memo_profile |> json_of_profile in
-        let plain_profile = Profile.dump_profile Profile.plain_profile |> json_of_profile in
-        Printf.fprintf oc "{\"step\":%d,\"without_memo_step\":%d,\"memo_profile\":%s,\"plain_profile\":%s}\n" r.step
-          r.without_memo_step memo_profile plain_profile;
-        flush oc
-      in
-      f write_steps_json)
+          loop false rest
+    in
+    loop true entries;
+    Buffer.add_char buf ']';
+    Buffer.contents buf
+  in
+  let memo_profile = Profile.dump_profile Profile.memo_profile |> json_of_profile in
+  let plain_profile = Profile.dump_profile Profile.plain_profile |> json_of_profile in
+  Printf.fprintf oc
+    "{\"name\":\"exec_time\",\"step\":%d,\"without_memo_step\":%d,\"memo_profile\":%s,\"plain_profile\":%s}\n" r.step
+    r.without_memo_step memo_profile plain_profile;
+  flush oc
+
+let write_memo_stats_json oc (memo : State.memo) : unit =
+  let stats = Memo.memo_stats memo in
+  let buf = Buffer.create 64 in
+  Buffer.add_string buf "{\"name\":\"memo_stats\",\"depth_breakdown\":[";
+  let len = Stdlib.Dynarray.length stats in
+  for i = 0 to len - 1 do
+    let node = Stdlib.Dynarray.get stats i in
+    if i > 0 then Buffer.add_char buf ',';
+    Buffer.add_string buf "{\"depth\":";
+    Buffer.add_string buf (string_of_int node.depth);
+    Buffer.add_string buf ",\"node_count\":";
+    Buffer.add_string buf (string_of_int node.node_count);
+    Buffer.add_char buf '}'
+  done;
+  Buffer.add_string buf "]}\n";
+  Buffer.output_buffer oc buf;
+  flush oc
 
 (* Evaluate using the direct (non-CEK) interpreter defined in LivePlain.  We expose
    the same LC.value interface by converting the input expression and environment

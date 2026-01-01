@@ -361,7 +361,8 @@ let parse_program () =
   |> dedup NamedExpr.equal_nexpr
 
 let run () =
-  with_steps_writer steps_file (fun write_steps ->
+  with_outchannel steps_file (fun oc ->
+      let write_steps = write_steps_json oc in
       let memo = Ant.Memo.init_memo () in
       let eval expr = eval_expression ~memo ~write_steps expr in
       parse_program ()
@@ -370,4 +371,5 @@ let run () =
           let expr = expr_of_nexpr nexpr in
           Format.printf "hazel candidate %d expr: %a@." i RunLiveCommon.pp_expr expr;
           let value = eval expr in
-          Printf.printf "hazel candidate %d value: %s\n" i (value_to_string value)))
+          Printf.printf "hazel candidate %d value: %s\n" i (value_to_string value));
+      write_memo_stats_json oc memo)
