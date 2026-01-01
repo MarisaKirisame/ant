@@ -5,9 +5,9 @@ open BatFingerTree
 open State
 open Pattern
 
-type pattern_subst_map = pattern Dynarray.t
+type pattern_subst_map = pattern Array.t
 type pattern_subst_cek = pattern_subst_map cek
-type value_subst_map = value Dynarray.t
+type value_subst_map = value Array.t
 type value_subst_cek = value_subst_map cek
 
 let string_of_pattern (p : pattern) : string =
@@ -96,7 +96,7 @@ let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
 let value_match_pattern (v : value) (p : pattern) : value_subst_map option =
   (*assert (value_valid v);*)
   let return x = x in
-  return (Option.map (fun lst -> Dynarray.of_list lst) (value_match_pattern_aux v p))
+  return (Option.map (fun lst -> Array.of_list lst) (value_match_pattern_aux v p))
 
 let rec pattern_to_value_aux (p : pattern) src (hole_idx : int ref) : value =
   if Generic.is_empty p then Generic.empty
