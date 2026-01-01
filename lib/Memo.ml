@@ -315,8 +315,7 @@ let rec read_hash (r : Read.read) (x : Read.read) (hash_acc : int) (read_acc : R
 let reads_equal (x : reads) (y : reads) : bool =
   x.c.pc = y.c.pc && List.equal Read.read_equal (Dynarray.to_list x.e) (Dynarray.to_list y.e) && Read.read_equal x.k y.k
 
-let unmatch_reads (x : reads) (y : reads) : reads =
-  zip_ek x y |> Option.value_exn |> map_ek (fun (a, b) -> Read.unmatch_read a b)
+let unmatch_reads (x : reads) (y : reads) : reads = zipwith_ek Read.unmatch_read x y
 
 let reads_hash (r : reads) (x : reads) : (int * reads) option =
   assert (Dynarray.length r.e = Dynarray.length x.e);
@@ -356,12 +355,12 @@ let join_reads (x : reads) (y : reads) : join_reads =
       (*print_endline "calling joining reads:";*)
       let x_weaken = ref false in
       let y_weaken = ref false in
-      let join (a, b) =
+      let join a b =
         let ret = Read.join a x_weaken Generic.empty b y_weaken Generic.empty Generic.empty in
         (*print_endline ("join reads:\n  " ^ string_of_read a ^ "\n  " ^ string_of_read b ^ "\n= " ^ string_of_read ret);*)
         ret
       in
-      let reads = zip_ek x y |> Option.value_exn |> map_ek join in
+      let reads = zipwith_ek join x y in
       let ret =
         {
           reads = map_ek (fun (x : Read.join) -> x.result) reads;

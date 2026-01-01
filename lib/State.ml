@@ -55,6 +55,14 @@ let zip_ek (x : 'a cek) (y : 'b cek) : ('a * 'b) cek option =
     let k = (x.k, y.k) in
     Some { c; e; k })
 
+let zipwith_ek (f : 'a -> 'b -> 'c) (x : 'a cek) (y : 'b cek) : 'c cek =
+  assert (Dynarray.length x.e = Dynarray.length y.e);
+  let c = x.c in
+  assert (x.c.pc = y.c.pc);
+  let e = Dynarray.init (Dynarray.length x.e) (fun i -> f (Dynarray.get x.e i) (Dynarray.get y.e i)) in
+  let k = f x.k y.k in
+  { c; e; k }
+
 let map_ek (f : 'a -> 'b) (s : 'a cek) : 'b cek =
   let c = s.c in
   let e = Dynarray.map f s.e in
