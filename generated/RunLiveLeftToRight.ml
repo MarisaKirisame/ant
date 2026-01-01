@@ -94,7 +94,7 @@ let left_to_right (expr : LC.expr) : LC.expr list =
   in
   build expr
 
-let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) Common.random_list LC.ENil
+let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) Common.random_list LC.ENil *)
 
 let run () =
   Common.with_outchannel steps_file (fun oc ->
