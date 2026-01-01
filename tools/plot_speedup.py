@@ -351,6 +351,7 @@ def plot_size_vs_sc(size_vs_sc: Sequence[Sequence[MemoSizeVsSc]], output: Path) 
     plt.xlabel("Pattern size")
     plt.ylabel("Step count (sc)")
     plt.title("Memo pattern size vs step count")
+    plt.yscale("log")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     if len(size_vs_sc) > 1:
         plt.legend()
