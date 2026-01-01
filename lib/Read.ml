@@ -149,61 +149,64 @@ type join = { result : read; x_rest : read; y_rest : read }
 
 let join_words_lcp_slot = Profile.register_slot Profile.memo_profile "join.words_lcp"
 
-let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (result_acc : read Lazy.t) : read Lazy.t
-    =
-  (*assert (read_valid x);
-  assert (read_valid y);*)
-  let recurse x y result_acc = join x x_weaken y y_weaken result_acc in
-  let return r =
-    (*assert ((read_measure r).degree = (read_measure x).degree);
-    assert ((read_measure r).max_degree = (read_measure x).max_degree);*)
-    r
-  in
-  (*assert ((read_measure x).degree = (read_measure y).degree);
-  assert ((read_measure x).max_degree = (read_measure y).max_degree);*)
-  if Generic.is_empty x then (
-    assert (Generic.is_empty y);
-    return result_acc)
-  else
-    let xh, xt = read_front_exn x in
-    let yh, yt = read_front_exn y in
+let join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (result_acc : read Lazy.t) : read Lazy.t =
+  let return x = x in
+  let rec loop xh xt yh yt result_acc =
     let slice slice_length slice_reason =
-      let xh, xt = read_slice x slice_length in
-      let yh, yt = read_slice y slice_length in
+      let xh, xt = read_slice (read_cons xh xt) slice_length in
+      let yh, yt = read_slice (read_cons yh yt) slice_length in
       recurse xt yt (lazy (read_snoc (Lazy.force result_acc) slice_reason))
     in
     match (xh, yh) with
-    (* We have to pop them off one of a time, because a small chunk might be masking a larger chunk.
-     * A more principled approach would be to calculate the lca.
-     *)
+    (* We have to pop them off one of a time, because a small chunk might be masking a larger chunk.*)
     | RSkip x, RSkip y ->
-        let m = min x y in
-        let xt = if x = m then xt else read_cons_unsafe (RSkip (x - m)) xt in
-        let yt = if y = m then yt else read_cons_unsafe (RSkip (y - m)) yt in
-        return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RSkip m))))
+        if x < y then
+          let xh, xt = read_front_exn xt in
+          let yh, yt = (RSkip (y - x), yt) in
+          return (loop xh xt yh yt (lazy (read_snoc (Lazy.force result_acc) (RSkip x))))
+        else if x > y then
+          let xh, xt = (RSkip (x - y), xt) in
+          let yh, yt = read_front_exn yt in
+          return (loop xh xt yh yt (lazy (read_snoc (Lazy.force result_acc) (RSkip y))))
+        else return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RSkip x))))
     | RSkip x, RRead y ->
         y_weaken := true;
-        let m = min x y in
-        let xt = if x = m then xt else read_cons_unsafe (RSkip (x - m)) xt in
-        let yt = if y = m then yt else read_cons_unsafe (RRead (y - m)) yt in
-        return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RSkip m))))
+        if x < y then
+          let xh, xt = read_front_exn xt in
+          let yh, yt = (RRead (y - x), yt) in
+          return (loop xh xt yh yt (lazy (read_snoc (Lazy.force result_acc) (RSkip x))))
+        else if x > y then
+          let xh, xt = (RSkip (x - y), xt) in
+          let yh, yt = read_front_exn yt in
+          return (loop xh xt yh yt (lazy (read_snoc (Lazy.force result_acc) (RSkip y))))
+        else return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RSkip x))))
     | RSkip _, RCon _ ->
         y_weaken := true;
         return (slice 1 (RSkip 1))
     | RRead x, RSkip y ->
         x_weaken := true;
-        let m = min x y in
-        let xt = if x = m then xt else read_cons_unsafe (RRead (x - m)) xt in
-        let yt = if y = m then yt else read_cons_unsafe (RSkip (y - m)) yt in
-        return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RSkip m))))
+        if x < y then
+          let xh, xt = read_front_exn xt in
+          let yh, yt = (RSkip (y - x), yt) in
+          return (loop xh xt yh yt (lazy (read_snoc (Lazy.force result_acc) (RSkip x))))
+        else if x > y then
+          let xh, xt = (RRead (x - y), xt) in
+          let yh, yt = read_front_exn yt in
+          return (loop xh xt yh yt (lazy (read_snoc (Lazy.force result_acc) (RSkip y))))
+        else return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RSkip x))))
     | RCon _, RSkip _ ->
         x_weaken := true;
         return (slice 1 (RSkip 1))
     | RRead x, RRead y ->
-        let m = min x y in
-        let xt = if x = m then xt else read_cons_unsafe (RRead (x - m)) xt in
-        let yt = if y = m then yt else read_cons_unsafe (RRead (y - m)) yt in
-        return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RRead m))))
+        if x < y then
+          let xh, xt = read_front_exn xt in
+          let yh, yt = (RRead (y - x), yt) in
+          return (loop xh xt yh yt (lazy (read_snoc (Lazy.force result_acc) (RRead x))))
+        else if x > y then
+          let xh, xt = (RRead (x - y), xt) in
+          let yh, yt = read_front_exn yt in
+          return (loop xh xt yh yt (lazy (read_snoc (Lazy.force result_acc) (RRead y))))
+        else return (recurse xt yt (lazy (read_snoc (Lazy.force result_acc) (RRead x))))
     | RRead _, RCon _ ->
         y_weaken := true;
         return (slice 1 (RRead 1))
@@ -220,6 +223,16 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
           let x = if Generic.is_empty xht then xt else read_cons_unsafe (RCon xht) xt in
           let y = if Generic.is_empty yht then yt else read_cons_unsafe (RCon yht) yt in
           return (recurse x y (lazy (read_snoc (Lazy.force result_acc) (RCon lcp))))
+  and recurse x y result_acc =
+    if Generic.is_empty x then (
+      assert (Generic.is_empty y);
+      result_acc)
+    else
+      let xh, xt = read_front_exn x in
+      let yh, yt = read_front_exn y in
+      loop xh xt yh yt result_acc
+  in
+  recurse x y result_acc
 
 let hash (x : int) (y : int) : int =
   let hash = Hashtbl.hash (x, y) in
