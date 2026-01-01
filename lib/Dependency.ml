@@ -61,8 +61,7 @@ let rec compose_pattern p s i j =
   else
     let ph, pt = pattern_front_exn p in
     match ph with
-    | PVar _ -> (
-        pattern_append (Array.get s i) (compose_pattern pt s (i + 1) j))
+    | PVar _ -> pattern_append (Array.get s i) (compose_pattern pt s (i + 1) j)
     | PCon ph -> pattern_cons (PCon ph) (compose_pattern pt s i j)
 
 let rec subst_value (s : value_subst_cek) (v : value) : value =
@@ -234,7 +233,7 @@ let compose_step (x : step) (y : step) : step =
       (fun p s ->
         (*assert (Pattern.pattern_valid p);
         Array.iter (fun sp -> assert (Pattern.pattern_valid sp)) s;*)
-        let ret = compose_pattern p ( s) in
+        let ret = compose_pattern p s 0 (Array.length s) in
         (*assert (Pattern.pattern_valid ret);*)
         ret)
       x.src s
