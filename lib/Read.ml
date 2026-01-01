@@ -147,6 +147,9 @@ let rec unmatch_read (x : read) (y : read) : read =
 
 type join = { result : read; x_rest : read; y_rest : read }
 
+let join_words_lca_slot = Profile.register_slot Profile.memo_profile "join.words_lca"
+let join_words_slice_slot = Profile.register_slot Profile.memo_profile "join.words_slice"
+
 let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (result_acc : read Lazy.t) : read Lazy.t
     =
   (*assert (read_valid x);
@@ -209,7 +212,8 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
         x_weaken := true;
         return (slice 1 (RRead 1))
     | RCon xh, RCon yh ->
-        let lca_length = Words.lca_length xh yh in
+        let lca_length = 
+           Profile.with_slot join_words_lca_slot (fun () -> Words.lca_length xh yh) in
         if lca_length = 0 then (
           assert (not (Generic.is_empty xh));
           assert (not (Generic.is_empty yh));
@@ -217,8 +221,8 @@ let rec join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (
           y_weaken := true;
           return (slice 1 (RRead 1)))
         else
-          let xhh, xht = Words.slice_length xh lca_length in
-          let yhh, yht = Words.slice_length yh lca_length in
+          let xhh, xht =  Profile.with_slot join_words_slice_slot (fun () -> Words.slice_length xh lca_length) in
+          let yhh, yht = Profile.with_slot join_words_slice_slot (fun () -> Words.slice_length yh lca_length) in
           assert (Words.equal_words xhh yhh);
           let x = if Generic.is_empty xht then xt else read_cons_unsafe (RCon xht) xt in
           let y = if Generic.is_empty yht then yt else read_cons_unsafe (RCon yht) yt in
