@@ -63,9 +63,16 @@ class MemoStatsNode:
 
 
 @dataclass(frozen=True)
+class MemoSizeVsSc:
+    size: int
+    sc: int
+
+
+@dataclass(frozen=True)
 class Result:
     pairs: list[tuple[float, float]]
     memo_stats: list[list[MemoStatsNode]]
+    size_vs_sc: list[list[MemoSizeVsSc]]
 
 
 def _sum_profile(entries: object, *, key_name: str) -> float:
@@ -140,6 +147,7 @@ def load_records(path: Path) -> Result:
     """Return parsed records from a JSONL file."""
     pairs: list[tuple[float, float]] = []
     memo_stats: list[list[MemoStatsNode]] = []
+    size_vs_sc: list[list[MemoSizeVsSc]] = []
     with path.open() as f:
         for line_no, line in enumerate(f, 1):
             if not line.strip():
@@ -175,13 +183,30 @@ def load_records(path: Path) -> Result:
                             raise ValueError(f"depth_breakdown[{idx}].node_count must be an int")
                         nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
                     memo_stats.append(nodes)
+                    raw_size_vs_sc = rec.get("size_vs_sc", [])
+                    if raw_size_vs_sc is None:
+                        raw_size_vs_sc = []
+                    if not isinstance(raw_size_vs_sc, list):
+                        raise ValueError("size_vs_sc must be a list")
+                    size_vs_sc_entries: list[MemoSizeVsSc] = []
+                    for idx, entry in enumerate(raw_size_vs_sc):
+                        if not isinstance(entry, dict):
+                            raise ValueError(f"size_vs_sc[{idx}] must be an object")
+                        size = entry.get("size")
+                        sc = entry.get("sc")
+                        if not isinstance(size, int):
+                            raise ValueError(f"size_vs_sc[{idx}].size must be an int")
+                        if not isinstance(sc, int):
+                            raise ValueError(f"size_vs_sc[{idx}].sc must be an int")
+                        size_vs_sc_entries.append(MemoSizeVsSc(size=size, sc=sc))
+                    size_vs_sc.append(size_vs_sc_entries)
                 else:
                     raise ValueError(f"unexpected record name: {name}")
             except Exception as exc:  # pylint: disable=broad-except
                 raise RuntimeError(f"failed to parse line {line_no}") from exc
     if not pairs:
         raise RuntimeError("no records found in file")
-    return Result(pairs=pairs, memo_stats=memo_stats)
+    return Result(pairs=pairs, memo_stats=memo_stats, size_vs_sc=size_vs_sc)
 
 
 def compare_stats(
@@ -302,6 +327,32 @@ def plot_memo_stats_cdf(
     plt.title("Memo stats CDF")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     if len(memo_stats) > 1:
+        plt.legend()
+    plt.tight_layout()
+    plt.savefig(output)
+    plt.close()
+
+
+def plot_size_vs_sc(size_vs_sc: Sequence[Sequence[MemoSizeVsSc]], output: Path) -> None:
+    if not size_vs_sc:
+        raise ValueError("size_vs_sc is empty")
+    plt.figure(figsize=(6, 4.5))
+    has_points = False
+    for idx, entries in enumerate(size_vs_sc, 1):
+        if not entries:
+            continue
+        sizes = [entry.size for entry in entries]
+        scs = [entry.sc for entry in entries]
+        label = f"run {idx}" if len(size_vs_sc) > 1 else None
+        plt.scatter(sizes, scs, alpha=0.6, label=label)
+        has_points = True
+    if not has_points:
+        raise ValueError("size_vs_sc has no entries")
+    plt.xlabel("Pattern size")
+    plt.ylabel("Step count (sc)")
+    plt.title("Memo pattern size vs step count")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    if len(size_vs_sc) > 1:
         plt.legend()
     plt.tight_layout()
     plt.savefig(output)

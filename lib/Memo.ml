@@ -658,21 +658,27 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   result
 
 let exec_done _ = failwith "exec is done, should not call step anymore"
+let pattern_size (p : Pattern.pattern) = Generic.size p
+let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
 
-type memo_stats = memo_stats_node Dynarray.t
-and memo_stats_node = { depth : int; mutable node_count : int }
+type memo_stats = { by_depth : by_depth Dynarray.t; size_vs_sc : size_vs_sc list }
+and by_depth = { depth : int; mutable node_count : int }
+and size_vs_sc = { size : int; sc : int }
 
 let memo_stats (m : memo) : memo_stats =
-  let stats = Dynarray.create () in
+  let by_depth = Dynarray.create () in
+  let size_vs_sc = ref [] in
   let rec aux (t : trie) (depth : int) : unit =
-    if Dynarray.length stats <= depth then Dynarray.add_last stats { depth; node_count = 0 };
-    let node_stat = Dynarray.get stats depth in
+    if Dynarray.length by_depth <= depth then Dynarray.add_last by_depth { depth; node_count = 0 };
+    let node_stat = Dynarray.get by_depth depth in
     node_stat.node_count <- node_stat.node_count + 1;
     match t with
-    | Stem st -> ( match st.next with None -> () | Some child -> aux child (depth + 1))
+    | Stem st -> (
+        size_vs_sc := { size = patterns_size st.step.src; sc = st.step.sc } :: !size_vs_sc;
+        match st.next with None -> () | Some child -> aux child (depth + 1))
     | Branch br ->
         Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1));
         List.iter br.merging ~f:(fun m -> Hashtbl.iter m.children ~f:(fun child -> aux child (depth + 1)))
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
-  stats
+  { by_depth; size_vs_sc = !size_vs_sc }
