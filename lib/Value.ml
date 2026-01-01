@@ -61,6 +61,17 @@ let value_cons (et : fg_et) (v : seq) : seq =
     | Words et, Words vh -> Generic.cons ~monoid ~measure vt (Words (Words.append et vh))
     | _ -> Generic.cons ~monoid ~measure v et
 
+let value_snoc (v : seq) (et : fg_et) : seq =
+  if Generic.is_empty v then Generic.singleton et
+  else
+    let vh, vt = Generic.rear_exn ~monoid ~measure v in
+    match (vt, et) with
+    | Words vt, Words et -> Generic.snoc ~monoid ~measure vh (Words (Words.append vt et))
+    | _ -> Generic.snoc ~monoid ~measure v et
+
+let value_snoc_unsafe (v : seq) (et : fg_et) : seq = Generic.snoc ~monoid ~measure v et
+let value_cons_unsafe (et : fg_et) (v : seq) : seq = Generic.cons ~monoid ~measure v et
+
 (* pop_n semantics are documented in docs/internal.md#value-slicing-semantics-valueml. *)
 let rec pop_n (s : seq) (n : int) : seq * seq =
   (*assert (value_valid s);*)
@@ -80,19 +91,18 @@ let rec pop_n (s : seq) (n : int) : seq * seq =
     | Words v ->
         assert (m.degree + (Words.summary v).max_degree >= n);
         let vh, vt = Words.slice_degree v (n - m.degree) in
-        let l = append x (value_cons (Words vh) Generic.empty) in
-        let r = if Words.is_empty vt then w else value_cons (Words vt) w in
+        let l = value_snoc_unsafe x (Words vh) in
+        let r = if Words.is_empty vt then w else value_cons_unsafe (Words vt) w in
         (l, r)
     | Reference v ->
         assert (m.degree < n);
         assert (m.degree + v.values_count >= n);
         let need = n - m.degree in
-        let l = Generic.snoc ~monoid ~measure x (Reference { v with values_count = need }) in
+        let l = value_snoc_unsafe x (Reference { v with values_count = need }) in
         if v.values_count = need then (l, w)
         else
           let r =
-            Generic.cons ~monoid ~measure w
-              (Reference { v with offset = v.offset + need; values_count = v.values_count - need })
+            value_cons_unsafe (Reference { v with offset = v.offset + need; values_count = v.values_count - need }) w
           in
           (l, r)
 
