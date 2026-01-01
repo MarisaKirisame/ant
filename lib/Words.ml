@@ -85,7 +85,7 @@ let rec splits (x : words) : words list =
     let h, t = pop x in
     h :: splits t
 
-let lca_length (x : words) (y : words) : int =
+let lcp_length (x : words) (y : words) : int =
   let return n =
     (*let xl, _ = slice_length x n in
     let yl, _ = slice_length y n in
@@ -108,17 +108,22 @@ let lca_length (x : words) (y : words) : int =
   in
   return (search 0 max_common_len)
 
-let lca (x : words) (y : words) : words * words * words =
-  let rec search lo hi common x_rest y_rest =
-    if lo = hi then (common, x_rest, y_rest)
+let lcp (x : words) (y : words) : words * words * words =
+  (* Invariants:
+   *   hi = max length of common prefix remaining to search
+   * Return:
+   *   (lcp of x and y, suffix of x ++ x_rest, suffix of y ++ y_rest)
+   *)
+  let rec search hi common x x_rest y y_rest =
+    if 0 = hi then (common, append x x_rest, append y y_rest)
     else
-      let mid = (lo + hi + 1) / 2 in
-      let x_prefix, x_rest_ = slice_length x mid in
-      let y_prefix, y_rest_ = slice_length y mid in
-      if equal_words x_prefix y_prefix then search mid hi x_prefix x_rest_ y_rest_
-      else search lo (mid - 1) common x_rest y_rest
+      let mid = (hi + 1) / 2 in
+      let x_prefix, x_suffix = slice_length x mid in
+      let y_prefix, y_suffix = slice_length y mid in
+      if equal_words x_prefix y_prefix then search (hi - mid) (append common x_prefix) x_suffix x_rest y_suffix y_rest
+      else search (mid - 1) common x_prefix (append x_suffix x_rest) y_prefix (append y_suffix y_rest)
   in
-  search 0 (min (length x) (length y)) Generic.empty x y
+  search (min (length x) (length y)) Generic.empty x Generic.empty y Generic.empty
 
 let words_front_exn (s : words) : Word.t * words =
   let w, v = Generic.front_exn ~monoid ~measure s in
