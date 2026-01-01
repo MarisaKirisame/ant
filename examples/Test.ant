@@ -2,6 +2,11 @@ type list 'a =
   | Nil
   | Cons of 'a * list 'a;;
 
+type pair 'a 'b = Pair of 'a * 'b;;
+
+type wrap 'a = Wrap of 'a;;
+
+(*
 let nil = fun _ -> Nil;;
 
 let cons = fun a b -> Cons a b;;
@@ -21,6 +26,20 @@ let test_if = fun x ->
 
 let test_nested_if = fun x ->
   if (if x then 1 else 0) < 1 then 1 else 2;;
+*)
+
+let test_match = fun x ->
+  match x with
+  | Nil -> 0
+  | Cons a b -> 1;;
+
+let test_match2 = fun x ->
+  match x with
+  | Pair a b -> a + b;;
+
+let test_wrap = fun x ->
+  match x with
+  | Wrap a -> a;;
 
 (*
 let test_all = fun _ ->

@@ -370,25 +370,35 @@ and compile_cases (ctx : ctx) (s : scope) (dst : loc) (scrut : 'a expr) (MatchPa
     : world code -> unit code =
   let a, s = alloc_slot s in
   let b, s = alloc_slot s in
-  let match_k match_cont (_l, _s) w =
+  (* share cont: there is a bug *)
+  let _match_k match_cont (_l, _s) w =
     assert (equal_loc b _l);
     [%seqs
       set_loc dst (get_loc b w) w;
       app_ match_cont unit_]
   in
-  let scrut_k (_l, s) w =
+  let match_k _ (_l, _s) w =
+    assert (equal_loc b _l);
+    [%seqs
+      set_loc dst (get_loc b w) w;
+      assert_env_length_ w (int_ s.env_length);
+      shrink_env_ w (int_ 2);
+      k (dst, free_n_slots s 2) w]
+  in
+  let scrut_k (_l, s) =
     assert (equal_loc a _l);
+    reading s @@ fun s w ->
     [%seqs
       assert_env_length_ w (int_ s.env_length);
       let$ x = resolve_loc a w in
-      let$ match_cont =
+      (* let$ match_cont =
         paren @@ lam_unit_
         @@ fun _ ->
         [%seqs
           assert_env_length_ w (int_ s.env_length);
           shrink_env_ w (int_ 2);
           k (dst, free_n_slots s 2) w]
-      in
+      in *)
       let case cname =
         string (string_of_int @@ Hashtbl.find_exn ctx.ctag cname)
         ^^ space ^^ string "(*" ^^ space
@@ -399,9 +409,9 @@ and compile_cases (ctx : ctx) (s : scope) (dst : loc) (scrut : 'a expr) (MatchPa
         List.map
           ~f:(fun (pat, expr) ->
             match pat with
-            | PAny -> (string "_", compile_expr ctx s b expr (match_k match_cont) w)
-            | PVar (x, _) -> (string x, compile_expr ctx (add_s s x a) b expr (match_k match_cont) w)
-            | PCtorApp (cname, None, _) -> (case cname, compile_expr ctx s b expr (match_k match_cont) w)
+            | PAny -> (string "_", compile_expr ctx s b expr (match_k ()) w)
+            | PVar (x, _) -> (string x, compile_expr ctx (add_s s x a) b expr (match_k ()) w)
+            | PCtorApp (cname, None, _) -> (case cname, compile_expr ctx s b expr (match_k ()) w)
             | PCtorApp (cname, Some (PVar (x0, _)), _) ->
                 let c =
                   with_splits 1
@@ -416,7 +426,7 @@ and compile_cases (ctx : ctx) (s : scope) (dst : loc) (scrut : 'a expr) (MatchPa
                              fun (l, s) w ->
                               [%seqs
                                 to_unit_ @@ pop_env_ w;
-                                match_k match_cont (l, s) w]
+                                match_k () (l, s) w]
                             in
                             compile_expr ctx (add_s s x0 slot) b expr clean_k w]
                       | _ -> failwith "with_splits: unexpected arity")
@@ -439,7 +449,7 @@ and compile_cases (ctx : ctx) (s : scope) (dst : loc) (scrut : 'a expr) (MatchPa
                               [%seqs
                                 assert_env_length_ w (int_ s.env_length);
                                 shrink_env_ w (int_ n);
-                                match_k match_cont (l, s) w]
+                                match_k () (l, s) w]
                             in
                             let s = List.fold2_exn ~f:add_s ~init:s xs slots in
                             compile_expr ctx s b expr clean_k w]
