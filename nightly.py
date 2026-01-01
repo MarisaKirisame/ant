@@ -228,11 +228,15 @@ def profile_project() -> None:
     generate_ml_files(env=env)
     opam_exec(["dune", "build", "generated/GeneratedMain.exe"], env=env)
     binary = os.path.join("_build", "default", "generated", "GeneratedMain.exe")
-    for mode in ("live-simple", "live-left-to-right", "live-demand-driven", "hazel"):
-        opam_exec(
-            ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
-            env=env,
-        )
+    # for mode in ("live-simple", "live-left-to-right", "live-demand-driven", "hazel"):
+    #     opam_exec(
+    #         ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
+    #         env=env,
+    #     )
+    opam_exec(
+        ["perf", "record", "-o", f"perf-lisp.data", "--", binary, "lisp"],
+        env=env,
+    )
 
 
 def report_project() -> None:

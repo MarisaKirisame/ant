@@ -94,10 +94,10 @@ let left_to_right (expr : LC.expr) : LC.expr list =
   in
   build expr
 
-let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) Common.random_list LC.ENil
+let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) Common.random_list LC.ENil *)
 
-let run () =
-  Common.with_outchannel steps_file (fun oc ->
+let run () = print_endline "commented out."
+(* Common.with_outchannel steps_file (fun oc ->
       let write_steps = Common.write_steps_json oc in
       let memo = Ant.Memo.init_memo () in
       let eval expr = Common.eval_expression ~memo ~write_steps expr in
@@ -106,4 +106,4 @@ let run () =
       |> List.iteri (fun i e ->
           let applied = LC.EApp (e, random_list_expr) in
           Printf.printf "step %d value: %s\n" i (Common.value_to_string (eval applied)));
-      Common.write_memo_stats_json oc memo)
+      Common.write_memo_stats_json oc memo) *)
