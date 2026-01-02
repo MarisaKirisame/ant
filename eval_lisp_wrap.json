@@ -1,3 +1,1 @@
-{"wrap_depth":1,"code":"(wrap '((lambda (0) (var 0)) 99))","value":"99","runtime_seconds":14.688944816589355,"step":7822,"without_memo_step":2140639}
-{"wrap_depth":2,"code":"(wrap (wrap '((lambda (0) (var 0)) 99)))","value":"99","runtime_seconds":45.44472312927246,"step":12437,"without_memo_step":5716537}
-{"wrap_depth":3,"code":"(wrap (wrap (wrap '((lambda (0) (var 0)) 99))))","value":"99","runtime_seconds":87.80588507652283,"step":16406,"without_memo_step":10739699}
+{"wrap_depth":1,"code":"(wrap '((lambda (0) (var 0)) 99))","value":"99","runtime_seconds":29.04752516746521,"step":19818,"without_memo_step":8696145}
