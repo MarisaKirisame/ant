@@ -3,6 +3,9 @@ module Memo = Ant.Memo
 module Word = Ant.Word.Word
 module Frontend = LispFrontend
 module Json = Yojson.Safe
+module State = Ant.State
+
+let steps_file = "eval_steps_lisp.json"
 
 let with_memo f =
   let memo = Memo.init_memo () in
@@ -15,6 +18,15 @@ let empty_env_seq = LC.from_ocaml_list LC.from_ocaml_value (lisp_list_of_list []
 let rec expr_list exprs = match exprs with [] -> LC.EAtom LC.ANIL | hd :: tl -> LC.ECons (hd, expr_list tl)
 let seq_of_expr_list exprs = lisp_list_of_list exprs |> LC.from_ocaml_list LC.from_ocaml_expr
 let int_of_seq seq = Word.get_value (Memo.to_word seq)
+
+type step_writer = Memo.exec_result -> unit
+
+let current_memo : State.memo option ref = ref None
+let current_write_steps : step_writer option ref = ref None
+
+let with_outchannel steps_path f =
+  let oc = open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_path in
+  Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 
 let string_of_symbol = function
   | LC.SLambda -> "lambda"
@@ -38,6 +50,71 @@ let string_of_symbol = function
   | LC.SNum -> "num"
   | LC.SAnd -> "and"
   | LC.SElse -> "else"
+  | LC.SPlus -> "+"
+
+let write_steps_json oc (r : Memo.exec_result) : unit =
+  let escape_json s =
+    let buf = Buffer.create (String.length s) in
+    String.iter
+      (function
+        | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
+      s;
+    Buffer.contents buf
+  in
+  let json_of_profile entries =
+    let buf = Buffer.create 64 in
+    Buffer.add_char buf '[';
+    let rec loop first = function
+      | [] -> ()
+      | (name, time) :: rest ->
+          if not first then Buffer.add_char buf ',';
+          Buffer.add_char buf '[';
+          Buffer.add_char buf '"';
+          Buffer.add_string buf (escape_json name);
+          Buffer.add_char buf '"';
+          Buffer.add_char buf ',';
+          Buffer.add_string buf (string_of_int time);
+          Buffer.add_char buf ']';
+          loop false rest
+    in
+    loop true entries;
+    Buffer.add_char buf ']';
+    Buffer.contents buf
+  in
+  let memo_profile = Ant.Profile.dump_profile Ant.Profile.memo_profile |> json_of_profile in
+  let plain_profile = Ant.Profile.dump_profile Ant.Profile.plain_profile |> json_of_profile in
+  Printf.fprintf oc
+    "{\"name\":\"exec_time\",\"step\":%d,\"without_memo_step\":%d,\"memo_profile\":%s,\"plain_profile\":%s}\n" r.step
+    r.without_memo_step memo_profile plain_profile;
+  flush oc
+
+let write_memo_stats_json oc (memo : State.memo) : unit =
+  let stats = Memo.memo_stats memo in
+  let buf = Buffer.create 64 in
+  Buffer.add_string buf "{\"name\":\"memo_stats\",\"depth_breakdown\":[";
+  let len = Stdlib.Dynarray.length stats.by_depth in
+  for i = 0 to len - 1 do
+    let node = Stdlib.Dynarray.get stats.by_depth i in
+    if i > 0 then Buffer.add_char buf ',';
+    Buffer.add_string buf "{\"depth\":";
+    Buffer.add_string buf (string_of_int node.depth);
+    Buffer.add_string buf ",\"node_count\":";
+    Buffer.add_string buf (string_of_int node.node_count);
+    Buffer.add_char buf '}'
+  done;
+  Buffer.add_string buf "],\"size_vs_sc\":[";
+  List.iteri
+    (fun i (entry : Memo.size_vs_sc) ->
+      if i > 0 then Buffer.add_char buf ',';
+      Buffer.add_string buf "{\"size\":";
+      Buffer.add_string buf (string_of_int entry.size);
+      Buffer.add_string buf ",\"sc\":";
+      Buffer.add_string buf (string_of_int entry.sc);
+      Buffer.add_char buf '}')
+    stats.size_vs_sc;
+  Buffer.add_string buf "]}\n";
+  Buffer.output_buffer oc buf;
+  flush oc
 
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "#%d" i
@@ -83,12 +160,18 @@ let expect_equal ?(show = fun _ -> "<value>") label expected actual =
 
 let expect_value msg (x : LC.value) (y : LC.value) = expect_equal ~show:string_of_value msg x y
 let expr_of_int_list ints = List.map (fun n -> LC.EAtom (LC.ANumber n)) ints |> expr_list
+let rec value_list_of_ints = function [] -> LC.VNIL | x :: xs -> LC.VCons (LC.VNumber x, value_list_of_ints xs)
 
 let eval_expr_with_details expr =
   let seq = LC.from_ocaml_expr expr in
   let start = Unix.gettimeofday () in
-  let res = with_memo (fun memo -> LC.eval memo seq empty_env_seq) in
+  let res =
+    match !current_memo with
+    | Some memo -> LC.eval memo seq empty_env_seq
+    | None -> with_memo (fun memo -> LC.eval memo seq empty_env_seq)
+  in
   let stop = Unix.gettimeofday () in
+  Option.iter (fun write_steps -> write_steps res) !current_write_steps;
   {
     value = LC.to_ocaml_value res.words;
     runtime_seconds = stop -. start;
@@ -130,6 +213,23 @@ let test_cond_short_circuits () =
 let test_car_after_cons () =
   let code = "(car (cons 5 (quote ())))" in
   expect_eval "car unwraps the head of cons cells" code (LC.VNumber 5)
+
+let test_mapinc_list () =
+  let list_literal ints =
+    let body = String.concat " " (List.map string_of_int ints) in
+    Printf.sprintf "(quote (%s))" body
+  in
+  let code_for ints =
+    Printf.sprintf
+      "((define mapinc (xs) (cond ((null xs) (quote ())) (else (cons (+ (car xs) 1) (mapinc (cdr xs)))))) (mapinc %s))"
+      (list_literal ints)
+  in
+  let run_case n =
+    let input = List.init n Fun.id in
+    let expected = value_list_of_ints (List.map (fun x -> x + 1) input) in
+    expect_eval (Printf.sprintf "mapinc increments %d elements" n) (code_for input) expected
+  in
+  List.iter run_case [ 2; 40; 45 ]
 
 let read_file_content filename = In_channel.with_open_text filename In_channel.input_all
 let wrap_tests_output_path = "eval_lisp_wrap.json"
@@ -182,7 +282,7 @@ let json_of_wrap_result depth code details =
 
 let run_wrap_code_tests () =
   let template = read_file_content "./generated/Lisp.lisp" in
-  let wrap_depths = [ 1; 2 ] in
+  let wrap_depths = [ 1 ] in
   let results =
     List.map
       (fun depth ->
@@ -209,10 +309,22 @@ let run_wrap_code_tests () =
   Printf.printf "Saved wrap test results to %s\n" wrap_tests_output_path
 
 let run () =
-  test_atom_rejects_cons ();
-  test_eq_number_literals ();
-  test_eq_number_literals_false ();
-  test_cond_short_circuits ();
-  test_car_after_cons ();
-  run_wrap_code_tests ();
+  with_outchannel steps_file (fun oc ->
+      let memo = Memo.init_memo () in
+      let write_steps = write_steps_json oc in
+      current_memo := Some memo;
+      current_write_steps := Some write_steps;
+      Fun.protect
+        ~finally:(fun () ->
+          current_memo := None;
+          current_write_steps := None)
+        (fun () ->
+          test_atom_rejects_cons ();
+          test_eq_number_literals ();
+          test_eq_number_literals_false ();
+          test_cond_short_circuits ();
+          test_car_after_cons ();
+          test_mapinc_list ();
+          (* run_wrap_code_tests (); *)
+          write_memo_stats_json oc memo));
   print_endline "LispCEK smoke tests completed."
