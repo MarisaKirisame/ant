@@ -203,6 +203,39 @@ let drop (s : scope) (vars : string list) : scope =
 let return_with (s : scope) (v : words code) (w : world code) : unit code =
   [%seqs return_n_with_ w (int_ s.env_length) v (pc_to_exp_ (pc_ apply_cont))]
 
+type keep_t = { mutable keep : bool; mutable source : string option }
+
+let keep_only (s : scope) (fv : unit StrMap.t) : int Dynarray.t * scope =
+  check_scope s;
+  let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
+  Map.iteri s.meta_env ~f:(fun ~key ~data ->
+      match data with None -> () | Some (Slot i) -> Dynarray.set keep i { keep = false; source = Some key });
+  Map.iter_keys fv ~f:(fun fv ->
+      let i =
+        match Map.find s.meta_env fv with Some (Some (Slot i)) -> i | _ -> failwith ("keep_only not found:" ^ fv)
+      in
+      (Dynarray.get keep i).keep <- true);
+  let keep_idx : int Dynarray.t = Dynarray.create () in
+  let _, meta_env =
+    Dynarray.fold_left
+      (fun (i, acc) k ->
+        if k.keep then (
+          let ret =
+            match k.source with
+            | None -> (i + 1, acc)
+            | Some v -> (i + 1, Map.add_exn ~key:v ~data:(Some (Slot (Dynarray.length keep_idx))) acc)
+          in
+          Dynarray.add_last keep_idx i;
+          ret)
+        else (i + 1, acc))
+      (0, StrMap.empty) keep
+  in
+  let others = Map.map ~f:(fun _ -> None) s.meta_env in
+  let meta_env = Map.merge_skewed ~combine:(fun ~key:_ x _ -> x) meta_env others in
+  let s = { s with meta_env; env_length = Dynarray.length keep_idx } in
+  check_scope s;
+  (keep_idx, s)
+
 let reading (s : scope) (f : kont) (w : world code) : unit code =
   let make_code w = f { s with progressed = false } w in
   if s.progressed then goto_ w (add_code $ Some (lam_ "w" make_code)) else make_code w
@@ -263,6 +296,39 @@ and compile_expr (ctx : ctx) (s : scope) (dst : loc) (c : 'a expr) (k : kont_wit
                   shrink_env_ w (int_ @@ n_args);
                   k (dst, free_n_slots s n_args) w]])
             w]
+  | App (GVar (f, _), xs, info) ->
+      check_scope s;
+      let at_tail_pos = Liveness.(info.tail) in
+      let keep, keep_s = keep_only s @@ StrMap.of_alist_exn @@ CompileMemo.StrMap.to_list Liveness.(info.fv) in
+      let keep_length = keep_s.env_length in
+      let xs_length = List.length xs in
+      if at_tail_pos then (
+        assert (keep_length = 0);
+        (* a tail call cannot keep anything *)
+        let slots, s = alloc_n_slots s xs_length in
+        let* _l, s = compile_exprs compile_expr ctx s slots xs in
+        fun w ->
+          [%seqs
+            assert_env_length_ w @@ int_ s.env_length;
+            to_unit_ @@ env_call_ w (list_literal_of_ int_ []) @@ int_ xs_length;
+            goto_ w (Hashtbl.find_exn ctx.func_pc f)])
+      else
+        let cont_name = "cont_" ^ string_of_int ctx.conts_count in
+        (* subtracting 1 to remove the arguments; adding 1 for the next continuation*)
+        add_cont ctx cont_name (keep_length + 1) (fun w tl ->
+            [%seqs
+              set_k_ w (get_next_cont_ tl);
+              restore_env_ w (int_ keep_length) tl;
+              let _l, s = alloc_slot s in
+              k (dst, s) w]);
+        let slots, s = alloc_n_slots s xs_length in
+        let* _l, s = compile_exprs compile_expr ctx s slots xs in
+        fun w ->
+          [%seqs
+            assert_env_length_ w (int_ s.env_length);
+            (let$ keep = env_call_ w (list_literal_of_ int_ (Dynarray.to_list keep)) (int_ xs_length) in
+             set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ w ]));
+            goto_ w (Hashtbl.find_exn ctx.func_pc f)]
   | If (c, t, f, _) ->
       check_scope s;
       let a, s = alloc_slot s in
