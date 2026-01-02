@@ -738,15 +738,14 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
 let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) =
   let state = { c; e; k } in
   let m = init_memo () in
-  let w = make_world (copy_state state) m in
   let rec exec state =
-    if is_done state then ()
-    else (
+    if is_done state then state
+    else
+      let w = make_world state m in
       state.c.step w;
-      exec state)
+      exec w.state
   in
-  exec state;
-  Dynarray.get_last state.e
+  Dynarray.get_last (exec state).e
 
 let exec_done _ = failwith "exec is done, should not call step anymore"
 let pattern_size (p : Pattern.pattern) = Generic.size p
