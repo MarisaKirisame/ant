@@ -92,11 +92,13 @@ let rec compile_expr (e : 'a expr) : document =
   | Int v -> string (string_of_int v)
   | Float v -> string (string_of_float v)
   | Bool v -> string (string_of_bool v)
-  | Str v -> string v
+  | Str v -> dquotes (string v) (* TODO: escape the content *)
   | Builtin (Builtin b, _) -> string b
   | Var (name, _) -> string name
   | GVar (name, _) -> string name
   | Ctor (name, _) -> string name
+  | App (Builtin (Builtin "failwith_int", _), [ x ], _) ->
+      string "failwith" ^^ space ^^ parens (string "string_of_int" ^^ space ^^ parens (compile_expr x))
   | App (Ctor (name, _), args, _) ->
       string name ^^ space ^^ parens (separate_map (string ", ") parens_compile_expr args)
   | App (fn, args, _) -> parens_compile_expr fn ^^ space ^^ separate_map space parens_compile_expr args
@@ -133,6 +135,12 @@ let compile_stmt (x : 'a stmt) : document =
   | Term (BSeq (e, _)) -> compile_expr e
   | Term (BOne (pat, e, _) | BRec [ (pat, e, _) ]) ->
       string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
+  | Term (BRec ((pat, e, _) :: xs)) ->
+      let head = string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e in
+      List.fold_left
+        (fun acc (pat, e, _) ->
+          acc ^^ break 1 ^^ string "and " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e)
+        head xs
   | _ -> failwith "Not implemented (TODO)"
 
 let compile_plain (xs : 'a stmt list) : document =

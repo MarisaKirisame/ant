@@ -1,4 +1,5 @@
 module LC = LispCEK
+module Plain = LispPlain
 module Memo = Ant.Memo
 module Word = Ant.Word.Word
 module Frontend = LispFrontend
@@ -27,6 +28,40 @@ let current_write_steps : step_writer option ref = ref None
 let with_outchannel steps_path f =
   let oc = open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_path in
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
+
+let rec plain_symbol_of_lc = function
+  | LC.SLambda -> Plain.SLambda
+  | LC.SDefine -> Plain.SDefine
+  | LC.SQuote -> Plain.SQuote
+  | LC.SEq -> Plain.SEq
+  | LC.SCons -> Plain.SCons
+  | LC.SCond -> Plain.SCond
+  | LC.SAtom -> Plain.SAtom
+  | LC.SCar -> Plain.SCar
+  | LC.SCdr -> Plain.SCdr
+  | LC.SNull -> Plain.SNull
+  | LC.SError -> Plain.SError
+  | LC.SIf -> Plain.SIf
+  | LC.SDefvar -> Plain.SDefvar
+  | LC.SPair -> Plain.SPair
+  | LC.SSymbol -> Plain.SSymbol
+  | LC.STrue -> Plain.STrue
+  | LC.SFalse -> Plain.SFalse
+  | LC.SVar -> Plain.SVar
+  | LC.SNum -> Plain.SNum
+  | LC.SAnd -> Plain.SAnd
+  | LC.SElse -> Plain.SElse
+  | LC.SPlus -> Plain.SPlus
+
+let rec plain_atom_of_lc = function
+  | LC.AVar i -> Plain.AVar i
+  | LC.ANumber i -> Plain.ANumber i
+  | LC.ASymbol sym -> Plain.ASymbol (plain_symbol_of_lc sym)
+  | LC.ANIL -> Plain.ANIL
+
+let rec plain_expr_of_lc = function
+  | LC.EAtom atom -> Plain.EAtom (plain_atom_of_lc atom)
+  | LC.ECons (l, r) -> Plain.ECons (plain_expr_of_lc l, plain_expr_of_lc r)
 
 let string_of_symbol = function
   | LC.SLambda -> "lambda"
@@ -116,6 +151,12 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
   Buffer.output_buffer oc buf;
   flush oc
 
+let eval_plain_slot = Ant.Profile.register_slot Ant.Profile.plain_profile "eval_plain"
+
+let eval_plain expr =
+  let plain_expr = plain_expr_of_lc expr in
+  ignore (Ant.Profile.with_slot eval_plain_slot (fun () -> Plain.eval plain_expr Plain.Nil))
+
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "#%d" i
   | LC.ANumber i -> Printf.sprintf "%d" i
@@ -171,6 +212,7 @@ let eval_expr_with_details expr =
     | None -> with_memo (fun memo -> LC.eval memo seq empty_env_seq)
   in
   let stop = Unix.gettimeofday () in
+  eval_plain expr;
   Option.iter (fun write_steps -> write_steps res) !current_write_steps;
   {
     value = LC.to_ocaml_value res.words;
