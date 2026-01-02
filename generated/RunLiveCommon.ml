@@ -409,8 +409,13 @@ let eval_plain (expr : LC.expr) : LC.value =
   let lp_expr = lp_expr_of_lc expr in
   let lp_env = lp_list_of_lc lp_value_of_lc env in
   Gc.full_major ();
-  let lp_result = Profile.with_slot eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
-  lc_value_of_lp lp_result
+  (*let lp_result = Profile.with_slot eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
+  lc_value_of_lp lp_result*)
+  Profile.with_slot eval_plain_slot (fun () ->
+      LC.to_ocaml_value (Memo.exec_cek_raw
+        (Memo.pc_to_exp (Common.int_to_pc 4))
+        (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
+        (Memo.from_constructor LC.tag_cont_done)))
 
 let eval_expression ~memo ~write_steps x =
   let exec_res = LC.eval memo (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in

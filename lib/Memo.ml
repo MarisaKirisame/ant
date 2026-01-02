@@ -735,6 +735,19 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   let result = Profile.with_slot exec_cek_slot run in
   result
 
+let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) =
+  let state = { c; e; k } in
+  let m = init_memo () in
+  let w = make_world (copy_state state) m in
+  let rec exec state =
+    if is_done state then ()
+    else (
+      state.c.step w;
+      exec state)
+  in
+  exec state;
+  Dynarray.get_last state.e
+
 let exec_done _ = failwith "exec is done, should not call step anymore"
 let pattern_size (p : Pattern.pattern) = Generic.size p
 let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
