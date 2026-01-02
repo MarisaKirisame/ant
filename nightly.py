@@ -218,6 +218,20 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         ],
         env=env,
     )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Lisp.ant",
+            "generated/LispPlain.ml",
+            "--compile",
+            "--backend",
+            "plain",
+        ],
+        env=env,
+    )
 
 
 def run_project() -> None:
