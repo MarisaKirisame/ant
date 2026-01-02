@@ -209,6 +209,20 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         ],
         env=env,
     )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Lisp.ant",
+            "generated/LispPlain.ml",
+            "--compile",
+            "--backend",
+            "plain",
+        ],
+        env=env,
+    )
 
 
 def run_project() -> None:
@@ -245,82 +259,82 @@ def report_project() -> None:
 
 
 def generate_report() -> None:
-    run(
-        [
-            "python3",
-            "tools/generate_speedup_index.py",
-            "--input",
-            "eval_steps_simple.json",
-            "--plot",
-            "output/live-simple/speedup.png",
-            "--output",
-            "output/live-simple/index.html",
-        ]
-    )
-    run(
-        [
-            "python3",
-            "tools/generate_speedup_index.py",
-            "--input",
-            "eval_steps_left_to_right.json",
-            "--plot",
-            "output/live-left-to-right/speedup.png",
-            "--output",
-            "output/live-left-to-right/index.html",
-        ]
-    )
-    run(
-        [
-            "python3",
-            "tools/generate_speedup_index.py",
-            "--input",
-            "eval_steps_demand_driven.json",
-            "--plot",
-            "output/live-demand-driven/speedup.png",
-            "--output",
-            "output/live-demand-driven/index.html",
-        ]
-    )
-    run(
-        [
-            "python3",
-            "tools/generate_speedup_index.py",
-            "--input",
-            "eval_steps_from_hazel.json",
-            "--plot",
-            "output/hazel/speedup.png",
-            "--output",
-            "output/hazel/index.html",
-        ]
-    )
     # run(
     #     [
     #         "python3",
     #         "tools/generate_speedup_index.py",
     #         "--input",
-    #         "eval_steps_lisp.json",
+    #         "eval_steps_simple.json",
     #         "--plot",
-    #         "output/lisp/speedup.png",
+    #         "output/live-simple/speedup.png",
     #         "--output",
-    #         "output/lisp/index.html",
+    #         "output/live-simple/index.html",
     #     ]
     # )
+    # run(
+    #     [
+    #         "python3",
+    #         "tools/generate_speedup_index.py",
+    #         "--input",
+    #         "eval_steps_left_to_right.json",
+    #         "--plot",
+    #         "output/live-left-to-right/speedup.png",
+    #         "--output",
+    #         "output/live-left-to-right/index.html",
+    #     ]
+    # )
+    # run(
+    #     [
+    #         "python3",
+    #         "tools/generate_speedup_index.py",
+    #         "--input",
+    #         "eval_steps_demand_driven.json",
+    #         "--plot",
+    #         "output/live-demand-driven/speedup.png",
+    #         "--output",
+    #         "output/live-demand-driven/index.html",
+    #     ]
+    # )
+    # run(
+    #     [
+    #         "python3",
+    #         "tools/generate_speedup_index.py",
+    #         "--input",
+    #         "eval_steps_from_hazel.json",
+    #         "--plot",
+    #         "output/hazel/speedup.png",
+    #         "--output",
+    #         "output/hazel/index.html",
+    #     ]
+    # )
+    run(
+        [
+            "python3",
+            "tools/generate_speedup_index.py",
+            "--input",
+            "eval_steps_lisp.json",
+            "--plot",
+            "output/lisp/speedup.png",
+            "--output",
+            "output/lisp/index.html",
+        ]
+    )
     run(
         [
             "python3",
             "tools/render_live_index.py",
             "--output",
             "output/index.html",
-            "--entry",
-            "Simple Benchmark=output/live-simple/index.html",
-            "--entry",
-            "Left-to-right Benchmark=output/live-left-to-right/index.html",
-            "--entry",
-            "Demand-driven Benchmark=output/live-demand-driven/index.html",
-            "--entry",
-            "Hazel Benchmark=output/hazel/index.html",
             # "--entry",
-            # "Lisp Benchmark=output/lisp/index.html",
+            # "Simple Benchmark=output/live-simple/index.html",
+            # "--entry",
+            # "Left-to-right Benchmark=output/live-left-to-right/index.html",
+            # "--entry",
+            # "Demand-driven Benchmark=output/live-demand-driven/index.html",
+            # "--entry",
+            # "Hazel Benchmark=output/hazel/index.html",
+            "--entry",
+            "Lisp Benchmark=output/lisp/index.html",
         ]
     )
 

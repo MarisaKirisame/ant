@@ -33,7 +33,7 @@ import numpy as np
 
 # Toggle the metric being reported. When True, plot wall-clock time speedups;
 # when False, plot evaluation-step speedups.
-REPORT_WALL_CLOCK_TIME = False
+REPORT_WALL_CLOCK_TIME = True
 
 if REPORT_WALL_CLOCK_TIME:
     MEMO_KEY = "memo_profile"

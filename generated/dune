@@ -13,6 +13,7 @@
   RunLiveDemandDriven
   RunTailRec
   LispCEK
+  LispPlain
   LispFrontend
   RunLisp
   RunTest)

@@ -455,10 +455,10 @@ and eval = fun exp env ->
             let env_with_def = Cons (EnvEntry name closure) env in
             let kont = cadr_ exp in
             eval kont env_with_def
-          | SDefvar -> (* (defvar i val) kont *)
-            let val = eval (caddar_ exp) env in
+          | SDefvar -> (* (defvar i val__) kont *)
+            let val__ = eval (caddar_ exp) env in
             let name = (match expr_is_num (cadar_ exp) with | None -> failwith "eval: defvar name must be int literal" | Some x -> x) in
-            let env_with_def = Cons (EnvEntry name val) env in
+            let env_with_def = Cons (EnvEntry name val__) env in
             let kont = cadr_ exp in
             eval kont env_with_def
           | SQuote -> failwith "unexpected function quote"
