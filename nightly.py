@@ -293,6 +293,18 @@ def generate_report() -> None:
             "output/hazel/index.html",
         ]
     )
+    # run(
+    #     [
+    #         "python3",
+    #         "tools/generate_speedup_index.py",
+    #         "--input",
+    #         "eval_steps_lisp.json",
+    #         "--plot",
+    #         "output/lisp/speedup.png",
+    #         "--output",
+    #         "output/lisp/index.html",
+    #     ]
+    # )
     run(
         [
             "python3",
@@ -307,6 +319,8 @@ def generate_report() -> None:
             "Demand-driven Benchmark=output/live-demand-driven/index.html",
             "--entry",
             "Hazel Benchmark=output/hazel/index.html",
+            # "--entry",
+            # "Lisp Benchmark=output/lisp/index.html",
         ]
     )
 

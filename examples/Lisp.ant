@@ -35,6 +35,7 @@ type symbol =
   | SVar
   | SAnd
   | SElse
+  | SPlus
   ;;
 
 type atom =
@@ -102,6 +103,11 @@ let value_is_number_or_quote_number = fun v ->
   match v with
   | VNumber x -> Some x
   | _ -> None;;
+
+let value_to_number = fun v ->
+  match value_is_number_or_quote_number v with
+  | Some x -> x
+  | None -> failwith "plus: expected number";;
 
 let value_true_ = VNumber 0;;
 
@@ -212,7 +218,8 @@ let symbol_int = fun sym ->
   | SNum      -> 17
   | SVar      -> 18
   | SAnd      -> 19
-  | SElse     -> 20;;
+  | SElse     -> 20
+  | SPlus     -> 21;;
 
 let symbol_eq = fun x y ->
   symbol_int x = symbol_int y;;
@@ -413,6 +420,10 @@ and eval = fun exp env ->
       | SFalse -> failwith "false is not PROCEDURE"
       | SVar -> failwith "eval: symbol var is not intended to be used this way"
       | SNum -> is_num_ (eval (cadr_ exp) env)
+      | SPlus ->
+        let x = eval (cadr_ exp) env in
+        let y = eval (caddr_ exp) env in
+        VNumber (value_to_number x + value_to_number y)
       | SAnd ->
         if value_is_false (eval (cadr_ exp) env) then
           value_false_
@@ -465,6 +476,7 @@ and eval = fun exp env ->
           | SNull -> failwith "unexpected function null"
           | SError -> failwith "unexpected function error"
           | SNum -> failwith "unexpected function num"
+          | SPlus -> failwith "unexpected function plus"
           | SAnd -> failwith "unexpected function and"
           | SElse -> failwith "unexpected function else"
           | SVar -> failwith "eval: symbol var is not intended to be used this way"

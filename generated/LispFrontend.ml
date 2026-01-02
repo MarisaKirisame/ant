@@ -158,6 +158,7 @@ let builtin_symbol = function
   | "false" -> Some LC.SFalse
   | "var" -> Some LC.SVar
   | "num" -> Some LC.SNum
+  | "+" -> Some LC.SPlus
   | "and" -> Some LC.SAnd
   | "else" -> Some LC.SElse
   | _ -> None
