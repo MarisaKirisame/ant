@@ -255,7 +255,7 @@ let keep_only ?(exclude : loc list = []) (s : scope) (fv : unit StrMap.t) : int 
 
 let reading (s : scope) (f : kont) (w : world code) : unit code =
   let make_code w = f { s with progressed = false } w in
-  if s.progressed then goto_ w (add_code $ Some (lam_ "w" make_code)) else make_code w
+  if s.progressed then goto_ w (add_code @@ Some (lam_ "w" make_code)) else make_code w
 
 (* if a variable has already been in a earlier slot, in some cases we don't need to move it *)
 let rec compile_expr_no_move (ctx : ctx) (s : scope) (dst : loc) (c : 'a expr) (k : kont_with_loc) :
@@ -570,7 +570,7 @@ and compile_cases (ctx : ctx) (s : scope) (dst : loc) (scrut : 'a expr) (MatchPa
           c
       in
       let default_case = (string "_", unreachable_ (Dynarray.length codes)) in
-      paren $ match_raw_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])]
+      paren @@ match_raw_ (word_get_value_ (zro_ x)) @@ List.append t [ default_case ]]
   in
   fun w ->
     [%seqs
@@ -630,9 +630,9 @@ let generate_apply_cont ctx =
            let_pat_in_ pat
              (resolve_ w (raw "K"))
              (paren
-             $ match_ctor_tag_literal_default_ (word_get_value_ hd)
-                 (Dynarray.to_list (loop tl 0))
-                 (unreachable_ (pc_to_int apply_cont)))]))
+             @@ match_ctor_tag_literal_default_ (word_get_value_ hd)
+                  (Dynarray.to_list @@ loop tl 0)
+                  (unreachable_ @@ pc_to_int apply_cont))]))
 
 let generate_apply_cont_ ctx =
   set_code apply_cont
@@ -645,11 +645,11 @@ let generate_apply_cont_ ctx =
            let_pat_in_ pat
              (resolve_ w (raw "K"))
              (paren
-             $ match_ctor_tag_literal_default_ (word_get_value_ hd)
-                 (List.init (Dynarray.length ctx.conts) ~f:(fun i ->
-                      let name, action = Dynarray.get ctx.conts i in
-                      (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl)))
-                 (unreachable_ (pc_to_int apply_cont)))]))
+             @@ match_ctor_tag_literal_default_ (word_get_value_ hd)
+                  (List.init (Dynarray.length ctx.conts) ~f:(fun i ->
+                       let name, action = Dynarray.get ctx.conts i in
+                       (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl)))
+                  (unreachable_ @@ pc_to_int apply_cont))]))
 
 let ctor_tag_decls ctx =
   let xs = List.sort ~compare:(fun (_, x) (_, y) -> x - y) (Hashtbl.to_alist ctx.ctag) in
