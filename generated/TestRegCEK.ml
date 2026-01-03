@@ -102,8 +102,8 @@ let () =
       assert_env_length w_22 1;
       let hd_0, tl_0 = resolve w_22 K in
       match Word.get_value hd_0 with
-      | c_0 when c_0 = tag_cont_done -> exec_done w_22
-      | c_0 when c_0 = tag_cont_1 ->
+      | 0 (* tag_cont_done *) -> exec_done w_22
+      | 5 (* tag_cont_1 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 2 tl_0;
           set_env w_22 2 (Dynarray.get w_22.state.e 3);
@@ -119,7 +119,7 @@ let () =
           let keep_1 = env_call w_22 [ 1; 3; 4 ] 2 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; keep_1; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 2)
-      | c_0 when c_0 = tag_cont_2 ->
+      | 6 (* tag_cont_2 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 3 tl_0;
           set_env w_22 4 (Dynarray.get w_22.state.e 5);
@@ -133,7 +133,7 @@ let () =
           let keep_2 = env_call w_22 [ 1; 3; 5; 6 ] 2 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_3; keep_2; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 3)
-      | c_0 when c_0 = tag_cont_3 ->
+      | 7 (* tag_cont_3 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 4 tl_0;
           set_env w_22 6 (Dynarray.get w_22.state.e 7);
@@ -146,7 +146,7 @@ let () =
           let keep_3 = env_call w_22 [ 1; 3; 5; 7; 8 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_3; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 5)
-      | c_0 when c_0 = tag_cont_4 ->
+      | 8 (* tag_cont_4 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 5 tl_0;
           set_env w_22 8 (Dynarray.get w_22.state.e 9);
@@ -159,7 +159,7 @@ let () =
           let keep_4 = env_call w_22 [ 1; 3; 5; 7; 9; 10 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_4; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 7)
-      | c_0 when c_0 = tag_cont_5 ->
+      | 9 (* tag_cont_5 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 6 tl_0;
           set_env w_22 10 (Dynarray.get w_22.state.e 11);
@@ -172,7 +172,7 @@ let () =
           let keep_5 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 12 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_5; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 9)
-      | c_0 when c_0 = tag_cont_6 ->
+      | 10 (* tag_cont_6 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 7 tl_0;
           set_env w_22 12 (Dynarray.get w_22.state.e 13);
@@ -185,7 +185,7 @@ let () =
           let keep_6 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 13; 14 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_6; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 11)
-      | c_0 when c_0 = tag_cont_7 ->
+      | 11 (* tag_cont_7 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 8 tl_0;
           set_env w_22 14 (Dynarray.get w_22.state.e 15);
@@ -206,7 +206,7 @@ let () =
           let keep_7 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 13; 15; 16 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_7; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 15)
-      | c_0 when c_0 = tag_cont_8 ->
+      | 12 (* tag_cont_8 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 9 tl_0;
           set_env w_22 16 (Dynarray.get w_22.state.e 17);
@@ -227,7 +227,7 @@ let () =
           let keep_8 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 13; 15; 17; 18 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_8; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 17)
-      | c_0 when c_0 = tag_cont_9 ->
+      | 13 (* tag_cont_9 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 10 tl_0;
           set_env w_22 18 (Dynarray.get w_22.state.e 19);
@@ -245,7 +245,7 @@ let () =
           let keep_9 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 13; 15; 17; 19; 20 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_9; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 20)
-      | c_0 when c_0 = tag_cont_10 ->
+      | 14 (* tag_cont_10 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 11 tl_0;
           set_env w_22 20 (Dynarray.get w_22.state.e 21);
