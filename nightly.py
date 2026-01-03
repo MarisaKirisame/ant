@@ -139,7 +139,7 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "ant",
             "--",
             "examples/Test.ant",
-            "generated/TestRegMemo.ml",
+            "generated/TestRegCEK.ml",
             "--compile",
             "--backend",
             "reg-memo",
