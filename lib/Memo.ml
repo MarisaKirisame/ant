@@ -88,6 +88,7 @@ let rec resolve (w : world) (src : source) : Word.t * seq =
   | _ -> failwith "cannot resolve reference"
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
+let reset () = Dynarray.clear pc_map
 
 let add_exp (f : world -> unit) (pc_ : int) : unit =
   let pc = Dynarray.length pc_map in

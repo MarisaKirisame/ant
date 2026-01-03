@@ -31,6 +31,7 @@ let monoid : measure monoid =
   }
 
 let constructor_degree_table : int Dynarray.t = Dynarray.create ()
+let reset () = Dynarray.clear constructor_degree_table
 
 let set_constructor_degree (ctag : int) (degree : int) : unit =
   assert (Dynarray.length constructor_degree_table = ctag);

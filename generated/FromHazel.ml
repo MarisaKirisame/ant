@@ -363,6 +363,7 @@ let parse_program () =
 let run () =
   with_outchannel steps_file (fun oc ->
       let write_steps = write_steps_json oc in
+      RunLiveCommon.LC.populate_state ();
       let memo = Ant.Memo.init_memo () in
       let eval expr = eval_expression ~memo ~write_steps expr in
       parse_program ()

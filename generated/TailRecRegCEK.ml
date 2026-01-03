@@ -27,15 +27,15 @@ let rec to_ocaml_int_list x =
 let rec sum memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
   exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
-let () =
+let populate_state () =
+  Memo.reset ();
+  Words.reset ();
   add_exp
     (fun w_3 ->
       assert_env_length w_3 1;
       let hd_0, tl_0 = resolve w_3 K in
       match Word.get_value hd_0 with 0 (* tag_cont_done *) -> exec_done w_3 | _ -> failwith "unreachable (0)")
-    0
-
-let () =
+    0;
   add_exp
     (fun w_0 ->
       assert_env_length w_0 2;
@@ -45,9 +45,7 @@ let () =
       assert_env_length w_0 5;
       set_env w_0 3 (Dynarray.get w_0.state.e 0);
       w_0.state.c <- pc_to_exp (int_to_pc 3))
-    1
-
-let () =
+    1;
   add_exp
     (fun w_2 ->
       let x0_0 = resolve w_2 (Source.E 5) in
@@ -59,9 +57,7 @@ let () =
       assert_env_length w_2 9;
       ignore (env_call w_2 [] 2);
       w_2.state.c <- pc_to_exp (int_to_pc 1))
-    2
-
-let () =
+    2;
   add_exp
     (fun w_1 ->
       assert_env_length w_1 5;
@@ -89,8 +85,7 @@ let () =
           grow_env (* op *) w_1 2;
           w_1.state.c <- pc_to_exp (int_to_pc 2)
       | _ -> failwith "unreachable (3)")
-    3
-
-let () = Words.set_constructor_degree 0 1
-let () = Words.set_constructor_degree 1 1
-let () = Words.set_constructor_degree 2 (-1)
+    3;
+  Words.set_constructor_degree 0 1;
+  Words.set_constructor_degree 1 1;
+  Words.set_constructor_degree 2 (-1)
