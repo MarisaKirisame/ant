@@ -129,6 +129,7 @@ let rec unify ty1 ty2 =
         let min_level = TyLevel.min ll.level_new lr.level_new in
         ll.level_new <- TyLevel.marker_level;
         lr.level_new <- TyLevel.marker_level;
+        if List.length tyl1 <> List.length tyr1 then elab_error "unify: the arity of arrows must be the same";
         List.iter2_exn ~f:(unify_lev min_level) tyl1 tyr1;
         unify_lev min_level tyl2 tyr2;
         ll.level_new <- min_level;
