@@ -2,10 +2,7 @@
  (name runmodes)
  (modules
   FromHazel
-  TestCEK
-  TestRegCEK
   LiveCEK
-  LiveRegCEK
   LivePlain
   LiveLexer
   LiveParser
@@ -14,8 +11,7 @@
   RunLiveSimple
   RunLiveLeftToRight
   RunLiveDemandDriven
-  RunTailRec
-  RunTest)
+  RunTailRec)
  (libraries ant yojson sexplib)
  (wrapped false)
  (preprocess
