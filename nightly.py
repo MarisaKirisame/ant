@@ -97,20 +97,20 @@ def build_project() -> None:
 
 def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
     ensure_switch()
-    opam_exec(
-        [
-            "dune",
-            "exec",
-            "ant",
-            "--",
-            "examples/Test.ant",
-            "generated/TestSeq.ml",
-            "--compile",
-            "--backend",
-            "seq",
-        ],
-        env=env,
-    )
+    # opam_exec(
+    #     [
+    #         "dune",
+    #         "exec",
+    #         "ant",
+    #         "--",
+    #         "examples/Test.ant",
+    #         "generated/TestSeq.ml",
+    #         "--compile",
+    #         "--backend",
+    #         "seq",
+    #     ],
+    #     env=env,
+    # )
     opam_exec(
         [
             "dune",
@@ -122,6 +122,20 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "--compile",
             "--backend",
             "memo",
+        ],
+        env=env,
+    )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Test.ant",
+            "generated/TestRegMemo.ml",
+            "--compile",
+            "--backend",
+            "reg-memo",
         ],
         env=env,
     )
@@ -174,6 +188,20 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "ant",
             "--",
             "examples/Live.ant",
+            "generated/LiveRegCEK.ml",
+            "--compile",
+            "--backend",
+            "reg-memo",
+        ],
+        env=env,
+    )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Live.ant",
             "generated/LivePlain.ml",
             "--compile",
             "--backend",
@@ -192,6 +220,20 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "--compile",
             "--backend",
             "memo",
+        ],
+        env=env,
+    )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/TailRec.ant",
+            "generated/TailRecRegCEK.ml",
+            "--compile",
+            "--backend",
+            "reg-memo",
         ],
         env=env,
     )

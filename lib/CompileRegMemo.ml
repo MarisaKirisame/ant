@@ -205,7 +205,7 @@ let return_with (s : scope) (v : words code) (w : world code) : unit code =
 
 type keep_t = { mutable keep : bool; mutable source : string option }
 
-let keep_only ?(exclude : loc list = []) (s : scope) (fv : unit StrMap.t) : int Dynarray.t * scope =
+let keep_only ?(after_tail = false) (s : scope) (fv : unit StrMap.t) : int Dynarray.t * scope =
   (* Printf.eprintf "keep_only input:\n";
   Printf.eprintf "  env_length: %d\n" s.env_length;
   Printf.eprintf "  meta_env: ";
@@ -215,15 +215,15 @@ let keep_only ?(exclude : loc list = []) (s : scope) (fv : unit StrMap.t) : int 
   Map.iter_keys fv ~f:(fun k -> Printf.eprintf "%s; " k);
   Printf.eprintf "\n"; *)
   check_scope s;
-  let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = true; source = None }) in
-  Map.iteri s.meta_env ~f:(fun ~key ~data ->
-      match data with None -> () | Some (Slot i) -> Dynarray.set keep i { keep = false; source = Some key });
+  let keep : keep_t Dynarray.t = Dynarray.init s.env_length (fun _ -> { keep = not after_tail; source = None }) in
+  if not after_tail then
+    Map.iteri s.meta_env ~f:(fun ~key ~data ->
+        match data with None -> () | Some (Slot i) -> Dynarray.set keep i { keep = false; source = Some key });
   Map.iter_keys fv ~f:(fun fv ->
       let i =
         match Map.find s.meta_env fv with Some (Some (Slot i)) -> i | _ -> failwith ("keep_only not found:" ^ fv)
       in
       (Dynarray.get keep i).keep <- true);
-  List.iter exclude ~f:(fun (Slot i) -> (Dynarray.get keep i).keep <- false);
   let keep_idx : int Dynarray.t = Dynarray.create () in
   let _, meta_env =
     Dynarray.fold_left
@@ -317,7 +317,7 @@ and compile_expr (ctx : ctx) (s : scope) (dst : loc) (c : 'a expr) (k : kont_wit
       check_scope s;
       let at_tail_pos = Liveness.(info.tail) in
       let fv = StrMap.of_alist_exn @@ CompileMemo.StrMap.to_list Liveness.(info.fv) in
-      let keep, keep_s = keep_only ~exclude:(if at_tail_pos then [ dst ] else []) s fv in
+      let keep, keep_s = keep_only ~after_tail:at_tail_pos s fv in
       let keep_length = keep_s.env_length in
       let xs_length = List.length xs in
       if at_tail_pos then
