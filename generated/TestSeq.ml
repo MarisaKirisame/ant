@@ -18,5 +18,4 @@ let to_ocaml_int_list x =
       Cons (Seq.to_int x0, x1)
   | _ -> failwith "unreachable"
 
-let rec list_incr =
- fun x -> match to_ocaml_int_list x with Nil -> int_list_Nil | Cons (xh, xt) -> int_list_Cons (xh + 1, list_incr xt)
+let rec a = 1 + 2
