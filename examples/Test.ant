@@ -6,7 +6,6 @@ type pair 'a 'b = Pair of 'a * 'b;;
 
 type wrap 'a = Wrap of 'a;;
 
-(*
 let nil = fun _ -> Nil;;
 
 let cons = fun a b -> Cons a b;;
@@ -22,11 +21,10 @@ let test_nested_let = fun x ->
   y;;
 
 let test_if = fun x ->
-  if x then 1 else 2;;
+  if x < 0 then 1 else 2;;
 
 let test_nested_if = fun x ->
-  if (if x then 1 else 0) < 1 then 1 else 2;;
-*)
+  if (if x < 0 then 1 else 0) < 1 then 1 else 2;;
 
 let test_match = fun x ->
   match x with
@@ -41,14 +39,15 @@ let test_wrap = fun x ->
   match x with
   | Wrap a -> a;;
 
-(*
 let test_all = fun _ ->
-  let a = nil in
-  let _ = cons (a, a) in
-  let _ = test_op 1 2 in
-  let _ = test_const_op 0 in
-  let _ = test_nested_let 0 in
-  let _ = test_if 0 in
-  let _ = test_nested_if 0 in
+  let a = nil 0 in
+  let _1 = cons a a in
+  let _2 = test_op 1 2 in
+  let _3 = test_const_op 0 in
+  let _4 = test_nested_let 0 in
+  let _5 = test_if 0 in
+  let _6 = test_nested_if 0 in
+  let _7 = test_match (Cons 0 Nil) in
+  let _8 = test_match2 (Pair 1 2) in
+  let _9 = test_wrap (Wrap 0) in
   0;;
-*)
