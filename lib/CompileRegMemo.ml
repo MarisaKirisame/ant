@@ -618,7 +618,7 @@ let generate_apply_cont ctx =
            if Int.equal i @@ Dynarray.length ctx.conts then cont_codes
            else
              let name, action = Dynarray.get ctx.conts i in
-             let code = (Hashtbl.find_exn ctx.ctag_name name, action w tl) in
+             let code = (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl) in
              Dynarray.add_last cont_codes code;
              loop tl (i + 1)
          in
@@ -630,7 +630,7 @@ let generate_apply_cont ctx =
            let_pat_in_ pat
              (resolve_ w (raw "K"))
              (paren
-             $ match_ctor_tag_default_ (word_get_value_ hd)
+             $ match_ctor_tag_literal_default_ (word_get_value_ hd)
                  (Dynarray.to_list (loop tl 0))
                  (unreachable_ (pc_to_int apply_cont)))]))
 
@@ -645,10 +645,10 @@ let generate_apply_cont_ ctx =
            let_pat_in_ pat
              (resolve_ w (raw "K"))
              (paren
-             $ match_ctor_tag_default_ (word_get_value_ hd)
+             $ match_ctor_tag_literal_default_ (word_get_value_ hd)
                  (List.init (Dynarray.length ctx.conts) ~f:(fun i ->
                       let name, action = Dynarray.get ctx.conts i in
-                      (Hashtbl.find_exn ctx.ctag_name name, action w tl)))
+                      (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl)))
                  (unreachable_ (pc_to_int apply_cont)))]))
 
 let ctor_tag_decls ctx =
