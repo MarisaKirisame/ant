@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Parsing helpers and data structures for speedup stats."""
+"""Parsing helpers and data structures for speedup stats.
+
+Each exec_time record is expected to include both step counts and profiles.
+"""
 
 from __future__ import annotations
 
@@ -39,17 +42,17 @@ class ProfileEntry:
 
 @dataclass(frozen=True)
 class ExecTimeRecord:
-    step: int | None
-    without_memo_step: int | None
-    memo_profile: list[ProfileEntry] | None
-    plain_profile: list[ProfileEntry] | None
+    step: int
+    without_memo_step: int
+    memo_profile: list[ProfileEntry]
+    plain_profile: list[ProfileEntry]
 
 
 @dataclass(frozen=True)
 class Result:
     exec_times: list[ExecTimeRecord]
-    memo_stats: list[list[MemoStatsNode]]
-    size_vs_sc: list[list[MemoSizeVsSc]]
+    depth_breakdown: list[MemoStatsNode]
+    size_vs_sc: list[MemoSizeVsSc]
 
 
 def _parse_profile(entries: object, *, key_name: str) -> list[ProfileEntry]:
@@ -68,19 +71,14 @@ def _parse_profile(entries: object, *, key_name: str) -> list[ProfileEntry]:
     return parsed
 
 
-def _parse_optional_profile(value: object, *, key_name: str) -> list[ProfileEntry] | None:
-    if value is None:
-        return None
-    return _parse_profile(value, key_name=key_name)
-
-
 def load_records(
     path: Path,
 ) -> Result:
     """Return parsed records from a JSONL file."""
     exec_times: list[ExecTimeRecord] = []
-    memo_stats: list[list[MemoStatsNode]] = []
-    size_vs_sc: list[list[MemoSizeVsSc]] = []
+    depth_breakdown: list[MemoStatsNode] = []
+    size_vs_sc: list[MemoSizeVsSc] = []
+    seen_memo_stats = False
     with path.open() as f:
         for line_no, line in enumerate(f, 1):
             if not line.strip():
@@ -91,25 +89,16 @@ def load_records(
                 if name == "exec_time":
                     step = rec.get("step")
                     without_memo_step = rec.get("without_memo_step")
-                    memo_profile = _parse_optional_profile(
+                    memo_profile = _parse_profile(
                         rec.get("memo_profile"), key_name="memo_profile"
                     )
-                    plain_profile = _parse_optional_profile(
+                    plain_profile = _parse_profile(
                         rec.get("plain_profile"), key_name="plain_profile"
                     )
-                    if step is not None and not isinstance(step, int):
+                    if not isinstance(step, int):
                         raise ValueError("step must be an int")
-                    if without_memo_step is not None and not isinstance(
-                        without_memo_step, int
-                    ):
+                    if not isinstance(without_memo_step, int):
                         raise ValueError("without_memo_step must be an int")
-                    if (
-                        step is None
-                        and without_memo_step is None
-                        and memo_profile is None
-                        and plain_profile is None
-                    ):
-                        raise ValueError("exec_time record missing expected fields")
                     exec_times.append(
                         ExecTimeRecord(
                             step=step,
@@ -119,6 +108,9 @@ def load_records(
                         )
                     )
                 elif name == "memo_stats":
+                    if seen_memo_stats:
+                        raise ValueError("memo_stats record appears more than once")
+                    seen_memo_stats = True
                     stats = rec.get("depth_breakdown")
                     if not isinstance(stats, list):
                         raise ValueError("depth_breakdown must be a list")
@@ -133,10 +125,8 @@ def load_records(
                         if not isinstance(node_count, int):
                             raise ValueError(f"depth_breakdown[{idx}].node_count must be an int")
                         nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
-                    memo_stats.append(nodes)
+                    depth_breakdown = nodes
                     raw_size_vs_sc = rec.get("size_vs_sc", [])
-                    if raw_size_vs_sc is None:
-                        raw_size_vs_sc = []
                     if not isinstance(raw_size_vs_sc, list):
                         raise ValueError("size_vs_sc must be a list")
                     size_vs_sc_entries: list[MemoSizeVsSc] = []
@@ -150,7 +140,7 @@ def load_records(
                         if not isinstance(sc, int):
                             raise ValueError(f"size_vs_sc[{idx}].sc must be an int")
                         size_vs_sc_entries.append(MemoSizeVsSc(size=size, sc=sc))
-                    size_vs_sc.append(size_vs_sc_entries)
+                    size_vs_sc = size_vs_sc_entries
                 else:
                     raise ValueError(f"unexpected record name: {name}")
             except Exception as exc:  # pylint: disable=broad-except
@@ -158,5 +148,5 @@ def load_records(
     if not exec_times:
         raise RuntimeError("no exec_time records found in file")
     return Result(
-        exec_times=exec_times, memo_stats=memo_stats, size_vs_sc=size_vs_sc
+        exec_times=exec_times, depth_breakdown=depth_breakdown, size_vs_sc=size_vs_sc
     )

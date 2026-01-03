@@ -205,7 +205,8 @@ def _extract_data_path(report_path: Path) -> Path | None:
 def _collect_pairs(data_paths: Iterable[Path]) -> list[tuple[float, float]]:
     pairs: list[tuple[float, float]] = []
     for path in data_paths:
-        pairs.extend(pairs_from_result(load_records(path)))
+        baselines, memos = pairs_from_result(load_records(path))
+        pairs.extend(zip(baselines, memos))
     return pairs
 
 

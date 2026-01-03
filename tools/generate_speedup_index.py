@@ -12,9 +12,9 @@ from plot_speedup import (
     generate_plot,
     load_profile_totals,
     load_records,
-    plot_memo_stats,
-    plot_memo_stats_cdf,
     plot_size_vs_sc,
+    plot_depth_breakdown,
+    plot_depth_breakdown_cdf,
     render_profile_table,
 )
 
@@ -254,12 +254,12 @@ def main() -> None:
     memo_cdf_src = None
     size_scatter_src = None
     records = load_records(args.input)
-    if records.memo_stats:
+    if records.depth_breakdown:
         memo_plot = args.plot.with_name("memo_stats.png")
-        plot_memo_stats(records.memo_stats, memo_plot)
+        plot_depth_breakdown(records.depth_breakdown, memo_plot)
         memo_src = _image_src(memo_plot, args.output.parent)
         memo_cdf_plot = args.plot.with_name("memo_stats_cdf.png")
-        plot_memo_stats_cdf(records.memo_stats, memo_cdf_plot)
+        plot_depth_breakdown_cdf(records.depth_breakdown, memo_cdf_plot)
         memo_cdf_src = _image_src(memo_cdf_plot, args.output.parent)
     if any(records.size_vs_sc):
         size_scatter_plot = args.plot.with_name("size_vs_sc.png")

@@ -2,13 +2,11 @@
 """Plot speedup ratios from eval_steps.json produced by RunLive.
 
 The metric plotted (wall-clock time vs evaluation steps) is controlled by
-``REPORT_WALL_CLOCK_TIME`` below. Expected JSONL keys:
-  - When ``REPORT_WALL_CLOCK_TIME`` is True:
-      * "memo_profile": list of [name, time_ns] entries for memoized run
-      * "plain_profile": list of [name, time_ns] entries for baseline run
-  - When False:
-      * "step": memoized step count
-      * "without_memo_step": baseline step count
+``REPORT_WALL_CLOCK_TIME`` below. Expected JSONL keys for each exec_time record:
+  * "memo_profile": list of [name, time_ns] entries for memoized run
+  * "plain_profile": list of [name, time_ns] entries for baseline run
+  * "step": memoized step count
+  * "without_memo_step": baseline step count
 
 The script computes speedup statistics and writes two plots: a baseline vs
 memoized scatter plot on log-log axes, and a speedup-over-run line plot. The
@@ -120,85 +118,63 @@ def plot_speedup_line(ratios: Sequence[float], output: Path) -> None:
     plt.close()
 
 
-def plot_memo_stats(
-    memo_stats: Sequence[Sequence[MemoStatsNode]], output: Path
+def plot_depth_breakdown(
+    depth_breakdown: Sequence[MemoStatsNode], output: Path
 ) -> None:
-    if not memo_stats:
-        raise ValueError("memo_stats is empty")
+    if not depth_breakdown:
+        raise ValueError("depth_breakdown is empty")
     plt.figure(figsize=(6, 4.5))
-    for idx, nodes in enumerate(memo_stats, 1):
-        if not nodes:
-            continue
-        depths = [node.depth for node in nodes]
-        counts = [node.node_count for node in nodes]
-        label = f"run {idx}" if len(memo_stats) > 1 else None
-        plt.plot(depths, counts, marker="o", linewidth=1.5, label=label)
+    depths = [node.depth for node in depth_breakdown]
+    counts = [node.node_count for node in depth_breakdown]
+    plt.plot(depths, counts, marker="o", linewidth=1.5)
     plt.xlabel("Depth")
     plt.ylabel("Node count")
     plt.title("Memo stats by depth")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    if len(memo_stats) > 1:
-        plt.legend()
     plt.tight_layout()
     plt.savefig(output)
     plt.close()
 
 
-def plot_memo_stats_cdf(
-    memo_stats: Sequence[Sequence[MemoStatsNode]], output: Path
+def plot_depth_breakdown_cdf(
+    depth_breakdown: Sequence[MemoStatsNode], output: Path
 ) -> None:
-    if not memo_stats:
-        raise ValueError("memo_stats is empty")
+    if not depth_breakdown:
+        raise ValueError("depth_breakdown is empty")
     plt.figure(figsize=(6, 4.5))
-    for idx, nodes in enumerate(memo_stats, 1):
-        if not nodes:
-            continue
-        nodes_sorted = sorted(nodes, key=lambda node: node.depth)
-        total = sum(node.node_count for node in nodes_sorted)
-        if total <= 0:
-            continue
-        depths: list[int] = []
-        cdf: list[float] = []
-        cumulative = 0
-        for node in nodes_sorted:
-            cumulative += node.node_count
-            depths.append(node.depth)
-            cdf.append(100.0 * cumulative / total)
-        label = f"run {idx}" if len(memo_stats) > 1 else None
-        plt.plot(depths, cdf, marker="o", linewidth=1.5, label=label)
+    nodes_sorted = sorted(depth_breakdown, key=lambda node: node.depth)
+    total = sum(node.node_count for node in nodes_sorted)
+    if total <= 0:
+        raise ValueError("depth_breakdown total count must be positive")
+    depths: list[int] = []
+    cdf: list[float] = []
+    cumulative = 0
+    for node in nodes_sorted:
+        cumulative += node.node_count
+        depths.append(node.depth)
+        cdf.append(100.0 * cumulative / total)
+    plt.plot(depths, cdf, marker="o", linewidth=1.5)
     plt.xlabel("Depth")
     plt.ylabel("Nodes <= depth (%)")
     plt.title("Memo stats CDF")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    if len(memo_stats) > 1:
-        plt.legend()
     plt.tight_layout()
     plt.savefig(output)
     plt.close()
 
 
-def plot_size_vs_sc(size_vs_sc: Sequence[Sequence[MemoSizeVsSc]], output: Path) -> None:
+def plot_size_vs_sc(size_vs_sc: Sequence[MemoSizeVsSc], output: Path) -> None:
     if not size_vs_sc:
         raise ValueError("size_vs_sc is empty")
     plt.figure(figsize=(6, 4.5))
-    has_points = False
-    for idx, entries in enumerate(size_vs_sc, 1):
-        if not entries:
-            continue
-        sizes = [entry.size for entry in entries]
-        scs = [entry.sc for entry in entries]
-        label = f"run {idx}" if len(size_vs_sc) > 1 else None
-        plt.scatter(sizes, scs, alpha=0.6, label=label)
-        has_points = True
-    if not has_points:
-        raise ValueError("size_vs_sc has no entries")
+    sizes = [entry.size for entry in size_vs_sc]
+    scs = [entry.sc for entry in size_vs_sc]
+    plt.scatter(sizes, scs, alpha=0.6)
     plt.xlabel("Pattern size")
     plt.ylabel("Step count (sc)")
     plt.title("Memo pattern size vs step count")
     plt.yscale("log")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    if len(size_vs_sc) > 1:
-        plt.legend()
     plt.tight_layout()
     plt.savefig(output)
     plt.close()
@@ -213,37 +189,48 @@ def _sum_profile(entries: Sequence[ProfileEntry], *, key_name: str) -> float:
     return total
 
 
-def pairs_from_result(result: Result) -> list[tuple[float, float]]:
-    pairs: list[tuple[float, float]] = []
-    for idx, record in enumerate(result.exec_times, 1):
-        if REPORT_WALL_CLOCK_TIME:
-            if record.memo_profile is None:
-                raise ValueError(f"{MEMO_KEY} missing for exec_time record {idx}")
-            if record.plain_profile is None:
-                raise ValueError(f"{BASELINE_KEY} missing for exec_time record {idx}")
-            memo_value = _sum_profile(record.memo_profile, key_name=MEMO_KEY)
-            baseline_value = _sum_profile(record.plain_profile, key_name=BASELINE_KEY)
-        else:
-            if record.step is None:
-                raise ValueError(f"{MEMO_KEY} missing for exec_time record {idx}")
-            if record.without_memo_step is None:
-                raise ValueError(f"{BASELINE_KEY} missing for exec_time record {idx}")
-            memo_value = float(record.step)
-            baseline_value = float(record.without_memo_step)
-            if memo_value <= 0:
-                raise ValueError(f"{MEMO_KEY} must be positive")
-            if baseline_value <= 0:
-                raise ValueError(f"{BASELINE_KEY} must be positive")
-        pairs.append((baseline_value, memo_value))
-    return pairs
+def pairs_from_result(result: Result) -> tuple[list[float], list[float]]:
+    if REPORT_WALL_CLOCK_TIME:
+        memos = memo_profile_totals_from_result(result)
+        baselines = plain_profile_totals_from_result(result)
+    else:
+        memos = steps_from_result(result)
+        baselines = without_memo_steps_from_result(result)
+    return baselines, memos
+
+
+def steps_from_result(result: Result) -> list[float]:
+    steps = [float(record.step) for record in result.exec_times]
+    if any(value <= 0 for value in steps):
+        raise ValueError("step must be positive")
+    return steps
+
+
+def without_memo_steps_from_result(result: Result) -> list[float]:
+    steps = [float(record.without_memo_step) for record in result.exec_times]
+    if any(value <= 0 for value in steps):
+        raise ValueError("without_memo_step must be positive")
+    return steps
+
+
+def memo_profile_totals_from_result(result: Result) -> list[float]:
+    return [
+        _sum_profile(record.memo_profile, key_name=MEMO_KEY)
+        for record in result.exec_times
+    ]
+
+
+def plain_profile_totals_from_result(result: Result) -> list[float]:
+    return [
+        _sum_profile(record.plain_profile, key_name=BASELINE_KEY)
+        for record in result.exec_times
+    ]
 
 
 def _profile_totals(result: Result) -> tuple[dict[str, float], float]:
     totals: dict[str, float] = {}
     total_time = 0.0
-    for idx, record in enumerate(result.exec_times, 1):
-        if record.memo_profile is None:
-            raise ValueError(f"{MEMO_KEY} missing for exec_time record {idx}")
+    for record in result.exec_times:
         for entry in record.memo_profile:
             totals[entry.name] = totals.get(entry.name, 0.0) + entry.time_ns
             total_time += entry.time_ns
@@ -286,7 +273,8 @@ def generate_plot(
 ) -> tuple[list[float], SpeedupStats]:
     """Load pairs from input_path, write plots, and return ratios and stats."""
     result = load_records(input_path)
-    pairs = pairs_from_result(result)
+    baselines, memos = pairs_from_result(result)
+    pairs = list(zip(baselines, memos))
     ratios, stats = compare_stats(pairs)
     plot_speedup_line(ratios, line_output)
     if scatter_output is not None:
