@@ -21,16 +21,22 @@ from __future__ import annotations
 
 import argparse
 import html
-import json
 import math
 import statistics
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+from stats import (
+    MemoSizeVsSc,
+    MemoStatsNode,
+    ProfileEntry,
+    Result,
+    SpeedupStats,
+    load_records,
+)
 # Toggle the metric being reported. When True, plot wall-clock time speedups;
 # when False, plot evaluation-step speedups.
 REPORT_WALL_CLOCK_TIME = True
@@ -45,168 +51,6 @@ else:
     METRIC_LABEL = "evaluation steps"
 
 
-@dataclass(frozen=True)
-class SpeedupStats:
-    """Summary statistics for a collection of speedup ratios."""
-
-    samples: int
-    geo_mean: float
-    end_to_end: float
-    minimum: float
-    maximum: float
-
-
-@dataclass(frozen=True)
-class MemoStatsNode:
-    depth: int
-    node_count: int
-
-
-@dataclass(frozen=True)
-class MemoSizeVsSc:
-    size: int
-    sc: int
-
-
-@dataclass(frozen=True)
-class Result:
-    pairs: list[tuple[float, float]]
-    memo_stats: list[list[MemoStatsNode]]
-    size_vs_sc: list[list[MemoSizeVsSc]]
-
-
-def _sum_profile(entries: object, *, key_name: str) -> float:
-    if not isinstance(entries, list):
-        raise ValueError(f"{key_name} must be a list")
-    total = 0.0
-    for idx, entry in enumerate(entries):
-        if not (isinstance(entry, list) and len(entry) == 2):
-            raise ValueError(f"{key_name}[{idx}] must be a [name, time] pair")
-        _, value = entry
-        if not isinstance(value, (int, float)):
-            raise ValueError(f"{key_name}[{idx}] time must be numeric")
-        total += float(value)
-    return total
-
-
-def load_profile_totals(path: Path) -> tuple[dict[str, float], float]:
-    totals: dict[str, float] = {}
-    total_time = 0.0
-    with path.open() as f:
-        for line_no, line in enumerate(f, 1):
-            if not line.strip():
-                continue
-            try:
-                rec = json.loads(line)
-                if rec.get("name") != "exec_time":
-                    continue
-                entries = rec[MEMO_KEY]
-                if not isinstance(entries, list):
-                    raise ValueError(f"{MEMO_KEY} must be a list")
-                for idx, entry in enumerate(entries):
-                    if not (isinstance(entry, list) and len(entry) == 2):
-                        raise ValueError(f"{MEMO_KEY}[{idx}] must be a [name, time] pair")
-                    name, value = entry
-                    if not isinstance(name, str):
-                        raise ValueError(f"{MEMO_KEY}[{idx}] name must be a string")
-                    if not isinstance(value, (int, float)):
-                        raise ValueError(f"{MEMO_KEY}[{idx}] time must be numeric")
-                    totals[name] = totals.get(name, 0.0) + float(value)
-                    total_time += float(value)
-            except Exception as exc:  # pylint: disable=broad-except
-                raise RuntimeError(f"failed to parse line {line_no}") from exc
-    if total_time <= 0:
-        raise RuntimeError("memo profile total time must be positive")
-    return totals, total_time
-
-
-def render_profile_table(totals: dict[str, float], total_time: float) -> str:
-    rows = sorted(totals.items(), key=lambda item: item[1], reverse=True)
-    lines = [
-        "<table>",
-        "  <thead><tr><th>Slot</th><th>Total time (ns)</th><th>Percent</th></tr></thead>",
-        "  <tbody>",
-    ]
-    for name, value in rows:
-        percent = 100.0 * value / total_time
-        lines.append(
-            f"    <tr><td>{html.escape(name)}</td><td>{value:.0f}</td><td>{percent:.2f}%</td></tr>"
-        )
-    lines.append("  </tbody>")
-    lines.append("</table>")
-    return "\n".join(lines)
-
-
-def write_profile_table(input_path: Path, output_path: Path) -> None:
-    totals, total_time = load_profile_totals(input_path)
-    table = render_profile_table(totals, total_time)
-    output_path.write_text(table, encoding="utf-8")
-
-
-def load_records(path: Path) -> Result:
-    """Return parsed records from a JSONL file."""
-    pairs: list[tuple[float, float]] = []
-    memo_stats: list[list[MemoStatsNode]] = []
-    size_vs_sc: list[list[MemoSizeVsSc]] = []
-    with path.open() as f:
-        for line_no, line in enumerate(f, 1):
-            if not line.strip():
-                continue
-            try:
-                rec = json.loads(line)
-                name = rec.get("name")
-                if name == "exec_time":
-                    if REPORT_WALL_CLOCK_TIME:
-                        memo_value = _sum_profile(rec[MEMO_KEY], key_name=MEMO_KEY)
-                        baseline_value = _sum_profile(rec[BASELINE_KEY], key_name=BASELINE_KEY)
-                    else:
-                        memo_value = rec[MEMO_KEY]
-                        baseline_value = rec[BASELINE_KEY]
-                    if memo_value <= 0:
-                        raise ValueError(f"{MEMO_KEY} must be positive")
-                    if baseline_value <= 0:
-                        raise ValueError(f"{BASELINE_KEY} must be positive")
-                    pairs.append((baseline_value, memo_value))
-                elif name == "memo_stats":
-                    stats = rec.get("depth_breakdown")
-                    if not isinstance(stats, list):
-                        raise ValueError("depth_breakdown must be a list")
-                    nodes: list[MemoStatsNode] = []
-                    for idx, entry in enumerate(stats):
-                        if not isinstance(entry, dict):
-                            raise ValueError(f"depth_breakdown[{idx}] must be an object")
-                        depth = entry.get("depth")
-                        node_count = entry.get("node_count")
-                        if not isinstance(depth, int):
-                            raise ValueError(f"depth_breakdown[{idx}].depth must be an int")
-                        if not isinstance(node_count, int):
-                            raise ValueError(f"depth_breakdown[{idx}].node_count must be an int")
-                        nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
-                    memo_stats.append(nodes)
-                    raw_size_vs_sc = rec.get("size_vs_sc", [])
-                    if raw_size_vs_sc is None:
-                        raw_size_vs_sc = []
-                    if not isinstance(raw_size_vs_sc, list):
-                        raise ValueError("size_vs_sc must be a list")
-                    size_vs_sc_entries: list[MemoSizeVsSc] = []
-                    for idx, entry in enumerate(raw_size_vs_sc):
-                        if not isinstance(entry, dict):
-                            raise ValueError(f"size_vs_sc[{idx}] must be an object")
-                        size = entry.get("size")
-                        sc = entry.get("sc")
-                        if not isinstance(size, int):
-                            raise ValueError(f"size_vs_sc[{idx}].size must be an int")
-                        if not isinstance(sc, int):
-                            raise ValueError(f"size_vs_sc[{idx}].sc must be an int")
-                        size_vs_sc_entries.append(MemoSizeVsSc(size=size, sc=sc))
-                    size_vs_sc.append(size_vs_sc_entries)
-                else:
-                    raise ValueError(f"unexpected record name: {name}")
-            except Exception as exc:  # pylint: disable=broad-except
-                raise RuntimeError(f"failed to parse line {line_no}") from exc
-    if not pairs:
-        raise RuntimeError("no records found in file")
-    return Result(pairs=pairs, memo_stats=memo_stats, size_vs_sc=size_vs_sc)
 
 
 def compare_stats(
@@ -360,15 +204,93 @@ def plot_size_vs_sc(size_vs_sc: Sequence[Sequence[MemoSizeVsSc]], output: Path) 
     plt.close()
 
 
+def _sum_profile(entries: Sequence[ProfileEntry], *, key_name: str) -> float:
+    if not entries:
+        raise ValueError(f"{key_name} must be non-empty")
+    total = sum(entry.time_ns for entry in entries)
+    if total <= 0:
+        raise ValueError(f"{key_name} total must be positive")
+    return total
+
+
+def pairs_from_result(result: Result) -> list[tuple[float, float]]:
+    pairs: list[tuple[float, float]] = []
+    for idx, record in enumerate(result.exec_times, 1):
+        if REPORT_WALL_CLOCK_TIME:
+            if record.memo_profile is None:
+                raise ValueError(f"{MEMO_KEY} missing for exec_time record {idx}")
+            if record.plain_profile is None:
+                raise ValueError(f"{BASELINE_KEY} missing for exec_time record {idx}")
+            memo_value = _sum_profile(record.memo_profile, key_name=MEMO_KEY)
+            baseline_value = _sum_profile(record.plain_profile, key_name=BASELINE_KEY)
+        else:
+            if record.step is None:
+                raise ValueError(f"{MEMO_KEY} missing for exec_time record {idx}")
+            if record.without_memo_step is None:
+                raise ValueError(f"{BASELINE_KEY} missing for exec_time record {idx}")
+            memo_value = float(record.step)
+            baseline_value = float(record.without_memo_step)
+            if memo_value <= 0:
+                raise ValueError(f"{MEMO_KEY} must be positive")
+            if baseline_value <= 0:
+                raise ValueError(f"{BASELINE_KEY} must be positive")
+        pairs.append((baseline_value, memo_value))
+    return pairs
+
+
+def _profile_totals(result: Result) -> tuple[dict[str, float], float]:
+    totals: dict[str, float] = {}
+    total_time = 0.0
+    for idx, record in enumerate(result.exec_times, 1):
+        if record.memo_profile is None:
+            raise ValueError(f"{MEMO_KEY} missing for exec_time record {idx}")
+        for entry in record.memo_profile:
+            totals[entry.name] = totals.get(entry.name, 0.0) + entry.time_ns
+            total_time += entry.time_ns
+    if total_time <= 0:
+        raise RuntimeError("memo profile total time must be positive")
+    return totals, total_time
+
+
+def load_profile_totals(input_path: Path) -> tuple[dict[str, float], float]:
+    result = load_records(input_path)
+    return _profile_totals(result)
+
+
+def render_profile_table(totals: dict[str, float], total_time: float) -> str:
+    rows = sorted(totals.items(), key=lambda item: item[1], reverse=True)
+    lines = [
+        "<table>",
+        "  <thead><tr><th>Slot</th><th>Total time (ns)</th><th>Percent</th></tr></thead>",
+        "  <tbody>",
+    ]
+    for name, value in rows:
+        percent = 100.0 * value / total_time
+        lines.append(
+            f"    <tr><td>{html.escape(name)}</td><td>{value:.0f}</td><td>{percent:.2f}%</td></tr>"
+        )
+    lines.append("  </tbody>")
+    lines.append("</table>")
+    return "\n".join(lines)
+
+
+def write_profile_table(input_path: Path, output_path: Path) -> None:
+    result = load_records(input_path)
+    totals, total_time = _profile_totals(result)
+    table = render_profile_table(totals, total_time)
+    output_path.write_text(table, encoding="utf-8")
+
+
 def generate_plot(
     input_path: Path, line_output: Path, scatter_output: Optional[Path] = None
 ) -> tuple[list[float], SpeedupStats]:
     """Load pairs from input_path, write plots, and return ratios and stats."""
     result = load_records(input_path)
-    ratios, stats = compare_stats(result.pairs)
+    pairs = pairs_from_result(result)
+    ratios, stats = compare_stats(pairs)
     plot_speedup_line(ratios, line_output)
     if scatter_output is not None:
-        plot_scatter(result.pairs, scatter_output)
+        plot_scatter(pairs, scatter_output)
     return ratios, stats
 
 

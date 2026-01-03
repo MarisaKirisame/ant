@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
-from plot_speedup import SpeedupStats, compare_stats, load_records
+from plot_speedup import SpeedupStats, compare_stats, load_records, pairs_from_result
 
 
 def _parse_entry(raw: str) -> Tuple[str, Path]:
@@ -205,7 +205,7 @@ def _extract_data_path(report_path: Path) -> Path | None:
 def _collect_pairs(data_paths: Iterable[Path]) -> list[tuple[float, float]]:
     pairs: list[tuple[float, float]] = []
     for path in data_paths:
-        pairs.extend(load_records(path).pairs)
+        pairs.extend(pairs_from_result(load_records(path)))
     return pairs
 
 
