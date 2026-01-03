@@ -406,7 +406,9 @@ let rec index memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
 let rec eval memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
   exec_cek (pc_to_exp (int_to_pc 4)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
-let () =
+let populate_state () =
+  Memo.reset ();
+  Words.reset ();
   add_exp
     (fun w_5 ->
       assert_env_length w_5 1;
@@ -633,9 +635,7 @@ let () =
           shrink_env w_5 2;
           return_n_with w_5 3 (Dynarray.get w_5.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (0)")
-    0
-
-let () =
+    0;
   add_exp
     (fun w_0 ->
       assert_env_length w_0 2;
@@ -645,9 +645,7 @@ let () =
       assert_env_length w_0 5;
       set_env w_0 3 (Dynarray.get w_0.state.e 0);
       w_0.state.c <- pc_to_exp (int_to_pc 3))
-    1
-
-let () =
+    1;
   add_exp
     (fun w_2 ->
       assert_env_length w_2 9;
@@ -683,9 +681,7 @@ let () =
           ignore (env_call w_2 [] 2);
           w_2.state.c <- pc_to_exp (int_to_pc 1)
       | _ -> failwith "unreachable (2)")
-    2
-
-let () =
+    2;
   add_exp
     (fun w_1 ->
       assert_env_length w_1 5;
@@ -710,9 +706,7 @@ let () =
           shrink_env w_1 2;
           return_n_with w_1 3 (Dynarray.get w_1.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (3)")
-    3
-
-let () =
+    3;
   add_exp
     (fun w_3 ->
       assert_env_length w_3 2;
@@ -722,9 +716,7 @@ let () =
       assert_env_length w_3 5;
       set_env w_3 3 (Dynarray.get w_3.state.e 0);
       w_3.state.c <- pc_to_exp (int_to_pc 5))
-    4
-
-let () =
+    4;
   add_exp
     (fun w_4 ->
       assert_env_length w_4 5;
@@ -1095,9 +1087,7 @@ let () =
           shrink_env w_4 2;
           return_n_with w_4 3 (Dynarray.get w_4.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (5)")
-    5
-
-let () =
+    5;
   add_exp
     (fun w_6 ->
       assert_env_length w_6 11;
@@ -1177,9 +1167,7 @@ let () =
           shrink_env w_6 2;
           return_n_with w_6 3 (Dynarray.get w_6.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (6)")
-    6
-
-let () =
+    6;
   add_exp
     (fun w_7 ->
       assert_env_length w_7 11;
@@ -1259,9 +1247,7 @@ let () =
           shrink_env w_7 2;
           return_n_with w_7 3 (Dynarray.get w_7.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (7)")
-    7
-
-let () =
+    7;
   add_exp
     (fun w_8 ->
       assert_env_length w_8 11;
@@ -1341,9 +1327,7 @@ let () =
           shrink_env w_8 2;
           return_n_with w_8 3 (Dynarray.get w_8.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (8)")
-    8
-
-let () =
+    8;
   add_exp
     (fun w_9 ->
       assert_env_length w_9 11;
@@ -1423,9 +1407,7 @@ let () =
           shrink_env w_9 2;
           return_n_with w_9 3 (Dynarray.get w_9.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (9)")
-    9
-
-let () =
+    9;
   add_exp
     (fun w_10 ->
       assert_env_length w_10 11;
@@ -1505,9 +1487,7 @@ let () =
           shrink_env w_10 2;
           return_n_with w_10 3 (Dynarray.get w_10.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (10)")
-    10
-
-let () =
+    10;
   add_exp
     (fun w_11 ->
       assert_env_length w_11 9;
@@ -1548,9 +1528,7 @@ let () =
           shrink_env w_11 2;
           return_n_with w_11 3 (Dynarray.get w_11.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (11)")
-    11
-
-let () =
+    11;
   add_exp
     (fun w_12 ->
       assert_env_length w_12 11;
@@ -1659,9 +1637,7 @@ let () =
           shrink_env w_12 2;
           return_n_with w_12 3 (Dynarray.get w_12.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (12)")
-    12
-
-let () =
+    12;
   add_exp
     (fun w_13 ->
       assert_env_length w_13 11;
@@ -1744,9 +1720,7 @@ let () =
           shrink_env w_13 2;
           return_n_with w_13 3 (Dynarray.get w_13.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (13)")
-    13
-
-let () =
+    13;
   add_exp
     (fun w_14 ->
       assert_env_length w_14 9;
@@ -1822,9 +1796,7 @@ let () =
           shrink_env w_14 2;
           return_n_with w_14 3 (Dynarray.get w_14.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (14)")
-    14
-
-let () =
+    14;
   add_exp
     (fun w_15 ->
       assert_env_length w_15 9;
@@ -1900,9 +1872,7 @@ let () =
           shrink_env w_15 2;
           return_n_with w_15 3 (Dynarray.get w_15.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (15)")
-    15
-
-let () =
+    15;
   add_exp
     (fun w_16 ->
       assert_env_length w_16 11;
@@ -2002,9 +1972,7 @@ let () =
           shrink_env w_16 2;
           return_n_with w_16 3 (Dynarray.get w_16.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (16)")
-    16
-
-let () =
+    16;
   add_exp
     (fun w_18 ->
       let x0_0 = resolve w_18 (Source.E 11) in
@@ -2038,9 +2006,7 @@ let () =
       assert_env_length w_18 5;
       shrink_env w_18 2;
       return_n_with w_18 3 (Dynarray.get w_18.state.e 2) (pc_to_exp (int_to_pc 0)))
-    17
-
-let () =
+    17;
   add_exp
     (fun w_17 ->
       assert_env_length w_17 16;
@@ -2130,9 +2096,7 @@ let () =
           shrink_env w_17 2;
           return_n_with w_17 3 (Dynarray.get w_17.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (18)")
-    18
-
-let () =
+    18;
   add_exp
     (fun w_20 ->
       let x0_1 = resolve w_20 (Source.E 11) in
@@ -2197,9 +2161,7 @@ let () =
         assert_env_length w_20 5;
         shrink_env w_20 2;
         return_n_with w_20 3 (Dynarray.get w_20.state.e 2) (pc_to_exp (int_to_pc 0))))
-    19
-
-let () =
+    19;
   add_exp
     (fun w_19 ->
       assert_env_length w_19 16;
@@ -2288,9 +2250,7 @@ let () =
           shrink_env w_19 2;
           return_n_with w_19 3 (Dynarray.get w_19.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (20)")
-    20
-
-let () =
+    20;
   add_exp
     (fun w_22 ->
       let x0_2 = resolve w_22 (Source.E 11) in
@@ -2355,9 +2315,7 @@ let () =
         assert_env_length w_22 5;
         shrink_env w_22 2;
         return_n_with w_22 3 (Dynarray.get w_22.state.e 2) (pc_to_exp (int_to_pc 0))))
-    21
-
-let () =
+    21;
   add_exp
     (fun w_21 ->
       assert_env_length w_21 16;
@@ -2446,9 +2404,7 @@ let () =
           shrink_env w_21 2;
           return_n_with w_21 3 (Dynarray.get w_21.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (22)")
-    22
-
-let () =
+    22;
   add_exp
     (fun w_24 ->
       let x0_3 = resolve w_24 (Source.E 11) in
@@ -2513,9 +2469,7 @@ let () =
         assert_env_length w_24 5;
         shrink_env w_24 2;
         return_n_with w_24 3 (Dynarray.get w_24.state.e 2) (pc_to_exp (int_to_pc 0))))
-    23
-
-let () =
+    23;
   add_exp
     (fun w_23 ->
       assert_env_length w_23 16;
@@ -2604,9 +2558,7 @@ let () =
           shrink_env w_23 2;
           return_n_with w_23 3 (Dynarray.get w_23.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (24)")
-    24
-
-let () =
+    24;
   add_exp
     (fun w_26 ->
       let x0_4 = resolve w_26 (Source.E 11) in
@@ -2671,9 +2623,7 @@ let () =
         assert_env_length w_26 5;
         shrink_env w_26 2;
         return_n_with w_26 3 (Dynarray.get w_26.state.e 2) (pc_to_exp (int_to_pc 0))))
-    25
-
-let () =
+    25;
   add_exp
     (fun w_25 ->
       assert_env_length w_25 16;
@@ -2762,84 +2712,83 @@ let () =
           shrink_env w_25 2;
           return_n_with w_25 3 (Dynarray.get w_25.state.e 2) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (26)")
-    26
-
-let () = Words.set_constructor_degree 0 1
-let () = Words.set_constructor_degree 1 1
-let () = Words.set_constructor_degree 2 0
-let () = Words.set_constructor_degree 3 1
-let () = Words.set_constructor_degree 4 (-1)
-let () = Words.set_constructor_degree 5 1
-let () = Words.set_constructor_degree 6 0
-let () = Words.set_constructor_degree 7 0
-let () = Words.set_constructor_degree 8 (-1)
-let () = Words.set_constructor_degree 9 (-1)
-let () = Words.set_constructor_degree 10 (-1)
-let () = Words.set_constructor_degree 11 (-1)
-let () = Words.set_constructor_degree 12 (-1)
-let () = Words.set_constructor_degree 13 0
-let () = Words.set_constructor_degree 14 0
-let () = Words.set_constructor_degree 15 (-1)
-let () = Words.set_constructor_degree 16 (-1)
-let () = Words.set_constructor_degree 17 1
-let () = Words.set_constructor_degree 18 1
-let () = Words.set_constructor_degree 19 (-2)
-let () = Words.set_constructor_degree 20 1
-let () = Words.set_constructor_degree 21 (-1)
-let () = Words.set_constructor_degree 22 (-2)
-let () = Words.set_constructor_degree 23 (-1)
-let () = Words.set_constructor_degree 24 0
-let () = Words.set_constructor_degree 25 0
-let () = Words.set_constructor_degree 26 0
-let () = Words.set_constructor_degree 27 0
-let () = Words.set_constructor_degree 28 1
-let () = Words.set_constructor_degree 29 0
-let () = Words.set_constructor_degree 30 (-1)
-let () = Words.set_constructor_degree 31 1
-let () = Words.set_constructor_degree 32 1
-let () = Words.set_constructor_degree 33 1
-let () = Words.set_constructor_degree 34 1
-let () = Words.set_constructor_degree 35 (-1)
-let () = Words.set_constructor_degree 36 (-1)
-let () = Words.set_constructor_degree 37 (-1)
-let () = Words.set_constructor_degree 38 0
-let () = Words.set_constructor_degree 39 1
-let () = Words.set_constructor_degree 40 1
-let () = Words.set_constructor_degree 41 1
-let () = Words.set_constructor_degree 42 1
-let () = Words.set_constructor_degree 43 1
-let () = Words.set_constructor_degree 44 (-1)
-let () = Words.set_constructor_degree 45 (-1)
-let () = Words.set_constructor_degree 46 1
-let () = Words.set_constructor_degree 47 (-1)
-let () = Words.set_constructor_degree 48 (-1)
-let () = Words.set_constructor_degree 49 (-1)
-let () = Words.set_constructor_degree 50 (-1)
-let () = Words.set_constructor_degree 51 (-1)
-let () = Words.set_constructor_degree 52 (-2)
-let () = Words.set_constructor_degree 53 (-2)
-let () = Words.set_constructor_degree 54 0
-let () = Words.set_constructor_degree 55 0
-let () = Words.set_constructor_degree 56 (-6)
-let () = Words.set_constructor_degree 57 (-6)
-let () = Words.set_constructor_degree 58 (-6)
-let () = Words.set_constructor_degree 59 (-6)
-let () = Words.set_constructor_degree 60 (-6)
-let () = Words.set_constructor_degree 61 (-5)
-let () = Words.set_constructor_degree 62 (-8)
-let () = Words.set_constructor_degree 63 (-6)
-let () = Words.set_constructor_degree 64 (-8)
-let () = Words.set_constructor_degree 65 (-7)
-let () = Words.set_constructor_degree 66 (-7)
-let () = Words.set_constructor_degree 67 (-5)
-let () = Words.set_constructor_degree 68 (-5)
-let () = Words.set_constructor_degree 69 (-8)
-let () = Words.set_constructor_degree 70 (-9)
-let () = Words.set_constructor_degree 71 (-9)
-let () = Words.set_constructor_degree 72 (-9)
-let () = Words.set_constructor_degree 73 (-9)
-let () = Words.set_constructor_degree 74 (-9)
-let () = Words.set_constructor_degree 75 (-11)
-let () = Words.set_constructor_degree 76 (-12)
-let () = Words.set_constructor_degree 77 (-6)
-let () = Words.set_constructor_degree 78 (-6)
+    26;
+  Words.set_constructor_degree 0 1;
+  Words.set_constructor_degree 1 1;
+  Words.set_constructor_degree 2 0;
+  Words.set_constructor_degree 3 1;
+  Words.set_constructor_degree 4 (-1);
+  Words.set_constructor_degree 5 1;
+  Words.set_constructor_degree 6 0;
+  Words.set_constructor_degree 7 0;
+  Words.set_constructor_degree 8 (-1);
+  Words.set_constructor_degree 9 (-1);
+  Words.set_constructor_degree 10 (-1);
+  Words.set_constructor_degree 11 (-1);
+  Words.set_constructor_degree 12 (-1);
+  Words.set_constructor_degree 13 0;
+  Words.set_constructor_degree 14 0;
+  Words.set_constructor_degree 15 (-1);
+  Words.set_constructor_degree 16 (-1);
+  Words.set_constructor_degree 17 1;
+  Words.set_constructor_degree 18 1;
+  Words.set_constructor_degree 19 (-2);
+  Words.set_constructor_degree 20 1;
+  Words.set_constructor_degree 21 (-1);
+  Words.set_constructor_degree 22 (-2);
+  Words.set_constructor_degree 23 (-1);
+  Words.set_constructor_degree 24 0;
+  Words.set_constructor_degree 25 0;
+  Words.set_constructor_degree 26 0;
+  Words.set_constructor_degree 27 0;
+  Words.set_constructor_degree 28 1;
+  Words.set_constructor_degree 29 0;
+  Words.set_constructor_degree 30 (-1);
+  Words.set_constructor_degree 31 1;
+  Words.set_constructor_degree 32 1;
+  Words.set_constructor_degree 33 1;
+  Words.set_constructor_degree 34 1;
+  Words.set_constructor_degree 35 (-1);
+  Words.set_constructor_degree 36 (-1);
+  Words.set_constructor_degree 37 (-1);
+  Words.set_constructor_degree 38 0;
+  Words.set_constructor_degree 39 1;
+  Words.set_constructor_degree 40 1;
+  Words.set_constructor_degree 41 1;
+  Words.set_constructor_degree 42 1;
+  Words.set_constructor_degree 43 1;
+  Words.set_constructor_degree 44 (-1);
+  Words.set_constructor_degree 45 (-1);
+  Words.set_constructor_degree 46 1;
+  Words.set_constructor_degree 47 (-1);
+  Words.set_constructor_degree 48 (-1);
+  Words.set_constructor_degree 49 (-1);
+  Words.set_constructor_degree 50 (-1);
+  Words.set_constructor_degree 51 (-1);
+  Words.set_constructor_degree 52 (-2);
+  Words.set_constructor_degree 53 (-2);
+  Words.set_constructor_degree 54 0;
+  Words.set_constructor_degree 55 0;
+  Words.set_constructor_degree 56 (-6);
+  Words.set_constructor_degree 57 (-6);
+  Words.set_constructor_degree 58 (-6);
+  Words.set_constructor_degree 59 (-6);
+  Words.set_constructor_degree 60 (-6);
+  Words.set_constructor_degree 61 (-5);
+  Words.set_constructor_degree 62 (-8);
+  Words.set_constructor_degree 63 (-6);
+  Words.set_constructor_degree 64 (-8);
+  Words.set_constructor_degree 65 (-7);
+  Words.set_constructor_degree 66 (-7);
+  Words.set_constructor_degree 67 (-5);
+  Words.set_constructor_degree 68 (-5);
+  Words.set_constructor_degree 69 (-8);
+  Words.set_constructor_degree 70 (-9);
+  Words.set_constructor_degree 71 (-9);
+  Words.set_constructor_degree 72 (-9);
+  Words.set_constructor_degree 73 (-9);
+  Words.set_constructor_degree 74 (-9);
+  Words.set_constructor_degree 75 (-11);
+  Words.set_constructor_degree 76 (-12);
+  Words.set_constructor_degree 77 (-6);
+  Words.set_constructor_degree 78 (-6)

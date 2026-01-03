@@ -681,13 +681,17 @@ let pp_cek_ant x =
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
   ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ ctor_tag_decls ctx ^^ break 1 ^^ generated_stmt ^^ break 1
-  ^^ separate (break 1)
-       (List.init (Dynarray.length codes) (fun i ->
-            string "let () = add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i)))
+  ^^ string "let populate_state () =" ^^ break 1 ^^ string "  Memo.reset ();" ^^ break 1 ^^ string "  Words.reset ();"
   ^^ break 1
-  ^^ separate (break 1)
+  ^^ separate
+       (semi ^^ break 1)
+       (List.init (Dynarray.length codes) (fun i ->
+            string "  add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i)))
+  ^^ semi ^^ break 1
+  ^^ separate
+       (semi ^^ break 1)
        (List.init (Dynarray.length ctx.constructor_degree) (fun i ->
-            string "let () = Words.set_constructor_degree "
+            string "  Words.set_constructor_degree "
             ^^ uncode (int_ i)
             ^^ string " ("
             ^^ uncode (int_ (Dynarray.get ctx.constructor_degree i))

@@ -96,7 +96,9 @@ let rec test_wrap memo (x0 : Value.seq) : exec_result =
 let rec test_all memo (x0 : Value.seq) : exec_result =
   exec_cek (pc_to_exp (int_to_pc 22)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
-let () =
+let populate_state () =
+  Memo.reset ();
+  Words.reset ();
   add_exp
     (fun w_22 ->
       assert_env_length w_22 1;
@@ -282,18 +284,14 @@ let () =
           shrink_env w_22 1;
           return_n_with w_22 12 (Dynarray.get w_22.state.e 1) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (0)")
-    0
-
-let () =
+    0;
   add_exp
     (fun w_0 ->
       assert_env_length w_0 1;
       grow_env (* return value *) w_0 1;
       set_env w_0 1 (Memo.from_constructor tag_Nil);
       return_n_with w_0 2 (Dynarray.get w_0.state.e 1) (pc_to_exp (int_to_pc 0)))
-    1
-
-let () =
+    1;
   add_exp
     (fun w_1 ->
       assert_env_length w_1 2;
@@ -305,9 +303,7 @@ let () =
       assert_env_length w_1 5;
       shrink_env w_1 2;
       return_n_with w_1 3 (Dynarray.get w_1.state.e 2) (pc_to_exp (int_to_pc 0)))
-    2
-
-let () =
+    2;
   add_exp
     (fun w_2 ->
       assert_env_length w_2 2;
@@ -315,9 +311,7 @@ let () =
       assert_env_length w_2 3;
       grow_env (* op *) w_2 2;
       w_2.state.c <- pc_to_exp (int_to_pc 4))
-    3
-
-let () =
+    3;
   add_exp
     (fun w_3 ->
       let x0_0 = resolve w_3 (Source.E 0) in
@@ -327,9 +321,7 @@ let () =
       assert_env_length w_3 5;
       shrink_env w_3 2;
       return_n_with w_3 3 (Dynarray.get w_3.state.e 2) (pc_to_exp (int_to_pc 0)))
-    4
-
-let () =
+    4;
   add_exp
     (fun w_4 ->
       assert_env_length w_4 1;
@@ -341,9 +333,7 @@ let () =
       set_env w_4 3 (Memo.from_int 1);
       set_env w_4 4 (Memo.from_int 2);
       w_4.state.c <- pc_to_exp (int_to_pc 6))
-    5
-
-let () =
+    5;
   add_exp
     (fun w_5 ->
       let x0_1 = resolve w_5 (Source.E 3) in
@@ -358,9 +348,7 @@ let () =
       assert_env_length w_5 3;
       shrink_env w_5 1;
       return_n_with w_5 2 (Dynarray.get w_5.state.e 1) (pc_to_exp (int_to_pc 0)))
-    6
-
-let () =
+    6;
   add_exp
     (fun w_6 ->
       assert_env_length w_6 1;
@@ -374,9 +362,7 @@ let () =
       set_env w_6 4 (Memo.from_int 1);
       set_env w_6 5 (Memo.from_int 2);
       w_6.state.c <- pc_to_exp (int_to_pc 8))
-    7
-
-let () =
+    7;
   add_exp
     (fun w_7 ->
       let x0_2 = resolve w_7 (Source.E 4) in
@@ -396,9 +382,7 @@ let () =
       assert_env_length w_7 3;
       shrink_env w_7 1;
       return_n_with w_7 2 (Dynarray.get w_7.state.e 1) (pc_to_exp (int_to_pc 0)))
-    8
-
-let () =
+    8;
   add_exp
     (fun w_8 ->
       assert_env_length w_8 1;
@@ -409,9 +393,7 @@ let () =
       grow_env (* op *) w_8 2;
       set_env w_8 5 (Memo.from_int 0);
       w_8.state.c <- pc_to_exp (int_to_pc 10))
-    9
-
-let () =
+    9;
   add_exp
     (fun w_9 ->
       let x0_3 = resolve w_9 (Source.E 0) in
@@ -434,9 +416,7 @@ let () =
         assert_env_length w_9 4;
         shrink_env w_9 2;
         return_n_with w_9 2 (Dynarray.get w_9.state.e 1) (pc_to_exp (int_to_pc 0))))
-    10
-
-let () =
+    10;
   add_exp
     (fun w_10 ->
       assert_env_length w_10 1;
@@ -451,9 +431,7 @@ let () =
       grow_env (* op *) w_10 2;
       set_env w_10 9 (Memo.from_int 0);
       w_10.state.c <- pc_to_exp (int_to_pc 14))
-    11
-
-let () =
+    11;
   add_exp
     (fun w_12 ->
       let x0_5 = resolve w_12 (Source.E 4) in
@@ -476,9 +454,7 @@ let () =
         assert_env_length w_12 4;
         shrink_env w_12 2;
         return_n_with w_12 2 (Dynarray.get w_12.state.e 1) (pc_to_exp (int_to_pc 0))))
-    12
-
-let () =
+    12;
   add_exp
     (fun w_13 ->
       let x0_6 = resolve w_13 (Source.E 4) in
@@ -501,9 +477,7 @@ let () =
         assert_env_length w_13 4;
         shrink_env w_13 2;
         return_n_with w_13 2 (Dynarray.get w_13.state.e 1) (pc_to_exp (int_to_pc 0))))
-    13
-
-let () =
+    13;
   add_exp
     (fun w_11 ->
       let x0_4 = resolve w_11 (Source.E 0) in
@@ -528,9 +502,7 @@ let () =
         shrink_env w_11 2;
         set_env w_11 5 (Memo.from_int 1);
         w_11.state.c <- pc_to_exp (int_to_pc 13)))
-    14
-
-let () =
+    14;
   add_exp
     (fun w_14 ->
       assert_env_length w_14 1;
@@ -540,9 +512,7 @@ let () =
       assert_env_length w_14 4;
       set_env w_14 2 (Dynarray.get w_14.state.e 0);
       w_14.state.c <- pc_to_exp (int_to_pc 16))
-    15
-
-let () =
+    15;
   add_exp
     (fun w_15 ->
       assert_env_length w_15 4;
@@ -569,9 +539,7 @@ let () =
           shrink_env w_15 2;
           return_n_with w_15 2 (Dynarray.get w_15.state.e 1) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (16)")
-    16
-
-let () =
+    16;
   add_exp
     (fun w_16 ->
       assert_env_length w_16 1;
@@ -581,9 +549,7 @@ let () =
       assert_env_length w_16 4;
       set_env w_16 2 (Dynarray.get w_16.state.e 0);
       w_16.state.c <- pc_to_exp (int_to_pc 19))
-    17
-
-let () =
+    17;
   add_exp
     (fun w_18 ->
       let x0_7 = resolve w_18 (Source.E 4) in
@@ -598,9 +564,7 @@ let () =
       assert_env_length w_18 4;
       shrink_env w_18 2;
       return_n_with w_18 2 (Dynarray.get w_18.state.e 1) (pc_to_exp (int_to_pc 0)))
-    18
-
-let () =
+    18;
   add_exp
     (fun w_17 ->
       assert_env_length w_17 4;
@@ -617,9 +581,7 @@ let () =
           grow_env (* op *) w_17 2;
           w_17.state.c <- pc_to_exp (int_to_pc 18)
       | _ -> failwith "unreachable (19)")
-    19
-
-let () =
+    19;
   add_exp
     (fun w_19 ->
       assert_env_length w_19 1;
@@ -629,9 +591,7 @@ let () =
       assert_env_length w_19 4;
       set_env w_19 2 (Dynarray.get w_19.state.e 0);
       w_19.state.c <- pc_to_exp (int_to_pc 21))
-    20
-
-let () =
+    20;
   add_exp
     (fun w_20 ->
       assert_env_length w_20 4;
@@ -651,9 +611,7 @@ let () =
           shrink_env w_20 2;
           return_n_with w_20 2 (Dynarray.get w_20.state.e 1) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (21)")
-    21
-
-let () =
+    21;
   add_exp
     (fun w_21 ->
       assert_env_length w_21 1;
@@ -667,20 +625,19 @@ let () =
       let keep_0 = env_call w_21 [ 1; 2 ] 1 in
       w_21.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_0; w_21.state.k ];
       w_21.state.c <- pc_to_exp (int_to_pc 1))
-    22
-
-let () = Words.set_constructor_degree 0 1
-let () = Words.set_constructor_degree 1 1
-let () = Words.set_constructor_degree 2 (-1)
-let () = Words.set_constructor_degree 3 (-1)
-let () = Words.set_constructor_degree 4 0
-let () = Words.set_constructor_degree 5 (-2)
-let () = Words.set_constructor_degree 6 (-3)
-let () = Words.set_constructor_degree 7 (-4)
-let () = Words.set_constructor_degree 8 (-5)
-let () = Words.set_constructor_degree 9 (-6)
-let () = Words.set_constructor_degree 10 (-7)
-let () = Words.set_constructor_degree 11 (-8)
-let () = Words.set_constructor_degree 12 (-9)
-let () = Words.set_constructor_degree 13 (-10)
-let () = Words.set_constructor_degree 14 (-11)
+    22;
+  Words.set_constructor_degree 0 1;
+  Words.set_constructor_degree 1 1;
+  Words.set_constructor_degree 2 (-1);
+  Words.set_constructor_degree 3 (-1);
+  Words.set_constructor_degree 4 0;
+  Words.set_constructor_degree 5 (-2);
+  Words.set_constructor_degree 6 (-3);
+  Words.set_constructor_degree 7 (-4);
+  Words.set_constructor_degree 8 (-5);
+  Words.set_constructor_degree 9 (-6);
+  Words.set_constructor_degree 10 (-7);
+  Words.set_constructor_degree 11 (-8);
+  Words.set_constructor_degree 12 (-9);
+  Words.set_constructor_degree 13 (-10);
+  Words.set_constructor_degree 14 (-11)
