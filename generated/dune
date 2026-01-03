@@ -5,6 +5,7 @@
   TestCEK
   TestRegCEK
   LiveCEK
+  LiveRegCEK
   LivePlain
   LiveLexer
   LiveParser
