@@ -14,13 +14,9 @@ from typing import Iterable, List, Sequence, Tuple
 
 from dominate import document
 from dominate import tags as tag
+from common import fmt_speedup, stat_card
 from plot_speedup import SpeedupStats, compare_stats, load_records, pairs_from_result
 import generate_speedup_index as speedup_module
-
-
-def _fmt(value: float) -> str:
-    """Format a speedup value with sensible precision for very small numbers."""
-    return f"{value:.4g}"
 
 
 def _render_html(
@@ -40,11 +36,11 @@ def _render_html(
             tag.p("Select a benchmark run to explore the detailed results.")
             if summary:
                 with tag.section(cls="stats"):
-                    _stat_card("Samples", f"{summary.samples}")
-                    _stat_card("Geometric mean", f"{_fmt(summary.geo_mean)}x")
-                    _stat_card("End-to-end speedup", f"{_fmt(summary.end_to_end)}x")
-                    _stat_card("Best speedup", f"{_fmt(summary.maximum)}x")
-                    _stat_card("Lowest speedup", f"{_fmt(summary.minimum)}x")
+                    stat_card("Samples", f"{summary.samples}")
+                    stat_card("Geometric mean", f"{fmt_speedup(summary.geo_mean)}x")
+                    stat_card("End-to-end speedup", f"{fmt_speedup(summary.end_to_end)}x")
+                    stat_card("Best speedup", f"{fmt_speedup(summary.maximum)}x")
+                    stat_card("Lowest speedup", f"{fmt_speedup(summary.minimum)}x")
             with tag.section(cls="grid"):
                 for label, rel in entries:
                     with tag.a(href=rel, cls="card"):
@@ -52,10 +48,6 @@ def _render_html(
     return doc.render()
 
 
-def _stat_card(label: str, value: str) -> None:
-    with tag.div(cls="stat"):
-        tag.span(label, cls="label")
-        tag.span(value, cls="value")
 
 
 def generate_html(
@@ -64,11 +56,10 @@ def generate_html(
     output: Path,
     entries: Sequence[Tuple[str, Path]],
     data_paths: Sequence[Path] | None = None,
-    css_source: Path | None = None,
+    css_source: Path,
 ) -> SpeedupStats | None:
     output.parent.mkdir(parents=True, exist_ok=True)
     entries_with_rel = _relativize(entries, output)
-    css_source = css_source or Path(__file__).with_name("style.css")
     if not css_source.exists():
         raise FileNotFoundError(f"missing stylesheet source: {css_source}")
     css_path = output.parent / css_source.name
@@ -99,21 +90,26 @@ def generate_html(
 
 
 def generate_reports() -> None:
+    css_source = Path(__file__).with_name("style.css")
     speedup_module.generate_speedup_report(
         input_path=Path("eval_steps_simple.json"),
         output_dir=Path("output/live-simple"),
+        css_source=css_source,
     )
     speedup_module.generate_speedup_report(
         input_path=Path("eval_steps_left_to_right.json"),
         output_dir=Path("output/live-left-to-right"),
+        css_source=css_source,
     )
     speedup_module.generate_speedup_report(
         input_path=Path("eval_steps_demand_driven.json"),
         output_dir=Path("output/live-demand-driven"),
+        css_source=css_source,
     )
     speedup_module.generate_speedup_report(
         input_path=Path("eval_steps_from_hazel.json"),
         output_dir=Path("output/hazel"),
+        css_source=css_source,
     )
     generate_html(
         title="Live Benchmark Index",
@@ -124,6 +120,7 @@ def generate_reports() -> None:
             ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
             ("Hazel Benchmark", Path("output/hazel/index.html")),
         ],
+        css_source=css_source,
     )
 
 

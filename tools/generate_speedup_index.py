@@ -9,34 +9,37 @@ from pathlib import Path
 from dominate import document
 from dominate import tags as tag
 from dominate.util import raw
+from common import fmt_speedup, stat_card
 from plot_speedup import (
     SpeedupStats,
     generate_plot,
-    load_profile_totals,
     load_records,
     plot_size_vs_sc,
     plot_depth_breakdown,
     plot_depth_breakdown_cdf,
+    profile_totals_from_result,
     render_profile_table,
 )
+from stats import Result
 
 
-def _fmt(value: float) -> str:
-    """Format a speedup value with sensible precision for very small numbers."""
-    return f"{value:.4g}"
-
-
-def _render_html(
-    stats: SpeedupStats,
-    line_plot: str,
-    scatter_plot: str,
+def render_html(
+    records: Result,
+    output_dir: Path,
     data_label: str,
-    profile_table: str,
-    memo_plot: str | None,
-    memo_cdf_plot: str | None,
-    size_scatter_plot: str | None,
     css_href: str,
-) -> str:
+) -> tuple[str, SpeedupStats]:
+    _, stats, line_plot, scatter_plot = generate_plot(records, output_dir)
+    memo_plot = None
+    memo_cdf_plot = None
+    size_scatter_plot = None
+    if records.depth_breakdown:
+        memo_plot = plot_depth_breakdown(records.depth_breakdown, output_dir)
+        memo_cdf_plot = plot_depth_breakdown_cdf(records.depth_breakdown, output_dir)
+    if any(records.size_vs_sc):
+        size_scatter_plot = plot_size_vs_sc(records.size_vs_sc, output_dir)
+    profile_totals, profile_total_time = profile_totals_from_result(records)
+    profile_table = render_profile_table(profile_totals, profile_total_time)
     doc = document(title="Memoization Speedup")
     doc["lang"] = "en"
     with doc.head:
@@ -47,11 +50,11 @@ def _render_html(
             tag.h1("Memoization Speedup")
             tag.p(f"Data source: {data_label}", cls="meta")
             with tag.section(cls="stats"):
-                _stat_card("Samples", f"{stats.samples}")
-                _stat_card("Geometric mean", f"{_fmt(stats.geo_mean)}x")
-                _stat_card("End-to-end speedup", f"{_fmt(stats.end_to_end)}x")
-                _stat_card("Best speedup", f"{_fmt(stats.maximum)}x")
-                _stat_card("Lowest speedup", f"{_fmt(stats.minimum)}x")
+                stat_card("Samples", f"{stats.samples}")
+                stat_card("Geometric mean", f"{fmt_speedup(stats.geo_mean)}x")
+                stat_card("End-to-end speedup", f"{fmt_speedup(stats.end_to_end)}x")
+                stat_card("Best speedup", f"{fmt_speedup(stats.maximum)}x")
+                stat_card("Lowest speedup", f"{fmt_speedup(stats.minimum)}x")
             _plot_image(line_plot, "Speedup per run plot")
             _plot_image(scatter_plot, "Their vs our scatter plot")
             if memo_plot:
@@ -62,13 +65,7 @@ def _render_html(
                 _plot_image(size_scatter_plot, "Memo size vs sc scatter plot")
             with tag.section(cls="profile"):
                 raw(profile_table)
-    return doc.render()
-
-
-def _stat_card(label: str, value: str) -> None:
-    with tag.div(cls="stat"):
-        tag.span(label, cls="label")
-        tag.span(value, cls="value")
+    return doc.render(), stats
 
 
 def _plot_image(src: str, alt: str) -> None:
@@ -80,40 +77,23 @@ def generate_speedup_report(
     *,
     input_path: Path,
     output_dir: Path,
-    css_source: Path | None = None,
+    css_source: Path,
 ) -> SpeedupStats:
     output_path = output_dir / "index.html"
-    css_source = css_source or Path(__file__).with_name("style.css")
     if not css_source.exists():
         raise FileNotFoundError(f"missing stylesheet source: {css_source}")
     css_path = output_dir / css_source.name
     css_href = css_source.name
-    _, stats, line_plot, scatter_plot = generate_plot(input_path, output_dir)
-    memo_plot = None
-    memo_cdf_plot = None
-    size_scatter_plot = None
-    records = load_records(input_path)
-    if records.depth_breakdown:
-        memo_plot = plot_depth_breakdown(records.depth_breakdown, output_dir)
-        memo_cdf_plot = plot_depth_breakdown_cdf(records.depth_breakdown, output_dir)
-    if any(records.size_vs_sc):
-        size_scatter_plot = plot_size_vs_sc(records.size_vs_sc, output_dir)
-    profile_totals, profile_total_time = load_profile_totals(input_path)
-    profile_table = render_profile_table(profile_totals, profile_total_time)
     data_label = str(input_path)
-    output_path.write_text(
-        _render_html(
-            stats,
-            line_plot,
-            scatter_plot,
-            data_label,
-            profile_table,
-            memo_plot,
-            memo_cdf_plot,
-            size_scatter_plot,
-            css_href,
-        ),
-        encoding="utf-8",
-    )
+    records = load_records(input_path)
+    html, stats = render_html(records, output_dir, data_label, css_href)
+    output_path.write_text(html, encoding="utf-8")
     shutil.copyfile(css_source, css_path)
+    print(
+        f"wrote {output_path} ("
+        f"geo mean: {fmt_speedup(stats.geo_mean)}x, "
+        f"end-to-end: {fmt_speedup(stats.end_to_end)}x, "
+        f"max: {fmt_speedup(stats.maximum)}x, "
+        f"min: {fmt_speedup(stats.minimum)}x)"
+    )
     return stats

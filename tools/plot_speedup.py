@@ -253,9 +253,13 @@ def _profile_totals(result: Result) -> tuple[dict[str, float], float]:
     return totals, total_time
 
 
+def profile_totals_from_result(result: Result) -> tuple[dict[str, float], float]:
+    return _profile_totals(result)
+
+
 def load_profile_totals(input_path: Path) -> tuple[dict[str, float], float]:
     result = load_records(input_path)
-    return _profile_totals(result)
+    return profile_totals_from_result(result)
 
 
 def render_profile_table(totals: dict[str, float], total_time: float) -> str:
@@ -278,10 +282,9 @@ def render_profile_table(totals: dict[str, float], total_time: float) -> str:
 
 
 def generate_plot(
-    input_path: Path, output_dir: Path
+    result: Result, output_dir: Path
 ) -> tuple[list[float], SpeedupStats, str, str]:
-    """Load pairs, write plots to output_dir, and return ratios, stats, and paths."""
-    result = load_records(input_path)
+    """Write plots for result into output_dir and return ratios, stats, and filenames."""
     baselines, memos = pairs_from_result(result)
     pairs = list(zip(baselines, memos))
     ratios, stats = compare_stats(pairs)
