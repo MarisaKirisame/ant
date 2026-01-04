@@ -32,7 +32,6 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 import generate_report as report_module  # noqa: E402
-import generate_speedup_index as speedup_module  # noqa: E402
 
 
 def run(
@@ -230,40 +229,9 @@ def profile_project() -> None:
 
 def report_project() -> None:
     run_project()
-    generate_report()
+    report_module.generate_reports()
 
 
-def generate_report() -> None:
-    speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_simple.json"),
-        plot_path=Path("output/live-simple/speedup.png"),
-        output_path=Path("output/live-simple/index.html"),
-    )
-    speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_left_to_right.json"),
-        plot_path=Path("output/live-left-to-right/speedup.png"),
-        output_path=Path("output/live-left-to-right/index.html"),
-    )
-    speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_demand_driven.json"),
-        plot_path=Path("output/live-demand-driven/speedup.png"),
-        output_path=Path("output/live-demand-driven/index.html"),
-    )
-    speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_from_hazel.json"),
-        plot_path=Path("output/hazel/speedup.png"),
-        output_path=Path("output/hazel/index.html"),
-    )
-    report_module.generate_report(
-        title="Live Benchmark Index",
-        output=Path("output/index.html"),
-        entries=[
-            ("Simple Benchmark", Path("output/live-simple/index.html")),
-            ("Left-to-right Benchmark", Path("output/live-left-to-right/index.html")),
-            ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
-            ("Hazel Benchmark", Path("output/hazel/index.html")),
-        ],
-    )
 
 
 def compile_generated() -> None:
@@ -315,7 +283,7 @@ def main(argv: Iterable[str]) -> int:
         install_dependencies()
         build_project()
         run_project()
-        generate_report()
+        report_module.generate_reports()
     else:
         print(f"Unknown stage: {stage}", file=sys.stderr)
         print(

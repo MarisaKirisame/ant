@@ -7,7 +7,6 @@ speedup summary (samples, geometric mean, end-to-end, best, lowest) across all e
 
 from __future__ import annotations
 
-import argparse
 import os
 import shutil
 from pathlib import Path
@@ -16,19 +15,7 @@ from typing import Iterable, List, Sequence, Tuple
 from dominate import document
 from dominate import tags as tag
 from plot_speedup import SpeedupStats, compare_stats, load_records, pairs_from_result
-
-
-def _parse_entry(raw: str) -> Tuple[str, Path]:
-    if "=" not in raw:
-        raise argparse.ArgumentTypeError(f"entry must be LABEL=PATH, got {raw!r}")
-    label, path = raw.split("=", 1)
-    label = label.strip()
-    if not label:
-        raise argparse.ArgumentTypeError(f"entry label cannot be empty: {raw!r}")
-    clean_path = Path(path.strip())
-    if not clean_path:
-        raise argparse.ArgumentTypeError(f"entry path cannot be empty: {raw!r}")
-    return label, clean_path
+import generate_speedup_index as speedup_module
 
 
 def _fmt(value: float) -> str:
@@ -71,7 +58,7 @@ def _stat_card(label: str, value: str) -> None:
         tag.span(value, cls="value")
 
 
-def generate_report(
+def generate_html(
     *,
     title: str,
     output: Path,
@@ -111,6 +98,35 @@ def generate_report(
     return summary
 
 
+def generate_reports() -> None:
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_simple.json"),
+        output_dir=Path("output/live-simple"),
+    )
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_left_to_right.json"),
+        output_dir=Path("output/live-left-to-right"),
+    )
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_demand_driven.json"),
+        output_dir=Path("output/live-demand-driven"),
+    )
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_from_hazel.json"),
+        output_dir=Path("output/hazel"),
+    )
+    generate_html(
+        title="Live Benchmark Index",
+        output=Path("output/index.html"),
+        entries=[
+            ("Simple Benchmark", Path("output/live-simple/index.html")),
+            ("Left-to-right Benchmark", Path("output/live-left-to-right/index.html")),
+            ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
+            ("Hazel Benchmark", Path("output/hazel/index.html")),
+        ],
+    )
+
+
 def _relativize(entries: Iterable[Tuple[str, Path]], output: Path) -> List[Tuple[str, str]]:
     base = output.parent
     return [(label, os.path.relpath(path, base)) for label, path in entries]
@@ -141,49 +157,3 @@ def _collect_pairs(data_paths: Iterable[Path]) -> list[tuple[float, float]]:
         baselines, memos = pairs_from_result(load_records(path))
         pairs.extend(zip(baselines, memos))
     return pairs
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--title", default="Live Benchmark Index", help="page title")
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path("output/index.html"),
-        help="where to write the index file",
-    )
-    parser.add_argument(
-        "--entry",
-        action="append",
-        type=_parse_entry,
-        required=True,
-        help="benchmark entry formatted as LABEL=REPORT_PATH (can be repeated)",
-    )
-    parser.add_argument(
-        "--data",
-        action="append",
-        type=Path,
-        help="optional JSONL stats file to include in the combined summary (can be repeated)",
-    )
-    args = parser.parse_args()
-
-    summary = generate_report(
-        title=args.title,
-        output=args.output,
-        entries=args.entry,
-        data_paths=args.data,
-    )
-    msg = f"wrote {args.output} with {len(args.entry)} links"
-    if summary:
-        msg += (
-            f" (combined samples: {summary.samples}, "
-            f"geo mean: {_fmt(summary.geo_mean)}x, "
-            f"end-to-end: {_fmt(summary.end_to_end)}x, "
-            f"max: {_fmt(summary.maximum)}x, "
-            f"min: {_fmt(summary.minimum)}x)"
-        )
-    print(msg)
-
-
-if __name__ == "__main__":
-    main()

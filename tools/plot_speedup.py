@@ -17,16 +17,16 @@ profile time share per slot is also written.
 
 from __future__ import annotations
 
-import argparse
 import math
 import statistics
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, Sequence
 
 from dominate import tags as tag
 import matplotlib.pyplot as plt
 import numpy as np
 
+from common import fresh
 from stats import (
     MemoSizeVsSc,
     MemoStatsNode,
@@ -71,10 +71,15 @@ def compare_stats(
     return ratios, stats
 
 
-def plot_scatter(pairs: Iterable[tuple[float, float]], output: Path) -> None:
+def _fresh_plot_name() -> str:
+    return f"{fresh()}.png"
+
+
+def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
     pairs_list = list(pairs)
     baselines = [baseline for baseline, _ in pairs_list]
     memos = [memo for _, memo in pairs_list]
+    output_path = output_dir / _fresh_plot_name()
     plt.figure(figsize=(6, 4.5))
     plt.scatter(memos, baselines, alpha=0.75)
     min_time = min(min(baselines), min(memos))
@@ -100,12 +105,14 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output: Path) -> None:
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(output)
+    plt.savefig(output_path)
     plt.close()
+    return output_path.name
 
 
-def plot_speedup_line(ratios: Sequence[float], output: Path) -> None:
+def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
     xs = list(range(1, len(ratios) + 1))
+    output_path = output_dir / _fresh_plot_name()
     plt.figure(figsize=(6, 4.5))
     plt.plot(xs, ratios, marker="o", linewidth=1.5)
     plt.yscale("log")
@@ -114,15 +121,17 @@ def plot_speedup_line(ratios: Sequence[float], output: Path) -> None:
     plt.title(f"Speedup per Execution ({METRIC_LABEL}, log scale)")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.tight_layout()
-    plt.savefig(output)
+    plt.savefig(output_path)
     plt.close()
+    return output_path.name
 
 
 def plot_depth_breakdown(
-    depth_breakdown: Sequence[MemoStatsNode], output: Path
-) -> None:
+    depth_breakdown: Sequence[MemoStatsNode], output_dir: Path
+) -> str:
     if not depth_breakdown:
         raise ValueError("depth_breakdown is empty")
+    output_path = output_dir / _fresh_plot_name()
     plt.figure(figsize=(6, 4.5))
     depths = [node.depth for node in depth_breakdown]
     counts = [node.node_count for node in depth_breakdown]
@@ -132,15 +141,17 @@ def plot_depth_breakdown(
     plt.title("Memo stats by depth")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.tight_layout()
-    plt.savefig(output)
+    plt.savefig(output_path)
     plt.close()
+    return output_path.name
 
 
 def plot_depth_breakdown_cdf(
-    depth_breakdown: Sequence[MemoStatsNode], output: Path
-) -> None:
+    depth_breakdown: Sequence[MemoStatsNode], output_dir: Path
+) -> str:
     if not depth_breakdown:
         raise ValueError("depth_breakdown is empty")
+    output_path = output_dir / _fresh_plot_name()
     plt.figure(figsize=(6, 4.5))
     nodes_sorted = sorted(depth_breakdown, key=lambda node: node.depth)
     total = sum(node.node_count for node in nodes_sorted)
@@ -159,13 +170,15 @@ def plot_depth_breakdown_cdf(
     plt.title("Memo stats CDF")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.tight_layout()
-    plt.savefig(output)
+    plt.savefig(output_path)
     plt.close()
+    return output_path.name
 
 
-def plot_size_vs_sc(size_vs_sc: Sequence[MemoSizeVsSc], output: Path) -> None:
+def plot_size_vs_sc(size_vs_sc: Sequence[MemoSizeVsSc], output_dir: Path) -> str:
     if not size_vs_sc:
         raise ValueError("size_vs_sc is empty")
+    output_path = output_dir / _fresh_plot_name()
     plt.figure(figsize=(6, 4.5))
     sizes = [entry.size for entry in size_vs_sc]
     scs = [entry.sc for entry in size_vs_sc]
@@ -176,8 +189,9 @@ def plot_size_vs_sc(size_vs_sc: Sequence[MemoSizeVsSc], output: Path) -> None:
     plt.yscale("log")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.tight_layout()
-    plt.savefig(output)
+    plt.savefig(output_path)
     plt.close()
+    return output_path.name
 
 
 def _sum_profile(entries: Sequence[ProfileEntry], *, key_name: str) -> float:
@@ -263,63 +277,14 @@ def render_profile_table(totals: dict[str, float], total_time: float) -> str:
     return tbl.render()
 
 
-def write_profile_table(input_path: Path, output_path: Path) -> None:
-    result = load_records(input_path)
-    totals, total_time = _profile_totals(result)
-    table = render_profile_table(totals, total_time)
-    output_path.write_text(table, encoding="utf-8")
-
-
 def generate_plot(
-    input_path: Path, line_output: Path, scatter_output: Optional[Path] = None
-) -> tuple[list[float], SpeedupStats]:
-    """Load pairs from input_path, write plots, and return ratios and stats."""
+    input_path: Path, output_dir: Path
+) -> tuple[list[float], SpeedupStats, str, str]:
+    """Load pairs, write plots to output_dir, and return ratios, stats, and paths."""
     result = load_records(input_path)
     baselines, memos = pairs_from_result(result)
     pairs = list(zip(baselines, memos))
     ratios, stats = compare_stats(pairs)
-    plot_speedup_line(ratios, line_output)
-    if scatter_output is not None:
-        plot_scatter(pairs, scatter_output)
-    return ratios, stats
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--input",
-        type=Path,
-        default=Path("eval_steps.json"),
-        help="path to the JSONL stats file (default: eval_steps.json)",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path("speedup.png"),
-        help="path to save the speedup line plot (default: speedup.png)",
-    )
-    parser.add_argument(
-        "--scatter",
-        type=Path,
-        default=Path("scatter.png"),
-        help="path to save the scatter plot (default: scatter.png)",
-    )
-    parser.add_argument(
-        "--profile-table",
-        type=Path,
-        default=Path("memo_profile.html"),
-        help="path to save the memo profile HTML table (default: memo_profile.html)",
-    )
-    args = parser.parse_args()
-
-    ratios, stats = generate_plot(args.input, args.output, args.scatter)
-    write_profile_table(args.input, args.profile_table)
-    print(
-        f"plotted {stats.samples} samples to {args.output} and {args.scatter} "
-        f"(geo mean: {stats.geo_mean:.2f}x, end-to-end: {stats.end_to_end:.2f}x, "
-        f"min: {stats.minimum:.2f}x, max: {stats.maximum:.2f}x)"
-    )
-
-
-if __name__ == "__main__":
-    main()
+    line_plot = plot_speedup_line(ratios, output_dir)
+    scatter_plot = plot_scatter(pairs, output_dir)
+    return ratios, stats, line_plot, scatter_plot

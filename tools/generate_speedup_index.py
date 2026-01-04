@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import argparse
-import os
 import shutil
 from pathlib import Path
 
@@ -28,20 +26,15 @@ def _fmt(value: float) -> str:
     return f"{value:.4g}"
 
 
-def _image_src(plot_path: Path, output_dir: Path) -> str:
-    """Return a relative path for the plot image."""
-    return os.path.relpath(plot_path, output_dir)
-
-
 def _render_html(
     stats: SpeedupStats,
-    line_src: str,
-    scatter_src: str,
+    line_plot: str,
+    scatter_plot: str,
     data_label: str,
     profile_table: str,
-    memo_src: str | None,
-    memo_cdf_src: str | None,
-    size_scatter_src: str | None,
+    memo_plot: str | None,
+    memo_cdf_plot: str | None,
+    size_scatter_plot: str | None,
     css_href: str,
 ) -> str:
     doc = document(title="Memoization Speedup")
@@ -59,14 +52,14 @@ def _render_html(
                 _stat_card("End-to-end speedup", f"{_fmt(stats.end_to_end)}x")
                 _stat_card("Best speedup", f"{_fmt(stats.maximum)}x")
                 _stat_card("Lowest speedup", f"{_fmt(stats.minimum)}x")
-            _plot_image(line_src, "Speedup per run plot")
-            _plot_image(scatter_src, "Their vs our scatter plot")
-            if memo_src:
-                _plot_image(memo_src, "Memo stats depth vs node count plot")
-            if memo_cdf_src:
-                _plot_image(memo_cdf_src, "Memo stats CDF plot")
-            if size_scatter_src:
-                _plot_image(size_scatter_src, "Memo size vs sc scatter plot")
+            _plot_image(line_plot, "Speedup per run plot")
+            _plot_image(scatter_plot, "Their vs our scatter plot")
+            if memo_plot:
+                _plot_image(memo_plot, "Memo stats depth vs node count plot")
+            if memo_cdf_plot:
+                _plot_image(memo_cdf_plot, "Memo stats CDF plot")
+            if size_scatter_plot:
+                _plot_image(size_scatter_plot, "Memo size vs sc scatter plot")
             with tag.section(cls="profile"):
                 raw(profile_table)
     return doc.render()
@@ -86,101 +79,41 @@ def _plot_image(src: str, alt: str) -> None:
 def generate_speedup_report(
     *,
     input_path: Path,
-    plot_path: Path,
-    output_path: Path,
-    scatter_path: Path | None = None,
+    output_dir: Path,
     css_source: Path | None = None,
 ) -> SpeedupStats:
-    plot_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "index.html"
     css_source = css_source or Path(__file__).with_name("style.css")
     if not css_source.exists():
         raise FileNotFoundError(f"missing stylesheet source: {css_source}")
-    css_path = output_path.parent / css_source.name
-    css_href = os.path.relpath(css_path, output_path.parent)
-    scatter_path = scatter_path or plot_path.with_name("scatter.png")
-
-    _, stats = generate_plot(input_path, plot_path, scatter_path)
-    memo_src = None
-    memo_cdf_src = None
-    size_scatter_src = None
+    css_path = output_dir / css_source.name
+    css_href = css_source.name
+    _, stats, line_plot, scatter_plot = generate_plot(input_path, output_dir)
+    memo_plot = None
+    memo_cdf_plot = None
+    size_scatter_plot = None
     records = load_records(input_path)
     if records.depth_breakdown:
-        memo_plot = plot_path.with_name("memo_stats.png")
-        plot_depth_breakdown(records.depth_breakdown, memo_plot)
-        memo_src = _image_src(memo_plot, output_path.parent)
-        memo_cdf_plot = plot_path.with_name("memo_stats_cdf.png")
-        plot_depth_breakdown_cdf(records.depth_breakdown, memo_cdf_plot)
-        memo_cdf_src = _image_src(memo_cdf_plot, output_path.parent)
+        memo_plot = plot_depth_breakdown(records.depth_breakdown, output_dir)
+        memo_cdf_plot = plot_depth_breakdown_cdf(records.depth_breakdown, output_dir)
     if any(records.size_vs_sc):
-        size_scatter_plot = plot_path.with_name("size_vs_sc.png")
-        plot_size_vs_sc(records.size_vs_sc, size_scatter_plot)
-        size_scatter_src = _image_src(size_scatter_plot, output_path.parent)
+        size_scatter_plot = plot_size_vs_sc(records.size_vs_sc, output_dir)
     profile_totals, profile_total_time = load_profile_totals(input_path)
     profile_table = render_profile_table(profile_totals, profile_total_time)
-    line_src = _image_src(plot_path, output_path.parent)
-    scatter_src = _image_src(scatter_path, output_path.parent)
-    data_label = os.path.relpath(input_path, output_path.parent)
+    data_label = str(input_path)
     output_path.write_text(
         _render_html(
             stats,
-            line_src,
-            scatter_src,
+            line_plot,
+            scatter_plot,
             data_label,
             profile_table,
-            memo_src,
-            memo_cdf_src,
-            size_scatter_src,
+            memo_plot,
+            memo_cdf_plot,
+            size_scatter_plot,
             css_href,
         ),
         encoding="utf-8",
     )
     shutil.copyfile(css_source, css_path)
     return stats
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--input",
-        type=Path,
-        default=Path("eval_steps.json"),
-        help="path to the JSONL stats file (default: eval_steps.json)",
-    )
-    parser.add_argument(
-        "--plot",
-        type=Path,
-        default=Path("speedup.png"),
-        help="where to write the plot image (default: speedup.png)",
-    )
-    parser.add_argument(
-        "--scatter",
-        type=Path,
-        default=None,
-        help="where to write the scatter image (default: scatter.png next to plot)",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path("index.html"),
-        help="where to write the HTML report (default: index.html)",
-    )
-    args = parser.parse_args()
-
-    scatter_path = args.scatter or args.plot.with_name("scatter.png")
-    stats = generate_speedup_report(
-        input_path=args.input,
-        plot_path=args.plot,
-        output_path=args.output,
-        scatter_path=scatter_path,
-    )
-    print(
-        f"wrote {args.output} (plot: {args.plot}, scatter: {scatter_path}, "
-        f"geo mean: {_fmt(stats.geo_mean)}x, "
-        f"end-to-end: {_fmt(stats.end_to_end)}x, max: {_fmt(stats.maximum)}x, "
-        f"min: {_fmt(stats.minimum)}x)"
-    )
-
-
-if __name__ == "__main__":
-    main()
