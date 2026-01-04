@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import html
 import os
+import shutil
 from pathlib import Path
 
 from plot_speedup import (
@@ -38,6 +40,7 @@ def _render_html(
     memo_src: str | None,
     memo_cdf_src: str | None,
     size_scatter_src: str | None,
+    css_href: str,
 ) -> str:
     memo_section = (
         f"""
@@ -68,110 +71,7 @@ def _render_html(
 <head>
   <meta charset="utf-8">
   <title>Memoization Speedup</title>
-  <style>
-    :root {{
-      --bg: #0f172a;
-      --card: #111827;
-      --text: #e5e7eb;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Segoe UI", Helvetica, sans-serif;
-      background: radial-gradient(circle at 20% 20%, #1f2937, #0f172a 55%);
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 32px;
-    }}
-    .panel {{
-      width: min(960px, 100%);
-      background: var(--card);
-      border: 1px solid #1f2937;
-      border-radius: 16px;
-      padding: 28px 32px 32px;
-      box-shadow: 0 10px 50px rgba(0, 0, 0, 0.35);
-    }}
-    h1 {{
-      margin: 0 0 12px;
-      font-size: 26px;
-      letter-spacing: 0.2px;
-    }}
-    .meta {{
-      margin: 0 0 24px;
-      color: var(--muted);
-      font-size: 14px;
-    }}
-    .stats {{
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 12px;
-      margin-bottom: 20px;
-    }}
-    .stat {{
-      padding: 14px 12px;
-      border: 1px solid #1f2937;
-      border-radius: 10px;
-      background: #0b1324;
-    }}
-    .label {{
-      display: block;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }}
-    .value {{
-      font-size: 22px;
-      font-weight: 600;
-      color: var(--accent);
-    }}
-    .plot {{
-      width: 100%;
-      border: 1px solid #1f2937;
-      border-radius: 12px;
-      background: #0b1324;
-      padding: 12px;
-      margin-bottom: 16px;
-    }}
-    .plot img {{
-      width: 100%;
-      display: block;
-      border-radius: 8px;
-    }}
-    .profile {{
-      margin-top: 8px;
-    }}
-    table {{
-      width: 100%;
-      border-collapse: collapse;
-      background: #0b1324;
-      border: 1px solid #1f2937;
-      border-radius: 12px;
-      overflow: hidden;
-      font-size: 13px;
-    }}
-    th, td {{
-      text-align: left;
-      padding: 10px 12px;
-      border-bottom: 1px solid #1f2937;
-    }}
-    thead {{
-      background: #0f1a30;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      font-size: 11px;
-    }}
-    tbody tr:last-child td {{
-      border-bottom: none;
-    }}
-  </style>
+  <link rel="stylesheet" href="{html.escape(css_href)}">
 </head>
 <body>
   <main class="panel">
@@ -247,6 +147,11 @@ def main() -> None:
 
     args.plot.parent.mkdir(parents=True, exist_ok=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    css_source = Path(__file__).with_name("style.css")
+    if not css_source.exists():
+        raise FileNotFoundError(f"missing stylesheet source: {css_source}")
+    css_path = args.output.parent / css_source.name
+    css_href = os.path.relpath(css_path, args.output.parent)
     scatter_path = args.scatter or args.plot.with_name("scatter.png")
 
     _, stats = generate_plot(args.input, args.plot, scatter_path)
@@ -280,9 +185,11 @@ def main() -> None:
             memo_src,
             memo_cdf_src,
             size_scatter_src,
+            css_href,
         ),
         encoding="utf-8",
     )
+    shutil.copyfile(css_source, css_path)
     print(
         f"wrote {args.output} (plot: {args.plot}, scatter: {scatter_path}, "
         f"geo mean: {_fmt(stats.geo_mean)}x, "

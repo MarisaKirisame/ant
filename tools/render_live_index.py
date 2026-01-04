@@ -151,10 +151,10 @@ def main() -> None:
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     entries_with_rel = _relativize(args.entry, args.output)
-    css_source = Path(__file__).with_suffix(".css")
+    css_source = Path(__file__).with_name("style.css")
     if not css_source.exists():
         raise FileNotFoundError(f"missing stylesheet source: {css_source}")
-    css_path = args.output.with_suffix(".css")
+    css_path = args.output.parent / css_source.name
     css_href = os.path.relpath(css_path, args.output.parent)
 
     data_paths: list[Path] = []
