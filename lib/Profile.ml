@@ -51,4 +51,5 @@ let dump_profile (p : profile) : (string * int) list =
   ret
 
 let memo_profile = create_profile ()
+let cek_profile = create_profile ()
 let plain_profile = create_profile ()

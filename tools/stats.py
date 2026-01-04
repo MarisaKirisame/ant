@@ -45,6 +45,7 @@ class ExecTimeRecord:
     step: int
     without_memo_step: int
     memo_profile: list[ProfileEntry]
+    cek_profile: list[ProfileEntry]
     plain_profile: list[ProfileEntry]
 
 
@@ -92,6 +93,9 @@ def load_records(
                     memo_profile = _parse_profile(
                         rec.get("memo_profile"), key_name="memo_profile"
                     )
+                    cek_profile = _parse_profile(
+                        rec.get("cek_profile"), key_name="cek_profile"
+                    )
                     plain_profile = _parse_profile(
                         rec.get("plain_profile"), key_name="plain_profile"
                     )
@@ -104,6 +108,7 @@ def load_records(
                             step=step,
                             without_memo_step=without_memo_step,
                             memo_profile=memo_profile,
+                            cek_profile=cek_profile,
                             plain_profile=plain_profile,
                         )
                     )

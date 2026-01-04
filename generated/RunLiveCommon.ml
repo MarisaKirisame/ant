@@ -364,10 +364,12 @@ let write_steps_json oc (r : Memo.exec_result) : unit =
     Buffer.contents buf
   in
   let memo_profile = Profile.dump_profile Profile.memo_profile |> json_of_profile in
+  let cek_profile = Profile.dump_profile Profile.cek_profile |> json_of_profile in
   let plain_profile = Profile.dump_profile Profile.plain_profile |> json_of_profile in
   Printf.fprintf oc
-    "{\"name\":\"exec_time\",\"step\":%d,\"without_memo_step\":%d,\"memo_profile\":%s,\"plain_profile\":%s}\n" r.step
-    r.without_memo_step memo_profile plain_profile;
+    "{\"name\":\"exec_time\",\"step\":%d,\"without_memo_step\":%d,\"memo_profile\":%s,\"plain_profile\":%s, \
+     \"cek_profile\":%s}\n"
+    r.step r.without_memo_step memo_profile plain_profile cek_profile;
   flush oc
 
 let write_memo_stats_json oc (memo : State.memo) : unit =
@@ -403,15 +405,16 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
    to LivePlain, running it, then converting the resulting value back.  Timing is
    recorded via the shared profiler and consumed by write_steps_json. *)
 let eval_plain_slot = Profile.register_slot Profile.plain_profile "eval_plain"
+let eval_cek_slot = Profile.register_slot Profile.cek_profile "eval_cek"
 
 let eval_plain (expr : LC.expr) : LC.value =
   let env = LC.Nil in
   let lp_expr = lp_expr_of_lc expr in
   let lp_env = lp_list_of_lc lp_value_of_lc env in
   Gc.full_major ();
-  (*let lp_result = Profile.with_slot eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
-  lc_value_of_lp lp_result*)
-  Profile.with_slot eval_plain_slot (fun () ->
+  let lp_result = Profile.with_slot eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
+  (*lc_value_of_lp lp_result*)
+  Profile.with_slot eval_cek_slot (fun () ->
       LC.to_ocaml_value
         (Memo.exec_cek_raw
            (Memo.pc_to_exp (Common.int_to_pc 4))

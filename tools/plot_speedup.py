@@ -4,6 +4,7 @@
 The metric plotted (wall-clock time vs evaluation steps) is controlled by
 ``REPORT_WALL_CLOCK_TIME`` below. Expected JSONL keys for each exec_time record:
   * "memo_profile": list of [name, time_ns] entries for memoized run
+  * "cek_profile": list of [name, time_ns] entries for CEK run
   * "plain_profile": list of [name, time_ns] entries for baseline run
   * "step": memoized step count
   * "without_memo_step": baseline step count
@@ -257,6 +258,22 @@ def profile_totals_from_result(result: Result) -> tuple[dict[str, float], float]
     return _profile_totals(result)
 
 
+def profile_values_from_result(result: Result, profile_key: str) -> list[float]:
+    values: list[float] = []
+    for record in result.exec_times:
+        entries = getattr(record, profile_key)
+        values.append(_sum_profile(entries, key_name=profile_key))
+    return values
+
+
+def pairs_from_profiles(
+    result: Result, *, baseline_key: str, memo_key: str
+) -> list[tuple[float, float]]:
+    baselines = profile_values_from_result(result, baseline_key)
+    memos = profile_values_from_result(result, memo_key)
+    return list(zip(baselines, memos))
+
+
 def load_profile_totals(input_path: Path) -> tuple[dict[str, float], float]:
     result = load_records(input_path)
     return profile_totals_from_result(result)
@@ -287,7 +304,14 @@ def generate_plot(
     """Write plots for result into output_dir and return ratios, stats, and filenames."""
     baselines, memos = pairs_from_result(result)
     pairs = list(zip(baselines, memos))
+    ratios, stats, line_plot, scatter_plot = generate_plot_for_pairs(pairs, output_dir)
+    return ratios, stats, line_plot, scatter_plot
+
+
+def generate_plot_for_pairs(
+    pairs: Sequence[tuple[float, float]], output_dir: Path
+) -> tuple[SpeedupStats, str, str]:
     ratios, stats = compare_stats(pairs)
     line_plot = plot_speedup_line(ratios, output_dir)
     scatter_plot = plot_scatter(pairs, output_dir)
-    return ratios, stats, line_plot, scatter_plot
+    return stats, line_plot, scatter_plot
