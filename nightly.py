@@ -8,6 +8,7 @@ import os
 import shlex
 import subprocess
 import sys
+from pathlib import Path
 from typing import Iterable, Mapping, MutableMapping, Optional
 
 
@@ -25,6 +26,13 @@ PACKAGES = [
     "cmdliner",
     "core_bench",
 ]
+
+TOOLS_DIR = Path(__file__).resolve().parent / "tools"
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+import generate_report as report_module  # noqa: E402
+import generate_speedup_index as speedup_module  # noqa: E402
 
 
 def run(
@@ -226,69 +234,35 @@ def report_project() -> None:
 
 
 def generate_report() -> None:
-    run(
-        [
-            "python3",
-            "tools/generate_speedup_index.py",
-            "--input",
-            "eval_steps_simple.json",
-            "--plot",
-            "output/live-simple/speedup.png",
-            "--output",
-            "output/live-simple/index.html",
-        ]
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_simple.json"),
+        plot_path=Path("output/live-simple/speedup.png"),
+        output_path=Path("output/live-simple/index.html"),
     )
-    run(
-        [
-            "python3",
-            "tools/generate_speedup_index.py",
-            "--input",
-            "eval_steps_left_to_right.json",
-            "--plot",
-            "output/live-left-to-right/speedup.png",
-            "--output",
-            "output/live-left-to-right/index.html",
-        ]
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_left_to_right.json"),
+        plot_path=Path("output/live-left-to-right/speedup.png"),
+        output_path=Path("output/live-left-to-right/index.html"),
     )
-    run(
-        [
-            "python3",
-            "tools/generate_speedup_index.py",
-            "--input",
-            "eval_steps_demand_driven.json",
-            "--plot",
-            "output/live-demand-driven/speedup.png",
-            "--output",
-            "output/live-demand-driven/index.html",
-        ]
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_demand_driven.json"),
+        plot_path=Path("output/live-demand-driven/speedup.png"),
+        output_path=Path("output/live-demand-driven/index.html"),
     )
-    run(
-        [
-            "python3",
-            "tools/generate_speedup_index.py",
-            "--input",
-            "eval_steps_from_hazel.json",
-            "--plot",
-            "output/hazel/speedup.png",
-            "--output",
-            "output/hazel/index.html",
-        ]
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_from_hazel.json"),
+        plot_path=Path("output/hazel/speedup.png"),
+        output_path=Path("output/hazel/index.html"),
     )
-    run(
-        [
-            "python3",
-            "tools/render_live_index.py",
-            "--output",
-            "output/index.html",
-            "--entry",
-            "Simple Benchmark=output/live-simple/index.html",
-            "--entry",
-            "Left-to-right Benchmark=output/live-left-to-right/index.html",
-            "--entry",
-            "Demand-driven Benchmark=output/live-demand-driven/index.html",
-            "--entry",
-            "Hazel Benchmark=output/hazel/index.html",
-        ]
+    report_module.generate_report(
+        title="Live Benchmark Index",
+        output=Path("output/index.html"),
+        entries=[
+            ("Simple Benchmark", Path("output/live-simple/index.html")),
+            ("Left-to-right Benchmark", Path("output/live-left-to-right/index.html")),
+            ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
+            ("Hazel Benchmark", Path("output/hazel/index.html")),
+        ],
     )
 
 

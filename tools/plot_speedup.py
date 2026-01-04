@@ -18,12 +18,12 @@ profile time share per slot is also written.
 from __future__ import annotations
 
 import argparse
-import html
 import math
 import statistics
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
+from dominate import tags as tag
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -246,19 +246,21 @@ def load_profile_totals(input_path: Path) -> tuple[dict[str, float], float]:
 
 def render_profile_table(totals: dict[str, float], total_time: float) -> str:
     rows = sorted(totals.items(), key=lambda item: item[1], reverse=True)
-    lines = [
-        "<table>",
-        "  <thead><tr><th>Slot</th><th>Total time (ns)</th><th>Percent</th></tr></thead>",
-        "  <tbody>",
-    ]
-    for name, value in rows:
-        percent = 100.0 * value / total_time
-        lines.append(
-            f"    <tr><td>{html.escape(name)}</td><td>{value:.0f}</td><td>{percent:.2f}%</td></tr>"
-        )
-    lines.append("  </tbody>")
-    lines.append("</table>")
-    return "\n".join(lines)
+    tbl = tag.table()
+    with tbl:
+        with tag.thead():
+            with tag.tr():
+                tag.th("Slot")
+                tag.th("Total time (ns)")
+                tag.th("Percent")
+        with tag.tbody():
+            for name, value in rows:
+                percent = 100.0 * value / total_time
+                with tag.tr():
+                    tag.td(name)
+                    tag.td(f"{value:.0f}")
+                    tag.td(f"{percent:.2f}%")
+    return tbl.render()
 
 
 def write_profile_table(input_path: Path, output_path: Path) -> None:

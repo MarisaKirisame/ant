@@ -8,12 +8,13 @@ speedup summary (samples, geometric mean, end-to-end, best, lowest) across all e
 from __future__ import annotations
 
 import argparse
-import html
 import os
 import shutil
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
+from dominate import document
+from dominate import tags as tag
 from plot_speedup import SpeedupStats, compare_stats, load_records, pairs_from_result
 
 
@@ -41,56 +42,73 @@ def _render_html(
     summary: SpeedupStats | None,
     css_href: str,
 ) -> str:
-    links = "\n".join(
-        f'      <a class="card" href="{html.escape(rel)}"><span>{html.escape(label)}</span></a>'
-        for label, rel in entries
+    doc = document(title=title)
+    doc["lang"] = "en"
+    with doc.head:
+        tag.meta(charset="utf-8")
+        tag.link(rel="stylesheet", href=css_href)
+    with doc:
+        with tag.main():
+            tag.h1(title)
+            tag.p("Select a benchmark run to explore the detailed results.")
+            if summary:
+                with tag.section(cls="stats"):
+                    _stat_card("Samples", f"{summary.samples}")
+                    _stat_card("Geometric mean", f"{_fmt(summary.geo_mean)}x")
+                    _stat_card("End-to-end speedup", f"{_fmt(summary.end_to_end)}x")
+                    _stat_card("Best speedup", f"{_fmt(summary.maximum)}x")
+                    _stat_card("Lowest speedup", f"{_fmt(summary.minimum)}x")
+            with tag.section(cls="grid"):
+                for label, rel in entries:
+                    with tag.a(href=rel, cls="card"):
+                        tag.span(label)
+    return doc.render()
+
+
+def _stat_card(label: str, value: str) -> None:
+    with tag.div(cls="stat"):
+        tag.span(label, cls="label")
+        tag.span(value, cls="value")
+
+
+def generate_report(
+    *,
+    title: str,
+    output: Path,
+    entries: Sequence[Tuple[str, Path]],
+    data_paths: Sequence[Path] | None = None,
+    css_source: Path | None = None,
+) -> SpeedupStats | None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    entries_with_rel = _relativize(entries, output)
+    css_source = css_source or Path(__file__).with_name("style.css")
+    if not css_source.exists():
+        raise FileNotFoundError(f"missing stylesheet source: {css_source}")
+    css_path = output.parent / css_source.name
+    css_href = os.path.relpath(css_path, output.parent)
+
+    inferred_paths: list[Path] = []
+    if data_paths:
+        inferred_paths.extend(data_paths)
+    else:
+        for _, report_path in entries:
+            if report_path.exists():
+                inferred = _extract_data_path(report_path)
+                if inferred and inferred.exists():
+                    inferred_paths.append(inferred)
+
+    summary: SpeedupStats | None = None
+    if inferred_paths:
+        pairs = _collect_pairs(inferred_paths)
+        if pairs:
+            _, summary = compare_stats(pairs)
+
+    output.write_text(
+        _render_html(title, entries_with_rel, summary, css_href),
+        encoding="utf-8",
     )
-    stats_html = (
-        f"""
-    <section class="stats">
-      <div class="stat">
-        <span class="label">Samples</span>
-        <span class="value">{summary.samples}</span>
-      </div>
-      <div class="stat">
-        <span class="label">Geometric mean</span>
-        <span class="value">{_fmt(summary.geo_mean)}x</span>
-      </div>
-      <div class="stat">
-        <span class="label">End-to-end speedup</span>
-        <span class="value">{_fmt(summary.end_to_end)}x</span>
-      </div>
-      <div class="stat">
-        <span class="label">Best speedup</span>
-        <span class="value">{_fmt(summary.maximum)}x</span>
-      </div>
-      <div class="stat">
-        <span class="label">Lowest speedup</span>
-        <span class="value">{_fmt(summary.minimum)}x</span>
-      </div>
-    </section>"""
-        if summary
-        else ""
-    )
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>{html.escape(title)}</title>
-  <link rel="stylesheet" href="{html.escape(css_href)}">
-</head>
-<body>
-  <main>
-    <h1>{html.escape(title)}</h1>
-    <p>Select a benchmark run to explore the detailed results.</p>
-{stats_html}
-    <section class="grid">
-{links}
-    </section>
-  </main>
-</body>
-</html>
-"""
+    shutil.copyfile(css_source, css_path)
+    return summary
 
 
 def _relativize(entries: Iterable[Tuple[str, Path]], output: Path) -> List[Tuple[str, str]]:
@@ -149,36 +167,13 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    entries_with_rel = _relativize(args.entry, args.output)
-    css_source = Path(__file__).with_name("style.css")
-    if not css_source.exists():
-        raise FileNotFoundError(f"missing stylesheet source: {css_source}")
-    css_path = args.output.parent / css_source.name
-    css_href = os.path.relpath(css_path, args.output.parent)
-
-    data_paths: list[Path] = []
-    if args.data:
-        data_paths.extend(args.data)
-    else:
-        for _, report_path in args.entry:
-            if report_path.exists():
-                inferred = _extract_data_path(report_path)
-                if inferred and inferred.exists():
-                    data_paths.append(inferred)
-
-    summary: SpeedupStats | None = None
-    if data_paths:
-        pairs = _collect_pairs(data_paths)
-        if pairs:
-            _, summary = compare_stats(pairs)
-
-    args.output.write_text(
-        _render_html(args.title, entries_with_rel, summary, css_href),
-        encoding="utf-8",
+    summary = generate_report(
+        title=args.title,
+        output=args.output,
+        entries=args.entry,
+        data_paths=args.data,
     )
-    shutil.copyfile(css_source, css_path)
-    msg = f"wrote {args.output} with {len(entries_with_rel)} links"
+    msg = f"wrote {args.output} with {len(args.entry)} links"
     if summary:
         msg += (
             f" (combined samples: {summary.samples}, "
