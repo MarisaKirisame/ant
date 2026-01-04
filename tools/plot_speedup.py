@@ -274,6 +274,12 @@ def pairs_from_profiles(
     return list(zip(baselines, memos))
 
 
+def pairs_from_steps(result: Result) -> list[tuple[float, float]]:
+    baselines = without_memo_steps_from_result(result)
+    memos = steps_from_result(result)
+    return list(zip(baselines, memos))
+
+
 def load_profile_totals(input_path: Path) -> tuple[dict[str, float], float]:
     result = load_records(input_path)
     return profile_totals_from_result(result)

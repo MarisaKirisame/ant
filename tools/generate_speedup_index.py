@@ -14,6 +14,7 @@ from plot_speedup import (
     generate_plot_for_pairs,
     load_records,
     pairs_from_profiles,
+    pairs_from_steps,
     plot_size_vs_sc,
     plot_depth_breakdown,
     plot_depth_breakdown_cdf,
@@ -64,6 +65,12 @@ def render_html(
                 baseline_key="plain_profile",
                 memo_key="memo_profile",
             )
+            _render_speedup_comparison(
+                records,
+                output_dir,
+                label="Memo vs Plain (steps)",
+                pairs=pairs_from_steps(records),
+            )
             _plot_image(memo_plot, "Memo stats depth vs node count plot")
             _plot_image(memo_cdf_plot, "Memo stats CDF plot")
             _plot_image(size_scatter_plot, "Memo size vs sc scatter plot")
@@ -77,10 +84,14 @@ def _render_speedup_comparison(
     output_dir: Path,
     *,
     label: str,
-    baseline_key: str,
-    memo_key: str,
+    baseline_key: str | None = None,
+    memo_key: str | None = None,
+    pairs: list[tuple[float, float]] | None = None,
 ) -> None:
-    pairs = pairs_from_profiles(records, baseline_key=baseline_key, memo_key=memo_key)
+    if pairs is None:
+        if baseline_key is None or memo_key is None:
+            raise ValueError("baseline_key and memo_key are required when pairs is None")
+        pairs = pairs_from_profiles(records, baseline_key=baseline_key, memo_key=memo_key)
     stats, line_plot, scatter_plot = generate_plot_for_pairs(pairs, output_dir)
     with tag.section(cls="comparison"):
         with tag.details():
