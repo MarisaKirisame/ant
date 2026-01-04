@@ -30,14 +30,9 @@ def render_html(
     css_href: str,
 ) -> tuple[str, SpeedupStats]:
     _, stats, line_plot, scatter_plot = generate_plot(records, output_dir)
-    memo_plot = None
-    memo_cdf_plot = None
-    size_scatter_plot = None
-    if records.depth_breakdown:
-        memo_plot = plot_depth_breakdown(records.depth_breakdown, output_dir)
-        memo_cdf_plot = plot_depth_breakdown_cdf(records.depth_breakdown, output_dir)
-    if any(records.size_vs_sc):
-        size_scatter_plot = plot_size_vs_sc(records.size_vs_sc, output_dir)
+    memo_plot = plot_depth_breakdown(records.depth_breakdown, output_dir)
+    memo_cdf_plot = plot_depth_breakdown_cdf(records.depth_breakdown, output_dir)
+    size_scatter_plot = plot_size_vs_sc(records.size_vs_sc, output_dir)
     profile_totals, profile_total_time = profile_totals_from_result(records)
     profile_table = render_profile_table(profile_totals, profile_total_time)
     doc = document(title="Memoization Speedup")
@@ -57,12 +52,9 @@ def render_html(
                 stat_card("Lowest speedup", f"{fmt_speedup(stats.minimum)}x")
             _plot_image(line_plot, "Speedup per run plot")
             _plot_image(scatter_plot, "Their vs our scatter plot")
-            if memo_plot:
-                _plot_image(memo_plot, "Memo stats depth vs node count plot")
-            if memo_cdf_plot:
-                _plot_image(memo_cdf_plot, "Memo stats CDF plot")
-            if size_scatter_plot:
-                _plot_image(size_scatter_plot, "Memo size vs sc scatter plot")
+            _plot_image(memo_plot, "Memo stats depth vs node count plot")
+            _plot_image(memo_cdf_plot, "Memo stats CDF plot")
+            _plot_image(size_scatter_plot, "Memo size vs sc scatter plot")
             with tag.section(cls="profile"):
                 raw(profile_table)
     return doc.render(), stats
@@ -79,6 +71,7 @@ def generate_speedup_report(
     output_dir: Path,
     css_source: Path,
 ) -> SpeedupStats:
+    output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "index.html"
     if not css_source.exists():
         raise FileNotFoundError(f"missing stylesheet source: {css_source}")
