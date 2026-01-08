@@ -47,7 +47,7 @@ def _render_html(
                     for label, stats in comparison_summaries:
                         value = (
                             f"Geo {fmt_speedup(stats.geo_mean)}x · "
-                            f"Arith {fmt_speedup(stats.arith_mean)}x"
+                            f"End-to-end {fmt_speedup(stats.end_to_end)}x"
                         )
                         stat_card(label, value)
             elif summary:
