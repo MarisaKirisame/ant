@@ -88,6 +88,7 @@ let rec resolve (w : world) (src : source) : Word.t * seq =
   | _ -> failwith "cannot resolve reference"
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
+let reset () = Dynarray.clear pc_map
 
 let add_exp (f : world -> unit) (pc_ : int) : unit =
   let pc = Dynarray.length pc_map in
@@ -160,6 +161,22 @@ let pop_env (w : world) : value =
   assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
   v
 
+let set_env (w : world) (i : int) (v : seq) : unit =
+  assert ((Generic.measure ~monoid ~measure v).degree = 1);
+  assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
+  Dynarray.set w.state.e i v
+
+let grow_env (w : world) (n : int) : unit =
+  let rec aux f n =
+    if n < 0 then () else f (from_int 0);
+    aux f (n - 1)
+  in
+  Dynarray.append_iter w.state.e aux n
+
+let shrink_env (w : world) (n : int) : unit =
+  assert (Dynarray.length w.state.e >= n);
+  Dynarray.truncate w.state.e (Dynarray.length w.state.e - n)
+
 let env_call (w : world) (keep : int list) (nargs : int) : seq =
   let l = Dynarray.length w.state.e in
   let ret = appends (List.map keep ~f:(fun i -> Dynarray.get w.state.e i)) in
@@ -183,6 +200,11 @@ let get_next_cont (seqs : seq) : seq =
 let return_n (w : world) (n : int) (return_exp : exp) : unit =
   assert (Dynarray.length w.state.e = n);
   w.state.e <- Dynarray.of_list [ Dynarray.get_last w.state.e ];
+  w.state.c <- return_exp
+
+let return_n_with (w : world) (n : int) (v : value) (return_exp : exp) : unit =
+  assert (Dynarray.length w.state.e = n);
+  w.state.e <- Dynarray.of_list [ v ];
   w.state.c <- return_exp
 
 let drop_n (w : world) (e : int) (n : int) : unit =

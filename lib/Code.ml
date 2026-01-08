@@ -88,6 +88,9 @@ let assert_env_length_ (w : world code) (e : int code) : unit code = app2_ (from
 let return_n_ (w : world code) (n : int code) (exp : exp code) : unit code =
   app3_ (from_ir $ Function "return_n") w n exp
 
+let return_n_with_ (w : world code) (n : int code) (v : Value.seq code) (exp : exp code) : unit code =
+  app4_ (from_ir $ Function "return_n_with") w n v exp
+
 let drop_n_ (w : world code) (e : int code) (n : int code) : unit code = app3_ (from_ir $ Function "drop_n") w e n
 let pc_to_int_ (pc : int code) : int code = app_ (from_ir $ Function "pc_to_int") pc
 let int_to_pc_ (int : int code) : pc code = app_ (from_ir $ Function "int_to_pc") int
@@ -117,6 +120,10 @@ let if_ (cond : 'a code) (then_ : 'b code) (else_ : 'b code) : 'b code =
   code $ group (string "if " ^^ uncode cond ^^ string " then " ^^ uncode then_ ^^ string " else " ^^ uncode else_)
 
 let dyn_array_get_ (arr : 'a Dynarray.t code) (i : int code) : 'a code = app2_ (from_ir $ Function "Dynarray.get") arr i
+
+let dyn_array_set_ (arr : 'a Dynarray.t code) (i : int code) (v : 'a code) : unit code =
+  app3_ (from_ir $ Function "Dynarray.set") arr i v
+
 let dyn_array_remove_last_ (arr : 'a Dynarray.t code) : unit code = app_ (from_ir $ Function "Dynarray.remove_last") arr
 let world_state_ (w : world code) : state code = code $ parens (uncode w ^^ string ".state")
 let state_env_ (s : state code) : env code = code $ parens (uncode s ^^ string ".e")
@@ -136,6 +143,15 @@ let pop_env_ (w : world code) : Value.value code = app_ (from_ir $ Function "pop
 let goto_ (w : world code) (pc_value : pc) : unit code = set_c_ w (pc_to_exp_ (pc_ pc_value))
 let push_env_ (w : world code) (v : Value.seq code) : unit code = app2_ (from_ir $ Function "push_env") w v
 let get_env_ (w : world code) (i : int code) : Value.seq code = dyn_array_get_ (state_env_ @@ world_state_ w) i
+
+let set_env_ (w : world code) (i : int code) (v : Value.seq code) : unit code =
+  app3_ (from_ir $ Function "set_env") w i v
+
+let grow_env_ ?(comment : string option) (w : world code) (n : int code) : unit code =
+  let comment = match comment with None -> "" | Some c -> " (* " ^ c ^ " *)" in
+  app2_ (from_ir $ Function [%string "grow_env%{comment}"]) w n
+
+let shrink_env_ (w : world code) (n : int code) : unit code = app2_ (from_ir $ Function "shrink_env") w n
 let exec_done_ (w : world code) : unit code = app_ (from_ir $ Function "exec_done") w
 
 let env_call_ (w : world code) (keep : int list code) (nargs : int code) : Value.seq code =
@@ -156,6 +172,9 @@ let memo_appends_ (xs : Value.seq code list) : Value.seq code =
 let memo_from_int_ (i : int code) : Value.seq code = app_ (from_ir $ Function "Memo.from_int") i
 let int_from_word_ (w : Word.t code) : int code = app_ (from_ir $ Function "Word.get_value") w
 let memo_splits_ (seq : Value.seq code) : Value.seq list code = app_ (from_ir $ Function "Memo.splits") seq
+
+let debug_ (s : string) : unit code =
+  app_ (from_ir $ Function "print_endline") (code @@ dquotes @@ string @@ String.escaped s)
 
 (* NOTE: this number should be modified w.r.t the definition of Memo.splits_* in Memo.ml *)
 let n_max_specialized_arity = 4
@@ -239,6 +258,15 @@ let match_ctor_tag_default_ (x : int code) (fs : (string * 'a code) list) (dflt 
     Stdlib.List.map
       (fun (tag_name, body) ->
         (Raw (dummy_name ^^ string " when " ^^ dummy_name ^^ string " = " ^^ string tag_name), to_ir body))
+      fs
+  in
+  from_ir (Match (to_ir x, alts @ [ (Raw (string "_"), to_ir dflt) ]))
+
+let match_ctor_tag_literal_default_ (x : int code) (fs : (int * string * 'a code) list) (dflt : 'a code) : 'a code =
+  let alts =
+    Stdlib.List.map
+      (fun (tag, tag_name, body) ->
+        (Raw (string (string_of_int tag) ^^ string " (* " ^^ string tag_name ^^ string " *)"), to_ir body))
       fs
   in
   from_ir (Match (to_ir x, alts @ [ (Raw (string "_"), to_ir dflt) ]))

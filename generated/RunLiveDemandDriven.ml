@@ -144,6 +144,7 @@ let demanded_interactive = DemandedExpansion.interactive
 let run () =
   Common.with_outchannel steps_file (fun oc ->
       let write_steps = Common.write_steps_json oc in
+      Common.LC.populate_state ();
       let memo = Ant.Memo.init_memo () in
       let eval expr = Common.eval_expression ~memo ~write_steps expr in
       print_endline "demanded_interactive quicksort (list fixed):";
