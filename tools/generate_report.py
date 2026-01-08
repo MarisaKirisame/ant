@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Render a small index.html that links to multiple benchmark reports.
 
-If the underlying data files are available, the page also shows entry-level
-speedup summaries (geometric + arithmetic means) for each benchmark.
+If the underlying data files are available, the page also shows combined
+speedup summaries (geometric + arithmetic means) for key comparisons.
 """
 
 from __future__ import annotations
@@ -15,7 +15,14 @@ from typing import Iterable, List, Sequence, Tuple
 from dominate import document
 from dominate import tags as tag
 from common import fmt_speedup, stat_card
-from plot_speedup import SpeedupStats, compare_stats, load_records, pairs_from_result
+from plot_speedup import (
+    SpeedupStats,
+    compare_stats,
+    load_records,
+    pairs_from_profiles,
+    pairs_from_result,
+    pairs_from_steps,
+)
 import generate_speedup_index as speedup_module
 
 
@@ -23,7 +30,7 @@ def _render_html(
     title: str,
     entries: Sequence[Tuple[str, str]],
     summary: SpeedupStats | None,
-    entry_summaries: Sequence[Tuple[str, SpeedupStats]] | None,
+    comparison_summaries: Sequence[Tuple[str, SpeedupStats]] | None,
     css_href: str,
 ) -> str:
     doc = document(title=title)
@@ -35,9 +42,9 @@ def _render_html(
         with tag.main():
             tag.h1(title)
             tag.p("Select a benchmark run to explore the detailed results.")
-            if entry_summaries:
+            if comparison_summaries:
                 with tag.section(cls="stats"):
-                    for label, stats in entry_summaries:
+                    for label, stats in comparison_summaries:
                         value = (
                             f"Geo {fmt_speedup(stats.geo_mean)}x · "
                             f"Arith {fmt_speedup(stats.arith_mean)}x"
@@ -66,7 +73,6 @@ def generate_html(
     output: Path,
     entries: Sequence[Tuple[str, Path]],
     data_paths: Sequence[Path] | None = None,
-    entry_data_paths: Sequence[Path] | None = None,
     css_source: Path,
 ) -> SpeedupStats | None:
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -92,24 +98,45 @@ def generate_html(
         if pairs:
             _, summary = compare_stats(pairs)
 
-    entry_summaries: list[Tuple[str, SpeedupStats]] = []
-    if entry_data_paths:
-        for (label, _), data_path in zip(entries, entry_data_paths):
-            if data_path.exists():
-                baselines, memos = pairs_from_result(load_records(data_path))
-                _, stats = compare_stats(list(zip(baselines, memos)))
-                entry_summaries.append((label, stats))
-    elif entries:
-        for label, report_path in entries:
+    comparisons: list[tuple[str, list[tuple[float, float]]]] = [
+        ("Memo vs CEK", []),
+        ("CEK vs Plain", []),
+        ("Memo vs Plain", []),
+        ("Memo vs Plain (steps)", []),
+    ]
+    if entries:
+        for _, report_path in entries:
             if report_path.exists():
                 inferred = _extract_data_path(report_path)
                 if inferred and inferred.exists():
-                    baselines, memos = pairs_from_result(load_records(inferred))
-                    _, stats = compare_stats(list(zip(baselines, memos)))
-                    entry_summaries.append((label, stats))
+                    result = load_records(inferred)
+                    comparisons[0][1].extend(
+                        pairs_from_profiles(
+                            result, baseline_key="cek_profile", memo_key="memo_profile"
+                        )
+                    )
+                    comparisons[1][1].extend(
+                        pairs_from_profiles(
+                            result, baseline_key="plain_profile", memo_key="cek_profile"
+                        )
+                    )
+                    comparisons[2][1].extend(
+                        pairs_from_profiles(
+                            result, baseline_key="plain_profile", memo_key="memo_profile"
+                        )
+                    )
+                    comparisons[3][1].extend(pairs_from_steps(result))
+
+    comparison_summaries: list[Tuple[str, SpeedupStats]] = []
+    for label, pairs in comparisons:
+        if pairs:
+            _, stats = compare_stats(pairs)
+            comparison_summaries.append((label, stats))
 
     output.write_text(
-        _render_html(title, entries_with_rel, summary, entry_summaries, css_href),
+        _render_html(
+            title, entries_with_rel, summary, comparison_summaries, css_href
+        ),
         encoding="utf-8",
     )
     shutil.copyfile(css_source, css_path)
@@ -146,12 +173,6 @@ def generate_reports() -> None:
             ("Left-to-right Benchmark", Path("output/live-left-to-right/index.html")),
             ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
             ("Hazel Benchmark", Path("output/hazel/index.html")),
-        ],
-        entry_data_paths=[
-            Path("eval_steps_simple.json"),
-            Path("eval_steps_left_to_right.json"),
-            Path("eval_steps_demand_driven.json"),
-            Path("eval_steps_from_hazel.json"),
         ],
         css_source=css_source,
     )
