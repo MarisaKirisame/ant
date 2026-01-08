@@ -62,9 +62,11 @@ def compare_stats(
     total_baseline = sum(baseline for baseline, _ in pairs)
     total_memo = sum(memo for _, memo in pairs)
     geo_mean = math.exp(statistics.mean(math.log(r) for r in ratios))
+    arith_mean = statistics.mean(ratios)
     stats = SpeedupStats(
         samples=len(pairs),
         geo_mean=geo_mean,
+        arith_mean=arith_mean,
         end_to_end=total_baseline / total_memo,
         minimum=min(ratios),
         maximum=max(ratios),

@@ -99,6 +99,7 @@ def _render_speedup_comparison(
             with tag.section(cls="stats"):
                 stat_card("Samples", f"{stats.samples}")
                 stat_card("Geometric mean", f"{fmt_speedup(stats.geo_mean)}x")
+                stat_card("Arithmetic mean", f"{fmt_speedup(stats.arith_mean)}x")
                 stat_card("End-to-end speedup", f"{fmt_speedup(stats.end_to_end)}x")
                 stat_card("Best speedup", f"{fmt_speedup(stats.maximum)}x")
                 stat_card("Lowest speedup", f"{fmt_speedup(stats.minimum)}x")

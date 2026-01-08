@@ -17,6 +17,7 @@ class SpeedupStats:
 
     samples: int
     geo_mean: float
+    arith_mean: float
     end_to_end: float
     minimum: float
     maximum: float

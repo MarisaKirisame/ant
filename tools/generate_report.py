@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Render a small index.html that links to multiple benchmark reports.
 
-If the underlying data files are available, the page also shows a combined
-speedup summary (samples, geometric mean, end-to-end, best, lowest) across all entries.
+If the underlying data files are available, the page also shows entry-level
+speedup summaries (geometric + arithmetic means) for each benchmark.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ def _render_html(
     title: str,
     entries: Sequence[Tuple[str, str]],
     summary: SpeedupStats | None,
+    entry_summaries: Sequence[Tuple[str, SpeedupStats]] | None,
     css_href: str,
 ) -> str:
     doc = document(title=title)
@@ -34,10 +35,19 @@ def _render_html(
         with tag.main():
             tag.h1(title)
             tag.p("Select a benchmark run to explore the detailed results.")
-            if summary:
+            if entry_summaries:
+                with tag.section(cls="stats"):
+                    for label, stats in entry_summaries:
+                        value = (
+                            f"Geo {fmt_speedup(stats.geo_mean)}x · "
+                            f"Arith {fmt_speedup(stats.arith_mean)}x"
+                        )
+                        stat_card(label, value)
+            elif summary:
                 with tag.section(cls="stats"):
                     stat_card("Samples", f"{summary.samples}")
                     stat_card("Geometric mean", f"{fmt_speedup(summary.geo_mean)}x")
+                    stat_card("Arithmetic mean", f"{fmt_speedup(summary.arith_mean)}x")
                     stat_card("End-to-end speedup", f"{fmt_speedup(summary.end_to_end)}x")
                     stat_card("Best speedup", f"{fmt_speedup(summary.maximum)}x")
                     stat_card("Lowest speedup", f"{fmt_speedup(summary.minimum)}x")
@@ -56,6 +66,7 @@ def generate_html(
     output: Path,
     entries: Sequence[Tuple[str, Path]],
     data_paths: Sequence[Path] | None = None,
+    entry_data_paths: Sequence[Path] | None = None,
     css_source: Path,
 ) -> SpeedupStats | None:
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -81,8 +92,24 @@ def generate_html(
         if pairs:
             _, summary = compare_stats(pairs)
 
+    entry_summaries: list[Tuple[str, SpeedupStats]] = []
+    if entry_data_paths:
+        for (label, _), data_path in zip(entries, entry_data_paths):
+            if data_path.exists():
+                baselines, memos = pairs_from_result(load_records(data_path))
+                _, stats = compare_stats(list(zip(baselines, memos)))
+                entry_summaries.append((label, stats))
+    elif entries:
+        for label, report_path in entries:
+            if report_path.exists():
+                inferred = _extract_data_path(report_path)
+                if inferred and inferred.exists():
+                    baselines, memos = pairs_from_result(load_records(inferred))
+                    _, stats = compare_stats(list(zip(baselines, memos)))
+                    entry_summaries.append((label, stats))
+
     output.write_text(
-        _render_html(title, entries_with_rel, summary, css_href),
+        _render_html(title, entries_with_rel, summary, entry_summaries, css_href),
         encoding="utf-8",
     )
     shutil.copyfile(css_source, css_path)
@@ -120,6 +147,12 @@ def generate_reports() -> None:
             ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
             ("Hazel Benchmark", Path("output/hazel/index.html")),
         ],
+        entry_data_paths=[
+            Path("eval_steps_simple.json"),
+            Path("eval_steps_left_to_right.json"),
+            Path("eval_steps_demand_driven.json"),
+            Path("eval_steps_from_hazel.json"),
+        ],
         css_source=css_source,
     )
 
@@ -145,7 +178,12 @@ def _extract_data_path(report_path: Path) -> Path | None:
     rel = text[start:end].strip()
     if not rel:
         return None
-    return (report_path.parent / rel).resolve()
+    candidates = [report_path.parent / rel]
+    candidates.extend(parent / rel for parent in report_path.parents)
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return None
 
 
 def _collect_pairs(data_paths: Iterable[Path]) -> list[tuple[float, float]]:
