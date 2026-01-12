@@ -225,6 +225,10 @@ def profile_project() -> None:
             ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
             env=env,
         )
+    opam_exec(
+        ["perf", "record", "-o", f"perf-tailrec.data", "--", binary, "tailrec"],
+        env=env,
+    )
 
 
 def report_project() -> None:

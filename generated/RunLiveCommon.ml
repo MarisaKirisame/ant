@@ -3,6 +3,8 @@ open NamedExpr
 module LC = LiveCEK
 module LP = LivePlain
 
+let with_runtime_ f = LC.with_runtime_ f
+
 let base_names =
   [|
     "a";
@@ -408,24 +410,27 @@ let eval_plain_slot = Profile.register_slot Profile.plain_profile "eval_plain"
 let eval_cek_slot = Profile.register_slot Profile.cek_profile "eval_cek"
 
 let eval_plain (expr : LC.expr) : LC.value =
-  let env = LC.Nil in
-  let lp_expr = lp_expr_of_lc expr in
-  let lp_env = lp_list_of_lc lp_value_of_lc env in
-  Gc.full_major ();
-  let lp_result = Profile.with_slot eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
-  (*lc_value_of_lp lp_result*)
-  Profile.with_slot eval_cek_slot (fun () ->
-      LC.to_ocaml_value
-        (Memo.exec_cek_raw
-           (Memo.pc_to_exp (Common.int_to_pc 4))
-           (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
-           (Memo.from_constructor LC.tag_cont_done)))
+  with_runtime_ (fun () ->
+      let env = LC.Nil in
+      let lp_expr = lp_expr_of_lc expr in
+      let lp_env = lp_list_of_lc lp_value_of_lc env in
+      Gc.full_major ();
+      let lp_result = Profile.with_slot eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
+      ignore lp_result;
+      (*lc_value_of_lp lp_result*)
+      Profile.with_slot eval_cek_slot (fun () ->
+          LC.to_ocaml_value
+            (Memo.exec_cek_raw
+               (Memo.pc_to_exp (Common.int_to_pc 4))
+               (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
+               (Memo.from_constructor LC.tag_cont_done))))
 
 let eval_expression ~memo ~write_steps x =
-  let exec_res = LC.eval memo (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
-  let _ = eval_plain x in
-  write_steps exec_res;
-  LC.to_ocaml_value exec_res.words
+  with_runtime_ (fun () ->
+      let exec_res = LC.eval memo (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
+      let _ = eval_plain x in
+      write_steps exec_res;
+      LC.to_ocaml_value exec_res.words)
 
 let quicksort_nexpr =
   parse_nexpr

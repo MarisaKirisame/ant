@@ -97,13 +97,14 @@ let left_to_right (expr : LC.expr) : LC.expr list =
 let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) Common.random_list LC.ENil
 
 let run () =
-  Common.with_outchannel steps_file (fun oc ->
-      let write_steps = Common.write_steps_json oc in
-      let memo = Ant.Memo.init_memo () in
-      let eval expr = Common.eval_expression ~memo ~write_steps expr in
-      print_endline "left_to_right quicksort (list fixed):";
-      left_to_right Common.quicksort_expr
-      |> List.iteri (fun i e ->
-          let applied = LC.EApp (e, random_list_expr) in
-          Printf.printf "step %d value: %s\n" i (Common.value_to_string (eval applied)));
-      Common.write_memo_stats_json oc memo)
+  Common.with_runtime_ (fun () ->
+      Common.with_outchannel steps_file (fun oc ->
+          let write_steps = Common.write_steps_json oc in
+          let memo = Ant.Memo.init_memo () in
+          let eval expr = Common.eval_expression ~memo ~write_steps expr in
+          print_endline "left_to_right quicksort (list fixed):";
+          left_to_right Common.quicksort_expr
+          |> List.iteri (fun i e ->
+              let applied = LC.EApp (e, random_list_expr) in
+              Printf.printf "step %d value: %s\n" i (Common.value_to_string (eval applied)));
+          Common.write_memo_stats_json oc memo))
