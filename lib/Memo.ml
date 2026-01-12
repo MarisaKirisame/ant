@@ -16,19 +16,6 @@ open Core
 let log x = print_endline x
 let log x = ignore x
 
-type runtime = { pc_map : exp Dynarray.t }
-
-let current_runtime : runtime option ref = ref None
-let create_runtime () : runtime = { pc_map = Dynarray.create () }
-
-let with_runtime (runtime : runtime) (f : unit -> 'a) : 'a =
-  let prev = !current_runtime in
-  current_runtime := Some runtime;
-  Fun.protect ~finally:(fun () -> current_runtime := prev) f
-
-let get_runtime () : runtime =
-  match !current_runtime with Some runtime -> runtime | None -> failwith "Memo runtime not set"
-
 (* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
 type words = seq
 type exec_result = { words : words; step : int; without_memo_step : int }
@@ -100,16 +87,15 @@ let rec resolve (w : world) (src : source) : Word.t * seq =
       (vhh, vt)
   | _ -> failwith "cannot resolve reference"
 
+let pc_map : exp Dynarray.t = Dynarray.create ()
+let reset () = Dynarray.clear pc_map
+
 let add_exp (f : world -> unit) (pc_ : int) : unit =
-  let pc_map = (get_runtime ()).pc_map in
   let pc = Dynarray.length pc_map in
   assert (Int.equal pc pc_);
   Dynarray.add_last pc_map { step = f; pc }
 
-let pc_to_exp (Pc pc) : exp =
-  let pc_map = (get_runtime ()).pc_map in
-  Dynarray.get pc_map pc
-
+let pc_to_exp (Pc pc) : exp = Dynarray.get pc_map pc
 let from_constructor (ctag : int) : seq = Generic.singleton (Words (Generic.singleton (Word.ConstructorTag ctag)))
 let from_int (i : int) : seq = Generic.singleton (Words (Generic.singleton (Word.Int i)))
 
@@ -217,9 +203,7 @@ let assert_env_length (w : world) (e : int) : unit =
   if l <> e then print_endline ("env_length should be " ^ string_of_int e ^ " but is " ^ string_of_int l);
   assert (l = e)
 
-let init_memo () : memo =
-  let pc_map = (get_runtime ()).pc_map in
-  Array.create ~len:(Dynarray.length pc_map) None
+let init_memo () : memo = Array.create ~len:(Dynarray.length pc_map) None
 
 let rec value_hash (r : Read.read) (v : Value.value) (hash_acc : int) (value_acc : Value.value) :
     (int * Value.value) option =

@@ -30,27 +30,15 @@ let monoid : measure monoid =
         });
   }
 
-type runtime = { constructor_degree_table : int Dynarray.t }
-
-let current_runtime : runtime option ref = ref None
-let create_runtime () : runtime = { constructor_degree_table = Dynarray.create () }
-
-let with_runtime (runtime : runtime) (f : unit -> 'a) : 'a =
-  let prev = !current_runtime in
-  current_runtime := Some runtime;
-  Fun.protect ~finally:(fun () -> current_runtime := prev) f
-
-let get_runtime () : runtime =
-  match !current_runtime with Some runtime -> runtime | None -> failwith "Words runtime not set"
+let constructor_degree_table : int Dynarray.t = Dynarray.create ()
+let reset () = Dynarray.clear constructor_degree_table
 
 let set_constructor_degree (ctag : int) (degree : int) : unit =
-  let table = (get_runtime ()).constructor_degree_table in
-  assert (Dynarray.length table = ctag);
-  Dynarray.add_last table degree
+  assert (Dynarray.length constructor_degree_table = ctag);
+  Dynarray.add_last constructor_degree_table degree
 
 let measure (w : Word.t) : measure =
-  let table = (get_runtime ()).constructor_degree_table in
-  let degree = match w with Int _ -> 1 | ConstructorTag value -> Dynarray.get table value in
+  let degree = match w with Int _ -> 1 | ConstructorTag value -> Dynarray.get constructor_degree_table value in
   { length = 1; degree; max_degree = degree; hash = lazy (Hasher.from_int (Word.hash w)) }
 
 type words = (Word.t, measure) Generic.fg

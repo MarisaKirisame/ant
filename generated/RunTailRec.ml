@@ -12,8 +12,8 @@ let run_case ~memo label xs =
   Printf.printf "%s -> sum=%d (took %d steps, %d without memo)\n" label total result.step result.without_memo_step
 
 let run () =
-  Tail.with_runtime_ (fun () ->
-      let memo = Ant.Memo.init_memo () in
-      run_case ~memo "empty" [];
-      run_case ~memo "short" [ 1; 2; 3; 4 ];
-      run_case ~memo "long" (List.init 100 (fun i -> i + 1)))
+  Tail.populate_state ();
+  let memo = Ant.Memo.init_memo () in
+  run_case ~memo "empty" [];
+  run_case ~memo "short" [ 1; 2; 3; 4 ];
+  run_case ~memo "long" (List.init 100 (fun i -> i + 1))

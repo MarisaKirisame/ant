@@ -680,38 +680,21 @@ let pp_cek_ant x =
   let generated_stmt = separate_map (break 1) (compile_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
-  ^^ break 1 ^^ string "open Common" ^^ break 1
-  ^^ string "let words_runtime = Words.create_runtime ()"
-  ^^ break 1
-  ^^ string "let memo_runtime = Memo.create_runtime ()"
-  ^^ break 1
-  ^^ string "let with_runtime_ f = Words.with_runtime words_runtime (fun () -> Memo.with_runtime memo_runtime f)"
-  ^^ break 1 ^^ string "module Words0 = Words" ^^ break 1
-  ^^ string "module Words = struct include Words0"
-  ^^ break 1
-  ^^ string
-       "  let set_constructor_degree ctag degree = with_runtime_ (fun () -> Words0.set_constructor_degree ctag degree)"
-  ^^ break 1 ^^ string "end" ^^ break 1 ^^ string "module Memo0 = Memo" ^^ break 1
-  ^^ string "module Memo = struct include Memo0"
-  ^^ break 1
-  ^^ string "  let add_exp f pc = with_runtime_ (fun () -> Memo0.add_exp f pc)"
-  ^^ break 1
-  ^^ string "  let pc_to_exp pc = with_runtime_ (fun () -> Memo0.pc_to_exp pc)"
-  ^^ break 1
-  ^^ string "  let init_memo () = with_runtime_ Memo0.init_memo"
-  ^^ break 1 ^^ string "end" ^^ break 1 ^^ string "let add_exp = Memo.add_exp" ^^ break 1
-  ^^ string "let pc_to_exp = Memo.pc_to_exp" ^^ break 1 ^^ ctor_tag_decls ctx ^^ break 1 ^^ generated_stmt ^^ break 1
+  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ ctor_tag_decls ctx ^^ break 1 ^^ generated_stmt ^^ break 1
+  ^^ string "let populate_state () =" ^^ break 1 ^^ string "  Memo.reset ();" ^^ break 1 ^^ string "  Words.reset ();"
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
-            string "let () = add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i)))
+            string "add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i) ^^ semi))
   ^^ break 1
-  ^^ separate (break 1)
+  ^^ separate
+       (semi ^^ break 1)
        (List.init (Dynarray.length ctx.constructor_degree) (fun i ->
-            string "let () = Words.set_constructor_degree "
+            string "Words.set_constructor_degree "
             ^^ uncode (int_ i)
             ^^ string " ("
             ^^ uncode (int_ (Dynarray.get ctx.constructor_degree i))
             ^^ string ")"))
+  ^^ string ";;"
 
 module Backend = struct
   let compile prog =
