@@ -3,7 +3,21 @@ open Word
 open Memo
 open Value
 open Common
-
+let words_runtime = Words.create_runtime ()
+let memo_runtime = Memo.create_runtime ()
+let with_runtime_ f = Words.with_runtime words_runtime (fun () -> Memo.with_runtime memo_runtime f)
+module Words0 = Words
+module Words = struct include Words0
+  let set_constructor_degree ctag degree = with_runtime_ (fun () -> Words0.set_constructor_degree ctag degree)
+end
+module Memo0 = Memo
+module Memo = struct include Memo0
+  let add_exp f pc = with_runtime_ (fun () -> Memo0.add_exp f pc)
+  let pc_to_exp pc = with_runtime_ (fun () -> Memo0.pc_to_exp pc)
+  let init_memo () = with_runtime_ Memo0.init_memo
+end
+let add_exp = Memo.add_exp
+let pc_to_exp = Memo.pc_to_exp
 let tag_cont_done = 0
 let tag_Z = 1
 let tag_S = 2
