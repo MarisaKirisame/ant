@@ -4,30 +4,6 @@ open Memo
 open Value
 open Common
 
-let words_runtime = Words.create_runtime ()
-let memo_runtime = Memo.create_runtime ()
-let with_runtime_ f = Words.with_runtime words_runtime (fun () -> Memo.with_runtime memo_runtime f)
-
-module Words0 = Words
-
-module Words = struct
-  include Words0
-
-  let set_constructor_degree ctag degree = with_runtime_ (fun () -> Words0.set_constructor_degree ctag degree)
-end
-
-module Memo0 = Memo
-
-module Memo = struct
-  include Memo0
-
-  let add_exp f pc = with_runtime_ (fun () -> Memo0.add_exp f pc)
-  let pc_to_exp pc = with_runtime_ (fun () -> Memo0.pc_to_exp pc)
-  let init_memo () = with_runtime_ Memo0.init_memo
-end
-
-let add_exp = Memo.add_exp
-let pc_to_exp = Memo.pc_to_exp
 let tag_cont_done = 0
 let tag_Nil = 1
 let tag_Cons = 2
@@ -512,7 +488,9 @@ let rec evcon memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
 let rec eval memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
   exec_cek (pc_to_exp (int_to_pc 115)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
-let () =
+let populate_state () =
+  Memo.reset ();
+  Words.reset ();
   add_exp
     (fun w_120 ->
       assert_env_length w_120 1;
@@ -1389,17 +1367,13 @@ let () =
           ignore (env_call w_120 [] 2);
           w_120.state.c <- pc_to_exp (int_to_pc 115)
       | _ -> failwith "unreachable (0)")
-    0
-
-let () =
+    0;
   add_exp
     (fun w_0 ->
       assert_env_length w_0 2;
       push_env w_0 (Dynarray.get w_0.state.e 0);
       w_0.state.c <- pc_to_exp (int_to_pc 3))
-    1
-
-let () =
+    1;
   add_exp
     (fun w_2 ->
       assert_env_length w_2 7;
@@ -1411,9 +1385,7 @@ let () =
       assert_env_length w_2 6;
       ignore (env_call w_2 [] 2);
       w_2.state.c <- pc_to_exp (int_to_pc 1))
-    2
-
-let () =
+    2;
   add_exp
     (fun w_1 ->
       assert_env_length w_1 3;
@@ -1441,9 +1413,7 @@ let () =
           push_env w_1 (Memo.from_int 1);
           w_1.state.c <- pc_to_exp (int_to_pc 2)
       | c_0 -> failwith ("unreachable:" ^ string_of_int c_0 ^ "(3)"))
-    3
-
-let () =
+    3;
   add_exp
     (fun w_3 ->
       assert_env_length w_3 1;
@@ -1453,9 +1423,7 @@ let () =
       assert_env_length w_3 3;
       ignore (env_call w_3 [] 2);
       w_3.state.c <- pc_to_exp (int_to_pc 1))
-    4
-
-let () =
+    4;
   add_exp
     (fun w_4 ->
       assert_env_length w_4 1;
@@ -1483,17 +1451,13 @@ let () =
       push_env w_4 (Memo.appends [ Memo.from_constructor tag_ECons; ctor_arg_6; ctor_arg_5 ]);
       assert_env_length w_4 2;
       return_n w_4 2 (pc_to_exp (int_to_pc 0)))
-    5
-
-let () =
+    5;
   add_exp
     (fun w_5 ->
       assert_env_length w_5 1;
       push_env w_5 (Dynarray.get w_5.state.e 0);
       w_5.state.c <- pc_to_exp (int_to_pc 7))
-    6
-
-let () =
+    6;
   add_exp
     (fun w_6 ->
       assert_env_length w_6 2;
@@ -1514,17 +1478,13 @@ let () =
           assert_env_length w_6 2;
           return_n w_6 2 (pc_to_exp (int_to_pc 0))
       | c_1 -> failwith ("unreachable:" ^ string_of_int c_1 ^ "(7)"))
-    7
-
-let () =
+    7;
   add_exp
     (fun w_7 ->
       assert_env_length w_7 1;
       push_env w_7 (Dynarray.get w_7.state.e 0);
       w_7.state.c <- pc_to_exp (int_to_pc 9))
-    8
-
-let () =
+    8;
   add_exp
     (fun w_8 ->
       assert_env_length w_8 2;
@@ -1545,17 +1505,13 @@ let () =
           assert_env_length w_8 2;
           return_n w_8 2 (pc_to_exp (int_to_pc 0))
       | c_2 -> failwith ("unreachable:" ^ string_of_int c_2 ^ "(9)"))
-    9
-
-let () =
+    9;
   add_exp
     (fun w_9 ->
       assert_env_length w_9 1;
       push_env w_9 (Dynarray.get w_9.state.e 0);
       w_9.state.c <- pc_to_exp (int_to_pc 12))
-    10
-
-let () =
+    10;
   add_exp
     (fun w_11 ->
       assert_env_length w_11 3;
@@ -1587,9 +1543,7 @@ let () =
           assert_env_length w_11 2;
           return_n w_11 2 (pc_to_exp (int_to_pc 0))
       | c_4 -> failwith ("unreachable:" ^ string_of_int c_4 ^ "(11)"))
-    11
-
-let () =
+    11;
   add_exp
     (fun w_10 ->
       assert_env_length w_10 2;
@@ -1611,17 +1565,13 @@ let () =
           assert_env_length w_10 2;
           return_n w_10 2 (pc_to_exp (int_to_pc 0))
       | c_3 -> failwith ("unreachable:" ^ string_of_int c_3 ^ "(12)"))
-    12
-
-let () =
+    12;
   add_exp
     (fun w_12 ->
       assert_env_length w_12 1;
       push_env w_12 (Dynarray.get w_12.state.e 0);
       w_12.state.c <- pc_to_exp (int_to_pc 15))
-    13
-
-let () =
+    13;
   add_exp
     (fun w_14 ->
       assert_env_length w_14 3;
@@ -1653,9 +1603,7 @@ let () =
           assert_env_length w_14 2;
           return_n w_14 2 (pc_to_exp (int_to_pc 0))
       | c_6 -> failwith ("unreachable:" ^ string_of_int c_6 ^ "(14)"))
-    14
-
-let () =
+    14;
   add_exp
     (fun w_13 ->
       assert_env_length w_13 2;
@@ -1677,17 +1625,13 @@ let () =
           assert_env_length w_13 2;
           return_n w_13 2 (pc_to_exp (int_to_pc 0))
       | c_5 -> failwith ("unreachable:" ^ string_of_int c_5 ^ "(15)"))
-    15
-
-let () =
+    15;
   add_exp
     (fun w_15 ->
       assert_env_length w_15 1;
       push_env w_15 (Dynarray.get w_15.state.e 0);
       w_15.state.c <- pc_to_exp (int_to_pc 18))
-    16
-
-let () =
+    16;
   add_exp
     (fun w_17 ->
       assert_env_length w_17 3;
@@ -1719,9 +1663,7 @@ let () =
           assert_env_length w_17 2;
           return_n w_17 2 (pc_to_exp (int_to_pc 0))
       | c_8 -> failwith ("unreachable:" ^ string_of_int c_8 ^ "(17)"))
-    17
-
-let () =
+    17;
   add_exp
     (fun w_16 ->
       assert_env_length w_16 2;
@@ -1750,17 +1692,13 @@ let () =
           push_env w_16 (Dynarray.get w_16.state.e 1);
           w_16.state.c <- pc_to_exp (int_to_pc 17)
       | c_7 -> failwith ("unreachable:" ^ string_of_int c_7 ^ "(18)"))
-    18
-
-let () =
+    18;
   add_exp
     (fun w_18 ->
       assert_env_length w_18 1;
       push_env w_18 (Dynarray.get w_18.state.e 0);
       w_18.state.c <- pc_to_exp (int_to_pc 21))
-    19
-
-let () =
+    19;
   add_exp
     (fun w_20 ->
       assert_env_length w_20 3;
@@ -1784,9 +1722,7 @@ let () =
           assert_env_length w_20 2;
           return_n w_20 2 (pc_to_exp (int_to_pc 0))
       | c_10 -> failwith ("unreachable:" ^ string_of_int c_10 ^ "(20)"))
-    20
-
-let () =
+    20;
   add_exp
     (fun w_19 ->
       assert_env_length w_19 2;
@@ -1815,17 +1751,13 @@ let () =
           push_env w_19 (Dynarray.get w_19.state.e 1);
           w_19.state.c <- pc_to_exp (int_to_pc 20)
       | c_9 -> failwith ("unreachable:" ^ string_of_int c_9 ^ "(21)"))
-    21
-
-let () =
+    21;
   add_exp
     (fun w_21 ->
       assert_env_length w_21 1;
       push_env w_21 (Dynarray.get w_21.state.e 0);
       w_21.state.c <- pc_to_exp (int_to_pc 23))
-    22
-
-let () =
+    22;
   add_exp
     (fun w_22 ->
       assert_env_length w_22 2;
@@ -1853,9 +1785,7 @@ let () =
           assert_env_length w_22 2;
           return_n w_22 2 (pc_to_exp (int_to_pc 0))
       | c_11 -> failwith ("unreachable:" ^ string_of_int c_11 ^ "(23)"))
-    23
-
-let () =
+    23;
   add_exp
     (fun w_23 ->
       assert_env_length w_23 1;
@@ -1864,9 +1794,7 @@ let () =
       let keep_vals_0 = env_call w_23 [] 1 in
       w_23.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_vals_0; w_23.state.k ];
       w_23.state.c <- pc_to_exp (int_to_pc 22))
-    24
-
-let () =
+    24;
   add_exp
     (fun w_24 ->
       assert_env_length w_24 0;
@@ -1876,26 +1804,20 @@ let () =
       push_env w_24 (Memo.appends [ Memo.from_constructor tag_VNumber; ctor_arg_11 ]);
       assert_env_length w_24 1;
       return_n w_24 1 (pc_to_exp (int_to_pc 0)))
-    25
-
-let () =
+    25;
   add_exp
     (fun w_25 ->
       assert_env_length w_25 0;
       push_env w_25 (Memo.from_constructor tag_VNIL);
       assert_env_length w_25 1;
       return_n w_25 1 (pc_to_exp (int_to_pc 0)))
-    26
-
-let () =
+    26;
   add_exp
     (fun w_26 ->
       assert_env_length w_26 1;
       push_env w_26 (Dynarray.get w_26.state.e 0);
       w_26.state.c <- pc_to_exp (int_to_pc 29))
-    27
-
-let () =
+    27;
   add_exp
     (fun w_28 ->
       assert_env_length w_28 3;
@@ -1919,9 +1841,7 @@ let () =
           assert_env_length w_28 2;
           return_n w_28 2 (pc_to_exp (int_to_pc 0))
       | c_13 -> failwith ("unreachable:" ^ string_of_int c_13 ^ "(28)"))
-    28
-
-let () =
+    28;
   add_exp
     (fun w_27 ->
       assert_env_length w_27 2;
@@ -1943,17 +1863,13 @@ let () =
           assert_env_length w_27 2;
           return_n w_27 2 (pc_to_exp (int_to_pc 0))
       | c_12 -> failwith ("unreachable:" ^ string_of_int c_12 ^ "(29)"))
-    29
-
-let () =
+    29;
   add_exp
     (fun w_29 ->
       assert_env_length w_29 1;
       push_env w_29 (Dynarray.get w_29.state.e 0);
       w_29.state.c <- pc_to_exp (int_to_pc 31))
-    30
-
-let () =
+    30;
   add_exp
     (fun w_30 ->
       assert_env_length w_30 2;
@@ -1973,17 +1889,13 @@ let () =
           assert_env_length w_30 2;
           return_n w_30 2 (pc_to_exp (int_to_pc 0))
       | c_14 -> failwith ("unreachable:" ^ string_of_int c_14 ^ "(31)"))
-    31
-
-let () =
+    31;
   add_exp
     (fun w_31 ->
       assert_env_length w_31 1;
       push_env w_31 (Dynarray.get w_31.state.e 0);
       w_31.state.c <- pc_to_exp (int_to_pc 35))
-    32
-
-let () =
+    32;
   add_exp
     (fun w_34 ->
       assert_env_length w_34 6;
@@ -2008,9 +1920,7 @@ let () =
           assert_env_length w_34 2;
           return_n w_34 2 (pc_to_exp (int_to_pc 0))
       | c_17 -> failwith ("unreachable:" ^ string_of_int c_17 ^ "(33)"))
-    33
-
-let () =
+    33;
   add_exp
     (fun w_33 ->
       assert_env_length w_33 4;
@@ -2028,9 +1938,7 @@ let () =
           push_env w_33 (Dynarray.get w_33.state.e 4);
           w_33.state.c <- pc_to_exp (int_to_pc 33)
       | c_16 -> failwith ("unreachable:" ^ string_of_int c_16 ^ "(34)"))
-    34
-
-let () =
+    34;
   add_exp
     (fun w_32 ->
       assert_env_length w_32 2;
@@ -2048,17 +1956,13 @@ let () =
           push_env w_32 (Dynarray.get w_32.state.e 2);
           w_32.state.c <- pc_to_exp (int_to_pc 34)
       | c_15 -> failwith ("unreachable:" ^ string_of_int c_15 ^ "(35)"))
-    35
-
-let () =
+    35;
   add_exp
     (fun w_35 ->
       assert_env_length w_35 1;
       push_env w_35 (Dynarray.get w_35.state.e 0);
       w_35.state.c <- pc_to_exp (int_to_pc 40))
-    36
-
-let () =
+    36;
   add_exp
     (fun w_39 ->
       assert_env_length w_39 8;
@@ -2085,9 +1989,7 @@ let () =
           assert_env_length w_39 2;
           return_n w_39 2 (pc_to_exp (int_to_pc 0))
       | c_21 -> failwith ("unreachable:" ^ string_of_int c_21 ^ "(37)"))
-    37
-
-let () =
+    37;
   add_exp
     (fun w_38 ->
       assert_env_length w_38 6;
@@ -2105,9 +2007,7 @@ let () =
           push_env w_38 (Dynarray.get w_38.state.e 6);
           w_38.state.c <- pc_to_exp (int_to_pc 37)
       | c_20 -> failwith ("unreachable:" ^ string_of_int c_20 ^ "(38)"))
-    38
-
-let () =
+    38;
   add_exp
     (fun w_37 ->
       assert_env_length w_37 4;
@@ -2125,9 +2025,7 @@ let () =
           push_env w_37 (Dynarray.get w_37.state.e 4);
           w_37.state.c <- pc_to_exp (int_to_pc 38)
       | c_19 -> failwith ("unreachable:" ^ string_of_int c_19 ^ "(39)"))
-    39
-
-let () =
+    39;
   add_exp
     (fun w_36 ->
       assert_env_length w_36 2;
@@ -2145,17 +2043,13 @@ let () =
           push_env w_36 (Dynarray.get w_36.state.e 2);
           w_36.state.c <- pc_to_exp (int_to_pc 39)
       | c_18 -> failwith ("unreachable:" ^ string_of_int c_18 ^ "(40)"))
-    40
-
-let () =
+    40;
   add_exp
     (fun w_40 ->
       assert_env_length w_40 1;
       push_env w_40 (Dynarray.get w_40.state.e 0);
       w_40.state.c <- pc_to_exp (int_to_pc 43))
-    41
-
-let () =
+    41;
   add_exp
     (fun w_42 ->
       assert_env_length w_42 4;
@@ -2178,9 +2072,7 @@ let () =
           assert_env_length w_42 2;
           return_n w_42 2 (pc_to_exp (int_to_pc 0))
       | c_23 -> failwith ("unreachable:" ^ string_of_int c_23 ^ "(42)"))
-    42
-
-let () =
+    42;
   add_exp
     (fun w_41 ->
       assert_env_length w_41 2;
@@ -2198,17 +2090,13 @@ let () =
           push_env w_41 (Dynarray.get w_41.state.e 2);
           w_41.state.c <- pc_to_exp (int_to_pc 42)
       | c_22 -> failwith ("unreachable:" ^ string_of_int c_22 ^ "(43)"))
-    43
-
-let () =
+    43;
   add_exp
     (fun w_43 ->
       assert_env_length w_43 1;
       push_env w_43 (Dynarray.get w_43.state.e 0);
       w_43.state.c <- pc_to_exp (int_to_pc 46))
-    44
-
-let () =
+    44;
   add_exp
     (fun w_45 ->
       assert_env_length w_45 4;
@@ -2231,9 +2119,7 @@ let () =
           assert_env_length w_45 2;
           return_n w_45 2 (pc_to_exp (int_to_pc 0))
       | c_25 -> failwith ("unreachable:" ^ string_of_int c_25 ^ "(45)"))
-    45
-
-let () =
+    45;
   add_exp
     (fun w_44 ->
       assert_env_length w_44 2;
@@ -2251,17 +2137,13 @@ let () =
           push_env w_44 (Dynarray.get w_44.state.e 1);
           w_44.state.c <- pc_to_exp (int_to_pc 45)
       | c_24 -> failwith ("unreachable:" ^ string_of_int c_24 ^ "(46)"))
-    46
-
-let () =
+    46;
   add_exp
     (fun w_46 ->
       assert_env_length w_46 1;
       push_env w_46 (Dynarray.get w_46.state.e 0);
       w_46.state.c <- pc_to_exp (int_to_pc 49))
-    47
-
-let () =
+    47;
   add_exp
     (fun w_48 ->
       assert_env_length w_48 4;
@@ -2284,9 +2166,7 @@ let () =
           assert_env_length w_48 2;
           return_n w_48 2 (pc_to_exp (int_to_pc 0))
       | c_27 -> failwith ("unreachable:" ^ string_of_int c_27 ^ "(48)"))
-    48
-
-let () =
+    48;
   add_exp
     (fun w_47 ->
       assert_env_length w_47 2;
@@ -2304,17 +2184,13 @@ let () =
           push_env w_47 (Dynarray.get w_47.state.e 1);
           w_47.state.c <- pc_to_exp (int_to_pc 48)
       | c_26 -> failwith ("unreachable:" ^ string_of_int c_26 ^ "(49)"))
-    49
-
-let () =
+    49;
   add_exp
     (fun w_49 ->
       assert_env_length w_49 1;
       push_env w_49 (Dynarray.get w_49.state.e 0);
       w_49.state.c <- pc_to_exp (int_to_pc 53))
-    50
-
-let () =
+    50;
   add_exp
     (fun w_52 ->
       assert_env_length w_52 6;
@@ -2339,9 +2215,7 @@ let () =
           assert_env_length w_52 2;
           return_n w_52 2 (pc_to_exp (int_to_pc 0))
       | c_30 -> failwith ("unreachable:" ^ string_of_int c_30 ^ "(51)"))
-    51
-
-let () =
+    51;
   add_exp
     (fun w_51 ->
       assert_env_length w_51 4;
@@ -2359,9 +2233,7 @@ let () =
           push_env w_51 (Dynarray.get w_51.state.e 4);
           w_51.state.c <- pc_to_exp (int_to_pc 51)
       | c_29 -> failwith ("unreachable:" ^ string_of_int c_29 ^ "(52)"))
-    52
-
-let () =
+    52;
   add_exp
     (fun w_50 ->
       assert_env_length w_50 2;
@@ -2379,17 +2251,13 @@ let () =
           push_env w_50 (Dynarray.get w_50.state.e 1);
           w_50.state.c <- pc_to_exp (int_to_pc 52)
       | c_28 -> failwith ("unreachable:" ^ string_of_int c_28 ^ "(53)"))
-    53
-
-let () =
+    53;
   add_exp
     (fun w_53 ->
       assert_env_length w_53 1;
       push_env w_53 (Dynarray.get w_53.state.e 0);
       w_53.state.c <- pc_to_exp (int_to_pc 57))
-    54
-
-let () =
+    54;
   add_exp
     (fun w_56 ->
       assert_env_length w_56 6;
@@ -2414,9 +2282,7 @@ let () =
           assert_env_length w_56 2;
           return_n w_56 2 (pc_to_exp (int_to_pc 0))
       | c_33 -> failwith ("unreachable:" ^ string_of_int c_33 ^ "(55)"))
-    55
-
-let () =
+    55;
   add_exp
     (fun w_55 ->
       assert_env_length w_55 4;
@@ -2434,9 +2300,7 @@ let () =
           push_env w_55 (Dynarray.get w_55.state.e 4);
           w_55.state.c <- pc_to_exp (int_to_pc 55)
       | c_32 -> failwith ("unreachable:" ^ string_of_int c_32 ^ "(56)"))
-    56
-
-let () =
+    56;
   add_exp
     (fun w_54 ->
       assert_env_length w_54 2;
@@ -2454,17 +2318,13 @@ let () =
           push_env w_54 (Dynarray.get w_54.state.e 1);
           w_54.state.c <- pc_to_exp (int_to_pc 56)
       | c_31 -> failwith ("unreachable:" ^ string_of_int c_31 ^ "(57)"))
-    57
-
-let () =
+    57;
   add_exp
     (fun w_57 ->
       assert_env_length w_57 1;
       push_env w_57 (Dynarray.get w_57.state.e 0);
       w_57.state.c <- pc_to_exp (int_to_pc 62))
-    58
-
-let () =
+    58;
   add_exp
     (fun w_61 ->
       assert_env_length w_61 8;
@@ -2491,9 +2351,7 @@ let () =
           assert_env_length w_61 2;
           return_n w_61 2 (pc_to_exp (int_to_pc 0))
       | c_37 -> failwith ("unreachable:" ^ string_of_int c_37 ^ "(59)"))
-    59
-
-let () =
+    59;
   add_exp
     (fun w_60 ->
       assert_env_length w_60 6;
@@ -2511,9 +2369,7 @@ let () =
           push_env w_60 (Dynarray.get w_60.state.e 6);
           w_60.state.c <- pc_to_exp (int_to_pc 59)
       | c_36 -> failwith ("unreachable:" ^ string_of_int c_36 ^ "(60)"))
-    60
-
-let () =
+    60;
   add_exp
     (fun w_59 ->
       assert_env_length w_59 4;
@@ -2531,9 +2387,7 @@ let () =
           push_env w_59 (Dynarray.get w_59.state.e 4);
           w_59.state.c <- pc_to_exp (int_to_pc 60)
       | c_35 -> failwith ("unreachable:" ^ string_of_int c_35 ^ "(61)"))
-    61
-
-let () =
+    61;
   add_exp
     (fun w_58 ->
       assert_env_length w_58 2;
@@ -2551,17 +2405,13 @@ let () =
           push_env w_58 (Dynarray.get w_58.state.e 1);
           w_58.state.c <- pc_to_exp (int_to_pc 61)
       | c_34 -> failwith ("unreachable:" ^ string_of_int c_34 ^ "(62)"))
-    62
-
-let () =
+    62;
   add_exp
     (fun w_62 ->
       assert_env_length w_62 1;
       push_env w_62 (Dynarray.get w_62.state.e 0);
       w_62.state.c <- pc_to_exp (int_to_pc 64))
-    63
-
-let () =
+    63;
   add_exp
     (fun w_63 ->
       assert_env_length w_63 2;
@@ -2582,17 +2432,13 @@ let () =
           assert_env_length w_63 2;
           return_n w_63 2 (pc_to_exp (int_to_pc 0))
       | c_38 -> failwith ("unreachable:" ^ string_of_int c_38 ^ "(64)"))
-    64
-
-let () =
+    64;
   add_exp
     (fun w_64 ->
       assert_env_length w_64 1;
       push_env w_64 (Dynarray.get w_64.state.e 0);
       w_64.state.c <- pc_to_exp (int_to_pc 66))
-    65
-
-let () =
+    65;
   add_exp
     (fun w_65 ->
       assert_env_length w_65 2;
@@ -2613,17 +2459,13 @@ let () =
           assert_env_length w_65 2;
           return_n w_65 2 (pc_to_exp (int_to_pc 0))
       | c_39 -> failwith ("unreachable:" ^ string_of_int c_39 ^ "(66)"))
-    66
-
-let () =
+    66;
   add_exp
     (fun w_66 ->
       assert_env_length w_66 1;
       push_env w_66 (Dynarray.get w_66.state.e 0);
       w_66.state.c <- pc_to_exp (int_to_pc 68))
-    67
-
-let () =
+    67;
   add_exp
     (fun w_67 ->
       assert_env_length w_67 2;
@@ -2763,9 +2605,7 @@ let () =
           assert_env_length w_67 2;
           return_n w_67 2 (pc_to_exp (int_to_pc 0))
       | c_40 -> failwith ("unreachable:" ^ string_of_int c_40 ^ "(68)"))
-    68
-
-let () =
+    68;
   add_exp
     (fun w_68 ->
       assert_env_length w_68 2;
@@ -2774,17 +2614,13 @@ let () =
       let keep_vals_1 = env_call w_68 [ 1 ] 1 in
       w_68.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; keep_vals_1; w_68.state.k ];
       w_68.state.c <- pc_to_exp (int_to_pc 67))
-    69
-
-let () =
+    69;
   add_exp
     (fun w_69 ->
       assert_env_length w_69 2;
       push_env w_69 (Dynarray.get w_69.state.e 0);
       w_69.state.c <- pc_to_exp (int_to_pc 77))
-    70
-
-let () =
+    70;
   add_exp
     (fun w_71 ->
       assert_env_length w_71 3;
@@ -2804,9 +2640,7 @@ let () =
           assert_env_length w_71 3;
           return_n w_71 3 (pc_to_exp (int_to_pc 0))
       | c_42 -> failwith ("unreachable:" ^ string_of_int c_42 ^ "(71)"))
-    71
-
-let () =
+    71;
   add_exp
     (fun w_73 ->
       assert_env_length w_73 6;
@@ -2821,9 +2655,7 @@ let () =
       drop_n w_73 4 1;
       assert_env_length w_73 3;
       return_n w_73 3 (pc_to_exp (int_to_pc 0)))
-    72
-
-let () =
+    72;
   add_exp
     (fun w_72 ->
       assert_env_length w_72 4;
@@ -2849,9 +2681,7 @@ let () =
           assert_env_length w_72 3;
           return_n w_72 3 (pc_to_exp (int_to_pc 0))
       | c_43 -> failwith ("unreachable:" ^ string_of_int c_43 ^ "(73)"))
-    73
-
-let () =
+    73;
   add_exp
     (fun w_75 ->
       assert_env_length w_75 6;
@@ -2866,9 +2696,7 @@ let () =
       drop_n w_75 4 1;
       assert_env_length w_75 3;
       return_n w_75 3 (pc_to_exp (int_to_pc 0)))
-    74
-
-let () =
+    74;
   add_exp
     (fun w_74 ->
       assert_env_length w_74 4;
@@ -2894,9 +2722,7 @@ let () =
           assert_env_length w_74 3;
           return_n w_74 3 (pc_to_exp (int_to_pc 0))
       | c_44 -> failwith ("unreachable:" ^ string_of_int c_44 ^ "(75)"))
-    75
-
-let () =
+    75;
   add_exp
     (fun w_76 ->
       assert_env_length w_76 4;
@@ -2924,9 +2750,7 @@ let () =
           assert_env_length w_76 3;
           return_n w_76 3 (pc_to_exp (int_to_pc 0))
       | c_45 -> failwith ("unreachable:" ^ string_of_int c_45 ^ "(76)"))
-    76
-
-let () =
+    76;
   add_exp
     (fun w_70 ->
       assert_env_length w_70 3;
@@ -2963,17 +2787,13 @@ let () =
           push_env w_70 (Dynarray.get w_70.state.e 1);
           w_70.state.c <- pc_to_exp (int_to_pc 76)
       | c_41 -> failwith ("unreachable:" ^ string_of_int c_41 ^ "(77)"))
-    77
-
-let () =
+    77;
   add_exp
     (fun w_77 ->
       assert_env_length w_77 2;
       push_env w_77 (Dynarray.get w_77.state.e 0);
       w_77.state.c <- pc_to_exp (int_to_pc 80))
-    78
-
-let () =
+    78;
   add_exp
     (fun w_79 ->
       assert_env_length w_79 4;
@@ -3001,9 +2821,7 @@ let () =
           assert_env_length w_79 3;
           return_n w_79 3 (pc_to_exp (int_to_pc 0))
       | c_47 -> failwith ("unreachable:" ^ string_of_int c_47 ^ "(79)"))
-    79
-
-let () =
+    79;
   add_exp
     (fun w_78 ->
       assert_env_length w_78 3;
@@ -3032,17 +2850,13 @@ let () =
           assert_env_length w_78 3;
           return_n w_78 3 (pc_to_exp (int_to_pc 0))
       | c_46 -> failwith ("unreachable:" ^ string_of_int c_46 ^ "(80)"))
-    80
-
-let () =
+    80;
   add_exp
     (fun w_80 ->
       assert_env_length w_80 2;
       push_env w_80 (Dynarray.get w_80.state.e 0);
       w_80.state.c <- pc_to_exp (int_to_pc 86))
-    81
-
-let () =
+    81;
   add_exp
     (fun w_83 ->
       assert_env_length w_83 6;
@@ -3057,9 +2871,7 @@ let () =
       drop_n w_83 4 1;
       assert_env_length w_83 3;
       return_n w_83 3 (pc_to_exp (int_to_pc 0)))
-    82
-
-let () =
+    82;
   add_exp
     (fun w_82 ->
       assert_env_length w_82 4;
@@ -3085,9 +2897,7 @@ let () =
           assert_env_length w_82 3;
           return_n w_82 3 (pc_to_exp (int_to_pc 0))
       | c_49 -> failwith ("unreachable:" ^ string_of_int c_49 ^ "(83)"))
-    83
-
-let () =
+    83;
   add_exp
     (fun w_84 ->
       assert_env_length w_84 3;
@@ -3107,9 +2917,7 @@ let () =
           assert_env_length w_84 3;
           return_n w_84 3 (pc_to_exp (int_to_pc 0))
       | c_50 -> failwith ("unreachable:" ^ string_of_int c_50 ^ "(84)"))
-    84
-
-let () =
+    84;
   add_exp
     (fun w_85 ->
       assert_env_length w_85 4;
@@ -3137,9 +2945,7 @@ let () =
           assert_env_length w_85 3;
           return_n w_85 3 (pc_to_exp (int_to_pc 0))
       | c_51 -> failwith ("unreachable:" ^ string_of_int c_51 ^ "(85)"))
-    85
-
-let () =
+    85;
   add_exp
     (fun w_81 ->
       assert_env_length w_81 3;
@@ -3194,17 +3000,13 @@ let () =
           push_env w_81 (Dynarray.get w_81.state.e 1);
           w_81.state.c <- pc_to_exp (int_to_pc 85)
       | c_48 -> failwith ("unreachable:" ^ string_of_int c_48 ^ "(86)"))
-    86
-
-let () =
+    86;
   add_exp
     (fun w_86 ->
       assert_env_length w_86 1;
       push_env w_86 (Dynarray.get w_86.state.e 0);
       w_86.state.c <- pc_to_exp (int_to_pc 88))
-    87
-
-let () =
+    87;
   add_exp
     (fun w_87 ->
       assert_env_length w_87 2;
@@ -3248,17 +3050,13 @@ let () =
           push_env w_87 split1_34;
           failwith "car: cannot apply on CLOSURE"
       | c_52 -> failwith ("unreachable:" ^ string_of_int c_52 ^ "(88)"))
-    88
-
-let () =
+    88;
   add_exp
     (fun w_88 ->
       assert_env_length w_88 1;
       push_env w_88 (Dynarray.get w_88.state.e 0);
       w_88.state.c <- pc_to_exp (int_to_pc 90))
-    89
-
-let () =
+    89;
   add_exp
     (fun w_89 ->
       assert_env_length w_89 2;
@@ -3302,17 +3100,13 @@ let () =
           push_env w_89 split1_36;
           failwith "cdr: cannot apply on CLOSURE"
       | c_53 -> failwith ("unreachable:" ^ string_of_int c_53 ^ "(90)"))
-    90
-
-let () =
+    90;
   add_exp
     (fun w_90 ->
       assert_env_length w_90 1;
       push_env w_90 (Dynarray.get w_90.state.e 0);
       w_90.state.c <- pc_to_exp (int_to_pc 92))
-    91
-
-let () =
+    91;
   add_exp
     (fun w_91 ->
       assert_env_length w_91 2;
@@ -3366,17 +3160,13 @@ let () =
           w_91.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_vals_6; w_91.state.k ];
           w_91.state.c <- pc_to_exp (int_to_pc 25)
       | c_54 -> failwith ("unreachable:" ^ string_of_int c_54 ^ "(92)"))
-    92
-
-let () =
+    92;
   add_exp
     (fun w_92 ->
       assert_env_length w_92 1;
       push_env w_92 (Dynarray.get w_92.state.e 0);
       w_92.state.c <- pc_to_exp (int_to_pc 94))
-    93
-
-let () =
+    93;
   add_exp
     (fun w_93 ->
       assert_env_length w_93 2;
@@ -3430,17 +3220,13 @@ let () =
           w_93.state.k <- Memo.appends [ Memo.from_constructor tag_cont_12; keep_vals_11; w_93.state.k ];
           w_93.state.c <- pc_to_exp (int_to_pc 26)
       | c_55 -> failwith ("unreachable:" ^ string_of_int c_55 ^ "(94)"))
-    94
-
-let () =
+    94;
   add_exp
     (fun w_94 ->
       assert_env_length w_94 1;
       push_env w_94 (Dynarray.get w_94.state.e 0);
       w_94.state.c <- pc_to_exp (int_to_pc 96))
-    95
-
-let () =
+    95;
   add_exp
     (fun w_95 ->
       assert_env_length w_95 2;
@@ -3494,17 +3280,13 @@ let () =
           w_95.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; keep_vals_16; w_95.state.k ];
           w_95.state.c <- pc_to_exp (int_to_pc 26)
       | c_56 -> failwith ("unreachable:" ^ string_of_int c_56 ^ "(96)"))
-    96
-
-let () =
+    96;
   add_exp
     (fun w_96 ->
       assert_env_length w_96 1;
       push_env w_96 (Dynarray.get w_96.state.e 0);
       w_96.state.c <- pc_to_exp (int_to_pc 98))
-    97
-
-let () =
+    97;
   add_exp
     (fun w_97 ->
       assert_env_length w_97 2;
@@ -3558,9 +3340,7 @@ let () =
           w_97.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_vals_21; w_97.state.k ];
           w_97.state.c <- pc_to_exp (int_to_pc 26)
       | c_57 -> failwith ("unreachable:" ^ string_of_int c_57 ^ "(98)"))
-    98
-
-let () =
+    98;
   add_exp
     (fun w_98 ->
       assert_env_length w_98 2;
@@ -3571,17 +3351,13 @@ let () =
       let keep_vals_22 = env_call w_98 [] 2 in
       w_98.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; keep_vals_22; w_98.state.k ];
       w_98.state.c <- pc_to_exp (int_to_pc 81))
-    99
-
-let () =
+    99;
   add_exp
     (fun w_99 ->
       assert_env_length w_99 2;
       push_env w_99 (Dynarray.get w_99.state.e 1);
       w_99.state.c <- pc_to_exp (int_to_pc 101))
-    100
-
-let () =
+    100;
   add_exp
     (fun w_100 ->
       assert_env_length w_100 3;
@@ -3605,17 +3381,13 @@ let () =
           w_100.state.k <- Memo.appends [ Memo.from_constructor tag_cont_24; keep_vals_23; w_100.state.k ];
           w_100.state.c <- pc_to_exp (int_to_pc 6)
       | c_58 -> failwith ("unreachable:" ^ string_of_int c_58 ^ "(101)"))
-    101
-
-let () =
+    101;
   add_exp
     (fun w_101 ->
       assert_env_length w_101 3;
       push_env w_101 (Dynarray.get w_101.state.e 0);
       w_101.state.c <- pc_to_exp (int_to_pc 104))
-    102
-
-let () =
+    102;
   add_exp
     (fun w_103 ->
       assert_env_length w_103 6;
@@ -3651,9 +3423,7 @@ let () =
           w_103.state.k <- Memo.appends [ Memo.from_constructor tag_cont_25; keep_vals_24; w_103.state.k ];
           w_103.state.c <- pc_to_exp (int_to_pc 102)
       | c_60 -> failwith ("unreachable:" ^ string_of_int c_60 ^ "(103)"))
-    103
-
-let () =
+    103;
   add_exp
     (fun w_102 ->
       assert_env_length w_102 4;
@@ -3677,17 +3447,13 @@ let () =
           push_env w_102 (Dynarray.get w_102.state.e 1);
           w_102.state.c <- pc_to_exp (int_to_pc 103)
       | c_59 -> failwith ("unreachable:" ^ string_of_int c_59 ^ "(104)"))
-    104
-
-let () =
+    104;
   add_exp
     (fun w_104 ->
       assert_env_length w_104 1;
       push_env w_104 (Dynarray.get w_104.state.e 0);
       w_104.state.c <- pc_to_exp (int_to_pc 107))
-    105
-
-let () =
+    105;
   add_exp
     (fun w_106 ->
       assert_env_length w_106 3;
@@ -3706,9 +3472,7 @@ let () =
           ignore (pop_env w_106);
           failwith "destruct_names: impossible"
       | c_62 -> failwith ("unreachable:" ^ string_of_int c_62 ^ "(106)"))
-    106
-
-let () =
+    106;
   add_exp
     (fun w_105 ->
       assert_env_length w_105 2;
@@ -3737,17 +3501,13 @@ let () =
           push_env w_105 (Dynarray.get w_105.state.e 1);
           w_105.state.c <- pc_to_exp (int_to_pc 106)
       | c_61 -> failwith ("unreachable:" ^ string_of_int c_61 ^ "(107)"))
-    107
-
-let () =
+    107;
   add_exp
     (fun w_107 ->
       assert_env_length w_107 1;
       push_env w_107 (Dynarray.get w_107.state.e 0);
       w_107.state.c <- pc_to_exp (int_to_pc 109))
-    108
-
-let () =
+    108;
   add_exp
     (fun w_108 ->
       assert_env_length w_108 2;
@@ -3767,17 +3527,13 @@ let () =
           w_108.state.k <- Memo.appends [ Memo.from_constructor tag_cont_28; keep_vals_27; w_108.state.k ];
           w_108.state.c <- pc_to_exp (int_to_pc 26)
       | c_63 -> failwith ("unreachable:" ^ string_of_int c_63 ^ "(109)"))
-    109
-
-let () =
+    109;
   add_exp
     (fun w_109 ->
       assert_env_length w_109 1;
       push_env w_109 (Dynarray.get w_109.state.e 0);
       w_109.state.c <- pc_to_exp (int_to_pc 112))
-    110
-
-let () =
+    110;
   add_exp
     (fun w_111 ->
       assert_env_length w_111 3;
@@ -3856,9 +3612,7 @@ let () =
           assert_env_length w_111 2;
           return_n w_111 2 (pc_to_exp (int_to_pc 0))
       | c_65 -> failwith ("unreachable:" ^ string_of_int c_65 ^ "(111)"))
-    111
-
-let () =
+    111;
   add_exp
     (fun w_110 ->
       assert_env_length w_110 2;
@@ -3887,33 +3641,25 @@ let () =
           w_110.state.k <- Memo.appends [ Memo.from_constructor tag_cont_29; keep_vals_28; w_110.state.k ];
           w_110.state.c <- pc_to_exp (int_to_pc 110)
       | c_64 -> failwith ("unreachable:" ^ string_of_int c_64 ^ "(112)"))
-    112
-
-let () =
+    112;
   add_exp
     (fun w_112 ->
       assert_env_length w_112 2;
       push_env w_112 (Dynarray.get w_112.state.e 0);
       w_112.state.c <- pc_to_exp (int_to_pc 116))
-    113
-
-let () =
+    113;
   add_exp
     (fun w_114 ->
       assert_env_length w_114 2;
       push_env w_114 (Dynarray.get w_114.state.e 0);
       w_114.state.c <- pc_to_exp (int_to_pc 117))
-    114
-
-let () =
+    114;
   add_exp
     (fun w_116 ->
       assert_env_length w_116 2;
       push_env w_116 (Dynarray.get w_116.state.e 0);
       w_116.state.c <- pc_to_exp (int_to_pc 120))
-    115
-
-let () =
+    115;
   add_exp
     (fun w_113 ->
       assert_env_length w_113 3;
@@ -3942,9 +3688,7 @@ let () =
           assert_env_length w_113 3;
           return_n w_113 3 (pc_to_exp (int_to_pc 0))
       | c_66 -> failwith ("unreachable:" ^ string_of_int c_66 ^ "(116)"))
-    116
-
-let () =
+    116;
   add_exp
     (fun w_115 ->
       assert_env_length w_115 3;
@@ -3968,9 +3712,7 @@ let () =
           ignore (pop_env w_115);
           failwith "no cond clause matched"
       | c_67 -> failwith ("unreachable:" ^ string_of_int c_67 ^ "(117)"))
-    117
-
-let () =
+    117;
   add_exp
     (fun w_119 ->
       assert_env_length w_119 5;
@@ -3999,9 +3741,7 @@ let () =
           ignore (pop_env w_119);
           failwith "cannot directly evaluate this symbol"
       | c_70 -> failwith ("unreachable:" ^ string_of_int c_70 ^ "(118)"))
-    118
-
-let () =
+    118;
   add_exp
     (fun w_118 ->
       assert_env_length w_118 4;
@@ -4048,9 +3788,7 @@ let () =
           ignore (pop_env w_118);
           failwith "ill-formed expression: NIL"
       | c_69 -> failwith ("unreachable:" ^ string_of_int c_69 ^ "(119)"))
-    119
-
-let () =
+    119;
   add_exp
     (fun w_117 ->
       assert_env_length w_117 3;
@@ -4079,9 +3817,7 @@ let () =
           w_117.state.k <- Memo.appends [ Memo.from_constructor tag_cont_35; keep_vals_34; w_117.state.k ];
           w_117.state.c <- pc_to_exp (int_to_pc 63)
       | c_68 -> failwith ("unreachable:" ^ string_of_int c_68 ^ "(120)"))
-    120
-
-let () =
+    120;
   add_exp
     (fun w_121 ->
       assert_env_length w_121 1;
@@ -4103,9 +3839,7 @@ let () =
           ignore (pop_env w_121);
           failwith "plus: expected number"
       | c_71 -> failwith ("unreachable:" ^ string_of_int c_71 ^ "(121)"))
-    121
-
-let () =
+    121;
   add_exp
     (fun w_122 ->
       assert_env_length w_122 1;
@@ -4121,9 +3855,7 @@ let () =
         let keep_vals_36 = env_call w_122 [] 0 in
         w_122.state.k <- Memo.appends [ Memo.from_constructor tag_cont_38; keep_vals_36; w_122.state.k ];
         w_122.state.c <- pc_to_exp (int_to_pc 26)))
-    122
-
-let () =
+    122;
   add_exp
     (fun w_124 ->
       assert_env_length w_124 4;
@@ -4143,9 +3875,7 @@ let () =
         assert_env_length w_124 5;
         ignore (env_call w_124 [] 2);
         w_124.state.c <- pc_to_exp (int_to_pc 100)))
-    123
-
-let () =
+    123;
   add_exp
     (fun w_123 ->
       assert_env_length w_123 5;
@@ -4155,9 +3885,7 @@ let () =
       ignore (pop_env w_123);
       push_env w_123 (Memo.from_int (if Word.get_value (fst x0_4) = Word.get_value (fst x1_4) then 1 else 0));
       w_123.state.c <- pc_to_exp (int_to_pc 123))
-    124
-
-let () =
+    124;
   add_exp
     (fun w_125 ->
       assert_env_length w_125 2;
@@ -4181,9 +3909,7 @@ let () =
           ignore (pop_env w_125);
           failwith "destruct_names: impossible, names must be int literals"
       | c_72 -> failwith ("unreachable:" ^ string_of_int c_72 ^ "(125)"))
-    125
-
-let () =
+    125;
   add_exp
     (fun w_126 ->
       assert_env_length w_126 2;
@@ -4194,9 +3920,7 @@ let () =
       push_env w_126 (Memo.from_int (if Word.get_value (fst x0_5) = Word.get_value (fst x1_5) then 1 else 0));
       assert_env_length w_126 1;
       return_n w_126 1 (pc_to_exp (int_to_pc 0)))
-    126
-
-let () =
+    126;
   add_exp
     (fun w_128 ->
       assert_env_length w_128 4;
@@ -4339,9 +4063,7 @@ let () =
           ignore (pop_env w_128);
           failwith "invalid symbol here1"
       | c_74 -> failwith ("unreachable:" ^ string_of_int c_74 ^ "(127)"))
-    127
-
-let () =
+    127;
   add_exp
     (fun w_127 ->
       assert_env_length w_127 3;
@@ -4365,9 +4087,7 @@ let () =
           w_127.state.k <- Memo.appends [ Memo.from_constructor tag_cont_60; keep_vals_59; w_127.state.k ];
           w_127.state.c <- pc_to_exp (int_to_pc 63)
       | c_73 -> failwith ("unreachable:" ^ string_of_int c_73 ^ "(128)"))
-    128
-
-let () =
+    128;
   add_exp
     (fun w_129 ->
       assert_env_length w_129 4;
@@ -4388,9 +4108,7 @@ let () =
         let keep_vals_60 = env_call w_129 [ 0 ] 1 in
         w_129.state.k <- Memo.appends [ Memo.from_constructor tag_cont_61; keep_vals_60; w_129.state.k ];
         w_129.state.c <- pc_to_exp (int_to_pc 41)))
-    129
-
-let () =
+    129;
   add_exp
     (fun w_130 ->
       assert_env_length w_130 3;
@@ -4419,9 +4137,7 @@ let () =
           w_130.state.k <- Memo.appends [ Memo.from_constructor tag_cont_76; keep_vals_75; w_130.state.k ];
           w_130.state.c <- pc_to_exp (int_to_pc 63)
       | c_75 -> failwith ("unreachable:" ^ string_of_int c_75 ^ "(130)"))
-    130
-
-let () =
+    130;
   add_exp
     (fun w_131 ->
       assert_env_length w_131 3;
@@ -4439,17 +4155,13 @@ let () =
         let keep_vals_88 = env_call w_131 [ 1 ] 1 in
         w_131.state.k <- Memo.appends [ Memo.from_constructor tag_cont_90; keep_vals_88; w_131.state.k ];
         w_131.state.c <- pc_to_exp (int_to_pc 32)))
-    131
-
-let () =
+    131;
   add_exp
     (fun w_133 ->
       let err_0 = resolve w_133 (Source.E 1) in
       ignore (pop_env w_133);
       failwith (string_of_int (Word.get_value (fst err_0))))
-    132
-
-let () =
+    132;
   add_exp
     (fun w_132 ->
       assert_env_length w_132 1;
@@ -4472,9 +4184,7 @@ let () =
           push_env w_132 (Dynarray.get w_132.state.e 0);
           w_132.state.c <- pc_to_exp (int_to_pc 132)
       | c_76 -> failwith ("unreachable:" ^ string_of_int c_76 ^ "(133)"))
-    133
-
-let () =
+    133;
   add_exp
     (fun w_135 ->
       assert_env_length w_135 4;
@@ -4574,9 +4284,7 @@ let () =
           ignore (pop_env w_135);
           failwith "1"
       | c_78 -> failwith ("unreachable:" ^ string_of_int c_78 ^ "(134)"))
-    134
-
-let () =
+    134;
   add_exp
     (fun w_134 ->
       assert_env_length w_134 3;
@@ -4600,9 +4308,7 @@ let () =
           w_134.state.k <- Memo.appends [ Memo.from_constructor tag_cont_94; keep_vals_93; w_134.state.k ];
           w_134.state.c <- pc_to_exp (int_to_pc 44)
       | c_77 -> failwith ("unreachable:" ^ string_of_int c_77 ^ "(135)"))
-    135
-
-let () =
+    135;
   add_exp
     (fun w_136 ->
       assert_env_length w_136 3;
@@ -4631,9 +4337,7 @@ let () =
           w_136.state.k <- Memo.appends [ Memo.from_constructor tag_cont_96; keep_vals_95; w_136.state.k ];
           w_136.state.c <- pc_to_exp (int_to_pc 63)
       | c_79 -> failwith ("unreachable:" ^ string_of_int c_79 ^ "(136)"))
-    136
-
-let () =
+    136;
   add_exp
     (fun w_138 ->
       assert_env_length w_138 2;
@@ -4662,9 +4366,7 @@ let () =
           ignore (pop_env w_138);
           failwith "unexpected function nil"
       | c_81 -> failwith ("unreachable:" ^ string_of_int c_81 ^ "(137)"))
-    137
-
-let () =
+    137;
   add_exp
     (fun w_137 ->
       assert_env_length w_137 1;
@@ -4688,9 +4390,7 @@ let () =
           push_env w_137 split1_54;
           failwith "unexpected CONS"
       | c_80 -> failwith ("unreachable:" ^ string_of_int c_80 ^ "(138)"))
-    138
-
-let () =
+    138;
   add_exp
     (fun w_139 ->
       assert_env_length w_139 3;
@@ -4736,9 +4436,7 @@ let () =
           w_139.state.k <- Memo.appends [ Memo.from_constructor tag_cont_103; keep_vals_102; w_139.state.k ];
           w_139.state.c <- pc_to_exp (int_to_pc 65)
       | c_82 -> failwith ("unreachable:" ^ string_of_int c_82 ^ "(139)"))
-    139
-
-let () =
+    139;
   add_exp
     (fun w_141 ->
       assert_env_length w_141 2;
@@ -4758,9 +4456,7 @@ let () =
           ignore (pop_env w_141);
           failwith "impossible"
       | c_84 -> failwith ("unreachable:" ^ string_of_int c_84 ^ "(140)"))
-    140
-
-let () =
+    140;
   add_exp
     (fun w_140 ->
       assert_env_length w_140 1;
@@ -4779,9 +4475,7 @@ let () =
           ignore (pop_env w_140);
           failwith "impossible"
       | c_83 -> failwith ("unreachable:" ^ string_of_int c_83 ^ "(141)"))
-    141
-
-let () =
+    141;
   add_exp
     (fun w_142 ->
       assert_env_length w_142 4;
@@ -4803,9 +4497,7 @@ let () =
         assert_env_length w_142 5;
         ignore (env_call w_142 [] 2);
         w_142.state.c <- pc_to_exp (int_to_pc 115)))
-    142
-
-let () =
+    142;
   add_exp
     (fun w_143 ->
       assert_env_length w_143 2;
@@ -4827,9 +4519,7 @@ let () =
       drop_n w_143 1 0;
       assert_env_length w_143 1;
       return_n w_143 1 (pc_to_exp (int_to_pc 0)))
-    143
-
-let () =
+    143;
   add_exp
     (fun w_144 ->
       assert_env_length w_144 1;
@@ -4845,9 +4535,7 @@ let () =
         let keep_vals_108 = env_call w_144 [] 0 in
         w_144.state.k <- Memo.appends [ Memo.from_constructor tag_cont_110; keep_vals_108; w_144.state.k ];
         w_144.state.c <- pc_to_exp (int_to_pc 25)))
-    144
-
-let () =
+    144;
   add_exp
     (fun w_145 ->
       assert_env_length w_145 4;
@@ -4895,9 +4583,7 @@ let () =
           w_145.state.k <- Memo.appends [ Memo.from_constructor tag_cont_112; keep_vals_111; w_145.state.k ];
           w_145.state.c <- pc_to_exp (int_to_pc 41)
       | c_85 -> failwith ("unreachable:" ^ string_of_int c_85 ^ "(145)"))
-    145
-
-let () =
+    145;
   add_exp
     (fun w_146 ->
       assert_env_length w_146 4;
@@ -4937,160 +4623,159 @@ let () =
           w_146.state.k <- Memo.appends [ Memo.from_constructor tag_cont_115; keep_vals_114; w_146.state.k ];
           w_146.state.c <- pc_to_exp (int_to_pc 41)
       | c_86 -> failwith ("unreachable:" ^ string_of_int c_86 ^ "(146)"))
-    146
-
-let () = Words.set_constructor_degree 0 1
-let () = Words.set_constructor_degree 1 1
-let () = Words.set_constructor_degree 2 (-1)
-let () = Words.set_constructor_degree 3 1
-let () = Words.set_constructor_degree 4 0
-let () = Words.set_constructor_degree 5 1
-let () = Words.set_constructor_degree 6 1
-let () = Words.set_constructor_degree 7 1
-let () = Words.set_constructor_degree 8 1
-let () = Words.set_constructor_degree 9 1
-let () = Words.set_constructor_degree 10 1
-let () = Words.set_constructor_degree 11 1
-let () = Words.set_constructor_degree 12 1
-let () = Words.set_constructor_degree 13 1
-let () = Words.set_constructor_degree 14 1
-let () = Words.set_constructor_degree 15 1
-let () = Words.set_constructor_degree 16 1
-let () = Words.set_constructor_degree 17 1
-let () = Words.set_constructor_degree 18 1
-let () = Words.set_constructor_degree 19 1
-let () = Words.set_constructor_degree 20 1
-let () = Words.set_constructor_degree 21 1
-let () = Words.set_constructor_degree 22 1
-let () = Words.set_constructor_degree 23 1
-let () = Words.set_constructor_degree 24 1
-let () = Words.set_constructor_degree 25 1
-let () = Words.set_constructor_degree 26 1
-let () = Words.set_constructor_degree 27 0
-let () = Words.set_constructor_degree 28 0
-let () = Words.set_constructor_degree 29 0
-let () = Words.set_constructor_degree 30 1
-let () = Words.set_constructor_degree 31 0
-let () = Words.set_constructor_degree 32 (-1)
-let () = Words.set_constructor_degree 33 0
-let () = Words.set_constructor_degree 34 0
-let () = Words.set_constructor_degree 35 1
-let () = Words.set_constructor_degree 36 (-1)
-let () = Words.set_constructor_degree 37 (-1)
-let () = Words.set_constructor_degree 38 (-1)
-let () = Words.set_constructor_degree 39 0
-let () = Words.set_constructor_degree 40 (-1)
-let () = Words.set_constructor_degree 41 0
-let () = Words.set_constructor_degree 42 0
-let () = Words.set_constructor_degree 43 0
-let () = Words.set_constructor_degree 44 0
-let () = Words.set_constructor_degree 45 0
-let () = Words.set_constructor_degree 46 0
-let () = Words.set_constructor_degree 47 0
-let () = Words.set_constructor_degree 48 0
-let () = Words.set_constructor_degree 49 0
-let () = Words.set_constructor_degree 50 0
-let () = Words.set_constructor_degree 51 0
-let () = Words.set_constructor_degree 52 0
-let () = Words.set_constructor_degree 53 0
-let () = Words.set_constructor_degree 54 0
-let () = Words.set_constructor_degree 55 0
-let () = Words.set_constructor_degree 56 0
-let () = Words.set_constructor_degree 57 0
-let () = Words.set_constructor_degree 58 0
-let () = Words.set_constructor_degree 59 0
-let () = Words.set_constructor_degree 60 0
-let () = Words.set_constructor_degree 61 0
-let () = Words.set_constructor_degree 62 (-3)
-let () = Words.set_constructor_degree 63 (-1)
-let () = Words.set_constructor_degree 64 (-1)
-let () = Words.set_constructor_degree 65 0
-let () = Words.set_constructor_degree 66 0
-let () = Words.set_constructor_degree 67 (-1)
-let () = Words.set_constructor_degree 68 (-2)
-let () = Words.set_constructor_degree 69 (-3)
-let () = Words.set_constructor_degree 70 0
-let () = Words.set_constructor_degree 71 0
-let () = Words.set_constructor_degree 72 0
-let () = Words.set_constructor_degree 73 (-2)
-let () = Words.set_constructor_degree 74 (-1)
-let () = Words.set_constructor_degree 75 0
-let () = Words.set_constructor_degree 76 0
-let () = Words.set_constructor_degree 77 (-1)
-let () = Words.set_constructor_degree 78 (-1)
-let () = Words.set_constructor_degree 79 (-1)
-let () = Words.set_constructor_degree 80 (-3)
-let () = Words.set_constructor_degree 81 (-2)
-let () = Words.set_constructor_degree 82 (-3)
-let () = Words.set_constructor_degree 83 0
-let () = Words.set_constructor_degree 84 (-1)
-let () = Words.set_constructor_degree 85 (-1)
-let () = Words.set_constructor_degree 86 (-1)
-let () = Words.set_constructor_degree 87 (-2)
-let () = Words.set_constructor_degree 88 (-1)
-let () = Words.set_constructor_degree 89 (-1)
-let () = Words.set_constructor_degree 90 (-2)
-let () = Words.set_constructor_degree 91 (-2)
-let () = Words.set_constructor_degree 92 (-1)
-let () = Words.set_constructor_degree 93 (-1)
-let () = Words.set_constructor_degree 94 (-1)
-let () = Words.set_constructor_degree 95 (-2)
-let () = Words.set_constructor_degree 96 (-2)
-let () = Words.set_constructor_degree 97 (-1)
-let () = Words.set_constructor_degree 98 (-2)
-let () = Words.set_constructor_degree 99 (-1)
-let () = Words.set_constructor_degree 100 0
-let () = Words.set_constructor_degree 101 0
-let () = Words.set_constructor_degree 102 0
-let () = Words.set_constructor_degree 103 (-2)
-let () = Words.set_constructor_degree 104 0
-let () = Words.set_constructor_degree 105 0
-let () = Words.set_constructor_degree 106 (-3)
-let () = Words.set_constructor_degree 107 (-2)
-let () = Words.set_constructor_degree 108 0
-let () = Words.set_constructor_degree 109 0
-let () = Words.set_constructor_degree 110 (-2)
-let () = Words.set_constructor_degree 111 (-2)
-let () = Words.set_constructor_degree 112 0
-let () = Words.set_constructor_degree 113 (-2)
-let () = Words.set_constructor_degree 114 (-2)
-let () = Words.set_constructor_degree 115 (-2)
-let () = Words.set_constructor_degree 116 (-3)
-let () = Words.set_constructor_degree 117 (-2)
-let () = Words.set_constructor_degree 118 (-2)
-let () = Words.set_constructor_degree 119 (-2)
-let () = Words.set_constructor_degree 120 0
-let () = Words.set_constructor_degree 121 (-2)
-let () = Words.set_constructor_degree 122 (-2)
-let () = Words.set_constructor_degree 123 (-1)
-let () = Words.set_constructor_degree 124 (-3)
-let () = Words.set_constructor_degree 125 (-1)
-let () = Words.set_constructor_degree 126 (-1)
-let () = Words.set_constructor_degree 127 0
-let () = Words.set_constructor_degree 128 (-1)
-let () = Words.set_constructor_degree 129 (-2)
-let () = Words.set_constructor_degree 130 (-3)
-let () = Words.set_constructor_degree 131 (-2)
-let () = Words.set_constructor_degree 132 0
-let () = Words.set_constructor_degree 133 (-2)
-let () = Words.set_constructor_degree 134 0
-let () = Words.set_constructor_degree 135 (-3)
-let () = Words.set_constructor_degree 136 (-1)
-let () = Words.set_constructor_degree 137 0
-let () = Words.set_constructor_degree 138 (-2)
-let () = Words.set_constructor_degree 139 (-3)
-let () = Words.set_constructor_degree 140 (-2)
-let () = Words.set_constructor_degree 141 (-2)
-let () = Words.set_constructor_degree 142 (-1)
-let () = Words.set_constructor_degree 143 0
-let () = Words.set_constructor_degree 144 (-3)
-let () = Words.set_constructor_degree 145 (-3)
-let () = Words.set_constructor_degree 146 (-3)
-let () = Words.set_constructor_degree 147 0
-let () = Words.set_constructor_degree 148 0
-let () = Words.set_constructor_degree 149 (-3)
-let () = Words.set_constructor_degree 150 (-1)
-let () = Words.set_constructor_degree 151 (-3)
-let () = Words.set_constructor_degree 152 (-3)
-let () = Words.set_constructor_degree 153 (-1)
-let () = Words.set_constructor_degree 154 (-1)
+    146;
+  Words.set_constructor_degree 0 1;
+  Words.set_constructor_degree 1 1;
+  Words.set_constructor_degree 2 (-1);
+  Words.set_constructor_degree 3 1;
+  Words.set_constructor_degree 4 0;
+  Words.set_constructor_degree 5 1;
+  Words.set_constructor_degree 6 1;
+  Words.set_constructor_degree 7 1;
+  Words.set_constructor_degree 8 1;
+  Words.set_constructor_degree 9 1;
+  Words.set_constructor_degree 10 1;
+  Words.set_constructor_degree 11 1;
+  Words.set_constructor_degree 12 1;
+  Words.set_constructor_degree 13 1;
+  Words.set_constructor_degree 14 1;
+  Words.set_constructor_degree 15 1;
+  Words.set_constructor_degree 16 1;
+  Words.set_constructor_degree 17 1;
+  Words.set_constructor_degree 18 1;
+  Words.set_constructor_degree 19 1;
+  Words.set_constructor_degree 20 1;
+  Words.set_constructor_degree 21 1;
+  Words.set_constructor_degree 22 1;
+  Words.set_constructor_degree 23 1;
+  Words.set_constructor_degree 24 1;
+  Words.set_constructor_degree 25 1;
+  Words.set_constructor_degree 26 1;
+  Words.set_constructor_degree 27 0;
+  Words.set_constructor_degree 28 0;
+  Words.set_constructor_degree 29 0;
+  Words.set_constructor_degree 30 1;
+  Words.set_constructor_degree 31 0;
+  Words.set_constructor_degree 32 (-1);
+  Words.set_constructor_degree 33 0;
+  Words.set_constructor_degree 34 0;
+  Words.set_constructor_degree 35 1;
+  Words.set_constructor_degree 36 (-1);
+  Words.set_constructor_degree 37 (-1);
+  Words.set_constructor_degree 38 (-1);
+  Words.set_constructor_degree 39 0;
+  Words.set_constructor_degree 40 (-1);
+  Words.set_constructor_degree 41 0;
+  Words.set_constructor_degree 42 0;
+  Words.set_constructor_degree 43 0;
+  Words.set_constructor_degree 44 0;
+  Words.set_constructor_degree 45 0;
+  Words.set_constructor_degree 46 0;
+  Words.set_constructor_degree 47 0;
+  Words.set_constructor_degree 48 0;
+  Words.set_constructor_degree 49 0;
+  Words.set_constructor_degree 50 0;
+  Words.set_constructor_degree 51 0;
+  Words.set_constructor_degree 52 0;
+  Words.set_constructor_degree 53 0;
+  Words.set_constructor_degree 54 0;
+  Words.set_constructor_degree 55 0;
+  Words.set_constructor_degree 56 0;
+  Words.set_constructor_degree 57 0;
+  Words.set_constructor_degree 58 0;
+  Words.set_constructor_degree 59 0;
+  Words.set_constructor_degree 60 0;
+  Words.set_constructor_degree 61 0;
+  Words.set_constructor_degree 62 (-3);
+  Words.set_constructor_degree 63 (-1);
+  Words.set_constructor_degree 64 (-1);
+  Words.set_constructor_degree 65 0;
+  Words.set_constructor_degree 66 0;
+  Words.set_constructor_degree 67 (-1);
+  Words.set_constructor_degree 68 (-2);
+  Words.set_constructor_degree 69 (-3);
+  Words.set_constructor_degree 70 0;
+  Words.set_constructor_degree 71 0;
+  Words.set_constructor_degree 72 0;
+  Words.set_constructor_degree 73 (-2);
+  Words.set_constructor_degree 74 (-1);
+  Words.set_constructor_degree 75 0;
+  Words.set_constructor_degree 76 0;
+  Words.set_constructor_degree 77 (-1);
+  Words.set_constructor_degree 78 (-1);
+  Words.set_constructor_degree 79 (-1);
+  Words.set_constructor_degree 80 (-3);
+  Words.set_constructor_degree 81 (-2);
+  Words.set_constructor_degree 82 (-3);
+  Words.set_constructor_degree 83 0;
+  Words.set_constructor_degree 84 (-1);
+  Words.set_constructor_degree 85 (-1);
+  Words.set_constructor_degree 86 (-1);
+  Words.set_constructor_degree 87 (-2);
+  Words.set_constructor_degree 88 (-1);
+  Words.set_constructor_degree 89 (-1);
+  Words.set_constructor_degree 90 (-2);
+  Words.set_constructor_degree 91 (-2);
+  Words.set_constructor_degree 92 (-1);
+  Words.set_constructor_degree 93 (-1);
+  Words.set_constructor_degree 94 (-1);
+  Words.set_constructor_degree 95 (-2);
+  Words.set_constructor_degree 96 (-2);
+  Words.set_constructor_degree 97 (-1);
+  Words.set_constructor_degree 98 (-2);
+  Words.set_constructor_degree 99 (-1);
+  Words.set_constructor_degree 100 0;
+  Words.set_constructor_degree 101 0;
+  Words.set_constructor_degree 102 0;
+  Words.set_constructor_degree 103 (-2);
+  Words.set_constructor_degree 104 0;
+  Words.set_constructor_degree 105 0;
+  Words.set_constructor_degree 106 (-3);
+  Words.set_constructor_degree 107 (-2);
+  Words.set_constructor_degree 108 0;
+  Words.set_constructor_degree 109 0;
+  Words.set_constructor_degree 110 (-2);
+  Words.set_constructor_degree 111 (-2);
+  Words.set_constructor_degree 112 0;
+  Words.set_constructor_degree 113 (-2);
+  Words.set_constructor_degree 114 (-2);
+  Words.set_constructor_degree 115 (-2);
+  Words.set_constructor_degree 116 (-3);
+  Words.set_constructor_degree 117 (-2);
+  Words.set_constructor_degree 118 (-2);
+  Words.set_constructor_degree 119 (-2);
+  Words.set_constructor_degree 120 0;
+  Words.set_constructor_degree 121 (-2);
+  Words.set_constructor_degree 122 (-2);
+  Words.set_constructor_degree 123 (-1);
+  Words.set_constructor_degree 124 (-3);
+  Words.set_constructor_degree 125 (-1);
+  Words.set_constructor_degree 126 (-1);
+  Words.set_constructor_degree 127 0;
+  Words.set_constructor_degree 128 (-1);
+  Words.set_constructor_degree 129 (-2);
+  Words.set_constructor_degree 130 (-3);
+  Words.set_constructor_degree 131 (-2);
+  Words.set_constructor_degree 132 0;
+  Words.set_constructor_degree 133 (-2);
+  Words.set_constructor_degree 134 0;
+  Words.set_constructor_degree 135 (-3);
+  Words.set_constructor_degree 136 (-1);
+  Words.set_constructor_degree 137 0;
+  Words.set_constructor_degree 138 (-2);
+  Words.set_constructor_degree 139 (-3);
+  Words.set_constructor_degree 140 (-2);
+  Words.set_constructor_degree 141 (-2);
+  Words.set_constructor_degree 142 (-1);
+  Words.set_constructor_degree 143 0;
+  Words.set_constructor_degree 144 (-3);
+  Words.set_constructor_degree 145 (-3);
+  Words.set_constructor_degree 146 (-3);
+  Words.set_constructor_degree 147 0;
+  Words.set_constructor_degree 148 0;
+  Words.set_constructor_degree 149 (-3);
+  Words.set_constructor_degree 150 (-1);
+  Words.set_constructor_degree 151 (-3);
+  Words.set_constructor_degree 152 (-3);
+  Words.set_constructor_degree 153 (-1);
+  Words.set_constructor_degree 154 (-1)

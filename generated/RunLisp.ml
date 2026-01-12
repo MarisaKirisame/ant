@@ -351,23 +351,23 @@ let run_wrap_code_tests () =
   Printf.printf "Saved wrap test results to %s\n" wrap_tests_output_path
 
 let run () =
-  LC.with_runtime_ (fun () ->
-      with_outchannel steps_file (fun oc ->
-          let memo = Memo.init_memo () in
-          let write_steps = write_steps_json oc in
-          current_memo := Some memo;
-          current_write_steps := Some write_steps;
-          Fun.protect
-            ~finally:(fun () ->
-              current_memo := None;
-              current_write_steps := None)
-            (fun () ->
-              test_atom_rejects_cons ();
-              test_eq_number_literals ();
-              test_eq_number_literals_false ();
-              test_cond_short_circuits ();
-              test_car_after_cons ();
-              test_mapinc_list ();
-              (* run_wrap_code_tests (); *)
-              write_memo_stats_json oc memo));
-      print_endline "LispCEK smoke tests completed.")
+  with_outchannel steps_file (fun oc ->
+      let write_steps = write_steps_json oc in
+      LC.populate_state ();
+      let memo = Memo.init_memo () in
+      current_memo := Some memo;
+      current_write_steps := Some write_steps;
+      Fun.protect
+        ~finally:(fun () ->
+          current_memo := None;
+          current_write_steps := None)
+        (fun () ->
+          test_atom_rejects_cons ();
+          test_eq_number_literals ();
+          test_eq_number_literals_false ();
+          test_cond_short_circuits ();
+          test_car_after_cons ();
+          test_mapinc_list ();
+          (* run_wrap_code_tests (); *)
+          write_memo_stats_json oc memo));
+  print_endline "LispCEK smoke tests completed."
