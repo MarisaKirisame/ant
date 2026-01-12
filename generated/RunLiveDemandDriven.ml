@@ -1,4 +1,4 @@
-(* let steps_file = "eval_steps_demand_driven.json"
+let steps_file = "eval_steps_demand_driven.json"
 
 module Common = RunLiveCommon
 module LC = Common.LC
@@ -139,7 +139,7 @@ module DemandedExpansion = struct
     loop 0 start_prog
 end
 
-let demanded_interactive = DemandedExpansion.interactive *)
+let demanded_interactive = DemandedExpansion.interactive
 
 let run () =
   Common.with_outchannel steps_file (fun oc ->

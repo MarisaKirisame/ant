@@ -1,4 +1,4 @@
-(* (* Reads the Hazel-generated mk_program JSON blob (list of s-expr strings)
+(* Reads the Hazel-generated mk_program JSON blob (list of s-expr strings)
    and parses it into OCaml S-expressions. *)
 
 open Yojson.Safe
@@ -358,7 +358,7 @@ let test = test_string |> parse_nexpr
 let parse_program () =
   read_program_strings ()
   |> List.map (fun s -> s |> Sexp.of_string |> process |> subst_deepest_hole test |> clean)
-  |> dedup NamedExpr.equal_nexpr *)
+  |> dedup NamedExpr.equal_nexpr
 
 let run () =
   with_outchannel steps_file (fun oc ->

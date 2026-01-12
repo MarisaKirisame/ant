@@ -1,4 +1,4 @@
-(* let steps_file = "eval_steps_simple.json"
+let steps_file = "eval_steps_simple.json"
 
 module Common = RunLiveCommon
 module LC = Common.LC
@@ -10,7 +10,7 @@ let mapinc =
          LC.EVar (Common.nat_from_int 0),
          LC.ECons
            ( LC.EPlus (LC.EInt 1, LC.EVar (Common.nat_from_int 1)),
-             LC.EApp (LC.EVar (Common.nat_from_int 3), LC.EVar (Common.nat_from_int 0)) ) )) *)
+             LC.EApp (LC.EVar (Common.nat_from_int 3), LC.EVar (Common.nat_from_int 0)) ) ))
 
 let run () =
   Common.with_outchannel steps_file (fun oc ->
