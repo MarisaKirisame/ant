@@ -13,8 +13,7 @@ let run_case ~memo label xs =
 
 let run () =
   Tail.with_runtime_ (fun () ->
-    let memo = Ant.Memo.init_memo () in
-    run_case ~memo "empty" [];
-    run_case ~memo "short" [ 1; 2; 3; 4 ];
-    run_case ~memo "long" (List.init 100 (fun i -> i + 1));
-  )
+      let memo = Ant.Memo.init_memo () in
+      run_case ~memo "empty" [];
+      run_case ~memo "short" [ 1; 2; 3; 4 ];
+      run_case ~memo "long" (List.init 100 (fun i -> i + 1)))
