@@ -67,8 +67,8 @@ let populate_state () =
       assert_env_length w_2 4;
       push_env w_2 (Dynarray.get w_2.state.e 2);
       assert_env_length w_2 5;
-      let keep_0 = env_call w_2 [ 3 ] 1 in
-      w_2.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_0; w_2.state.k ];
+      let keep_vals_0 = env_call w_2 [ 3 ] 1 in
+      w_2.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_vals_0; w_2.state.k ];
       w_2.state.c <- pc_to_exp (int_to_pc 1))
     2;
   add_exp
@@ -95,7 +95,7 @@ let populate_state () =
           assert_env_length w_1 4;
           push_env w_1 (Memo.from_int 1);
           w_1.state.c <- pc_to_exp (int_to_pc 2)
-      | _ -> failwith "unreachable (3)")
+      | c_0 -> failwith ("unreachable:" ^ string_of_int c_0 ^ "(3)"))
     3;
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;
