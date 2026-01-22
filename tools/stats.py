@@ -34,6 +34,7 @@ class MemoRuleStat:
     size: int
     sc: int
     hit_count: int
+    insert_time: int
 
 
 @dataclass(frozen=True)
@@ -143,14 +144,22 @@ def load_records(
                         size = entry.get("size")
                         sc = entry.get("sc")
                         hit_count = entry.get("hit_count")
+                        insert_time = entry.get("insert_time")
                         if not isinstance(size, int):
                             raise ValueError(f"rule_stat[{idx}].size must be an int")
                         if not isinstance(sc, int):
                             raise ValueError(f"rule_stat[{idx}].sc must be an int")
                         if not isinstance(hit_count, int):
                             raise ValueError(f"rule_stat[{idx}].hit_count must be an int")
+                        if not isinstance(insert_time, int):
+                            raise ValueError(f"rule_stat[{idx}].insert_time must be an int")
                         rule_stat_entries.append(
-                            MemoRuleStat(size=size, sc=sc, hit_count=hit_count)
+                            MemoRuleStat(
+                                size=size,
+                                sc=sc,
+                                hit_count=hit_count,
+                                insert_time=insert_time,
+                            )
                         )
                     rule_stat = rule_stat_entries
                 else:

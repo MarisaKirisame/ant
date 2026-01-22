@@ -255,7 +255,7 @@ let compose_step (x : step) (y : step) : step =
   assert (can_step_through y dst);*)
   let dst = Profile.with_slot compose_step_step_through_slot (fun _ -> step_through y dst) in
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
-  { src; dst; sc = x.sc + y.sc; hit = 0 }
+  { src; dst; sc = x.sc + y.sc; hit = 0; insert_time = 0 }
 
 let make_step (value : state) (resolved : bool cek) m : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) value in*)
@@ -281,7 +281,7 @@ let make_step (value : state) (resolved : bool cek) m : step =
   w.state.c.step w;
   let dst = w.state in
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
-  { src; dst; sc = 1; hit = 0 }
+  { src; dst; sc = 1; hit = 0; insert_time = 0 }
 
 let bracket x = "(" ^ x ^ ")"
 

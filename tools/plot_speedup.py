@@ -216,6 +216,27 @@ def plot_rule_stat_hits(rule_stat: Sequence[MemoRuleStat], output_dir: Path) -> 
     return output_path.name
 
 
+def plot_rule_stat_insert_time(
+    rule_stat: Sequence[MemoRuleStat], output_dir: Path
+) -> str:
+    if not rule_stat:
+        raise ValueError("rule_stat is empty")
+    output_path = output_dir / _fresh_plot_name()
+    plt.figure(figsize=(6, 4.5))
+    sizes = [entry.size for entry in rule_stat]
+    insert_times = [entry.insert_time for entry in rule_stat]
+    plt.scatter(sizes, insert_times, alpha=0.6)
+    plt.xlabel("Pattern size")
+    plt.ylabel("Insert time (ns)")
+    plt.title("Memo rule size vs insert time")
+    plt.yscale("log")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    return output_path.name
+
+
 def _sum_profile(entries: Sequence[ProfileEntry], *, key_name: str) -> float:
     if not entries:
         raise ValueError(f"{key_name} must be non-empty")
