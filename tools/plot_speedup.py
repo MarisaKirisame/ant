@@ -29,7 +29,7 @@ import numpy as np
 
 from common import fresh
 from stats import (
-    MemoSizeVsSc,
+    MemoRuleStat,
     MemoStatsNode,
     ProfileEntry,
     Result,
@@ -178,17 +178,36 @@ def plot_depth_breakdown_cdf(
     return output_path.name
 
 
-def plot_size_vs_sc(size_vs_sc: Sequence[MemoSizeVsSc], output_dir: Path) -> str:
-    if not size_vs_sc:
-        raise ValueError("size_vs_sc is empty")
+def plot_rule_stat(rule_stat: Sequence[MemoRuleStat], output_dir: Path) -> str:
+    if not rule_stat:
+        raise ValueError("rule_stat is empty")
     output_path = output_dir / _fresh_plot_name()
     plt.figure(figsize=(6, 4.5))
-    sizes = [entry.size for entry in size_vs_sc]
-    scs = [entry.sc for entry in size_vs_sc]
+    sizes = [entry.size for entry in rule_stat]
+    scs = [entry.sc for entry in rule_stat]
     plt.scatter(sizes, scs, alpha=0.6)
     plt.xlabel("Pattern size")
     plt.ylabel("Step count (sc)")
-    plt.title("Memo pattern size vs step count")
+    plt.title("Memo rule size vs step count")
+    plt.yscale("log")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    return output_path.name
+
+
+def plot_rule_stat_hits(rule_stat: Sequence[MemoRuleStat], output_dir: Path) -> str:
+    if not rule_stat:
+        raise ValueError("rule_stat is empty")
+    output_path = output_dir / _fresh_plot_name()
+    plt.figure(figsize=(6, 4.5))
+    sizes = [entry.size for entry in rule_stat]
+    hits = [entry.hit_count for entry in rule_stat]
+    plt.scatter(sizes, hits, alpha=0.6)
+    plt.xlabel("Pattern size")
+    plt.ylabel("Hit count")
+    plt.title("Memo rule size vs hit count")
     plt.yscale("log")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.tight_layout()

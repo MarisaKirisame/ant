@@ -386,16 +386,18 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
     Buffer.add_string buf (string_of_int node.node_count);
     Buffer.add_char buf '}'
   done;
-  Buffer.add_string buf "],\"size_vs_sc\":[";
+  Buffer.add_string buf "],\"rule_stat\":[";
   List.iteri
-    (fun i (entry : Memo.size_vs_sc) ->
+    (fun i (entry : Memo.rule_stat) ->
       if i > 0 then Buffer.add_char buf ',';
       Buffer.add_string buf "{\"size\":";
       Buffer.add_string buf (string_of_int entry.size);
       Buffer.add_string buf ",\"sc\":";
       Buffer.add_string buf (string_of_int entry.sc);
+      Buffer.add_string buf ",\"hit_count\":";
+      Buffer.add_string buf (string_of_int entry.hit_count);
       Buffer.add_char buf '}')
-    stats.size_vs_sc;
+    stats.rule_stat;
   Buffer.add_string buf "]}\n";
   Buffer.output_buffer oc buf;
   flush oc

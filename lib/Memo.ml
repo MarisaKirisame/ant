@@ -674,6 +674,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     let rec raw_step_n s n = if n = 0 then s else raw_step_n (raw_step s) (n - 1) in
     let dbg_step_through step state =
       assert (step.sc > 0);
+      step.hit <- step.hit + 1;
       (*if not (Dependency.can_step_through step state) then
         print_endline ("cannot step through: " ^ Dependency.string_of_step step);*)
       let x = Profile.with_slot step_through_slot (fun () -> Dependency.step_through step state) in
@@ -752,24 +753,24 @@ let exec_done _ = failwith "exec is done, should not call step anymore"
 let pattern_size (p : Pattern.pattern) = Generic.size p
 let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
 
-type memo_stats = { by_depth : by_depth Dynarray.t; size_vs_sc : size_vs_sc list }
+type memo_stats = { by_depth : by_depth Dynarray.t; rule_stat : rule_stat list }
 and by_depth = { depth : int; mutable node_count : int }
-and size_vs_sc = { size : int; sc : int }
+and rule_stat = { size : int; sc : int; hit_count : int }
 
 let memo_stats (m : memo) : memo_stats =
   let by_depth = Dynarray.create () in
-  let size_vs_sc = ref [] in
+  let rule_stat = ref [] in
   let rec aux (t : trie) (depth : int) : unit =
     if Dynarray.length by_depth <= depth then Dynarray.add_last by_depth { depth; node_count = 0 };
     let node_stat = Dynarray.get by_depth depth in
     node_stat.node_count <- node_stat.node_count + 1;
     match t with
     | Stem st -> (
-        size_vs_sc := { size = patterns_size st.step.src; sc = st.step.sc } :: !size_vs_sc;
+        rule_stat := { size = patterns_size st.step.src; sc = st.step.sc; hit_count = st.step.hit } :: !rule_stat;
         match st.next with None -> () | Some child -> aux child (depth + 1))
     | Branch br ->
         Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1));
         List.iter br.merging ~f:(fun m -> Hashtbl.iter m.children ~f:(fun child -> aux child (depth + 1)))
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
-  { by_depth; size_vs_sc = !size_vs_sc }
+  { by_depth; rule_stat = !rule_stat }

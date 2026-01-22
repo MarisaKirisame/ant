@@ -16,7 +16,7 @@ and exp = {
 and kont = value
 and 'a cek = { mutable c : exp; mutable e : 'a Dynarray.t; mutable k : 'a }
 and state = value cek
-and step = { src : pattern cek; dst : value cek; sc : int }
+and step = { src : pattern cek; dst : value cek; sc : int; mutable hit : int }
 and memo = trie option Array.t
 and reads = Read.read cek
 

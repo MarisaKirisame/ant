@@ -30,9 +30,10 @@ class MemoStatsNode:
 
 
 @dataclass(frozen=True)
-class MemoSizeVsSc:
+class MemoRuleStat:
     size: int
     sc: int
+    hit_count: int
 
 
 @dataclass(frozen=True)
@@ -54,7 +55,7 @@ class ExecTimeRecord:
 class Result:
     exec_times: list[ExecTimeRecord]
     depth_breakdown: list[MemoStatsNode]
-    size_vs_sc: list[MemoSizeVsSc]
+    rule_stat: list[MemoRuleStat]
 
 
 def _parse_profile(entries: object, *, key_name: str) -> list[ProfileEntry]:
@@ -79,7 +80,7 @@ def load_records(
     """Return parsed records from a JSONL file."""
     exec_times: list[ExecTimeRecord] = []
     depth_breakdown: list[MemoStatsNode] = []
-    size_vs_sc: list[MemoSizeVsSc] = []
+    rule_stat: list[MemoRuleStat] = []
     seen_memo_stats = False
     with path.open() as f:
         for line_no, line in enumerate(f, 1):
@@ -132,21 +133,26 @@ def load_records(
                             raise ValueError(f"depth_breakdown[{idx}].node_count must be an int")
                         nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
                     depth_breakdown = nodes
-                    raw_size_vs_sc = rec.get("size_vs_sc", [])
-                    if not isinstance(raw_size_vs_sc, list):
-                        raise ValueError("size_vs_sc must be a list")
-                    size_vs_sc_entries: list[MemoSizeVsSc] = []
-                    for idx, entry in enumerate(raw_size_vs_sc):
+                    raw_rule_stat = rec.get("rule_stat", [])
+                    if not isinstance(raw_rule_stat, list):
+                        raise ValueError("rule_stat must be a list")
+                    rule_stat_entries: list[MemoRuleStat] = []
+                    for idx, entry in enumerate(raw_rule_stat):
                         if not isinstance(entry, dict):
-                            raise ValueError(f"size_vs_sc[{idx}] must be an object")
+                            raise ValueError(f"rule_stat[{idx}] must be an object")
                         size = entry.get("size")
                         sc = entry.get("sc")
+                        hit_count = entry.get("hit_count")
                         if not isinstance(size, int):
-                            raise ValueError(f"size_vs_sc[{idx}].size must be an int")
+                            raise ValueError(f"rule_stat[{idx}].size must be an int")
                         if not isinstance(sc, int):
-                            raise ValueError(f"size_vs_sc[{idx}].sc must be an int")
-                        size_vs_sc_entries.append(MemoSizeVsSc(size=size, sc=sc))
-                    size_vs_sc = size_vs_sc_entries
+                            raise ValueError(f"rule_stat[{idx}].sc must be an int")
+                        if not isinstance(hit_count, int):
+                            raise ValueError(f"rule_stat[{idx}].hit_count must be an int")
+                        rule_stat_entries.append(
+                            MemoRuleStat(size=size, sc=sc, hit_count=hit_count)
+                        )
+                    rule_stat = rule_stat_entries
                 else:
                     raise ValueError(f"unexpected record name: {name}")
             except Exception as exc:  # pylint: disable=broad-except
@@ -154,5 +160,5 @@ def load_records(
     if not exec_times:
         raise RuntimeError("no exec_time records found in file")
     return Result(
-        exec_times=exec_times, depth_breakdown=depth_breakdown, size_vs_sc=size_vs_sc
+        exec_times=exec_times, depth_breakdown=depth_breakdown, rule_stat=rule_stat
     )
