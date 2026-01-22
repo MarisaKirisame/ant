@@ -229,7 +229,6 @@ def plot_rule_stat_insert_time(
     plt.xlabel("Pattern size")
     plt.ylabel("Insert time (ns)")
     plt.title("Memo rule size vs insert time")
-    plt.yscale("log")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.tight_layout()
     plt.savefig(output_path)
