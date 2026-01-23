@@ -18,6 +18,7 @@ from plot_speedup import (
     plot_rule_stat,
     plot_rule_stat_hits,
     plot_rule_stat_insert_time,
+    plot_rule_stat_depth_insert_time,
     plot_depth_breakdown,
     plot_depth_breakdown_cdf,
     profile_totals_from_result,
@@ -37,6 +38,7 @@ def render_html(
     size_scatter_plot = plot_rule_stat(records.rule_stat, output_dir)
     hit_scatter_plot = plot_rule_stat_hits(records.rule_stat, output_dir)
     insert_time_scatter_plot = plot_rule_stat_insert_time(records.rule_stat, output_dir)
+    depth_insert_time_scatter_plot = plot_rule_stat_depth_insert_time(records.rule_stat, output_dir)
     profile_totals, profile_total_time = profile_totals_from_result(records)
     profile_table = render_profile_table(profile_totals, profile_total_time)
     doc = document(title="Memoization Speedup")
@@ -80,6 +82,7 @@ def render_html(
             _plot_image(size_scatter_plot, "Memo rule size vs sc scatter plot")
             _plot_image(hit_scatter_plot, "Memo rule size vs hit count scatter plot")
             _plot_image(insert_time_scatter_plot, "Memo rule size vs insert time scatter plot")
+            _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
             with tag.section(cls="profile"):
                 raw(profile_table)
     return doc.render()

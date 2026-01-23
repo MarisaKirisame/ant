@@ -398,6 +398,8 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
       Buffer.add_string buf (string_of_int entry.hit_count);
       Buffer.add_string buf ",\"insert_time\":";
       Buffer.add_string buf (string_of_int entry.insert_time);
+      Buffer.add_string buf ",\"depth\":";
+      Buffer.add_string buf (string_of_int entry.depth);
       Buffer.add_char buf '}')
     stats.rule_stat;
   Buffer.add_string buf "]}\n";
