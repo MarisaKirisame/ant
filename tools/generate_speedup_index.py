@@ -83,6 +83,7 @@ def render_html(
             _plot_image(hit_scatter_plot, "Memo rule size vs hit count scatter plot")
             _plot_image(insert_time_scatter_plot, "Memo rule size vs insert time scatter plot")
             _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
+            _render_large_rule_stats(records, min_size=40, limit=5)
             with tag.section(cls="profile"):
                 raw(profile_table)
     return doc.render()
@@ -120,6 +121,33 @@ def _render_speedup_comparison(
 def _plot_image(src: str, alt: str) -> None:
     with tag.section(cls="plot"):
         tag.img(src=src, alt=alt)
+
+
+def _render_large_rule_stats(records: Result, *, min_size: int, limit: int) -> None:
+    rules = [rule for rule in records.rule_stat if rule.size > min_size]
+    rules = sorted(rules, key=lambda rule: rule.size, reverse=True)[:limit]
+    with tag.section(cls="rule-stats"):
+        tag.h2(f"Rules with size > {min_size}")
+        if not rules:
+            tag.p("No rules matched the size filter.")
+            return None
+        with tag.table():
+            with tag.thead():
+                with tag.tr():
+                    tag.th("Size")
+                    tag.th("SC")
+                    tag.th("Hit count")
+                    tag.th("Insert time (ns)")
+                    tag.th("Depth")
+            with tag.tbody():
+                for rule in rules:
+                    with tag.tr():
+                        tag.td(str(rule.size))
+                        tag.td(str(rule.sc))
+                        tag.td(str(rule.hit_count))
+                        tag.td(str(rule.insert_time))
+                        tag.td(str(rule.depth))
+    return None
 
 
 def generate_speedup_report(
