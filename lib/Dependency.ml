@@ -12,7 +12,11 @@ type value_subst_cek = value_subst_map cek
 
 let string_of_pattern (p : pattern) : string =
   Generic.to_list p
-  |> List.map (fun pat -> match pat with PVar n -> "H(" ^ string_of_int n ^ ")" | PCon w -> string_of_words w)
+  |> List.map (fun pat ->
+         match pat with
+         | PVar n -> "H(" ^ string_of_int n ^ ")"
+         | Words w -> string_of_words w
+         | Reference r -> string_of_reference r)
   |> String.concat ""
 
 let rec unify (x : pattern) (y : pattern) : pattern =
@@ -38,21 +42,22 @@ let rec unify (x : pattern) (y : pattern) : pattern =
     | _, PVar yh ->
         let xl, xr = pattern_slice x yh in
         return (pattern_append xl (unify xr yt))
-    | PCon xh, PCon yh ->
+    | Words xh, Words yh ->
         let xl = Words.length xh in
         let yl = Words.length yh in
         if xl < yl then
           let yhh, yht = Words.slice_length yh xl in
           (*assert (Words.equal_words xh yhh);*)
-          return (pattern_cons (PCon xh) (unify xt (pattern_cons_unsafe (PCon yht) yt)))
+          return (pattern_cons (Words xh) (unify xt (pattern_cons_unsafe (Words yht) yt)))
         else if xl > yl then
           let xhh, xht = Words.slice_length xh yl in
           (*assert (Words.equal_words xhh yh);*)
-          return (pattern_cons (PCon xhh) (unify (pattern_cons_unsafe (PCon xht) xt) yt))
+          return (pattern_cons (Words xhh) (unify (pattern_cons_unsafe (Words xht) xt) yt))
         else (
           assert (xl = yl);
           (*assert (Words.equal_words xh yh);*)
-          return (pattern_cons (PCon xh) (unify xt yt))))
+          return (pattern_cons (Words xh) (unify xt yt)))
+    | Reference _, _ | _, Reference _ -> failwith "unify: pattern contains Reference")
 
 let rec compose_pattern p s =
   if pattern_is_empty p then match s with [] -> Generic.empty | _ -> failwith "hole count mismatch"
@@ -61,7 +66,8 @@ let rec compose_pattern p s =
     match ph with
     | PVar _ -> (
         match s with sh :: st -> pattern_append sh (compose_pattern pt st) | [] -> failwith "hole count mismatch")
-    | PCon ph -> pattern_cons (PCon ph) (compose_pattern pt s)
+    | Words ph -> pattern_cons (Words ph) (compose_pattern pt s)
+    | Reference _ -> failwith "compose_pattern: pattern contains Reference"
 
 let rec subst_value (s : value_subst_cek) (v : value) : value =
   if Generic.is_empty v then Generic.empty
@@ -72,6 +78,7 @@ let rec subst_value (s : value_subst_cek) (v : value) : value =
         let sm = cek_get s r.src in
         let sub_v = Array.get sm r.hole_idx in
         Value.append (Value.slice sub_v r.offset r.values_count) (subst_value s rest)
+    | rest, PVar _ -> failwith "subst_value: unexpected PVar in value"
 
 let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
   (*assert (value_valid v);*)
@@ -90,8 +97,9 @@ let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
         (*assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
         assert ((Value.summary vh).degree = ph);*)
         return (Option.map (fun vs -> vh :: vs) (value_match_pattern_aux vt pt))
-    | PCon ph -> (
+    | Words ph -> (
         match Value.unwords v ph with None -> return None | Some v -> return (value_match_pattern_aux v pt))
+    | Reference _ -> failwith "value_match_pattern: pattern contains Reference"
 
 let value_match_pattern (v : value) (p : pattern) : value_subst_map option =
   (*assert (value_valid v);*)
@@ -107,7 +115,8 @@ let rec pattern_to_value_aux (p : pattern) src (hole_idx : int ref) : value =
         let r = Reference { src; hole_idx = !hole_idx; offset = 0; values_count = n } in
         hole_idx := !hole_idx + 1;
         Value.value_cons r (pattern_to_value_aux pt src hole_idx)
-    | PCon c -> Value.value_cons (Words c) (pattern_to_value_aux pt src hole_idx)
+    | Words c -> Value.value_cons (Words c) (pattern_to_value_aux pt src hole_idx)
+    | Reference _ -> failwith "pattern_to_value: pattern contains Reference"
 
 let pattern_to_value (p : pattern cek) : value cek = maps_ek (fun p s -> pattern_to_value_aux p s (ref 0)) p
 
@@ -130,7 +139,7 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
         (*assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
         assert ((Value.summary vh).degree = ph);*)
         return (unify_vp_aux vt pt s)
-    | PCon ph -> (
+    | Words ph -> (
         match Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v with
         | rest, Words w ->
             let pl = Words.length ph in
@@ -141,7 +150,7 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
                 print_endline "should not happens:";
                 print_endline ("phh: " ^ string_of_words phh));
               assert (Lazy.force m.hash = Words.hash phh);
-              return (unify_vp_aux rest (pattern_cons_unsafe (PCon pht) pt) s))
+              return (unify_vp_aux rest (pattern_cons_unsafe (Words pht) pt) s))
             else (
               assert (m.length >= pl);
               match Words.unwords w ph with
@@ -163,7 +172,9 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
               assert (Pattern.pattern_valid ph);
               assert (Pattern.pattern_valid hole_value);*)
             Array.set sm r.hole_idx hole_value;
-            return (unify_vp_aux rest pt s))
+            return (unify_vp_aux rest pt s)
+        | rest, PVar _ -> failwith "unify_vp_aux: unexpected PVar in value")
+    | Reference _ -> failwith "unify_vp_aux: pattern contains Reference"
 
 let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek =
   let _ = zipwith_ek (fun v p -> unify_vp_aux v p s) v p in
@@ -194,7 +205,10 @@ let step_through (step : step) (state : state) : state =
   return (map_ek (subst_value subst) step.dst)
 
 let string_of_pat (p : pat) : string =
-  match p with PVar n -> "PVar(" ^ string_of_int n ^ ")" | PCon w -> "PCon(" ^ string_of_words w ^ ")"
+  match p with
+  | PVar n -> "PVar(" ^ string_of_int n ^ ")"
+  | Words w -> "Words(" ^ string_of_words w ^ ")"
+  | Reference r -> "Reference(" ^ string_of_reference r ^ ")"
 
 let string_of_pattern (p : pattern) : string =
   "[" ^ String.concat ";" (List.map string_of_pat (Generic.to_list p)) ^ "]"
@@ -223,7 +237,10 @@ let compose_step (x : step) (y : step) : step =
       if Generic.is_empty p then []
       else
         let ph, pt = pattern_front_exn p in
-        match ph with PVar n -> Generic.singleton (make_pvar n) :: loop pt | PCon _ -> loop pt
+        match ph with
+        | PVar n -> Generic.singleton (make_pvar n) :: loop pt
+        | Words _ -> loop pt
+        | Reference _ -> failwith "pattern_to_subst_map: pattern contains Reference"
     in
     Array.of_list (loop p)
   in
@@ -270,8 +287,8 @@ let make_step (value : state) (resolved : bool cek) m : step =
               let vht, vhh = Generic.front_exn ~monoid:Words.monoid ~measure:Words.measure vh in
               let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
               Generic.of_list ~monoid:Pattern.monoid ~measure:Pattern.pat_measure
-                (if (Value.summary vt).degree = 0 then [ PCon (Generic.singleton vhh) ]
-                 else [ PCon (Generic.singleton vhh); make_pvar (Value.summary vt).degree ])
+                (if (Value.summary vt).degree = 0 then [ Words (Generic.singleton vhh) ]
+                 else [ Words (Generic.singleton vhh); make_pvar (Value.summary vt).degree ])
           | _ -> failwith "cannot make step"
         else Generic.singleton (make_pvar (Value.summary v).degree))
       value resolved

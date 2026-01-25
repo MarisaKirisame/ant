@@ -6,7 +6,7 @@ include Reference
 (* Values extend the word finger tree with References so we can represent
  * partially materialised environments/continuations.
  *)
-type fg_et = Words of Words.words | Reference of reference [@@deriving eq]
+type fg_et = Words of Words.words | Reference of reference | PVar of int [@@deriving eq]
 
 type value = (fg_et, measure_t) Generic.fg
 and seq = value
@@ -25,6 +25,13 @@ let measure (et : fg_et) : measure_t =
       let m = Words.summary w in
       { degree = m.degree; max_degree = m.max_degree }
   | Reference r -> { degree = r.values_count; max_degree = r.values_count }
+  | PVar n -> { degree = n; max_degree = n }
+
+let merge_fg_et (x : fg_et) (y : fg_et) : fg_et option =
+  match (x, y) with
+  | PVar x, PVar y -> Some (PVar (x + y))
+  | Words x, Words y -> Some (Words (Words.append x y))
+  | _ -> None
 
 let rec value_valid x : bool =
   match Generic.front x ~monoid ~measure with
@@ -34,10 +41,9 @@ let rec value_valid x : bool =
       | None -> true
       | Some (_, y) ->
           (match (x, y) with
-            | Reference _, Reference _ -> true
-            | Reference _, Words _ -> true
             | Words _, Words _ -> false
-            | Words _, Reference _ -> true)
+            | PVar _, PVar _ -> false
+            | _ -> true)
           && value_valid rest)
 
 let summary x = Generic.measure ~monoid ~measure x
@@ -48,26 +54,25 @@ let append (x : seq) (y : seq) : seq =
   else
     let xh, xt = Generic.rear_exn ~monoid ~measure x in
     let yt, yh = Generic.front_exn ~monoid ~measure y in
-    match (xt, yh) with
-    | Words xt, Words yh ->
-        Generic.append ~monoid ~measure xh (Generic.cons ~monoid ~measure yt (Words (Words.append xt yh)))
-    | _ -> Generic.append ~monoid ~measure x y
+    match merge_fg_et xt yh with
+    | Some merged -> Generic.append ~monoid ~measure xh (Generic.cons ~monoid ~measure yt merged)
+    | None -> Generic.append ~monoid ~measure x y
 
 let value_cons (et : fg_et) (v : seq) : seq =
   if Generic.is_empty v then Generic.singleton et
   else
     let vt, vh = Generic.front_exn ~monoid ~measure v in
-    match (et, vh) with
-    | Words et, Words vh -> Generic.cons ~monoid ~measure vt (Words (Words.append et vh))
-    | _ -> Generic.cons ~monoid ~measure v et
+    match merge_fg_et et vh with
+    | Some merged -> Generic.cons ~monoid ~measure vt merged
+    | None -> Generic.cons ~monoid ~measure v et
 
 let value_snoc (v : seq) (et : fg_et) : seq =
   if Generic.is_empty v then Generic.singleton et
   else
     let vh, vt = Generic.rear_exn ~monoid ~measure v in
-    match (vt, et) with
-    | Words vt, Words et -> Generic.snoc ~monoid ~measure vh (Words (Words.append vt et))
-    | _ -> Generic.snoc ~monoid ~measure v et
+    match merge_fg_et vt et with
+    | Some merged -> Generic.snoc ~monoid ~measure vh merged
+    | None -> Generic.snoc ~monoid ~measure v et
 
 let value_snoc_unsafe (v : seq) (et : fg_et) : seq = Generic.snoc ~monoid ~measure v et
 let value_cons_unsafe (et : fg_et) (v : seq) : seq = Generic.cons ~monoid ~measure v et
@@ -98,6 +103,15 @@ let rec pop_n (s : seq) (n : int) : seq * seq =
         let l = value_snoc_unsafe x (Words vh) in
         let r = if Words.is_empty vt then w else value_cons_unsafe (Words vt) w in
         (l, r)
+    | PVar v ->
+        assert (m.degree < n);
+        assert (m.degree + v >= n);
+        let need = n - m.degree in
+        let l = value_snoc_unsafe x (PVar need) in
+        if v = need then (l, w)
+        else
+          let r = value_cons_unsafe (PVar (v - need)) w in
+          (l, r)
     | Reference v ->
         assert (m.degree < n);
         assert (m.degree + v.values_count >= n);
@@ -132,7 +146,10 @@ let string_of_reference (r : reference) : string =
   str
 
 let string_of_fg_et (et : fg_et) : string =
-  match et with Words w -> Words.string_of_words w | Reference r -> string_of_reference r
+  match et with
+  | Words w -> Words.string_of_words w
+  | Reference r -> string_of_reference r
+  | PVar n -> "H(" ^ string_of_int n ^ ")"
 
 let rec string_of_value_aux (v : value) : string =
   if Generic.is_empty v then ""
@@ -154,4 +171,4 @@ let unwords (v : value) (w : Words.words) : value option =
           (*assert (value_valid ret);*)
           Some ret
       | None -> None)
-  | Reference _ -> None
+  | Reference _ | PVar _ -> None

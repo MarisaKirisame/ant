@@ -250,7 +250,11 @@ let read_empty : read = Generic.empty
 let read_from_pattern (p : Pattern.pattern) : read =
   (*assert (Pattern.pattern_valid p);*)
   Generic.map ~monoid ~measure:red_measure
-    (fun pat -> match pat with Pattern.PVar n -> make_rskip n | Pattern.PCon c -> RCon c)
+    (fun pat ->
+      match pat with
+      | Pattern.PVar n -> make_rskip n
+      | Pattern.Words c -> RCon c
+      | Pattern.Reference _ -> failwith "read_from_pattern: pattern contains Reference")
     p
 
 let read_equal (x : read) (y : read) : bool =
