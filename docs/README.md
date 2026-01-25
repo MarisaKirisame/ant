@@ -18,11 +18,16 @@ For deeper dives, see `internal.md` (architecture) and `motivation.md` (why this
 - **Runtime core.** Finger-tree values live in `Value.ml`/`Words.ml`; memo storage and step composition are implemented in `Memo.ml`, `Dependency.ml`, `Pattern.ml`, and `State.ml`.
 
 ## Getting Started
+
+use `uv sync` to install deps.
+
 ```bash
 make dependency   # install opam switch + packages (idempotent)
 make build        # dune build
 make run          # regenerate generated/*.ml, format, and execute GeneratedMain
 ```
+
+you may need `git submodule update --init`
 
 `nightly.py` underpins these targets; it will print a harmless warning if the `ant` opam switch already exists.
 
