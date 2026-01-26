@@ -2,7 +2,7 @@
 name = "ant"
 version = "0.1.0"
 description = "Python project \"ant\"."
-readme = "README.md"
+readme = "docs/README.md"
 requires-python = ">=3.12"
 dependencies = [
     "cycler>=0.12.1",
