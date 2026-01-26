@@ -111,7 +111,7 @@ let to_word (s : seq) : Word.t =
       let wh, wt = Words.words_front_exn w in
       assert (Generic.is_empty wt);
       wh
-  | Reference _ -> failwith "conveting reference to_int"
+  | Reference _ -> failwith "converting reference to_int"
   | PVar _ -> failwith "converting PVar to_int"
 
 let append (x : seq) (y : seq) : seq = Value.append x y
