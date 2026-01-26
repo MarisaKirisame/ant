@@ -2,6 +2,7 @@ open BatFingerTree
 module Hasher = Hash.MCRC32C
 open Word
 include Reference
+open SeqOps
 
 (* Values extend the word finger tree with References so we can represent
  * partially materialised environments/continuations.
@@ -49,30 +50,13 @@ let rec value_valid x : bool =
 let summary x = Generic.measure ~monoid ~measure x
 
 let append (x : seq) (y : seq) : seq =
-  if Generic.is_empty x then y
-  else if Generic.is_empty y then x
-  else
-    let xh, xt = Generic.rear_exn ~monoid ~measure x in
-    let yt, yh = Generic.front_exn ~monoid ~measure y in
-    match merge_fg_et xt yh with
-    | Some merged -> Generic.append ~monoid ~measure xh (Generic.cons ~monoid ~measure yt merged)
-    | None -> Generic.append ~monoid ~measure x y
+  append_merge ~monoid ~measure ~merge:merge_fg_et x y
 
 let value_cons (et : fg_et) (v : seq) : seq =
-  if Generic.is_empty v then Generic.singleton et
-  else
-    let vt, vh = Generic.front_exn ~monoid ~measure v in
-    match merge_fg_et et vh with
-    | Some merged -> Generic.cons ~monoid ~measure vt merged
-    | None -> Generic.cons ~monoid ~measure v et
+  cons_merge ~monoid ~measure ~merge:merge_fg_et et v
 
 let value_snoc (v : seq) (et : fg_et) : seq =
-  if Generic.is_empty v then Generic.singleton et
-  else
-    let vh, vt = Generic.rear_exn ~monoid ~measure v in
-    match merge_fg_et vt et with
-    | Some merged -> Generic.snoc ~monoid ~measure vh merged
-    | None -> Generic.snoc ~monoid ~measure v et
+  snoc_merge ~monoid ~measure ~merge:merge_fg_et v et
 
 let value_snoc_unsafe (v : seq) (et : fg_et) : seq = Generic.snoc ~monoid ~measure v et
 let value_cons_unsafe (et : fg_et) (v : seq) : seq = Generic.cons ~monoid ~measure v et
