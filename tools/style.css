@@ -129,6 +129,19 @@ thead {
 tbody tr:last-child td {
   border-bottom: none;
 }
+.rule-stats table {
+  table-layout: auto;
+}
+.rule-stats th:not(:last-child),
+.rule-stats td:not(:last-child) {
+  white-space: nowrap;
+  width: 1%;
+}
+.rule-stats th:last-child,
+.rule-stats td:last-child {
+  width: 100%;
+  white-space: normal;
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
