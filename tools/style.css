@@ -101,6 +101,7 @@ p {
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   background: #0b1324;
   border: 1px solid #1f2937;
   border-radius: 12px;
@@ -112,6 +113,8 @@ td {
   text-align: left;
   padding: 10px 12px;
   border-bottom: 1px solid #1f2937;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 thead {
   background: #0f1a30;
