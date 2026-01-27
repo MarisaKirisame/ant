@@ -139,6 +139,7 @@ def _render_large_rule_stats(records: Result, *, min_size: int, limit: int) -> N
                     tag.th("Hit count")
                     tag.th("Insert time (ns)")
                     tag.th("Depth")
+                    tag.th("Rule")
             with tag.tbody():
                 for rule in rules:
                     with tag.tr():
@@ -147,6 +148,7 @@ def _render_large_rule_stats(records: Result, *, min_size: int, limit: int) -> N
                         tag.td(str(rule.hit_count))
                         tag.td(str(rule.insert_time))
                         tag.td(str(rule.depth))
+                        tag.td(tag.code(rule.rule))
     return None
 
 

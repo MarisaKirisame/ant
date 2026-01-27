@@ -374,6 +374,14 @@ let write_steps_json oc (r : Memo.exec_result) : unit =
 
 let write_memo_stats_json oc (memo : State.memo) : unit =
   let stats = Memo.memo_stats memo in
+  let escape_json s =
+    let buf = Buffer.create (String.length s) in
+    String.iter
+      (function
+        | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
+      s;
+    Buffer.contents buf
+  in
   let buf = Buffer.create 64 in
   Buffer.add_string buf "{\"name\":\"memo_stats\",\"depth_breakdown\":[";
   let len = Stdlib.Dynarray.length stats.by_depth in
@@ -400,6 +408,9 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
       Buffer.add_string buf (string_of_int entry.insert_time);
       Buffer.add_string buf ",\"depth\":";
       Buffer.add_string buf (string_of_int entry.depth);
+      Buffer.add_string buf ",\"rule\":\"";
+      Buffer.add_string buf (escape_json entry.rule);
+      Buffer.add_char buf '"';
       Buffer.add_char buf '}')
     stats.rule_stat;
   Buffer.add_string buf "]}\n";

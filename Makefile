@@ -22,4 +22,5 @@ report:
 
 # Run the full pipeline and produce the HTML speedup report into output/.
 nightly all:
+	pipx intall uv
 	uv run ./nightly.py all

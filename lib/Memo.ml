@@ -764,7 +764,7 @@ let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> ac
 
 type memo_stats = { by_depth : by_depth Dynarray.t; rule_stat : rule_stat list }
 and by_depth = { depth : int; mutable node_count : int }
-and rule_stat = { size : int; sc : int; hit_count : int; insert_time : int; depth : int }
+and rule_stat = { size : int; sc : int; hit_count : int; insert_time : int; depth : int; rule : string }
 
 let memo_stats (m : memo) : memo_stats =
   let by_depth = Dynarray.create () in
@@ -782,6 +782,7 @@ let memo_stats (m : memo) : memo_stats =
             hit_count = st.step.hit;
             insert_time = st.step.insert_time;
             depth;
+            rule = Dependency.string_of_step st.step;
           }
           :: !rule_stat;
         match st.next with None -> () | Some child -> aux child (depth + 1))
