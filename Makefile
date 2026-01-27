@@ -3,23 +3,23 @@
 .PHONY: dependency build run profile compile-generated nightly all report
 
 dependency:
-	./nightly.py dependency
+	uv run ./nightly.py dependency
 
 build:
-	./nightly.py build
+	uv run ./nightly.py build
 
 compile-generated:
-	./nightly.py compile-generated
+	uv run ./nightly.py compile-generated
 
 run:
-	./nightly.py run
+	uv run ./nightly.py run
 
 profile:
-	./nightly.py profile
+	uv run ./nightly.py profile
 
 report:
-	./nightly.py report
+	uv run ./nightly.py report
 
 # Run the full pipeline and produce the HTML speedup report into output/.
 nightly all:
-	./nightly.py all
+	uv run ./nightly.py all
