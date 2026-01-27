@@ -12,15 +12,17 @@ body {
   margin: 0;
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   font-family: "Segoe UI", Helvetica, sans-serif;
   background: radial-gradient(circle at 20% 20%, #1f2937, #0f172a 55%);
   color: var(--text);
   padding: 32px;
 }
 main {
-  width: min(720px, 100%);
+  width: 100%;
+  max-width: none;
   padding: 32px;
   border-radius: 18px;
   border: 1px solid #1f2937;
@@ -42,7 +44,8 @@ p {
   color: var(--muted);
 }
 .panel {
-  width: min(960px, 100%);
+  width: 100%;
+  max-width: none;
   background: var(--card);
   border: 1px solid #1f2937;
   border-radius: 16px;
