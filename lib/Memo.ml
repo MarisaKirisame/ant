@@ -448,151 +448,36 @@ let join_reads (x : reads) (y : reads) : join_reads =
       ret)
 
 let reads_from_patterns (p : Pattern.pattern cek) : reads = map_ek Read.read_from_pattern p
-let string_of_trie (t : trie) : string = match t with Stem _ -> "Stem" | Branch _ -> "Branch"
-let reads_from_trie (t : trie) : reads = match t with Stem { reads; _ } -> reads | Branch { reads; _ } -> reads
+let string_of_trie (t : trie) : string = match t with Leaf _ -> "Leaf" | Branch _ -> "Branch"
 
-let set_reads_of_trie (t : trie) (r : reads) : trie =
-  match t with Stem x -> Stem { x with reads = r } | Branch x -> Branch { x with reads = r }
-
-let rec merge (x : trie) (y : trie) : trie =
-  let rebase_merging (delta : reads) (m : merging) : merging =
-    { reads = unmatch_reads delta m.reads; children = m.children; miss_count = 0 }
+let patterns_of_state (x : state) : Pattern.pattern cek =
+  let rec f (v : Value.value) =
+    if Generic.is_empty v then Generic.empty
+    else
+      let vt, vh = Generic.front_exn ~monoid ~measure v in
+      match vh with Words w -> Pattern.pattern_cons (Pattern.PCon w) (f vt) | Reference r -> failwith "impossible"
   in
-  match (x, y) with
-  | Stem x, Stem y -> (
-      let j = join_reads x.reads y.reads in
-      (*print_endline
-        ("Merging Stem/Stem:\n  x reads: " ^ string_of_reads x.reads ^ "\n  y reads: " ^ string_of_reads y.reads
-       ^ "\n  result:  " ^ string_of_reads j.reads ^ "\n  x_rest:  " ^ string_of_reads j.x_rest ^ "\n  y_rest:  "
-       ^ string_of_reads j.y_rest);*)
+  map_ek f x
+
+let rec insert (x : trie) (step : step) (before : state) (after : state) : trie =
+  match x with
+  | Leaf x -> (
+      let j = join_reads (reads_from_patterns x.step.src) (reads_from_patterns (patterns_of_state before)) in
       match (j.x_weaken, j.y_weaken) with
-      | true, true ->
-          let children = Hashtbl.create (module Int) in
-          let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
-          let y_key, y_reads = Option.value_exn (reads_hash (Lazy.force j.reads) y.reads) in
-          assert (x_key <> y_key);
-          Hashtbl.set children x_key (Stem { x with reads = x_reads });
-          Hashtbl.set children y_key (Stem { y with reads = y_reads });
-          Branch { reads = Lazy.force j.reads; children; merging = [] }
-      | false, true ->
-          let y_reads = Option.value_exn (match_reads x.reads y.reads) in
-          Stem { x with next = merge_option x.next (Some (Stem { y with reads = y_reads })) }
-      | true, false ->
-          let x_reads = Option.value_exn (match_reads y.reads x.reads) in
-          Stem { y with next = merge_option y.next (Some (Stem { x with reads = x_reads })) }
       | false, false ->
-          let next = merge_option x.next y.next in
-          if x.step.sc >= y.step.sc then Stem { x with next } else Stem { y with next })
-  | Stem x, Branch y -> (
-      let j = join_reads x.reads y.reads in
-      (*print_endline
-        ("Merging Stem/Branch:\n  x reads: " ^ string_of_reads x.reads ^ "\n  y reads: " ^ string_of_reads y.reads
-       ^ "\n  result:  " ^ string_of_reads j.reads ^ "\n  x_rest:  " ^ string_of_reads j.x_rest ^ "\n  y_rest:  "
-       ^ string_of_reads j.y_rest);*)
-      match (j.x_weaken, j.y_weaken) with
-      | true, true ->
-          let children = Hashtbl.create (module Int) in
-          let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
-          Hashtbl.set children x_key (Stem { x with reads = x_reads });
-          (*Hashtbl.iter y.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash (Lazy.force j.reads) (unmatch_reads y.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
-          Branch
-            {
-              reads = Lazy.force j.reads;
-              children;
-              merging = [];
-              (*{ reads = y.reads; children = y.children; miss_count = 0 }
-                :: List.map y.merging ~f:(rebase_merging y.reads);*)
-            }
-      | false, true ->
-          let y_reads = Option.value_exn (match_reads x.reads y.reads) in
-          Stem { x with next = merge_option x.next (Some (Branch { y with reads = y_reads })) }
-      | true, false ->
-          let x_key, x_reads = Option.value_exn (reads_hash y.reads x.reads) in
-          Hashtbl.update y.children x_key ~f:(insert_option (Stem { x with reads = x_reads }));
-          Branch y
-      | _ ->
-          failwith
-            ("merge not implemented yet for Stem/Branch:" ^ string_of_bool j.x_weaken ^ "," ^ string_of_bool j.y_weaken)
-      )
-  | Branch x, Stem y -> merge (Stem y) (Branch x)
-  | Branch x, Branch y -> (
-      let j = join_reads x.reads y.reads in
-      match (j.x_weaken, j.y_weaken) with
-      | true, true ->
-          let children = Hashtbl.create (module Int) in
-          (*
-          Hashtbl.iter x.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
-          Hashtbl.iter y.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
-          Branch
-            {
-              reads = Lazy.force j.reads;
-              children;
-              merging = [];
-              (*merging =
-                { reads = j.x_rest; children = x.children; miss_count = 0 }
-                :: List.map x.merging ~f:(rebase_merging j.x_rest)
-                @ { reads = j.y_rest; children = y.children; miss_count = 0 }
-                  :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
-            }
-      | true, false ->
-          (*
-          Hashtbl.iter x.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update y.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
-          Branch
-            {
-              reads = y.reads;
-              children = y.children;
-              merging = [];
-              (*merging =
-                { reads = j.x_rest; children = x.children; miss_count = 0 }
-                :: List.map x.merging ~f:(rebase_merging j.x_rest)
-                @ y.merging;*)
-            }
-      | false, true ->
-          (*Hashtbl.iter y.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update x.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
-          Branch
-            {
-              reads = x.reads;
-              children = x.children;
-              merging = [];
-              (*merging =
-                x.merging
-                @ { reads = j.y_rest; children = y.children; miss_count = 0 }
-                  :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
-            }
-      | _ ->
-          failwith
-            ("merge not implemented yet for Branch/Branch:" ^ string_of_bool j.x_weaken ^ ","
-           ^ string_of_bool j.y_weaken))
+          if x.step.sc > step.sc then Leaf x
+          else Leaf { step = { step with src = patterns_of_state before; dst = after } }
+      | x, y -> failwith ("insert leaf: unimplemented: " ^ string_of_bool x ^ ", " ^ string_of_bool y))
+  | Branch _ -> failwith "insert branch: unimplemented"
 
-and merge_option (x : trie option) (y : trie option) : trie option =
-  match (x, y) with None, _ -> y | _, None -> x | Some x, Some y -> Some (merge x y)
+and insert_option (x : trie option) (step : step) (before : state) (after : state) : trie =
+  match x with
+  | None -> Leaf { step = { step with src = patterns_of_state before; dst = after } }
+  | Some x -> insert x step before after
 
-and insert_option (x : trie) (y : trie option) : trie = match y with None -> x | Some y -> merge x y
-
-let insert_step (m : memo) (step : step) : unit =
+let insert_step (m : memo) (step : step) (before : state) (after : state) : unit =
   let start_time = Time_stamp_counter.now () in
-  Array.set m step.src.c.pc
-    (Some (insert_option (Stem { reads = reads_from_patterns step.src; step; next = None }) (Array.get m step.src.c.pc)));
+  Array.set m step.src.c.pc (Some (insert_option (Array.get m step.src.c.pc) step before after));
   let end_time = Time_stamp_counter.now () in
   let calibrator = Lazy.force Time_stamp_counter.calibrator in
   let elapsed_time =
@@ -604,47 +489,13 @@ let insert_step (m : memo) (step : step) : unit =
 
 let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step option =
   match trie with
-  | Stem st -> (
-      match values_hash st.reads value with
-      | None -> acc
-      | Some (_, value) -> (
-          let acc =
-            match acc with
-            | None -> Some st.step
-            | Some step' -> if st.step.sc > step'.sc then Some st.step else Some step'
-          in
-          match st.next with None -> acc | Some child -> lookup_step_aux value child acc))
-  | Branch br -> (
-      br.merging <-
-        List.filter_map br.merging ~f:(fun m ->
-            let merge m_trie =
-              let m_hash, m_reads =
-                reads_hash br.reads (unmatch_reads m.reads (reads_from_trie m_trie)) |> Option.value_exn
-              in
-              Hashtbl.update br.children m_hash ~f:(insert_option (set_reads_of_trie m_trie m_reads))
-            in
-            let on_miss () =
-              m.miss_count <- m.miss_count + 1;
-              if m.miss_count >= Hashtbl.length m.children then (
-                Hashtbl.iter m.children ~f:merge;
-                None)
-              else Some m
-            in
-            match values_hash m.reads value with
-            | None -> on_miss ()
-            | Some (key, _) -> (
-                match Hashtbl.find m.children key with
-                | None -> on_miss ()
-                | Some m_trie ->
-                    Hashtbl.remove m.children key;
-                    merge m_trie;
-                    Some m));
-      match values_hash br.reads value with
-      | None -> acc
-      | Some (key, value) -> (
-          match Hashtbl.find br.children key with
-          | None -> acc
-          | Some child_trie -> lookup_step_aux value child_trie acc))
+  | Leaf leaf ->
+      if Dependency.can_step_through leaf.step value then
+        match acc with
+        | None -> Some leaf.step
+        | Some acc_step -> if leaf.step.sc > acc_step.sc then Some leaf.step else acc
+      else acc
+  | Branch br -> failwith "lookup_step_aux branch: unimplemented"
 
 let lookup_step (value : state) (m : memo) : step option =
   let pc = value.c.pc in
@@ -665,7 +516,7 @@ let rec fold_bin (f : 'a -> 'a -> 'a) (acc : 'a option) (x : 'a bin) : 'a option
 type history = slice bin ref
 
 (* we dont really need state for composition, but it is good for bug catching. *)
-and slice = { state : state; step : step }
+and slice = { before : state; after : state; step : step }
 
 let exec_cek_slot = Profile.register_slot Profile.memo_profile "exec_cek"
 let step_through_slot = Profile.register_slot Profile.memo_profile "step_through"
@@ -706,13 +557,13 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
        reversed so the newest slice sits on the right-hand side during carry. *)
     let compose_slice (y : slice) (x : slice) =
       let step = Profile.with_slot compose_step_slot (fun () -> Dependency.compose_step x.step y.step) in
-      Profile.with_slot insert_step_slot (fun () -> insert_step m step);
+      Profile.with_slot insert_step_slot (fun () -> insert_step m step x.before y.after);
       (*let lookuped = lookup_step x.state m |> Option.value_exn in
       if lookuped != step then
         failwith
           ("composed step is different from looked up step:" ^ Dependency.string_of_step step ^ "lookuped: "
          ^ Dependency.string_of_step lookuped);*)
-      { state = x.state; step }
+      { before = x.before; after = y.after; step }
     in
     let rec exec state =
       if is_done state then state
@@ -722,19 +573,20 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
         i := !i + 1;
         match Profile.with_slot lookup_step_slot (fun () -> lookup_step state m) with
         | Some step ->
-            hist := inc compose_slice { state; step } !hist;
+            let after = dbg_step_through step state in
+            hist := inc compose_slice { before = state; after; step } !hist;
             sc := !sc + step.sc;
-            dbg_step_through step state |> exec
+            exec after
         | None ->
             let old = copy_state state in
             let w = make_world state m in
             state.c.step w;
             let step = Dependency.make_step old w.resolved m in
             sc := !sc + step.sc;
-            insert_step m step;
-            hist := inc compose_slice { state = old; step } !hist;
-            let st = dbg_step_through step old in
-            exec st)
+            let after = dbg_step_through step old in
+            insert_step m step old after;
+            hist := inc compose_slice { before = old; after; step } !hist;
+            exec after)
     in
     let state = exec state in
     assert (Dynarray.length state.e = 1);
@@ -773,22 +625,7 @@ let memo_stats (m : memo) : memo_stats =
     if Dynarray.length by_depth <= depth then Dynarray.add_last by_depth { depth; node_count = 0 };
     let node_stat = Dynarray.get by_depth depth in
     node_stat.node_count <- node_stat.node_count + 1;
-    match t with
-    | Stem st -> (
-        rule_stat :=
-          {
-            size = patterns_size st.step.src;
-            sc = st.step.sc;
-            hit_count = st.step.hit;
-            insert_time = st.step.insert_time;
-            depth;
-            rule = Dependency.string_of_step st.step;
-          }
-          :: !rule_stat;
-        match st.next with None -> () | Some child -> aux child (depth + 1))
-    | Branch br ->
-        Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1));
-        List.iter br.merging ~f:(fun m -> Hashtbl.iter m.children ~f:(fun child -> aux child (depth + 1)))
+    match t with Branch br -> Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1))
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
   { by_depth; rule_stat = !rule_stat }

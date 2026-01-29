@@ -20,11 +20,11 @@ and step = { src : pattern cek; dst : value cek; sc : int; mutable hit : int; mu
 and memo = trie option Array.t
 and reads = Read.read cek
 
-and trie =
-  | Stem of { reads : reads; step : step; next : trie option }
-  | Branch of { reads : reads; children : (int, trie) Hashtbl.t; mutable merging : merging list }
-
-and merging = { reads : reads; children : (int, trie) Hashtbl.t; mutable miss_count : int }
+(* We have redone the trie design.
+ * Now its leaf nodes are fully concrete, so there are no variables, and we build up branch bottom up via antiunification.
+ * The branch might carries rules according to its reads.
+ *)
+and trie = Leaf of { step : step } | Branch of { reads : reads; children : (int, trie) Hashtbl.t; step : step option }
 and world = { state : state; memo : memo; resolved : bool cek }
 
 let cek_get (cek : 'a cek) (src : Source.t) : 'a =
