@@ -39,4 +39,4 @@ jobs:
           OPAMYES: "true"
 
       - name: Run pipeline
-        run: opam exec -- make run
+        run: make all
