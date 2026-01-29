@@ -9,7 +9,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
+      - uses: astral-sh/setup-uv@v7
       - name: Cache opam switch
         uses: actions/cache@v4
         with:
@@ -37,6 +37,6 @@ jobs:
         run: opam install . --deps-only --with-test
         env:
           OPAMYES: "true"
-
+      - run: git submodule update --init
       - name: Run pipeline
-        run: opam exec -- make run
+        run: make all
