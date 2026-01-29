@@ -37,6 +37,6 @@ jobs:
         run: opam install . --deps-only --with-test
         env:
           OPAMYES: "true"
-
+      - run: git submodule update --init
       - name: Run pipeline
         run: make all
