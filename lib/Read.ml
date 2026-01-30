@@ -145,8 +145,6 @@ let rec unmatch_read (x : read) (y : read) : read =
         read_append yh (unmatch_read xt yt)
     | RCon c -> read_cons (RCon c) (unmatch_read xt y)
 
-type join = { result : read; x_rest : read; y_rest : read }
-
 let join_words_lcp_slot = Profile.register_slot Profile.memo_profile "join.words_lcp"
 
 let join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (result_acc : read Lazy.t) : read Lazy.t =
@@ -233,13 +231,55 @@ let join (x : read) (x_weaken : bool ref) (y : read) (y_weaken : bool ref) (resu
   and recurse x y result_acc =
     if Generic.is_empty x then (
       assert (Generic.is_empty y);
-      result_acc)
+      return result_acc)
     else
       let xh, xt = read_front_exn x in
       let yh, yt = read_front_exn y in
       loop xh xt yh yt result_acc
   in
   recurse x y result_acc
+
+let rec add (x : read) (x_weaken : bool ref) (y : Value.value) (y_weaken : bool ref) (result_acc : read Lazy.t) :
+    read Lazy.t =
+  let return x = x in
+  if Generic.is_empty x then (
+    assert (Generic.is_empty y);
+    return result_acc)
+  else
+    let xh, xt = read_front_exn x in
+    match xh with
+    | RRead xh | RSkip xh ->
+        let _, yt = Value.pop_n y xh in
+        return (add xt x_weaken yt y_weaken (lazy (read_snoc (Lazy.force result_acc) (RSkip xh))))
+    | RCon xh -> (
+        let yh, yt = Value.front_exn y in
+        match yh with
+        | Value.Words yh -> (
+            let lcp, xh, yh = Profile.with_slot join_words_lcp_slot (fun () -> Words.lcp xh yh) in
+            if Generic.is_empty lcp then (
+              x_weaken := true;
+              y_weaken := true;
+              return
+                (add (read_pop_n x 1) x_weaken
+                   (snd (Value.pop_n y 1))
+                   y_weaken
+                   (lazy (read_snoc (Lazy.force result_acc) (RRead 1)))))
+            else
+              match (Generic.is_empty xh, Generic.is_empty yh) with
+              | true, true -> return (add xt x_weaken yt y_weaken (lazy (read_snoc (Lazy.force result_acc) (RCon lcp))))
+              | true, false ->
+                  return
+                    (add xt x_weaken (Value.value_cons (Words yh) yt) y_weaken
+                       (lazy (read_snoc (Lazy.force result_acc) (RCon lcp))))
+              | false, true ->
+                  return
+                    (add (read_cons (RCon xh) xt) x_weaken yt y_weaken
+                       (lazy (read_snoc (Lazy.force result_acc) (RCon lcp))))
+              | false, false ->
+                  return
+                    (add (read_cons (RCon xh) xt) x_weaken (Value.value_cons (Words yh) yt) y_weaken
+                       (lazy (read_snoc (Lazy.force result_acc) (RCon lcp)))))
+        | Value.Reference _ -> failwith "impossible: reference in pattern match")
 
 let hash (x : int) (y : int) : int =
   let hash = Hashtbl.hash (x, y) in

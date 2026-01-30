@@ -239,9 +239,10 @@ let string_of_read (r : Read.read) : string =
   "[" ^ String.concat ~sep:";" (List.map ~f:string_of_red (Generic.to_list r)) ^ "]"
 
 let string_of_reads (r : reads) : string =
-  let k_str = "k: " ^ string_of_read r.k in
-  let e_str = "e: [" ^ String.concat ~sep:"; " (List.map ~f:string_of_read (Dynarray.to_list r.e)) ^ "]" in
-  "{" ^ e_str ^ k_str ^ "; " ^ "}"
+  let c_str = "c: " ^ string_of_int r.c.pc ^ ";" in
+  let k_str = "k: " ^ string_of_read r.k ^ ";" in
+  let e_str = "e: [" ^ String.concat ~sep:"; " (List.map ~f:string_of_read (Dynarray.to_list r.e)) ^ "];" in
+  "{" ^ c_str ^ " " ^ e_str ^ " " ^ k_str ^ "}"
 
 let values_hash_slot = Profile.register_slot Profile.memo_profile "values_hash"
 
@@ -447,6 +448,26 @@ let join_reads (x : reads) (y : reads) : join_reads =
       assert (reads_equal y (unmatch_reads ret.reads ret.y_rest));*)
       ret)
 
+let add_reads_slot = Profile.register_slot Profile.memo_profile "add_reads"
+
+type add_reads = { reads : reads Lazy.t; x_weaken : bool; y_weaken : bool }
+
+let add_reads (x : reads) (y : state) : add_reads =
+  Profile.with_slot join_reads_slot (fun () ->
+      (*print_endline "calling joining reads:";*)
+      let x_weaken = ref false in
+      let y_weaken = ref false in
+      let add a b =
+        let ret = Read.add a x_weaken b y_weaken (lazy Generic.empty) in
+        (*print_endline ("join reads:\n  " ^ string_of_read a ^ "\n  " ^ string_of_read b ^ "\n= " ^ string_of_read ret);*)
+        ret
+      in
+      let reads = zipwith_ek add x y in
+      let ret = { reads = lazy (map_ek Lazy.force reads); x_weaken = !x_weaken; y_weaken = !y_weaken } in
+      (*assert (reads_equal x (unmatch_reads ret.reads ret.x_rest));
+      assert (reads_equal y (unmatch_reads ret.reads ret.y_rest));*)
+      ret)
+
 let reads_from_patterns (p : Pattern.pattern cek) : reads = map_ek Read.read_from_pattern p
 let string_of_trie (t : trie) : string = match t with Leaf _ -> "Leaf" | Branch _ -> "Branch"
 
@@ -459,16 +480,82 @@ let patterns_of_state (x : state) : Pattern.pattern cek =
   in
   map_ek f x
 
+let patterns_of_reads (r : reads) : Pattern.pattern cek =
+  let rec f (read : Read.read) =
+    if Generic.is_empty read then Generic.empty
+    else
+      let rh, rt = Read.read_front_exn read in
+      match rh with
+      | Read.RRead n -> Pattern.pattern_cons (Pattern.PVar n) (f rt)
+      | Read.RSkip n -> Pattern.pattern_cons (Pattern.PVar n) (f rt)
+      | Read.RCon w -> Pattern.pattern_cons (Pattern.PCon w) (f rt)
+  in
+  map_ek f r
+
+(*todo: need fix*)
 let rec insert (x : trie) (step : step) (before : state) (after : state) : trie =
   match x with
   | Leaf x -> (
-      let j = join_reads (reads_from_patterns x.step.src) (reads_from_patterns (patterns_of_state before)) in
+      let x_reads = reads_from_patterns x.step.src in
+      let y_reads = reads_from_patterns (patterns_of_state before) in
+      let j = join_reads x_reads y_reads in
       match (j.x_weaken, j.y_weaken) with
       | false, false ->
           if x.step.sc > step.sc then Leaf x
           else Leaf { step = { step with src = patterns_of_state before; dst = after } }
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          let x_key, _ = Option.value_exn (reads_hash (Lazy.force j.reads) x_reads) in
+          let y_key, _ = Option.value_exn (reads_hash (Lazy.force j.reads) y_reads) in
+          assert (x_key <> y_key);
+          Hashtbl.set children x_key (Leaf x);
+          Hashtbl.set children y_key (Leaf { step = { step with src = patterns_of_state before; dst = after } });
+          let j_step =
+            let src = patterns_of_reads (Lazy.force j.reads) in
+            let inp = Dependency.pattern_to_value src in
+            if Dependency.can_step_through step inp then Some { step with src; dst = Dependency.step_through step inp }
+            else None
+          in
+          Branch { reads = Lazy.force j.reads; children; step = j_step }
       | x, y -> failwith ("insert leaf: unimplemented: " ^ string_of_bool x ^ ", " ^ string_of_bool y))
-  | Branch _ -> failwith "insert branch: unimplemented"
+  | Branch x -> (
+      let x_reads = x.reads in
+      let j = add_reads x_reads before in
+      match (j.x_weaken, j.y_weaken) with
+      | false, false -> (
+          let y_key, _ = Option.value_exn (values_hash (Lazy.force j.reads) before) in
+          let j_step =
+            if match x.step with None -> true | Some s -> s.sc < step.sc then
+              let src = patterns_of_reads (Lazy.force j.reads) in
+              let inp = Dependency.pattern_to_value src in
+              if Dependency.can_step_through step inp then
+                Some { step with src; dst = Dependency.step_through step inp }
+              else x.step
+            else x.step
+          in
+          match Hashtbl.find x.children y_key with
+          | None ->
+              Hashtbl.set x.children y_key (Leaf { step = { step with src = patterns_of_state before; dst = after } });
+              Branch { x with step = j_step }
+          | Some child ->
+              let new_child = insert child step before after in
+              Hashtbl.set x.children y_key new_child;
+              Branch { x with step = j_step })
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          let x_key, _ = Option.value_exn (reads_hash (Lazy.force j.reads) x_reads) in
+          let y_key, _ = Option.value_exn (values_hash (Lazy.force j.reads) before) in
+          assert (x_key <> y_key);
+          Hashtbl.set children x_key (Branch x);
+          Hashtbl.set children y_key (Leaf { step = { step with src = patterns_of_state before; dst = after } });
+          let j_step =
+            let src = patterns_of_reads (Lazy.force j.reads) in
+            let inp = Dependency.pattern_to_value src in
+            if Dependency.can_step_through step inp then Some { step with src; dst = Dependency.step_through step inp }
+            else None
+          in
+          Branch { reads = Lazy.force j.reads; children; step = j_step }
+      | _ -> failwith ("insert branch: unimplemented: " ^ string_of_bool j.x_weaken ^ ", " ^ string_of_bool j.y_weaken))
 
 and insert_option (x : trie option) (step : step) (before : state) (after : state) : trie =
   match x with
@@ -495,7 +582,22 @@ let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step
         | None -> Some leaf.step
         | Some acc_step -> if leaf.step.sc > acc_step.sc then Some leaf.step else acc
       else acc
-  | Branch br -> failwith "lookup_step_aux branch: unimplemented"
+  | Branch br -> (
+      match values_hash br.reads value with
+      | None -> acc
+      | Some (key, _) -> (
+          match Hashtbl.find br.children key with
+          | None -> acc
+          | Some child ->
+              let acc =
+                match (acc, br.step) with
+                | None, x -> x
+                | x, None -> x
+                | Some acc_step, Some br_step ->
+                    assert (Dependency.can_step_through br_step value);
+                    if br_step.sc > acc_step.sc then Some br_step else acc
+              in
+              lookup_step_aux value child acc))
 
 let lookup_step (value : state) (m : memo) : step option =
   let pc = value.c.pc in
@@ -625,7 +727,15 @@ let memo_stats (m : memo) : memo_stats =
     if Dynarray.length by_depth <= depth then Dynarray.add_last by_depth { depth; node_count = 0 };
     let node_stat = Dynarray.get by_depth depth in
     node_stat.node_count <- node_stat.node_count + 1;
-    match t with Branch br -> Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1))
+    match t with
+    | Branch br -> Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1))
+    | Leaf leaf ->
+        let size = patterns_size leaf.step.src in
+        let sc = leaf.step.sc in
+        let hit_count = leaf.step.hit in
+        let insert_time = leaf.step.insert_time in
+        let rule = Dependency.string_of_step leaf.step in
+        rule_stat := { size; sc; hit_count; insert_time; depth; rule } :: !rule_stat
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
   { by_depth; rule_stat = !rule_stat }
