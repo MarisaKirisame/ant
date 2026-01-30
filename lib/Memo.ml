@@ -589,7 +589,15 @@ and merge_option (x : trie option) (y : trie option) : trie option =
 
 and insert_option (x : trie) (y : trie option) : trie = match y with None -> x | Some y -> merge x y
 
+let pattern_size (p : Pattern.pattern) = Generic.size p
+let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
+let max_rule_size = 30
+
 let insert_step (m : memo) (step : step) : unit =
+  if patterns_size step.src > max_rule_size then (
+    step.insert_time <- 0;
+    ())
+  else
   let start_time = Time_stamp_counter.now () in
   Array.set m step.src.c.pc
     (Some (insert_option (Stem { reads = reads_from_patterns step.src; step; next = None }) (Array.get m step.src.c.pc)));
@@ -759,9 +767,6 @@ let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) =
   Dynarray.get_last (exec state).e
 
 let exec_done _ = failwith "exec is done, should not call step anymore"
-let pattern_size (p : Pattern.pattern) = Generic.size p
-let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
-
 type memo_stats = { by_depth : by_depth Dynarray.t; rule_stat : rule_stat list }
 and by_depth = { depth : int; mutable node_count : int }
 and rule_stat = { size : int; sc : int; hit_count : int; insert_time : int; depth : int; rule : string }
