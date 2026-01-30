@@ -591,7 +591,7 @@ and insert_option (x : trie) (y : trie option) : trie = match y with None -> x |
 
 let pattern_size (p : Pattern.pattern) = Generic.size p
 let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
-let max_rule_size = 30
+let max_rule_size = 25
 
 let insert_step (m : memo) (step : step) : unit =
   if patterns_size step.src > max_rule_size then (
