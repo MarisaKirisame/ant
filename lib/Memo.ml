@@ -598,17 +598,18 @@ let insert_step (m : memo) (step : step) : unit =
     step.insert_time <- 0;
     ())
   else
-  let start_time = Time_stamp_counter.now () in
-  Array.set m step.src.c.pc
-    (Some (insert_option (Stem { reads = reads_from_patterns step.src; step; next = None }) (Array.get m step.src.c.pc)));
-  let end_time = Time_stamp_counter.now () in
-  let calibrator = Lazy.force Time_stamp_counter.calibrator in
-  let elapsed_time =
-    Time_stamp_counter.diff end_time start_time
-    |> Time_stamp_counter.Span.to_time_ns_span ~calibrator
-    |> Core.Time_ns.Span.to_int63_ns |> Core.Int63.to_int_exn
-  in
-  step.insert_time <- elapsed_time
+    let start_time = Time_stamp_counter.now () in
+    Array.set m step.src.c.pc
+      (Some
+         (insert_option (Stem { reads = reads_from_patterns step.src; step; next = None }) (Array.get m step.src.c.pc)));
+    let end_time = Time_stamp_counter.now () in
+    let calibrator = Lazy.force Time_stamp_counter.calibrator in
+    let elapsed_time =
+      Time_stamp_counter.diff end_time start_time
+      |> Time_stamp_counter.Span.to_time_ns_span ~calibrator
+      |> Core.Time_ns.Span.to_int63_ns |> Core.Int63.to_int_exn
+    in
+    step.insert_time <- elapsed_time
 
 let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step option =
   match trie with
@@ -767,6 +768,7 @@ let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) =
   Dynarray.get_last (exec state).e
 
 let exec_done _ = failwith "exec is done, should not call step anymore"
+
 type memo_stats = { by_depth : by_depth Dynarray.t; rule_stat : rule_stat list }
 and by_depth = { depth : int; mutable node_count : int }
 and rule_stat = { size : int; sc : int; hit_count : int; insert_time : int; depth : int; rule : string }

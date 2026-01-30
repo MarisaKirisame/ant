@@ -507,6 +507,7 @@ let random_list =
     58;
   ]
 
-let random_list = random_list @ random_list @ random_list @ random_list @ random_list @ random_list @ random_list @ random_list
+let random_list =
+  random_list @ random_list @ random_list @ random_list @ random_list @ random_list @ random_list @ random_list
 
 let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) random_list LC.ENil
