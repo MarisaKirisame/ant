@@ -409,7 +409,7 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
       Buffer.add_string buf ",\"depth\":";
       Buffer.add_string buf (string_of_int entry.depth);
       Buffer.add_string buf ",\"rule\":\"";
-      Buffer.add_string buf (escape_json entry.rule);
+      Buffer.add_string buf "" (*escape_json (Lazy.force entry.rule)*);
       Buffer.add_char buf '"';
       Buffer.add_char buf '}')
     stats.rule_stat;
@@ -507,7 +507,5 @@ let random_list =
     58;
   ]
 
-let random_list =
-  random_list @ random_list @ random_list @ random_list @ random_list @ random_list @ random_list @ random_list
-
+let random_list = random_list @ random_list @ random_list
 let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) random_list LC.ENil
