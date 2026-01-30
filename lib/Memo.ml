@@ -594,7 +594,7 @@ let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> ac
 let max_rule_size = 25
 
 let insert_step (m : memo) (step : step) : unit =
-  if patterns_size step.src > max_rule_size then (
+  if false && patterns_size step.src > max_rule_size then (
     step.insert_time <- 0;
     ())
   else
