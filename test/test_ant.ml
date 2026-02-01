@@ -149,6 +149,12 @@ let setup_exec_cek_program () =
     1
 
 let test_exec_cek_basic () =
+  (* Component test (Memo.exec_cek):
+     - Build a tiny CEK program that pushes a constant (42) then halts.
+     - Run both exec_cek (memoized) and exec_cek_raw (non-memoized) and
+       assert they produce the same final word.
+     - Assert the memo counters are exactly (step=1, without_memo_step=1)
+       for this fixed program. *)
   setup_exec_cek_program ();
   let c = Memo.pc_to_exp (Common.int_to_pc 1) in
   let e = Stdlib.Dynarray.of_list [ Memo.from_int 7 ] in
@@ -181,6 +187,13 @@ let setup_compose_program () =
     2
 
 let test_dependency_steps () =
+  (* Component test (Dependency.make_step/step_through/compose_step):
+     - Execute two concrete CEK steps manually to get two successive states.
+     - make_step should capture each transition; step_through should replay it
+       to the same concrete state.
+     - compose_step should combine those two steps; replaying the composed
+       step from the original state should match the two-step final state.
+     - The composed step's sc must equal sc1 + sc2. *)
   setup_compose_program ();
   let memo = Memo.init_memo () in
   let start =
@@ -204,6 +217,12 @@ let test_dependency_steps () =
   assert (Dependency.state_equal replay_composed w2.state)
 
 let test_live_eval_expression () =
+  (* Component test (RunLiveCommon.eval_expression):
+     - Evaluate the fixed expression (1 + 2) via the Live CEK pipeline.
+     - Assert the returned value is VInt 3.
+     - Capture the exec_result passed to write_steps and assert it is present.
+     - Assert the memo counters are exactly (step=10, without_memo_step=11)
+       for this expression with a fresh memo. *)
   RunLiveCommon.LC.populate_state ();
   let memo = Memo.init_memo () in
   let captured = ref None in
@@ -218,6 +237,10 @@ let test_live_eval_expression () =
       assert (r.without_memo_step = 11)
 
 let test_integration_steps () =
+  (* Integration test (eval_steps_*.json fixtures):
+     - Read the checked-in make run outputs and assert fixed step counts.
+     - We check the first exec_time entry for each file to lock the baseline.
+     - We also assert the presence of a specific hazel candidate (33, 1375). *)
   assert_first_steps "eval_steps_simple.json" 2 2;
   assert_first_steps "eval_steps_left_to_right.json" 6 6;
   assert_first_steps "eval_steps_demand_driven.json" 6 6;
