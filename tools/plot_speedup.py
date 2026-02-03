@@ -39,6 +39,8 @@ from stats import (
 # Toggle the metric being reported. When True, plot wall-clock time speedups;
 # when False, plot evaluation-step speedups.
 REPORT_WALL_CLOCK_TIME = True
+# Toggle whether plots that show absolute time values use log scale.
+REPORT_ABSOLUTE_TIME_LOG_SCALE = True
 
 if REPORT_WALL_CLOCK_TIME:
     MEMO_KEY = "memo_profile"
@@ -100,11 +102,21 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
         linestyle="--",
         linewidth=1,
     )
-    plt.xscale("log")
-    plt.yscale("log")
+    if REPORT_WALL_CLOCK_TIME:
+        if REPORT_ABSOLUTE_TIME_LOG_SCALE:
+            plt.xscale("log")
+            plt.yscale("log")
+    else:
+        plt.xscale("log")
+        plt.yscale("log")
     plt.xlabel(f"Our ({METRIC_LABEL})")
     plt.ylabel(f"Their ({METRIC_LABEL})")
-    plt.title(f"Our vs Their ({METRIC_LABEL}, log-log)")
+    scale_label = (
+        "linear"
+        if REPORT_WALL_CLOCK_TIME and not REPORT_ABSOLUTE_TIME_LOG_SCALE
+        else "log-log"
+    )
+    plt.title(f"Our vs Their ({METRIC_LABEL}, {scale_label})")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.legend()
     plt.tight_layout()
@@ -226,6 +238,8 @@ def plot_rule_stat_insert_time(
     sizes = [entry.size for entry in rule_stat]
     insert_times = [entry.insert_time for entry in rule_stat]
     plt.scatter(sizes, insert_times, alpha=0.6)
+    if REPORT_ABSOLUTE_TIME_LOG_SCALE:
+        plt.yscale("log")
     plt.xlabel("Pattern size")
     plt.ylabel("Insert time (ns)")
     plt.title("Memo rule size vs insert time")
@@ -246,6 +260,8 @@ def plot_rule_stat_depth_insert_time(
     depths = [entry.depth for entry in rule_stat]
     insert_times = [entry.insert_time for entry in rule_stat]
     plt.scatter(depths, insert_times, alpha=0.6)
+    if REPORT_ABSOLUTE_TIME_LOG_SCALE:
+        plt.yscale("log")
     plt.xlabel("Depth")
     plt.ylabel("Insert time (ns)")
     plt.title("Memo rule depth vs insert time")
