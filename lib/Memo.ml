@@ -470,10 +470,12 @@ let rec merge (x : trie) (y : trie) : trie =
           let children = Hashtbl.create (module Int) in
           let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
           let y_key, y_reads = Option.value_exn (reads_hash (Lazy.force j.reads) y.reads) in
-          assert (x_key <> y_key);
-          Hashtbl.set children x_key (Stem { x with reads = x_reads });
-          Hashtbl.set children y_key (Stem { y with reads = y_reads });
-          Branch { reads = Lazy.force j.reads; children; merging = [] }
+          if x_key = y_key then Stem y (*todo: fix*)
+          else (
+            assert (x_key <> y_key);
+            Hashtbl.set children x_key (Stem { x with reads = x_reads });
+            Hashtbl.set children y_key (Stem { y with reads = y_reads });
+            Branch { reads = Lazy.force j.reads; children; merging = [] })
       | false, true ->
           let y_reads = Option.value_exn (match_reads x.reads y.reads) in
           Stem { x with next = merge_option x.next (Some (Stem { y with reads = y_reads })) }
@@ -514,6 +516,7 @@ let rec merge (x : trie) (y : trie) : trie =
           let x_key, x_reads = Option.value_exn (reads_hash y.reads x.reads) in
           Hashtbl.update y.children x_key ~f:(insert_option (Stem { x with reads = x_reads }));
           Branch y
+      | false, false -> (*weird case, i think due to hack on instantiation, todo: remove*) Branch y
       | _ ->
           failwith
             ("merge not implemented yet for Stem/Branch:" ^ string_of_bool j.x_weaken ^ "," ^ string_of_bool j.y_weaken)
@@ -682,6 +685,29 @@ let compose_step_slot = Profile.register_slot Profile.memo_profile "compose_step
 let insert_step_slot = Profile.register_slot Profile.memo_profile "insert_step"
 let lookup_step_slot = Profile.register_slot Profile.memo_profile "lookup_step"
 
+let instantiate (step : step) (state : state) : step =
+  let keep_last_count = 10 in
+  let join p v : Pattern.pattern =
+    let pvar_count = Pattern.pattern_pvar_count p in
+    let rec instantiate_aux p v (count : int) =
+      assert (count >= 0);
+      if count = 0 then p
+      else
+        let ph, pt = Pattern.pattern_front_exn p in
+        match ph with
+        | Pattern.PCon ph ->
+            let v = Option.value_exn (Value.unwords v ph) in
+            Pattern.pattern_cons (PCon ph) (instantiate_aux pt v count)
+        | Pattern.PVar ph ->
+            let vh, vt = Value.pop_n v ph in
+            Pattern.pattern_cons (PCon (Value.value_to_words vh)) (instantiate_aux pt vt (count - 1))
+    in
+    if pvar_count <= keep_last_count then p else instantiate_aux p v (pvar_count - keep_last_count)
+  in
+  let src = zipwith_ek join step.src state in
+  let dst : state = Dependency.step_through step (Dependency.pattern_to_value src) in
+  { step with src; dst }
+
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
   let run () =
     let raw_step s =
@@ -715,6 +741,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
        reversed so the newest slice sits on the right-hand side during carry. *)
     let compose_slice (y : slice) (x : slice) =
       let step = Profile.with_slot compose_step_slot (fun () -> Dependency.compose_step x.step y.step) in
+      let step = instantiate step x.state in
       Profile.with_slot insert_step_slot (fun () -> insert_step m step);
       (*let lookuped = lookup_step x.state m |> Option.value_exn in
       if lookuped != step then

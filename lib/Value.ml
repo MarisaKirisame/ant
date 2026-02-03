@@ -155,3 +155,8 @@ let unwords (v : value) (w : Words.words) : value option =
           Some ret
       | None -> None)
   | Reference _ -> None
+
+let value_to_words (v : value) : Words.words =
+  let vt, vh = Generic.front_exn ~measure ~monoid v in
+  assert (Generic.is_empty vt);
+  match vh with Words vh -> vh | _ -> failwith "impossible"
