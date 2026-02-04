@@ -5,17 +5,10 @@ module Hashtbl = Core.Hashtbl
 
 let doc_of_code (c : 'a code) : document = Ir.ir_to_doc (Code.to_ir c)
 let seq_fn name = from_ir (Ir.Function ("Seq." ^ name))
-let word_fn name = from_ir (Ir.Function ("Word." ^ name))
-let option_fn name = from_ir (Ir.Function ("Option." ^ name))
 let seq_set_constructor_degree = seq_fn "set_constructor_degree"
 let seq_from_constructor = seq_fn "from_constructor"
 let seq_from_int = seq_fn "from_int"
 let seq_appends_fn = seq_fn "appends"
-let seq_list_match = seq_fn "list_match"
-let seq_splits = seq_fn "splits"
-let seq_to_int = seq_fn "to_int"
-let word_get_value = word_fn "get_value"
-let option_get = option_fn "get"
 
 let list_literal_of_codes (xs : 'a code list) : 'a list code =
   code (string "[" ^^ separate (string "; ") (List.map doc_of_code xs) ^^ string "]")
@@ -41,21 +34,6 @@ let with_registered_constructor (e : env) con_name types k =
   let constructor_index = Hashtbl.length e.ctag in
   Hashtbl.add_exn ~key:con_name ~data:constructor_index e.ctag;
   k ~params ~arity ~constructor_index
-
-let compile_ocaml_adt adt_name ctors =
-  let ctor_doc (con_name, types, _) =
-    let head = string con_name in
-    match types with
-    | [] -> head
-    | _ ->
-        head ^^ space ^^ string "of" ^^ space ^^ separate (space ^^ string "*" ^^ space) (List.map compile_seq_ty types)
-  in
-  let cases =
-    match ctors with
-    | [] -> empty
-    | _ -> break 1 ^^ string "|" ^^ space ^^ separate_map (break 1 ^^ string "|" ^^ space) ctor_doc ctors
-  in
-  string "type ocaml_" ^^ string adt_name ^^ space ^^ string "=" ^^ nest 2 cases
 
 let compile_adt_constructors (e : env) adt_name ctors =
   separate_map (break 1)
@@ -86,71 +64,37 @@ let compile_adt_constructors (e : env) adt_name ctors =
           group set_constructor_degree_doc ^^ break 1 ^^ group register_constructor_doc))
     ctors
 
-let compile_adt_ffi e adt_name ctors =
-  let from_case (con_name, types, _) =
-    let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
-    let pattern =
-      match params with
-      | [] -> string con_name
-      | _ -> string con_name ^^ parens (separate (comma ^^ space) (List.map (fun (_, name) -> string name) params))
-    in
-    let body =
-      string adt_name ^^ string "_" ^^ string con_name
-      ^^ match params with [] -> empty | _ -> space ^^ separate space (List.map (fun (_, name) -> string name) params)
-    in
-    group @@ align @@ string "| " ^^ pattern ^^ space ^^ string "->" ^^ nest 2 (break 1 ^^ body)
+let compile_adt (e : env) (tb : 'a ty_binding) =
+  let compile_conv is_to ty v =
+    match ty with
+    | TInt ->
+        if is_to then string "(Seq.to_int " ^^ v ^^ string ")" else string "(Seq.from_int " ^^ v ^^ string ")"
+    | TNamed _ -> v
+    | _ -> failwith (Printf.sprintf "Unsupported type: %s" (Syntax.string_of_document @@ Syntax.pp_ty ty))
   in
-  let from_ocaml_doc =
-    group @@ string "let from_ocaml_" ^^ string adt_name ^^ space ^^ string "x ="
-    ^^ nest 2
-         (break 1 ^^ string "match" ^^ space ^^ string "x" ^^ space ^^ string "with"
-         ^^ concat_map (fun case -> break 1 ^^ case) (List.map from_case ctors))
+  let ops : 'a CompileFfi.ops =
+    {
+      type_name_of = (fun name -> "ocaml_" ^ name);
+      compile_ty = compile_seq_ty;
+      compile_conv = (fun ~is_to ty v -> compile_conv is_to ty v);
+      appends = (fun xs -> string "Seq.appends" ^^ space ^^ brackets (separate (semi ^^ space) xs));
+      from_constructor = (fun tag -> string "Seq.from_constructor" ^^ space ^^ tag);
+      list_match = (fun v -> string "Seq.list_match" ^^ space ^^ v);
+      word_get_value = (fun v -> string "Word.get_value" ^^ space ^^ v);
+      splits = (fun v -> string "Seq.splits" ^^ space ^^ v);
+      splits_n = (fun _ -> None);
+      tag_expr = (fun ~cname:_ ~tag_id -> string (string_of_int tag_id));
+      match_tag = (fun ~cname:_ ~tag_id -> string "|" ^^ space ^^ string (string_of_int tag_id) ^^ space ^^ string "->");
+    }
   in
-  let to_case (con_name, types, _) =
-    let params = List.mapi (fun i ty -> (ty, "x" ^ string_of_int i)) types in
-    let tag = string (string_of_int (Hashtbl.find_exn e.ctag con_name)) in
-    let value_doc =
-      match params with
-      | [] -> string con_name
-      | _ ->
-          let binding =
-            string "let ["
-            ^^ separate (string "; ") (List.map (fun (_, name) -> string name) params)
-            ^^ string "] = "
-            ^^ doc_of_code (app_ seq_splits (var "t"))
-            ^^ space ^^ string "in"
-          in
-          let converted_args =
-            separate (comma ^^ space)
-              (List.map
-                 (fun (ty, name) ->
-                   match ty with
-                   | TInt -> doc_of_code (app_ seq_to_int (var name))
-                   | TNamed _ -> string name
-                   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_ty ty))
-                 params)
-          in
-          binding ^^ break 1 ^^ string con_name ^^ parens converted_args
-    in
-    group @@ align @@ string "| " ^^ tag ^^ space ^^ string "->" ^^ nest 2 (break 1 ^^ value_doc)
+  let type_defs = CompileFfi.compile_type_defs ops tb in
+  let constructors =
+    match tb with
+    | TBOne (adt_name, Enum { ctors; _ }) -> compile_adt_constructors e adt_name ctors
+    | TBRec _ -> failwith "Not implemented (TODO)"
   in
-  let default_case = string "| _ -> failwith \"unreachable\"" in
-  let to_ocaml_doc =
-    group @@ string "let to_ocaml_" ^^ string adt_name ^^ space ^^ string "x ="
-    ^^ nest 2
-         (break 1 ^^ string "let (h, t) = "
-         ^^ doc_of_code (app_ option_get (app_ seq_list_match (var "x")))
-         ^^ space ^^ string "in" ^^ break 1 ^^ string "match "
-         ^^ parens (doc_of_code (app_ word_get_value (var "h")))
-         ^^ space ^^ string "with"
-         ^^ concat_map (fun case -> break 1 ^^ case) (List.map to_case ctors @ [ default_case ]))
-  in
-  from_ocaml_doc ^^ break 1 ^^ to_ocaml_doc
-
-let compile_adt (e : env) adt_name ctors =
-  let generate_ocaml_adt = compile_ocaml_adt adt_name ctors in
-  let generate_adt_constructors = compile_adt_constructors e adt_name ctors in
-  generate_ocaml_adt ^^ break 1 ^^ generate_adt_constructors ^^ break 1 ^^ compile_adt_ffi e adt_name ctors
+  let conversions = CompileFfi.compile_conversions ops e.ctag tb in
+  type_defs ^^ break 1 ^^ constructors ^^ break 1 ^^ conversions
 
 let rec compile_pp_expr (e : 'a expr) : document =
   match e with
@@ -174,7 +118,7 @@ let rec compile_pp_expr (e : 'a expr) : document =
 
 let compile_pp_stmt (e : env) (s : 'a stmt) : document =
   match s with
-  | Type (TBOne (name, Enum { params = _; ctors })) -> (* TODO *) compile_adt e name ctors
+  | Type (TBOne _ as tb) -> compile_adt e tb
   | Type (TBRec _) -> failwith "Not implemented (TODO)"
   | Term (BSeq (tm, _)) -> compile_pp_expr tm
   | Term (BOne (x, tm, _)) ->

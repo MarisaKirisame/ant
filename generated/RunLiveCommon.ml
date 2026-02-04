@@ -70,132 +70,6 @@ let rec nat_from_int i =
 
 let rec int_of_nat = function LC.Z -> 0 | LC.S n -> 1 + int_of_nat n
 
-(*
-   LivePlain defines its own (non-memoised) versions of the datatypes that LiveCEK
-   uses.  To run the plain interpreter while reusing the existing printers and
-   helpers (which are written for LiveCEK values), we convert back and forth.
-*)
-
-let rec lp_nat_of_lc = function LC.Z -> LP.Z | LC.S n -> LP.S (lp_nat_of_lc n)
-let rec lc_nat_of_lp = function LP.Z -> LC.Z | LP.S n -> LC.S (lc_nat_of_lp n)
-let lp_option_of_lc f = function LC.None -> LP.None | LC.Some x -> LP.Some (f x)
-let lc_option_of_lp f = function LP.None -> LC.None | LP.Some x -> LC.Some (f x)
-let rec lp_list_of_lc f = function LC.Nil -> LP.Nil | LC.Cons (h, t) -> LP.Cons (f h, lp_list_of_lc f t)
-let rec lc_list_of_lp f = function LP.Nil -> LC.Nil | LP.Cons (h, t) -> LC.Cons (f h, lc_list_of_lp f t)
-
-let rec lp_expr_of_lc = function
-  | LC.EInt i -> LP.EInt i
-  | LC.EPlus (l, r) -> LP.EPlus (lp_expr_of_lc l, lp_expr_of_lc r)
-  | LC.ELt (l, r) -> LP.ELt (lp_expr_of_lc l, lp_expr_of_lc r)
-  | LC.ELe (l, r) -> LP.ELe (lp_expr_of_lc l, lp_expr_of_lc r)
-  | LC.EGt (l, r) -> LP.EGt (lp_expr_of_lc l, lp_expr_of_lc r)
-  | LC.EGe (l, r) -> LP.EGe (lp_expr_of_lc l, lp_expr_of_lc r)
-  | LC.EVar n -> LP.EVar (lp_nat_of_lc n)
-  | LC.EAbs b -> LP.EAbs (lp_expr_of_lc b)
-  | LC.EApp (f, x) -> LP.EApp (lp_expr_of_lc f, lp_expr_of_lc x)
-  | LC.ELet (l, r) -> LP.ELet (lp_expr_of_lc l, lp_expr_of_lc r)
-  | LC.ETrue -> LP.ETrue
-  | LC.EFalse -> LP.EFalse
-  | LC.EIf (c, t, e) -> LP.EIf (lp_expr_of_lc c, lp_expr_of_lc t, lp_expr_of_lc e)
-  | LC.ENil -> LP.ENil
-  | LC.ECons (h, t) -> LP.ECons (lp_expr_of_lc h, lp_expr_of_lc t)
-  | LC.EMatchList (v, n, c) -> LP.EMatchList (lp_expr_of_lc v, lp_expr_of_lc n, lp_expr_of_lc c)
-  | LC.EPair (a, b) -> LP.EPair (lp_expr_of_lc a, lp_expr_of_lc b)
-  | LC.EZro p -> LP.EZro (lp_expr_of_lc p)
-  | LC.EFst p -> LP.EFst (lp_expr_of_lc p)
-  | LC.EFix b -> LP.EFix (lp_expr_of_lc b)
-  | LC.EHole id -> LP.EHole (lp_option_of_lc (fun x -> x) id)
-  | LC.EUnit -> LP.EUnit
-
-let rec lc_expr_of_lp = function
-  | LP.EInt i -> LC.EInt i
-  | LP.EPlus (l, r) -> LC.EPlus (lc_expr_of_lp l, lc_expr_of_lp r)
-  | LP.ELt (l, r) -> LC.ELt (lc_expr_of_lp l, lc_expr_of_lp r)
-  | LP.ELe (l, r) -> LC.ELe (lc_expr_of_lp l, lc_expr_of_lp r)
-  | LP.EGt (l, r) -> LC.EGt (lc_expr_of_lp l, lc_expr_of_lp r)
-  | LP.EGe (l, r) -> LC.EGe (lc_expr_of_lp l, lc_expr_of_lp r)
-  | LP.EVar n -> LC.EVar (lc_nat_of_lp n)
-  | LP.EAbs b -> LC.EAbs (lc_expr_of_lp b)
-  | LP.EApp (f, x) -> LC.EApp (lc_expr_of_lp f, lc_expr_of_lp x)
-  | LP.ELet (l, r) -> LC.ELet (lc_expr_of_lp l, lc_expr_of_lp r)
-  | LP.ETrue -> LC.ETrue
-  | LP.EFalse -> LC.EFalse
-  | LP.EIf (c, t, e) -> LC.EIf (lc_expr_of_lp c, lc_expr_of_lp t, lc_expr_of_lp e)
-  | LP.ENil -> LC.ENil
-  | LP.ECons (h, t) -> LC.ECons (lc_expr_of_lp h, lc_expr_of_lp t)
-  | LP.EMatchList (v, n, c) -> LC.EMatchList (lc_expr_of_lp v, lc_expr_of_lp n, lc_expr_of_lp c)
-  | LP.EPair (a, b) -> LC.EPair (lc_expr_of_lp a, lc_expr_of_lp b)
-  | LP.EZro p -> LC.EZro (lc_expr_of_lp p)
-  | LP.EFst p -> LC.EFst (lc_expr_of_lp p)
-  | LP.EFix b -> LC.EFix (lc_expr_of_lp b)
-  | LP.EHole id -> LC.EHole (lc_option_of_lp (fun x -> x) id)
-  | LP.EUnit -> LC.EUnit
-
-let rec lp_vtype_of_lc = function
-  | LC.VTInt -> LP.VTInt
-  | LC.VTFunc -> LP.VTFunc
-  | LC.VTBool -> LP.VTBool
-  | LC.VTList -> LP.VTList
-  | LC.VTPair -> LP.VTPair
-
-let rec lc_vtype_of_lp = function
-  | LP.VTInt -> LC.VTInt
-  | LP.VTFunc -> LC.VTFunc
-  | LP.VTBool -> LC.VTBool
-  | LP.VTList -> LC.VTList
-  | LP.VTPair -> LC.VTPair
-
-let rec lp_value_of_lc = function
-  | LC.VInt i -> LP.VInt i
-  | LC.VAbs (body, env) -> LP.VAbs (lp_expr_of_lc body, lp_list_of_lc lp_value_of_lc env)
-  | LC.VUnit -> LP.VUnit
-  | LC.VTrue -> LP.VTrue
-  | LC.VFalse -> LP.VFalse
-  | LC.VNil -> LP.VNil
-  | LC.VCons (h, t) -> LP.VCons (lp_value_of_lc h, lp_value_of_lc t)
-  | LC.VPair (a, b) -> LP.VPair (lp_value_of_lc a, lp_value_of_lc b)
-  | LC.VFix (body, env) -> LP.VFix (lp_expr_of_lc body, lp_list_of_lc lp_value_of_lc env)
-  | LC.VStuck s -> LP.VStuck (lp_stuck_of_lc s)
-
-and lc_value_of_lp = function
-  | LP.VInt i -> LC.VInt i
-  | LP.VAbs (body, env) -> LC.VAbs (lc_expr_of_lp body, lc_list_of_lp lc_value_of_lp env)
-  | LP.VUnit -> LC.VUnit
-  | LP.VTrue -> LC.VTrue
-  | LP.VFalse -> LC.VFalse
-  | LP.VNil -> LC.VNil
-  | LP.VCons (h, t) -> LC.VCons (lc_value_of_lp h, lc_value_of_lp t)
-  | LP.VPair (a, b) -> LC.VPair (lc_value_of_lp a, lc_value_of_lp b)
-  | LP.VFix (body, env) -> LC.VFix (lc_expr_of_lp body, lc_list_of_lp lc_value_of_lp env)
-  | LP.VStuck s -> LC.VStuck (lc_stuck_of_lp s)
-
-and lp_stuck_of_lc = function
-  | LC.SHole (id, env) -> LP.SHole (lp_option_of_lc (fun x -> x) id, lp_list_of_lc lp_value_of_lc env)
-  | LC.STypeError (v, ty) -> LP.STypeError (lp_value_of_lc v, lp_vtype_of_lc ty)
-  | LC.SIndexError -> LP.SIndexError
-  | LC.SApp (s, e) -> LP.SApp (lp_stuck_of_lc s, lp_expr_of_lc e)
-  | LC.SAdd0 (s, e) -> LP.SAdd0 (lp_stuck_of_lc s, lp_expr_of_lc e)
-  | LC.SAdd1 (v, s) -> LP.SAdd1 (lp_value_of_lc v, lp_stuck_of_lc s)
-  | LC.SGt0 (s, e) -> LP.SGt0 (lp_stuck_of_lc s, lp_expr_of_lc e)
-  | LC.SGt1 (v, s) -> LP.SGt1 (lp_value_of_lc v, lp_stuck_of_lc s)
-  | LC.SIf (s, t, e) -> LP.SIf (lp_stuck_of_lc s, lp_expr_of_lc t, lp_expr_of_lc e)
-  | LC.SMatchList (s, n, c) -> LP.SMatchList (lp_stuck_of_lc s, lp_expr_of_lc n, lp_expr_of_lc c)
-  | LC.SZro s -> LP.SZro (lp_stuck_of_lc s)
-  | LC.SFst s -> LP.SFst (lp_stuck_of_lc s)
-
-and lc_stuck_of_lp = function
-  | LP.SHole (id, env) -> LC.SHole (lc_option_of_lp (fun x -> x) id, lc_list_of_lp lc_value_of_lp env)
-  | LP.STypeError (v, ty) -> LC.STypeError (lc_value_of_lp v, lc_vtype_of_lp ty)
-  | LP.SIndexError -> LC.SIndexError
-  | LP.SApp (s, e) -> LC.SApp (lc_stuck_of_lp s, lc_expr_of_lp e)
-  | LP.SAdd0 (s, e) -> LC.SAdd0 (lc_stuck_of_lp s, lc_expr_of_lp e)
-  | LP.SAdd1 (v, s) -> LC.SAdd1 (lc_value_of_lp v, lc_stuck_of_lp s)
-  | LP.SGt0 (s, e) -> LC.SGt0 (lc_stuck_of_lp s, lc_expr_of_lp e)
-  | LP.SGt1 (v, s) -> LC.SGt1 (lc_value_of_lp v, lc_stuck_of_lp s)
-  | LP.SIf (s, t, e) -> LC.SIf (lc_stuck_of_lp s, lc_expr_of_lp t, lc_expr_of_lp e)
-  | LP.SMatchList (s, n, c) -> LC.SMatchList (lc_stuck_of_lp s, lc_expr_of_lp n, lc_expr_of_lp c)
-  | LP.SZro s -> LC.SZro (lc_stuck_of_lp s)
-  | LP.SFst s -> LC.SFst (lc_stuck_of_lp s)
 
 let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
   let rec aux ctx = function
@@ -417,26 +291,15 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
   Buffer.output_buffer oc buf;
   flush oc
 
-(* Evaluate using the direct (non-CEK) interpreter defined in LivePlain.  We expose
-   the same LC.value interface by converting the input expression and environment
-   to LivePlain, running it, then converting the resulting value back.  Timing is
-   recorded via the shared profiler and consumed by write_steps_json. *)
+(* Evaluate using the direct (non-CEK) interpreter defined in LivePlain.  LivePlain
+   shares types with LiveCEK, so no conversion is necessary.  Timing is recorded via
+   the shared profiler and consumed by write_steps_json. *)
 let eval_plain_slot = Profile.register_slot Profile.plain_profile "eval_plain"
-let eval_cek_slot = Profile.register_slot Profile.cek_profile "eval_cek"
 
 let eval_plain (expr : LC.expr) : LC.value =
   let env = LC.Nil in
-  let lp_expr = lp_expr_of_lc expr in
-  let lp_env = lp_list_of_lc lp_value_of_lc env in
   Gc.full_major ();
-  let lp_result = Profile.with_slot eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
-  (*lc_value_of_lp lp_result*)
-  Profile.with_slot eval_cek_slot (fun () ->
-      LC.to_ocaml_value
-        (Memo.exec_cek_raw
-           (Memo.pc_to_exp (Common.int_to_pc 4))
-           (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
-           (Memo.from_constructor LC.tag_cont_done)))
+  Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env)
 
 let eval_expression ~memo ~write_steps x =
   let exec_res = LC.eval memo (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in

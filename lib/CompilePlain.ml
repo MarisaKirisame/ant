@@ -5,6 +5,9 @@ open Memo
 open State
 open Code
 
+let type_alias_module : string option ref = ref None
+let set_type_alias_module value = type_alias_module := value
+
 let rec compile_ty (x : 'a ty) : document =
   match x with
   | TUnit -> string "unit"
@@ -33,6 +36,33 @@ let compile_type_binding x =
   | TBRec decls ->
       string "type "
       ^^ separate_map (hardline ^^ string "and ") (fun (name, ty_kind) -> comple_type_decl name ty_kind) decls
+
+let compile_type_alias module_name =
+  let params_decl params =
+    match params with
+    | [] -> empty
+    | [ x ] -> string ("'" ^ x) ^^ space
+    | _ ->
+        parens (separate_map (string ", ") (fun p -> string ("'" ^ p)) params) ^^ space
+  in
+  let params_use params =
+    match params with
+    | [] -> empty
+    | [ x ] -> string ("'" ^ x) ^^ space
+    | _ ->
+        parens (separate_map (string ", ") (fun p -> string ("'" ^ p)) params) ^^ space
+  in
+  let alias_decl name params =
+    params_decl params ^^ string name ^^ space ^^ string "=" ^^ space ^^ params_use params
+    ^^ string module_name ^^ string "." ^^ string name
+  in
+  function
+  | TBOne (name, Enum { params; _ }) -> string "type " ^^ alias_decl name params
+  | TBRec decls ->
+      string "type "
+      ^^ separate_map (hardline ^^ string "and ")
+           (fun (name, Enum { params; _ }) -> alias_decl name params)
+           decls
 
 let rec compile_pat (p : 'a pattern) : document =
   match p with
@@ -87,7 +117,10 @@ and compile_let (p, e, _) = parens_compile_pat p ^^ string " = " ^^ parens (comp
 
 let compile_stmt (x : 'a stmt) : document =
   match x with
-  | Type tb -> compile_type_binding tb
+  | Type tb -> (
+      match !type_alias_module with
+      | None -> compile_type_binding tb
+      | Some module_name -> compile_type_alias module_name tb)
   | Term (BSeq (e, _)) -> compile_expr e
   | Term (BOne (pat, e, _) | BRec [ (pat, e, _) ]) ->
       string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
@@ -95,7 +128,10 @@ let compile_stmt (x : 'a stmt) : document =
 
 let compile_plain (xs : 'a stmt list) : document =
   let ys = List.map compile_stmt xs in
-  separate (string ";;" ^^ hardline ^^ hardline) ys
+  let body = separate (string ";;" ^^ hardline ^^ hardline) ys in
+  match !type_alias_module with
+  | None -> body
+  | Some module_name -> string "open " ^^ string module_name ^^ hardline ^^ hardline ^^ body
 
 module Backend = struct
   let compile (stmts, _) = compile_plain stmts
