@@ -70,7 +70,6 @@ let rec nat_from_int i =
 
 let rec int_of_nat = function LC.Z -> 0 | LC.S n -> 1 + int_of_nat n
 
-
 let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
   let rec aux ctx = function
     | NEInt i -> LC.EInt i

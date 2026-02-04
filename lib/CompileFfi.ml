@@ -1,6 +1,5 @@
 open PPrint
 open Syntax
-
 module Hashtbl = Core.Hashtbl
 
 type 'a ops = {
@@ -30,12 +29,10 @@ let compile_type_defs (ops : 'a ops) (binding : 'a ty_binding) : document =
       match params with
       | [] -> empty
       | [ x ] -> string "'" ^^ string x ^^ space
-      | _ ->
-          parens (separate_map (string ",") (fun param -> string "'" ^^ string param) params) ^^ space
+      | _ -> parens (separate_map (string ",") (fun param -> string "'" ^^ string param) params) ^^ space
     in
     (if is_and then string "and" else string "type")
-    ^^ space
-    ^^ params_doc
+    ^^ space ^^ params_doc
     ^^ string (ops.type_name_of name)
     ^^ space ^^ string "="
     ^^
@@ -81,8 +78,7 @@ let compile_conversions (ops : 'a ops) (ctx : (string, int) Hashtbl.t) (binding 
             let lhs = if arity > 1 then parens (separate (comma ^^ space) vars) else List.hd vars in
             break 1 ^^ string "let" ^^ space ^^ lhs ^^ space ^^ equals ^^ space ^^ rhs ^^ space ^^ string "in"
         | None ->
-            break 1
-            ^^ string "let args_list = "
+            break 1 ^^ string "let args_list = "
             ^^ ops.splits (string "t")
             ^^ string " in"
             ^^ concat_map
@@ -125,11 +121,12 @@ let compile_conversions (ops : 'a ops) (ctx : (string, int) Hashtbl.t) (binding 
       ^^ string ("to_ocaml_" ^ name)
       ^^ space ^^ params_pat_to ^^ string "x ="
       ^^ nest 2
-           (break 1
-           ^^ string "let h, t = Option.get (" ^^ ops.list_match (string "x") ^^ string ") in"
-           ^^ break 1 ^^ string "match " ^^ ops.word_get_value (string "h") ^^ string " with"
-           ^^ concat_map compile_to_ctor ctors
-           ^^ break 1 ^^ string "| _ -> failwith \"unreachable\"")
+           (break 1 ^^ string "let h, t = Option.get ("
+           ^^ ops.list_match (string "x")
+           ^^ string ") in" ^^ break 1 ^^ string "match "
+           ^^ ops.word_get_value (string "h")
+           ^^ string " with" ^^ concat_map compile_to_ctor ctors ^^ break 1
+           ^^ string "| _ -> failwith \"unreachable\"")
     in
     (header_from, header_to)
   in
