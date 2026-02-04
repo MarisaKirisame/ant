@@ -67,8 +67,7 @@ let compile_adt_constructors (e : env) adt_name ctors =
 let compile_adt (e : env) (tb : 'a ty_binding) =
   let compile_conv is_to ty v =
     match ty with
-    | TInt ->
-        if is_to then string "(Seq.to_int " ^^ v ^^ string ")" else string "(Seq.from_int " ^^ v ^^ string ")"
+    | TInt -> if is_to then string "(Seq.to_int " ^^ v ^^ string ")" else string "(Seq.from_int " ^^ v ^^ string ")"
     | TNamed _ -> v
     | _ -> failwith (Printf.sprintf "Unsupported type: %s" (Syntax.string_of_document @@ Syntax.pp_ty ty))
   in

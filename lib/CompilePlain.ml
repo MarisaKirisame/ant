@@ -42,27 +42,23 @@ let compile_type_alias module_name =
     match params with
     | [] -> empty
     | [ x ] -> string ("'" ^ x) ^^ space
-    | _ ->
-        parens (separate_map (string ", ") (fun p -> string ("'" ^ p)) params) ^^ space
+    | _ -> parens (separate_map (string ", ") (fun p -> string ("'" ^ p)) params) ^^ space
   in
   let params_use params =
     match params with
     | [] -> empty
     | [ x ] -> string ("'" ^ x) ^^ space
-    | _ ->
-        parens (separate_map (string ", ") (fun p -> string ("'" ^ p)) params) ^^ space
+    | _ -> parens (separate_map (string ", ") (fun p -> string ("'" ^ p)) params) ^^ space
   in
   let alias_decl name params =
-    params_decl params ^^ string name ^^ space ^^ string "=" ^^ space ^^ params_use params
-    ^^ string module_name ^^ string "." ^^ string name
+    params_decl params ^^ string name ^^ space ^^ string "=" ^^ space ^^ params_use params ^^ string module_name
+    ^^ string "." ^^ string name
   in
   function
   | TBOne (name, Enum { params; _ }) -> string "type " ^^ alias_decl name params
   | TBRec decls ->
       string "type "
-      ^^ separate_map (hardline ^^ string "and ")
-           (fun (name, Enum { params; _ }) -> alias_decl name params)
-           decls
+      ^^ separate_map (hardline ^^ string "and ") (fun (name, Enum { params; _ }) -> alias_decl name params) decls
 
 let rec compile_pat (p : 'a pattern) : document =
   match p with

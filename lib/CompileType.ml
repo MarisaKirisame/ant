@@ -51,9 +51,9 @@ let compile_ty_binding (ctx : (string, int) Core.Hashtbl.t) (binding : 'a ty_bin
         (fun ~cname ~tag_id ->
           string "|" ^^ space
           ^^ string (string_of_int tag_id)
-          ^^ space ^^ string "(*" ^^ space ^^ string ("tag_" ^ cname) ^^ space ^^ string "*) ->");
+          ^^ space ^^ string "(*" ^^ space
+          ^^ string ("tag_" ^ cname)
+          ^^ space ^^ string "*) ->");
     }
   in
-  CompileFfi.compile_type_defs ops binding
-  ^^ hardline
-  ^^ CompileFfi.compile_conversions ops ctx binding
+  CompileFfi.compile_type_defs ops binding ^^ hardline ^^ CompileFfi.compile_conversions ops ctx binding

@@ -20,8 +20,8 @@ let parse content =
       Printf.eprintf "Lexing error at line %d, character %d: %s\n" line cnum @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input output print_ast compile_pat compile_ant type_alias (module Backend : Compile.Backend) typing print_level
-    print_cps_transformed print_de print_cps_de =
+let driver input output print_ast compile_pat compile_ant type_alias (module Backend : Compile.Backend) typing
+    print_level print_cps_transformed print_de print_cps_de =
   let src = read_all input in
   let syn = parse src in
   let ast = Typing.top_type_of_prog syn in
@@ -105,8 +105,8 @@ let cmd =
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
   Cmd.v info
     Term.(
-      const driver $ input $ output $ print_ast $ compile_pat $ compile_ant $ type_alias $ backend $ typing $ print_level
-      $ print_cps_transformed $ print_de $ print_cps_de)
+      const driver $ input $ output $ print_ast $ compile_pat $ compile_ant $ type_alias $ backend $ typing
+      $ print_level $ print_cps_transformed $ print_de $ print_cps_de)
 
 let i = Cmd.eval cmd
 

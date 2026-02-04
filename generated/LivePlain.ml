@@ -1,5 +1,6 @@
 open LiveCEK
 
+<<<<<<< HEAD
 type nat = LiveCEK.nat;;
 
 type 'a list = 'a LiveCEK.list;;
@@ -19,11 +20,23 @@ and stuck =
   | SMatchList of stuck * expr * expr
   | SZro of stuck
   | SFst of stuck
+=======
+type nat = LiveCEK.nat
+type 'a list = 'a LiveCEK.list
+type 'a option = 'a LiveCEK.option
+type expr = LiveCEK.expr
+>>>>>>> 7b9a579 (fmt)
 
 type value = LiveCEK.value
 and vtype = LiveCEK.vtype
-and stuck = LiveCEK.stuck;;
+and stuck = LiveCEK.stuck
 
+<<<<<<< HEAD
+=======
+let rec index =
+ fun x n -> match x with Cons (xh, xt) -> ( match n with Z -> Some xh | S m -> index xt m) | _ -> None
+
+>>>>>>> 7b9a579 (fmt)
 let rec eval =
  fun expr env ->
   match expr with
@@ -94,7 +107,11 @@ let rec eval =
       | VFix (e, env_) -> eval e (Cons (eval x env, Cons (fv, env_)))
       | VStuck fs -> VStuck (SApp (fs, x))
       | _ -> VStuck (STypeError (fv, VTFunc)))
+<<<<<<< HEAD
   | EHole x -> VStuck (SHole x)
+=======
+  | EHole x -> VStuck (SHole (x, env))
+>>>>>>> 7b9a579 (fmt)
   | ETrue -> VTrue
   | EFalse -> VFalse
   | EIf (i, t, e) -> (

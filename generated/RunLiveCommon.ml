@@ -70,6 +70,7 @@ let rec nat_from_int i =
 
 let rec int_of_nat = function LC.Z -> 0 | LC.S n -> 1 + int_of_nat n
 
+<<<<<<< HEAD
 (*
    LivePlain defines its own (non-memoised) versions of the datatypes that LiveCEK
    uses.  To run the plain interpreter while reusing the existing printers and
@@ -197,6 +198,8 @@ and lc_stuck_of_lp = function
   | LP.SZro s -> LC.SZro (lc_stuck_of_lp s)
   | LP.SFst s -> LC.SFst (lc_stuck_of_lp s)
 
+=======
+>>>>>>> 7b9a579 (fmt)
 let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
   let rec aux ctx = function
     | NEInt i -> LC.EInt i

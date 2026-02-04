@@ -3,6 +3,7 @@ open Word
 open Memo
 open Value
 open Common
+
 let tag_cont_done = 0
 let tag_Z = 1
 let tag_S = 2
@@ -82,184 +83,184 @@ let tag_cont_20 = 75
 let tag_cont_21 = 76
 let tag_cont_22 = 77
 let tag_cont_23 = 78
-type nat =
-| Z
-| S of nat
+
+type nat = Z | S of nat
+
 let rec from_ocaml_nat x =
   match x with
-  | Z ->
-    Memo.appends [Memo.from_constructor tag_Z]
-  | S (x0) ->
-    Memo.appends [Memo.from_constructor tag_S; from_ocaml_nat x0]
+  | Z -> Memo.appends [ Memo.from_constructor tag_Z ]
+  | S x0 -> Memo.appends [ Memo.from_constructor tag_S; from_ocaml_nat x0 ]
+
 let rec to_ocaml_nat x =
   let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with| 1 (* tag_Z *) ->
-    Z| 2 (* tag_S *) ->
-    let x0 = Memo.splits_1 t in
-    S (to_ocaml_nat x0)
+  match Word.get_value h with
+  | 1 (* tag_Z *) -> Z
+  | 2 (* tag_S *) ->
+      let x0 = Memo.splits_1 t in
+      S (to_ocaml_nat x0)
   | _ -> failwith "unreachable"
-type 'a list =
-| Nil
-| Cons of 'a * 'a list
+
+type 'a list = Nil | Cons of 'a * 'a list
+
 let rec from_ocaml_list from_generic_a x =
   match x with
-  | Nil ->
-    Memo.appends [Memo.from_constructor tag_Nil]
+  | Nil -> Memo.appends [ Memo.from_constructor tag_Nil ]
   | Cons (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_Cons; from_generic_a x0; from_ocaml_list (fun x -> from_generic_a x) x1]
+      Memo.appends [ Memo.from_constructor tag_Cons; from_generic_a x0; from_ocaml_list (fun x -> from_generic_a x) x1 ]
+
 let rec to_ocaml_list to_generic_a x =
   let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with| 3 (* tag_Nil *) ->
-    Nil| 4 (* tag_Cons *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    Cons (to_generic_a x0, to_ocaml_list (fun x -> to_generic_a x) x1)
+  match Word.get_value h with
+  | 3 (* tag_Nil *) -> Nil
+  | 4 (* tag_Cons *) ->
+      let x0, x1 = Memo.splits_2 t in
+      Cons (to_generic_a x0, to_ocaml_list (fun x -> to_generic_a x) x1)
   | _ -> failwith "unreachable"
-type 'a option =
-| None
-| Some of 'a
+
+type 'a option = None | Some of 'a
+
 let rec from_ocaml_option from_generic_a x =
   match x with
-  | None ->
-    Memo.appends [Memo.from_constructor tag_None]
-  | Some (x0) ->
-    Memo.appends [Memo.from_constructor tag_Some; from_generic_a x0]
+  | None -> Memo.appends [ Memo.from_constructor tag_None ]
+  | Some x0 -> Memo.appends [ Memo.from_constructor tag_Some; from_generic_a x0 ]
+
 let rec to_ocaml_option to_generic_a x =
   let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with| 5 (* tag_None *) ->
-    None| 6 (* tag_Some *) ->
-    let x0 = Memo.splits_1 t in
-    Some (to_generic_a x0)
+  match Word.get_value h with
+  | 5 (* tag_None *) -> None
+  | 6 (* tag_Some *) ->
+      let x0 = Memo.splits_1 t in
+      Some (to_generic_a x0)
   | _ -> failwith "unreachable"
+
 type expr =
-| EInt of int
-| EPlus of expr * expr
-| ELt of expr * expr
-| ELe of expr * expr
-| EGt of expr * expr
-| EGe of expr * expr
-| EVar of nat
-| EAbs of expr
-| EApp of expr * expr
-| ELet of expr * expr
-| ETrue
-| EFalse
-| EIf of expr * expr * expr
-| ENil
-| ECons of expr * expr
-| EMatchList of expr * expr * expr
-| EPair of expr * expr
-| EZro of expr
-| EFst of expr
-| EFix of expr
-| EHole of int option
-| EUnit
+  | EInt of int
+  | EPlus of expr * expr
+  | ELt of expr * expr
+  | ELe of expr * expr
+  | EGt of expr * expr
+  | EGe of expr * expr
+  | EVar of nat
+  | EAbs of expr
+  | EApp of expr * expr
+  | ELet of expr * expr
+  | ETrue
+  | EFalse
+  | EIf of expr * expr * expr
+  | ENil
+  | ECons of expr * expr
+  | EMatchList of expr * expr * expr
+  | EPair of expr * expr
+  | EZro of expr
+  | EFst of expr
+  | EFix of expr
+  | EHole of int option
+  | EUnit
+
 let rec from_ocaml_expr x =
   match x with
-  | EInt (x0) ->
-    Memo.appends [Memo.from_constructor tag_EInt; (Memo.from_int x0)]
-  | EPlus (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_EPlus; from_ocaml_expr x0; from_ocaml_expr x1]
-  | ELt (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_ELt; from_ocaml_expr x0; from_ocaml_expr x1]
-  | ELe (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_ELe; from_ocaml_expr x0; from_ocaml_expr x1]
-  | EGt (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_EGt; from_ocaml_expr x0; from_ocaml_expr x1]
-  | EGe (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_EGe; from_ocaml_expr x0; from_ocaml_expr x1]
-  | EVar (x0) ->
-    Memo.appends [Memo.from_constructor tag_EVar; from_ocaml_nat x0]
-  | EAbs (x0) ->
-    Memo.appends [Memo.from_constructor tag_EAbs; from_ocaml_expr x0]
-  | EApp (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_EApp; from_ocaml_expr x0; from_ocaml_expr x1]
-  | ELet (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_ELet; from_ocaml_expr x0; from_ocaml_expr x1]
-  | ETrue ->
-    Memo.appends [Memo.from_constructor tag_ETrue]
-  | EFalse ->
-    Memo.appends [Memo.from_constructor tag_EFalse]
+  | EInt x0 -> Memo.appends [ Memo.from_constructor tag_EInt; Memo.from_int x0 ]
+  | EPlus (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EPlus; from_ocaml_expr x0; from_ocaml_expr x1 ]
+  | ELt (x0, x1) -> Memo.appends [ Memo.from_constructor tag_ELt; from_ocaml_expr x0; from_ocaml_expr x1 ]
+  | ELe (x0, x1) -> Memo.appends [ Memo.from_constructor tag_ELe; from_ocaml_expr x0; from_ocaml_expr x1 ]
+  | EGt (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EGt; from_ocaml_expr x0; from_ocaml_expr x1 ]
+  | EGe (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EGe; from_ocaml_expr x0; from_ocaml_expr x1 ]
+  | EVar x0 -> Memo.appends [ Memo.from_constructor tag_EVar; from_ocaml_nat x0 ]
+  | EAbs x0 -> Memo.appends [ Memo.from_constructor tag_EAbs; from_ocaml_expr x0 ]
+  | EApp (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EApp; from_ocaml_expr x0; from_ocaml_expr x1 ]
+  | ELet (x0, x1) -> Memo.appends [ Memo.from_constructor tag_ELet; from_ocaml_expr x0; from_ocaml_expr x1 ]
+  | ETrue -> Memo.appends [ Memo.from_constructor tag_ETrue ]
+  | EFalse -> Memo.appends [ Memo.from_constructor tag_EFalse ]
   | EIf (x0, x1, x2) ->
-    Memo.appends [Memo.from_constructor tag_EIf; from_ocaml_expr x0; from_ocaml_expr x1; from_ocaml_expr x2]
-  | ENil ->
-    Memo.appends [Memo.from_constructor tag_ENil]
-  | ECons (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_ECons; from_ocaml_expr x0; from_ocaml_expr x1]
+      Memo.appends [ Memo.from_constructor tag_EIf; from_ocaml_expr x0; from_ocaml_expr x1; from_ocaml_expr x2 ]
+  | ENil -> Memo.appends [ Memo.from_constructor tag_ENil ]
+  | ECons (x0, x1) -> Memo.appends [ Memo.from_constructor tag_ECons; from_ocaml_expr x0; from_ocaml_expr x1 ]
   | EMatchList (x0, x1, x2) ->
-    Memo.appends [Memo.from_constructor tag_EMatchList; from_ocaml_expr x0; from_ocaml_expr x1; from_ocaml_expr x2]
-  | EPair (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_EPair; from_ocaml_expr x0; from_ocaml_expr x1]
-  | EZro (x0) ->
-    Memo.appends [Memo.from_constructor tag_EZro; from_ocaml_expr x0]
-  | EFst (x0) ->
-    Memo.appends [Memo.from_constructor tag_EFst; from_ocaml_expr x0]
-  | EFix (x0) ->
-    Memo.appends [Memo.from_constructor tag_EFix; from_ocaml_expr x0]
-  | EHole (x0) ->
-    Memo.appends [Memo.from_constructor tag_EHole; from_ocaml_option (fun x -> (Memo.from_int x)) x0]
-  | EUnit ->
-    Memo.appends [Memo.from_constructor tag_EUnit]
+      Memo.appends [ Memo.from_constructor tag_EMatchList; from_ocaml_expr x0; from_ocaml_expr x1; from_ocaml_expr x2 ]
+  | EPair (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EPair; from_ocaml_expr x0; from_ocaml_expr x1 ]
+  | EZro x0 -> Memo.appends [ Memo.from_constructor tag_EZro; from_ocaml_expr x0 ]
+  | EFst x0 -> Memo.appends [ Memo.from_constructor tag_EFst; from_ocaml_expr x0 ]
+  | EFix x0 -> Memo.appends [ Memo.from_constructor tag_EFix; from_ocaml_expr x0 ]
+  | EHole x0 -> Memo.appends [ Memo.from_constructor tag_EHole; from_ocaml_option (fun x -> Memo.from_int x) x0 ]
+  | EUnit -> Memo.appends [ Memo.from_constructor tag_EUnit ]
+
 let rec to_ocaml_expr x =
   let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with| 7 (* tag_EInt *) ->
-    let x0 = Memo.splits_1 t in
-    EInt ((Word.get_value (Memo.to_word x0)))| 8 (* tag_EPlus *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    EPlus (to_ocaml_expr x0, to_ocaml_expr x1)| 9 (* tag_ELt *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    ELt (to_ocaml_expr x0, to_ocaml_expr x1)| 10 (* tag_ELe *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    ELe (to_ocaml_expr x0, to_ocaml_expr x1)| 11 (* tag_EGt *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    EGt (to_ocaml_expr x0, to_ocaml_expr x1)| 12 (* tag_EGe *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    EGe (to_ocaml_expr x0, to_ocaml_expr x1)| 13 (* tag_EVar *) ->
-    let x0 = Memo.splits_1 t in
-    EVar (to_ocaml_nat x0)| 14 (* tag_EAbs *) ->
-    let x0 = Memo.splits_1 t in
-    EAbs (to_ocaml_expr x0)| 15 (* tag_EApp *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    EApp (to_ocaml_expr x0, to_ocaml_expr x1)| 16 (* tag_ELet *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    ELet (to_ocaml_expr x0, to_ocaml_expr x1)| 17 (* tag_ETrue *) ->
-    ETrue| 18 (* tag_EFalse *) ->
-    EFalse| 19 (* tag_EIf *) ->
-    let (x0, x1, x2) = Memo.splits_3 t in
-    EIf (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)| 20 (* tag_ENil *) ->
-    ENil| 21 (* tag_ECons *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    ECons (to_ocaml_expr x0, to_ocaml_expr x1)| 22 (* tag_EMatchList *) ->
-    let (x0, x1, x2) = Memo.splits_3 t in
-    EMatchList (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)| 23 (* tag_EPair *) ->
-    let (x0, x1) = Memo.splits_2 t in
-    EPair (to_ocaml_expr x0, to_ocaml_expr x1)| 24 (* tag_EZro *) ->
-    let x0 = Memo.splits_1 t in
-    EZro (to_ocaml_expr x0)| 25 (* tag_EFst *) ->
-    let x0 = Memo.splits_1 t in
-    EFst (to_ocaml_expr x0)| 26 (* tag_EFix *) ->
-    let x0 = Memo.splits_1 t in
-    EFix (to_ocaml_expr x0)| 27 (* tag_EHole *) ->
-    let x0 = Memo.splits_1 t in
-    EHole (to_ocaml_option (fun x -> (Word.get_value (Memo.to_word x))) x0)| 28 (* tag_EUnit *) ->
-    EUnit
+  match Word.get_value h with
+  | 7 (* tag_EInt *) ->
+      let x0 = Memo.splits_1 t in
+      EInt (Word.get_value (Memo.to_word x0))
+  | 8 (* tag_EPlus *) ->
+      let x0, x1 = Memo.splits_2 t in
+      EPlus (to_ocaml_expr x0, to_ocaml_expr x1)
+  | 9 (* tag_ELt *) ->
+      let x0, x1 = Memo.splits_2 t in
+      ELt (to_ocaml_expr x0, to_ocaml_expr x1)
+  | 10 (* tag_ELe *) ->
+      let x0, x1 = Memo.splits_2 t in
+      ELe (to_ocaml_expr x0, to_ocaml_expr x1)
+  | 11 (* tag_EGt *) ->
+      let x0, x1 = Memo.splits_2 t in
+      EGt (to_ocaml_expr x0, to_ocaml_expr x1)
+  | 12 (* tag_EGe *) ->
+      let x0, x1 = Memo.splits_2 t in
+      EGe (to_ocaml_expr x0, to_ocaml_expr x1)
+  | 13 (* tag_EVar *) ->
+      let x0 = Memo.splits_1 t in
+      EVar (to_ocaml_nat x0)
+  | 14 (* tag_EAbs *) ->
+      let x0 = Memo.splits_1 t in
+      EAbs (to_ocaml_expr x0)
+  | 15 (* tag_EApp *) ->
+      let x0, x1 = Memo.splits_2 t in
+      EApp (to_ocaml_expr x0, to_ocaml_expr x1)
+  | 16 (* tag_ELet *) ->
+      let x0, x1 = Memo.splits_2 t in
+      ELet (to_ocaml_expr x0, to_ocaml_expr x1)
+  | 17 (* tag_ETrue *) -> ETrue
+  | 18 (* tag_EFalse *) -> EFalse
+  | 19 (* tag_EIf *) ->
+      let x0, x1, x2 = Memo.splits_3 t in
+      EIf (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)
+  | 20 (* tag_ENil *) -> ENil
+  | 21 (* tag_ECons *) ->
+      let x0, x1 = Memo.splits_2 t in
+      ECons (to_ocaml_expr x0, to_ocaml_expr x1)
+  | 22 (* tag_EMatchList *) ->
+      let x0, x1, x2 = Memo.splits_3 t in
+      EMatchList (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)
+  | 23 (* tag_EPair *) ->
+      let x0, x1 = Memo.splits_2 t in
+      EPair (to_ocaml_expr x0, to_ocaml_expr x1)
+  | 24 (* tag_EZro *) ->
+      let x0 = Memo.splits_1 t in
+      EZro (to_ocaml_expr x0)
+  | 25 (* tag_EFst *) ->
+      let x0 = Memo.splits_1 t in
+      EFst (to_ocaml_expr x0)
+  | 26 (* tag_EFix *) ->
+      let x0 = Memo.splits_1 t in
+      EFix (to_ocaml_expr x0)
+  | 27 (* tag_EHole *) ->
+      let x0 = Memo.splits_1 t in
+      EHole (to_ocaml_option (fun x -> Word.get_value (Memo.to_word x)) x0)
+  | 28 (* tag_EUnit *) -> EUnit
   | _ -> failwith "unreachable"
+
 type value =
-| VInt of int
-| VAbs of expr * value list
-| VUnit
-| VTrue
-| VFalse
-| VNil
-| VCons of value * value
-| VPair of value * value
-| VFix of expr * value list
-| VStuck of stuck
-and vtype =
-| VTInt
-| VTFunc
-| VTBool
-| VTList
-| VTPair
+  | VInt of int
+  | VAbs of expr * value list
+  | VUnit
+  | VTrue
+  | VFalse
+  | VNil
+  | VCons of value * value
+  | VPair of value * value
+  | VFix of expr * value list
+  | VStuck of stuck
+
+and vtype = VTInt | VTFunc | VTBool | VTList | VTPair
+
 and stuck =
   | SHole of int option
   | STypeError of value * vtype
@@ -275,38 +276,29 @@ and stuck =
   | SFst of stuck
 let rec from_ocaml_value x =
   match x with
-  | VInt (x0) ->
-    Memo.appends [Memo.from_constructor tag_VInt; (Memo.from_int x0)]
+  | VInt x0 -> Memo.appends [ Memo.from_constructor tag_VInt; Memo.from_int x0 ]
   | VAbs (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_VAbs; from_ocaml_expr x0; from_ocaml_list (fun x -> from_ocaml_value x) x1]
-  | VUnit ->
-    Memo.appends [Memo.from_constructor tag_VUnit]
-  | VTrue ->
-    Memo.appends [Memo.from_constructor tag_VTrue]
-  | VFalse ->
-    Memo.appends [Memo.from_constructor tag_VFalse]
-  | VNil ->
-    Memo.appends [Memo.from_constructor tag_VNil]
-  | VCons (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_VCons; from_ocaml_value x0; from_ocaml_value x1]
-  | VPair (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_VPair; from_ocaml_value x0; from_ocaml_value x1]
+      Memo.appends
+        [ Memo.from_constructor tag_VAbs; from_ocaml_expr x0; from_ocaml_list (fun x -> from_ocaml_value x) x1 ]
+  | VUnit -> Memo.appends [ Memo.from_constructor tag_VUnit ]
+  | VTrue -> Memo.appends [ Memo.from_constructor tag_VTrue ]
+  | VFalse -> Memo.appends [ Memo.from_constructor tag_VFalse ]
+  | VNil -> Memo.appends [ Memo.from_constructor tag_VNil ]
+  | VCons (x0, x1) -> Memo.appends [ Memo.from_constructor tag_VCons; from_ocaml_value x0; from_ocaml_value x1 ]
+  | VPair (x0, x1) -> Memo.appends [ Memo.from_constructor tag_VPair; from_ocaml_value x0; from_ocaml_value x1 ]
   | VFix (x0, x1) ->
-    Memo.appends [Memo.from_constructor tag_VFix; from_ocaml_expr x0; from_ocaml_list (fun x -> from_ocaml_value x) x1]
-  | VStuck (x0) ->
-    Memo.appends [Memo.from_constructor tag_VStuck; from_ocaml_stuck x0]
+      Memo.appends
+        [ Memo.from_constructor tag_VFix; from_ocaml_expr x0; from_ocaml_list (fun x -> from_ocaml_value x) x1 ]
+  | VStuck x0 -> Memo.appends [ Memo.from_constructor tag_VStuck; from_ocaml_stuck x0 ]
+
 and from_ocaml_vtype x =
   match x with
-  | VTInt ->
-    Memo.appends [Memo.from_constructor tag_VTInt]
-  | VTFunc ->
-    Memo.appends [Memo.from_constructor tag_VTFunc]
-  | VTBool ->
-    Memo.appends [Memo.from_constructor tag_VTBool]
-  | VTList ->
-    Memo.appends [Memo.from_constructor tag_VTList]
-  | VTPair ->
-    Memo.appends [Memo.from_constructor tag_VTPair]
+  | VTInt -> Memo.appends [ Memo.from_constructor tag_VTInt ]
+  | VTFunc -> Memo.appends [ Memo.from_constructor tag_VTFunc ]
+  | VTBool -> Memo.appends [ Memo.from_constructor tag_VTBool ]
+  | VTList -> Memo.appends [ Memo.from_constructor tag_VTList ]
+  | VTPair -> Memo.appends [ Memo.from_constructor tag_VTPair ]
+
 and from_ocaml_stuck x =
   match x with
   | SHole x0 -> Memo.appends [ Memo.from_constructor tag_SHole; from_ocaml_option (fun x -> Memo.from_int x) x0 ]
@@ -396,8 +388,13 @@ and from_ocaml_stuck x =
     let x0 = Memo.splits_1 t in
     SFst (to_ocaml_stuck x0)
   | _ -> failwith "unreachable"
-let rec index memo (x0 : Value.seq) (x1 : Value.seq): exec_result = (exec_cek (pc_to_exp (int_to_pc 1))(Dynarray.of_list[(x0);(x1)])((Memo.from_constructor tag_cont_done)) memo)
-let rec eval memo (x0 : Value.seq) (x1 : Value.seq): exec_result = (exec_cek (pc_to_exp (int_to_pc 4))(Dynarray.of_list[(x0);(x1)])((Memo.from_constructor tag_cont_done)) memo)
+
+let rec index memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+
+let rec eval memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek (pc_to_exp (int_to_pc 4)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+
 let populate_state () =
   Memo.reset ();
   Words.reset ();
@@ -830,11 +827,22 @@ let populate_state () =
           assert_env_length w_4 3;
           push_env w_4 (Dynarray.get w_4.state.e 2);
           assert_env_length w_4 4;
+<<<<<<< HEAD
           let ctor_arg_6 = pop_env w_4 in
           push_env w_4 (Memo.appends [ Memo.from_constructor tag_SHole; ctor_arg_6 ]);
           assert_env_length w_4 4;
           let ctor_arg_7 = pop_env w_4 in
           push_env w_4 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_7 ]);
+=======
+          push_env w_4 (Dynarray.get w_4.state.e 1);
+          assert_env_length w_4 5;
+          let ctor_arg_6 = pop_env w_4 in
+          let ctor_arg_7 = pop_env w_4 in
+          push_env w_4 (Memo.appends [ Memo.from_constructor tag_SHole; ctor_arg_7; ctor_arg_6 ]);
+          assert_env_length w_4 4;
+          let ctor_arg_8 = pop_env w_4 in
+          push_env w_4 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_8 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_4 4;
           drop_n w_4 4 1;
           assert_env_length w_4 3;
@@ -984,12 +992,21 @@ let populate_state () =
           assert_env_length w_6 5;
           push_env w_6 (Dynarray.get w_6.state.e 1);
           assert_env_length w_6 6;
+<<<<<<< HEAD
           let ctor_arg_8 = pop_env w_6 in
           let ctor_arg_9 = pop_env w_6 in
           push_env w_6 (Memo.appends [ Memo.from_constructor tag_SAdd0; ctor_arg_9; ctor_arg_8 ]);
           assert_env_length w_6 5;
           let ctor_arg_10 = pop_env w_6 in
           push_env w_6 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_10 ]);
+=======
+          let ctor_arg_9 = pop_env w_6 in
+          let ctor_arg_10 = pop_env w_6 in
+          push_env w_6 (Memo.appends [ Memo.from_constructor tag_SAdd0; ctor_arg_10; ctor_arg_9 ]);
+          assert_env_length w_6 5;
+          let ctor_arg_11 = pop_env w_6 in
+          push_env w_6 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_11 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_6 5;
           drop_n w_6 5 1;
           assert_env_length w_6 4;
@@ -1005,12 +1022,21 @@ let populate_state () =
           assert_env_length w_6 4;
           push_env w_6 (Memo.from_constructor tag_VTInt);
           assert_env_length w_6 5;
+<<<<<<< HEAD
           let ctor_arg_11 = pop_env w_6 in
           let ctor_arg_12 = pop_env w_6 in
           push_env w_6 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_12; ctor_arg_11 ]);
           assert_env_length w_6 4;
           let ctor_arg_13 = pop_env w_6 in
           push_env w_6 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_13 ]);
+=======
+          let ctor_arg_12 = pop_env w_6 in
+          let ctor_arg_13 = pop_env w_6 in
+          push_env w_6 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_13; ctor_arg_12 ]);
+          assert_env_length w_6 4;
+          let ctor_arg_14 = pop_env w_6 in
+          push_env w_6 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_14 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_6 4;
           drop_n w_6 4 1;
           assert_env_length w_6 3;
@@ -1048,12 +1074,21 @@ let populate_state () =
           assert_env_length w_7 5;
           push_env w_7 (Dynarray.get w_7.state.e 1);
           assert_env_length w_7 6;
+<<<<<<< HEAD
           let ctor_arg_14 = pop_env w_7 in
           let ctor_arg_15 = pop_env w_7 in
           push_env w_7 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_15; ctor_arg_14 ]);
           assert_env_length w_7 5;
           let ctor_arg_16 = pop_env w_7 in
           push_env w_7 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_16 ]);
+=======
+          let ctor_arg_15 = pop_env w_7 in
+          let ctor_arg_16 = pop_env w_7 in
+          push_env w_7 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_16; ctor_arg_15 ]);
+          assert_env_length w_7 5;
+          let ctor_arg_17 = pop_env w_7 in
+          push_env w_7 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_17 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_7 5;
           drop_n w_7 5 1;
           assert_env_length w_7 4;
@@ -1069,12 +1104,21 @@ let populate_state () =
           assert_env_length w_7 4;
           push_env w_7 (Memo.from_constructor tag_VTInt);
           assert_env_length w_7 5;
+<<<<<<< HEAD
           let ctor_arg_17 = pop_env w_7 in
           let ctor_arg_18 = pop_env w_7 in
           push_env w_7 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_18; ctor_arg_17 ]);
           assert_env_length w_7 4;
           let ctor_arg_19 = pop_env w_7 in
           push_env w_7 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_19 ]);
+=======
+          let ctor_arg_18 = pop_env w_7 in
+          let ctor_arg_19 = pop_env w_7 in
+          push_env w_7 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_19; ctor_arg_18 ]);
+          assert_env_length w_7 4;
+          let ctor_arg_20 = pop_env w_7 in
+          push_env w_7 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_20 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_7 4;
           drop_n w_7 4 1;
           assert_env_length w_7 3;
@@ -1112,12 +1156,21 @@ let populate_state () =
           assert_env_length w_8 5;
           push_env w_8 (Dynarray.get w_8.state.e 1);
           assert_env_length w_8 6;
+<<<<<<< HEAD
           let ctor_arg_20 = pop_env w_8 in
           let ctor_arg_21 = pop_env w_8 in
           push_env w_8 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_21; ctor_arg_20 ]);
           assert_env_length w_8 5;
           let ctor_arg_22 = pop_env w_8 in
           push_env w_8 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_22 ]);
+=======
+          let ctor_arg_21 = pop_env w_8 in
+          let ctor_arg_22 = pop_env w_8 in
+          push_env w_8 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_22; ctor_arg_21 ]);
+          assert_env_length w_8 5;
+          let ctor_arg_23 = pop_env w_8 in
+          push_env w_8 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_23 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_8 5;
           drop_n w_8 5 1;
           assert_env_length w_8 4;
@@ -1133,12 +1186,21 @@ let populate_state () =
           assert_env_length w_8 4;
           push_env w_8 (Memo.from_constructor tag_VTInt);
           assert_env_length w_8 5;
+<<<<<<< HEAD
           let ctor_arg_23 = pop_env w_8 in
           let ctor_arg_24 = pop_env w_8 in
           push_env w_8 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_24; ctor_arg_23 ]);
           assert_env_length w_8 4;
           let ctor_arg_25 = pop_env w_8 in
           push_env w_8 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_25 ]);
+=======
+          let ctor_arg_24 = pop_env w_8 in
+          let ctor_arg_25 = pop_env w_8 in
+          push_env w_8 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_25; ctor_arg_24 ]);
+          assert_env_length w_8 4;
+          let ctor_arg_26 = pop_env w_8 in
+          push_env w_8 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_26 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_8 4;
           drop_n w_8 4 1;
           assert_env_length w_8 3;
@@ -1176,12 +1238,21 @@ let populate_state () =
           assert_env_length w_9 5;
           push_env w_9 (Dynarray.get w_9.state.e 1);
           assert_env_length w_9 6;
+<<<<<<< HEAD
           let ctor_arg_26 = pop_env w_9 in
           let ctor_arg_27 = pop_env w_9 in
           push_env w_9 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_27; ctor_arg_26 ]);
           assert_env_length w_9 5;
           let ctor_arg_28 = pop_env w_9 in
           push_env w_9 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_28 ]);
+=======
+          let ctor_arg_27 = pop_env w_9 in
+          let ctor_arg_28 = pop_env w_9 in
+          push_env w_9 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_28; ctor_arg_27 ]);
+          assert_env_length w_9 5;
+          let ctor_arg_29 = pop_env w_9 in
+          push_env w_9 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_29 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_9 5;
           drop_n w_9 5 1;
           assert_env_length w_9 4;
@@ -1197,12 +1268,21 @@ let populate_state () =
           assert_env_length w_9 4;
           push_env w_9 (Memo.from_constructor tag_VTInt);
           assert_env_length w_9 5;
+<<<<<<< HEAD
           let ctor_arg_29 = pop_env w_9 in
           let ctor_arg_30 = pop_env w_9 in
           push_env w_9 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_30; ctor_arg_29 ]);
           assert_env_length w_9 4;
           let ctor_arg_31 = pop_env w_9 in
           push_env w_9 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_31 ]);
+=======
+          let ctor_arg_30 = pop_env w_9 in
+          let ctor_arg_31 = pop_env w_9 in
+          push_env w_9 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_31; ctor_arg_30 ]);
+          assert_env_length w_9 4;
+          let ctor_arg_32 = pop_env w_9 in
+          push_env w_9 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_32 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_9 4;
           drop_n w_9 4 1;
           assert_env_length w_9 3;
@@ -1240,12 +1320,21 @@ let populate_state () =
           assert_env_length w_10 5;
           push_env w_10 (Dynarray.get w_10.state.e 1);
           assert_env_length w_10 6;
+<<<<<<< HEAD
           let ctor_arg_32 = pop_env w_10 in
           let ctor_arg_33 = pop_env w_10 in
           push_env w_10 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_33; ctor_arg_32 ]);
           assert_env_length w_10 5;
           let ctor_arg_34 = pop_env w_10 in
           push_env w_10 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_34 ]);
+=======
+          let ctor_arg_33 = pop_env w_10 in
+          let ctor_arg_34 = pop_env w_10 in
+          push_env w_10 (Memo.appends [ Memo.from_constructor tag_SGt0; ctor_arg_34; ctor_arg_33 ]);
+          assert_env_length w_10 5;
+          let ctor_arg_35 = pop_env w_10 in
+          push_env w_10 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_35 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_10 5;
           drop_n w_10 5 1;
           assert_env_length w_10 4;
@@ -1261,12 +1350,21 @@ let populate_state () =
           assert_env_length w_10 4;
           push_env w_10 (Memo.from_constructor tag_VTInt);
           assert_env_length w_10 5;
+<<<<<<< HEAD
           let ctor_arg_35 = pop_env w_10 in
           let ctor_arg_36 = pop_env w_10 in
           push_env w_10 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_36; ctor_arg_35 ]);
           assert_env_length w_10 4;
           let ctor_arg_37 = pop_env w_10 in
           push_env w_10 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_37 ]);
+=======
+          let ctor_arg_36 = pop_env w_10 in
+          let ctor_arg_37 = pop_env w_10 in
+          push_env w_10 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_37; ctor_arg_36 ]);
+          assert_env_length w_10 4;
+          let ctor_arg_38 = pop_env w_10 in
+          push_env w_10 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_38 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_10 4;
           drop_n w_10 4 1;
           assert_env_length w_10 3;
@@ -1299,8 +1397,13 @@ let populate_state () =
           assert_env_length w_11 0;
           push_env w_11 (Memo.from_constructor tag_SIndexError);
           assert_env_length w_11 1;
+<<<<<<< HEAD
           let ctor_arg_38 = pop_env w_11 in
           push_env w_11 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_38 ]);
+=======
+          let ctor_arg_39 = pop_env w_11 in
+          push_env w_11 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_39 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_11 1;
           drop_n w_11 1 0;
           assert_env_length w_11 1;
@@ -1357,12 +1460,21 @@ let populate_state () =
           assert_env_length w_12 5;
           push_env w_12 (Dynarray.get w_12.state.e 1);
           assert_env_length w_12 6;
+<<<<<<< HEAD
           let ctor_arg_41 = pop_env w_12 in
           let ctor_arg_42 = pop_env w_12 in
           push_env w_12 (Memo.appends [ Memo.from_constructor tag_SApp; ctor_arg_42; ctor_arg_41 ]);
           assert_env_length w_12 5;
           let ctor_arg_43 = pop_env w_12 in
           push_env w_12 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_43 ]);
+=======
+          let ctor_arg_42 = pop_env w_12 in
+          let ctor_arg_43 = pop_env w_12 in
+          push_env w_12 (Memo.appends [ Memo.from_constructor tag_SApp; ctor_arg_43; ctor_arg_42 ]);
+          assert_env_length w_12 5;
+          let ctor_arg_44 = pop_env w_12 in
+          push_env w_12 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_44 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_12 5;
           drop_n w_12 5 1;
           assert_env_length w_12 4;
@@ -1378,12 +1490,21 @@ let populate_state () =
           assert_env_length w_12 4;
           push_env w_12 (Memo.from_constructor tag_VTFunc);
           assert_env_length w_12 5;
+<<<<<<< HEAD
           let ctor_arg_44 = pop_env w_12 in
           let ctor_arg_45 = pop_env w_12 in
           push_env w_12 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_45; ctor_arg_44 ]);
           assert_env_length w_12 4;
           let ctor_arg_46 = pop_env w_12 in
           push_env w_12 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_46 ]);
+=======
+          let ctor_arg_45 = pop_env w_12 in
+          let ctor_arg_46 = pop_env w_12 in
+          push_env w_12 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_46; ctor_arg_45 ]);
+          assert_env_length w_12 4;
+          let ctor_arg_47 = pop_env w_12 in
+          push_env w_12 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_47 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_12 4;
           drop_n w_12 4 1;
           assert_env_length w_12 3;
@@ -1428,6 +1549,7 @@ let populate_state () =
           assert_env_length w_13 6;
           push_env w_13 (Dynarray.get w_13.state.e 2);
           assert_env_length w_13 7;
+<<<<<<< HEAD
           let ctor_arg_47 = pop_env w_13 in
           let ctor_arg_48 = pop_env w_13 in
           let ctor_arg_49 = pop_env w_13 in
@@ -1435,6 +1557,15 @@ let populate_state () =
           assert_env_length w_13 5;
           let ctor_arg_50 = pop_env w_13 in
           push_env w_13 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_50 ]);
+=======
+          let ctor_arg_48 = pop_env w_13 in
+          let ctor_arg_49 = pop_env w_13 in
+          let ctor_arg_50 = pop_env w_13 in
+          push_env w_13 (Memo.appends [ Memo.from_constructor tag_SIf; ctor_arg_50; ctor_arg_49; ctor_arg_48 ]);
+          assert_env_length w_13 5;
+          let ctor_arg_51 = pop_env w_13 in
+          push_env w_13 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_51 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_13 5;
           drop_n w_13 5 1;
           assert_env_length w_13 4;
@@ -1449,12 +1580,21 @@ let populate_state () =
           assert_env_length w_13 5;
           push_env w_13 (Memo.from_constructor tag_VTBool);
           assert_env_length w_13 6;
+<<<<<<< HEAD
           let ctor_arg_51 = pop_env w_13 in
           let ctor_arg_52 = pop_env w_13 in
           push_env w_13 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_52; ctor_arg_51 ]);
           assert_env_length w_13 5;
           let ctor_arg_53 = pop_env w_13 in
           push_env w_13 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_53 ]);
+=======
+          let ctor_arg_52 = pop_env w_13 in
+          let ctor_arg_53 = pop_env w_13 in
+          push_env w_13 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_53; ctor_arg_52 ]);
+          assert_env_length w_13 5;
+          let ctor_arg_54 = pop_env w_13 in
+          push_env w_13 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_54 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_13 5;
           drop_n w_13 5 1;
           assert_env_length w_13 4;
@@ -1492,11 +1632,19 @@ let populate_state () =
           assert_env_length w_14 1;
           push_env w_14 (Dynarray.get w_14.state.e 0);
           assert_env_length w_14 2;
+<<<<<<< HEAD
           let ctor_arg_54 = pop_env w_14 in
           push_env w_14 (Memo.appends [ Memo.from_constructor tag_SZro; ctor_arg_54 ]);
           assert_env_length w_14 2;
           let ctor_arg_55 = pop_env w_14 in
           push_env w_14 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_55 ]);
+=======
+          let ctor_arg_55 = pop_env w_14 in
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_SZro; ctor_arg_55 ]);
+          assert_env_length w_14 2;
+          let ctor_arg_56 = pop_env w_14 in
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_56 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_14 2;
           drop_n w_14 2 1;
           assert_env_length w_14 1;
@@ -1511,12 +1659,21 @@ let populate_state () =
           assert_env_length w_14 2;
           push_env w_14 (Memo.from_constructor tag_VTPair);
           assert_env_length w_14 3;
+<<<<<<< HEAD
           let ctor_arg_56 = pop_env w_14 in
           let ctor_arg_57 = pop_env w_14 in
           push_env w_14 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_57; ctor_arg_56 ]);
           assert_env_length w_14 2;
           let ctor_arg_58 = pop_env w_14 in
           push_env w_14 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_58 ]);
+=======
+          let ctor_arg_57 = pop_env w_14 in
+          let ctor_arg_58 = pop_env w_14 in
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_58; ctor_arg_57 ]);
+          assert_env_length w_14 2;
+          let ctor_arg_59 = pop_env w_14 in
+          push_env w_14 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_59 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_14 2;
           drop_n w_14 2 1;
           assert_env_length w_14 1;
@@ -1554,11 +1711,19 @@ let populate_state () =
           assert_env_length w_15 1;
           push_env w_15 (Dynarray.get w_15.state.e 0);
           assert_env_length w_15 2;
+<<<<<<< HEAD
           let ctor_arg_59 = pop_env w_15 in
           push_env w_15 (Memo.appends [ Memo.from_constructor tag_SFst; ctor_arg_59 ]);
           assert_env_length w_15 2;
           let ctor_arg_60 = pop_env w_15 in
           push_env w_15 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_60 ]);
+=======
+          let ctor_arg_60 = pop_env w_15 in
+          push_env w_15 (Memo.appends [ Memo.from_constructor tag_SFst; ctor_arg_60 ]);
+          assert_env_length w_15 2;
+          let ctor_arg_61 = pop_env w_15 in
+          push_env w_15 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_61 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_15 2;
           drop_n w_15 2 1;
           assert_env_length w_15 1;
@@ -1573,12 +1738,21 @@ let populate_state () =
           assert_env_length w_15 2;
           push_env w_15 (Memo.from_constructor tag_VTPair);
           assert_env_length w_15 3;
+<<<<<<< HEAD
           let ctor_arg_61 = pop_env w_15 in
           let ctor_arg_62 = pop_env w_15 in
           push_env w_15 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_62; ctor_arg_61 ]);
           assert_env_length w_15 2;
           let ctor_arg_63 = pop_env w_15 in
           push_env w_15 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_63 ]);
+=======
+          let ctor_arg_62 = pop_env w_15 in
+          let ctor_arg_63 = pop_env w_15 in
+          push_env w_15 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_63; ctor_arg_62 ]);
+          assert_env_length w_15 2;
+          let ctor_arg_64 = pop_env w_15 in
+          push_env w_15 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_64 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_15 2;
           drop_n w_15 2 1;
           assert_env_length w_15 1;
@@ -1618,6 +1792,7 @@ let populate_state () =
           assert_env_length w_16 8;
           push_env w_16 (Dynarray.get w_16.state.e 0);
           assert_env_length w_16 9;
+<<<<<<< HEAD
           let ctor_arg_64 = pop_env w_16 in
           let ctor_arg_65 = pop_env w_16 in
           push_env w_16 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_65; ctor_arg_64 ]);
@@ -1625,6 +1800,15 @@ let populate_state () =
           let ctor_arg_66 = pop_env w_16 in
           let ctor_arg_67 = pop_env w_16 in
           push_env w_16 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_67; ctor_arg_66 ]);
+=======
+          let ctor_arg_65 = pop_env w_16 in
+          let ctor_arg_66 = pop_env w_16 in
+          push_env w_16 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_66; ctor_arg_65 ]);
+          assert_env_length w_16 8;
+          let ctor_arg_67 = pop_env w_16 in
+          let ctor_arg_68 = pop_env w_16 in
+          push_env w_16 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_68; ctor_arg_67 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_16 7;
           ignore (env_call w_16 [] 2);
           w_16.state.c <- pc_to_exp (int_to_pc 4)
@@ -1640,6 +1824,7 @@ let populate_state () =
           assert_env_length w_16 6;
           push_env w_16 (Dynarray.get w_16.state.e 2);
           assert_env_length w_16 7;
+<<<<<<< HEAD
           let ctor_arg_68 = pop_env w_16 in
           let ctor_arg_69 = pop_env w_16 in
           let ctor_arg_70 = pop_env w_16 in
@@ -1647,6 +1832,15 @@ let populate_state () =
           assert_env_length w_16 5;
           let ctor_arg_71 = pop_env w_16 in
           push_env w_16 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_71 ]);
+=======
+          let ctor_arg_69 = pop_env w_16 in
+          let ctor_arg_70 = pop_env w_16 in
+          let ctor_arg_71 = pop_env w_16 in
+          push_env w_16 (Memo.appends [ Memo.from_constructor tag_SMatchList; ctor_arg_71; ctor_arg_70; ctor_arg_69 ]);
+          assert_env_length w_16 5;
+          let ctor_arg_72 = pop_env w_16 in
+          push_env w_16 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_72 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_16 5;
           drop_n w_16 5 1;
           assert_env_length w_16 4;
@@ -1661,12 +1855,21 @@ let populate_state () =
           assert_env_length w_16 5;
           push_env w_16 (Memo.from_constructor tag_VTList);
           assert_env_length w_16 6;
+<<<<<<< HEAD
           let ctor_arg_72 = pop_env w_16 in
           let ctor_arg_73 = pop_env w_16 in
           push_env w_16 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_73; ctor_arg_72 ]);
           assert_env_length w_16 5;
           let ctor_arg_74 = pop_env w_16 in
           push_env w_16 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_74 ]);
+=======
+          let ctor_arg_73 = pop_env w_16 in
+          let ctor_arg_74 = pop_env w_16 in
+          push_env w_16 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_74; ctor_arg_73 ]);
+          assert_env_length w_16 5;
+          let ctor_arg_75 = pop_env w_16 in
+          push_env w_16 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_75 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_16 5;
           drop_n w_16 5 1;
           assert_env_length w_16 4;
@@ -1684,8 +1887,13 @@ let populate_state () =
       ignore (pop_env w_18);
       push_env w_18 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
       assert_env_length w_18 5;
+<<<<<<< HEAD
       let ctor_arg_75 = pop_env w_18 in
       push_env w_18 (Memo.appends [ Memo.from_constructor tag_VInt; ctor_arg_75 ]);
+=======
+      let ctor_arg_76 = pop_env w_18 in
+      push_env w_18 (Memo.appends [ Memo.from_constructor tag_VInt; ctor_arg_76 ]);
+>>>>>>> 7b9a579 (fmt)
       assert_env_length w_18 5;
       drop_n w_18 5 1;
       assert_env_length w_18 4;
@@ -1725,12 +1933,21 @@ let populate_state () =
           assert_env_length w_17 5;
           push_env w_17 (Dynarray.get w_17.state.e 3);
           assert_env_length w_17 6;
+<<<<<<< HEAD
           let ctor_arg_76 = pop_env w_17 in
           let ctor_arg_77 = pop_env w_17 in
           push_env w_17 (Memo.appends [ Memo.from_constructor tag_SAdd1; ctor_arg_77; ctor_arg_76 ]);
           assert_env_length w_17 5;
           let ctor_arg_78 = pop_env w_17 in
           push_env w_17 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_78 ]);
+=======
+          let ctor_arg_77 = pop_env w_17 in
+          let ctor_arg_78 = pop_env w_17 in
+          push_env w_17 (Memo.appends [ Memo.from_constructor tag_SAdd1; ctor_arg_78; ctor_arg_77 ]);
+          assert_env_length w_17 5;
+          let ctor_arg_79 = pop_env w_17 in
+          push_env w_17 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_79 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_17 5;
           drop_n w_17 5 1;
           assert_env_length w_17 4;
@@ -1750,12 +1967,21 @@ let populate_state () =
           assert_env_length w_17 4;
           push_env w_17 (Memo.from_constructor tag_VTInt);
           assert_env_length w_17 5;
+<<<<<<< HEAD
           let ctor_arg_79 = pop_env w_17 in
           let ctor_arg_80 = pop_env w_17 in
           push_env w_17 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_80; ctor_arg_79 ]);
           assert_env_length w_17 4;
           let ctor_arg_81 = pop_env w_17 in
           push_env w_17 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_81 ]);
+=======
+          let ctor_arg_80 = pop_env w_17 in
+          let ctor_arg_81 = pop_env w_17 in
+          push_env w_17 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_81; ctor_arg_80 ]);
+          assert_env_length w_17 4;
+          let ctor_arg_82 = pop_env w_17 in
+          push_env w_17 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_82 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_17 4;
           drop_n w_17 4 1;
           assert_env_length w_17 3;
@@ -1829,12 +2055,21 @@ let populate_state () =
           assert_env_length w_19 5;
           push_env w_19 (Dynarray.get w_19.state.e 3);
           assert_env_length w_19 6;
+<<<<<<< HEAD
           let ctor_arg_82 = pop_env w_19 in
           let ctor_arg_83 = pop_env w_19 in
           push_env w_19 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_83; ctor_arg_82 ]);
           assert_env_length w_19 5;
           let ctor_arg_84 = pop_env w_19 in
           push_env w_19 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_84 ]);
+=======
+          let ctor_arg_83 = pop_env w_19 in
+          let ctor_arg_84 = pop_env w_19 in
+          push_env w_19 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_84; ctor_arg_83 ]);
+          assert_env_length w_19 5;
+          let ctor_arg_85 = pop_env w_19 in
+          push_env w_19 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_85 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_19 5;
           drop_n w_19 5 1;
           assert_env_length w_19 4;
@@ -1854,12 +2089,21 @@ let populate_state () =
           assert_env_length w_19 4;
           push_env w_19 (Memo.from_constructor tag_VTInt);
           assert_env_length w_19 5;
+<<<<<<< HEAD
           let ctor_arg_85 = pop_env w_19 in
           let ctor_arg_86 = pop_env w_19 in
           push_env w_19 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_86; ctor_arg_85 ]);
           assert_env_length w_19 4;
           let ctor_arg_87 = pop_env w_19 in
           push_env w_19 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_87 ]);
+=======
+          let ctor_arg_86 = pop_env w_19 in
+          let ctor_arg_87 = pop_env w_19 in
+          push_env w_19 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_87; ctor_arg_86 ]);
+          assert_env_length w_19 4;
+          let ctor_arg_88 = pop_env w_19 in
+          push_env w_19 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_88 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_19 4;
           drop_n w_19 4 1;
           assert_env_length w_19 3;
@@ -1933,12 +2177,21 @@ let populate_state () =
           assert_env_length w_21 5;
           push_env w_21 (Dynarray.get w_21.state.e 3);
           assert_env_length w_21 6;
+<<<<<<< HEAD
           let ctor_arg_88 = pop_env w_21 in
           let ctor_arg_89 = pop_env w_21 in
           push_env w_21 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_89; ctor_arg_88 ]);
           assert_env_length w_21 5;
           let ctor_arg_90 = pop_env w_21 in
           push_env w_21 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_90 ]);
+=======
+          let ctor_arg_89 = pop_env w_21 in
+          let ctor_arg_90 = pop_env w_21 in
+          push_env w_21 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_90; ctor_arg_89 ]);
+          assert_env_length w_21 5;
+          let ctor_arg_91 = pop_env w_21 in
+          push_env w_21 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_91 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_21 5;
           drop_n w_21 5 1;
           assert_env_length w_21 4;
@@ -1958,12 +2211,21 @@ let populate_state () =
           assert_env_length w_21 4;
           push_env w_21 (Memo.from_constructor tag_VTInt);
           assert_env_length w_21 5;
+<<<<<<< HEAD
           let ctor_arg_91 = pop_env w_21 in
           let ctor_arg_92 = pop_env w_21 in
           push_env w_21 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_92; ctor_arg_91 ]);
           assert_env_length w_21 4;
           let ctor_arg_93 = pop_env w_21 in
           push_env w_21 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_93 ]);
+=======
+          let ctor_arg_92 = pop_env w_21 in
+          let ctor_arg_93 = pop_env w_21 in
+          push_env w_21 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_93; ctor_arg_92 ]);
+          assert_env_length w_21 4;
+          let ctor_arg_94 = pop_env w_21 in
+          push_env w_21 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_94 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_21 4;
           drop_n w_21 4 1;
           assert_env_length w_21 3;
@@ -2037,12 +2299,21 @@ let populate_state () =
           assert_env_length w_23 5;
           push_env w_23 (Dynarray.get w_23.state.e 3);
           assert_env_length w_23 6;
+<<<<<<< HEAD
           let ctor_arg_94 = pop_env w_23 in
           let ctor_arg_95 = pop_env w_23 in
           push_env w_23 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_95; ctor_arg_94 ]);
           assert_env_length w_23 5;
           let ctor_arg_96 = pop_env w_23 in
           push_env w_23 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_96 ]);
+=======
+          let ctor_arg_95 = pop_env w_23 in
+          let ctor_arg_96 = pop_env w_23 in
+          push_env w_23 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_96; ctor_arg_95 ]);
+          assert_env_length w_23 5;
+          let ctor_arg_97 = pop_env w_23 in
+          push_env w_23 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_97 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_23 5;
           drop_n w_23 5 1;
           assert_env_length w_23 4;
@@ -2062,12 +2333,21 @@ let populate_state () =
           assert_env_length w_23 4;
           push_env w_23 (Memo.from_constructor tag_VTInt);
           assert_env_length w_23 5;
+<<<<<<< HEAD
           let ctor_arg_97 = pop_env w_23 in
           let ctor_arg_98 = pop_env w_23 in
           push_env w_23 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_98; ctor_arg_97 ]);
           assert_env_length w_23 4;
           let ctor_arg_99 = pop_env w_23 in
           push_env w_23 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_99 ]);
+=======
+          let ctor_arg_98 = pop_env w_23 in
+          let ctor_arg_99 = pop_env w_23 in
+          push_env w_23 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_99; ctor_arg_98 ]);
+          assert_env_length w_23 4;
+          let ctor_arg_100 = pop_env w_23 in
+          push_env w_23 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_100 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_23 4;
           drop_n w_23 4 1;
           assert_env_length w_23 3;
@@ -2141,12 +2421,21 @@ let populate_state () =
           assert_env_length w_25 5;
           push_env w_25 (Dynarray.get w_25.state.e 3);
           assert_env_length w_25 6;
+<<<<<<< HEAD
           let ctor_arg_100 = pop_env w_25 in
           let ctor_arg_101 = pop_env w_25 in
           push_env w_25 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_101; ctor_arg_100 ]);
           assert_env_length w_25 5;
           let ctor_arg_102 = pop_env w_25 in
           push_env w_25 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_102 ]);
+=======
+          let ctor_arg_101 = pop_env w_25 in
+          let ctor_arg_102 = pop_env w_25 in
+          push_env w_25 (Memo.appends [ Memo.from_constructor tag_SGt1; ctor_arg_102; ctor_arg_101 ]);
+          assert_env_length w_25 5;
+          let ctor_arg_103 = pop_env w_25 in
+          push_env w_25 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_103 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_25 5;
           drop_n w_25 5 1;
           assert_env_length w_25 4;
@@ -2166,12 +2455,21 @@ let populate_state () =
           assert_env_length w_25 4;
           push_env w_25 (Memo.from_constructor tag_VTInt);
           assert_env_length w_25 5;
+<<<<<<< HEAD
           let ctor_arg_103 = pop_env w_25 in
           let ctor_arg_104 = pop_env w_25 in
           push_env w_25 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_104; ctor_arg_103 ]);
           assert_env_length w_25 4;
           let ctor_arg_105 = pop_env w_25 in
           push_env w_25 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_105 ]);
+=======
+          let ctor_arg_104 = pop_env w_25 in
+          let ctor_arg_105 = pop_env w_25 in
+          push_env w_25 (Memo.appends [ Memo.from_constructor tag_STypeError; ctor_arg_105; ctor_arg_104 ]);
+          assert_env_length w_25 4;
+          let ctor_arg_106 = pop_env w_25 in
+          push_env w_25 (Memo.appends [ Memo.from_constructor tag_VStuck; ctor_arg_106 ]);
+>>>>>>> 7b9a579 (fmt)
           assert_env_length w_25 4;
           drop_n w_25 4 1;
           assert_env_length w_25 3;
@@ -2228,7 +2526,11 @@ let populate_state () =
   Words.set_constructor_degree 41 1;
   Words.set_constructor_degree 42 1;
   Words.set_constructor_degree 43 1;
+<<<<<<< HEAD
   Words.set_constructor_degree 44 0;
+=======
+  Words.set_constructor_degree 44 (-1);
+>>>>>>> 7b9a579 (fmt)
   Words.set_constructor_degree 45 (-1);
   Words.set_constructor_degree 46 1;
   Words.set_constructor_degree 47 (-1);
