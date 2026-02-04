@@ -3,7 +3,6 @@ open Word
 open Memo
 open Value
 open Common
-
 let tag_cont_done = 0
 let tag_Z = 1
 let tag_S = 2
@@ -83,184 +82,184 @@ let tag_cont_20 = 75
 let tag_cont_21 = 76
 let tag_cont_22 = 77
 let tag_cont_23 = 78
-
-type nat = Z | S of nat
-
+type nat =
+| Z
+| S of nat
 let rec from_ocaml_nat x =
   match x with
-  | Z -> Memo.appends [ Memo.from_constructor tag_Z ]
-  | S x0 -> Memo.appends [ Memo.from_constructor tag_S; from_ocaml_nat x0 ]
-
+  | Z ->
+    Memo.appends [Memo.from_constructor tag_Z]
+  | S (x0) ->
+    Memo.appends [Memo.from_constructor tag_S; from_ocaml_nat x0]
 let rec to_ocaml_nat x =
   let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with
-  | 1 (* tag_Z *) -> Z
-  | 2 (* tag_S *) ->
-      let x0 = Memo.splits_1 t in
-      S (to_ocaml_nat x0)
+  match Word.get_value h with| 1 (* tag_Z *) ->
+    Z| 2 (* tag_S *) ->
+    let x0 = Memo.splits_1 t in
+    S (to_ocaml_nat x0)
   | _ -> failwith "unreachable"
-
-type 'a list = Nil | Cons of 'a * 'a list
-
+type 'a list =
+| Nil
+| Cons of 'a * 'a list
 let rec from_ocaml_list from_generic_a x =
   match x with
-  | Nil -> Memo.appends [ Memo.from_constructor tag_Nil ]
+  | Nil ->
+    Memo.appends [Memo.from_constructor tag_Nil]
   | Cons (x0, x1) ->
-      Memo.appends [ Memo.from_constructor tag_Cons; from_generic_a x0; from_ocaml_list (fun x -> from_generic_a x) x1 ]
-
+    Memo.appends [Memo.from_constructor tag_Cons; from_generic_a x0; from_ocaml_list (fun x -> from_generic_a x) x1]
 let rec to_ocaml_list to_generic_a x =
   let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with
-  | 3 (* tag_Nil *) -> Nil
-  | 4 (* tag_Cons *) ->
-      let x0, x1 = Memo.splits_2 t in
-      Cons (to_generic_a x0, to_ocaml_list (fun x -> to_generic_a x) x1)
+  match Word.get_value h with| 3 (* tag_Nil *) ->
+    Nil| 4 (* tag_Cons *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    Cons (to_generic_a x0, to_ocaml_list (fun x -> to_generic_a x) x1)
   | _ -> failwith "unreachable"
-
-type 'a option = None | Some of 'a
-
+type 'a option =
+| None
+| Some of 'a
 let rec from_ocaml_option from_generic_a x =
   match x with
-  | None -> Memo.appends [ Memo.from_constructor tag_None ]
-  | Some x0 -> Memo.appends [ Memo.from_constructor tag_Some; from_generic_a x0 ]
-
+  | None ->
+    Memo.appends [Memo.from_constructor tag_None]
+  | Some (x0) ->
+    Memo.appends [Memo.from_constructor tag_Some; from_generic_a x0]
 let rec to_ocaml_option to_generic_a x =
   let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with
-  | 5 (* tag_None *) -> None
-  | 6 (* tag_Some *) ->
-      let x0 = Memo.splits_1 t in
-      Some (to_generic_a x0)
+  match Word.get_value h with| 5 (* tag_None *) ->
+    None| 6 (* tag_Some *) ->
+    let x0 = Memo.splits_1 t in
+    Some (to_generic_a x0)
   | _ -> failwith "unreachable"
-
 type expr =
-  | EInt of int
-  | EPlus of expr * expr
-  | ELt of expr * expr
-  | ELe of expr * expr
-  | EGt of expr * expr
-  | EGe of expr * expr
-  | EVar of nat
-  | EAbs of expr
-  | EApp of expr * expr
-  | ELet of expr * expr
-  | ETrue
-  | EFalse
-  | EIf of expr * expr * expr
-  | ENil
-  | ECons of expr * expr
-  | EMatchList of expr * expr * expr
-  | EPair of expr * expr
-  | EZro of expr
-  | EFst of expr
-  | EFix of expr
-  | EHole of int option
-  | EUnit
-
+| EInt of int
+| EPlus of expr * expr
+| ELt of expr * expr
+| ELe of expr * expr
+| EGt of expr * expr
+| EGe of expr * expr
+| EVar of nat
+| EAbs of expr
+| EApp of expr * expr
+| ELet of expr * expr
+| ETrue
+| EFalse
+| EIf of expr * expr * expr
+| ENil
+| ECons of expr * expr
+| EMatchList of expr * expr * expr
+| EPair of expr * expr
+| EZro of expr
+| EFst of expr
+| EFix of expr
+| EHole of int option
+| EUnit
 let rec from_ocaml_expr x =
   match x with
-  | EInt x0 -> Memo.appends [ Memo.from_constructor tag_EInt; Memo.from_int x0 ]
-  | EPlus (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EPlus; from_ocaml_expr x0; from_ocaml_expr x1 ]
-  | ELt (x0, x1) -> Memo.appends [ Memo.from_constructor tag_ELt; from_ocaml_expr x0; from_ocaml_expr x1 ]
-  | ELe (x0, x1) -> Memo.appends [ Memo.from_constructor tag_ELe; from_ocaml_expr x0; from_ocaml_expr x1 ]
-  | EGt (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EGt; from_ocaml_expr x0; from_ocaml_expr x1 ]
-  | EGe (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EGe; from_ocaml_expr x0; from_ocaml_expr x1 ]
-  | EVar x0 -> Memo.appends [ Memo.from_constructor tag_EVar; from_ocaml_nat x0 ]
-  | EAbs x0 -> Memo.appends [ Memo.from_constructor tag_EAbs; from_ocaml_expr x0 ]
-  | EApp (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EApp; from_ocaml_expr x0; from_ocaml_expr x1 ]
-  | ELet (x0, x1) -> Memo.appends [ Memo.from_constructor tag_ELet; from_ocaml_expr x0; from_ocaml_expr x1 ]
-  | ETrue -> Memo.appends [ Memo.from_constructor tag_ETrue ]
-  | EFalse -> Memo.appends [ Memo.from_constructor tag_EFalse ]
+  | EInt (x0) ->
+    Memo.appends [Memo.from_constructor tag_EInt; (Memo.from_int x0)]
+  | EPlus (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_EPlus; from_ocaml_expr x0; from_ocaml_expr x1]
+  | ELt (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_ELt; from_ocaml_expr x0; from_ocaml_expr x1]
+  | ELe (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_ELe; from_ocaml_expr x0; from_ocaml_expr x1]
+  | EGt (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_EGt; from_ocaml_expr x0; from_ocaml_expr x1]
+  | EGe (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_EGe; from_ocaml_expr x0; from_ocaml_expr x1]
+  | EVar (x0) ->
+    Memo.appends [Memo.from_constructor tag_EVar; from_ocaml_nat x0]
+  | EAbs (x0) ->
+    Memo.appends [Memo.from_constructor tag_EAbs; from_ocaml_expr x0]
+  | EApp (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_EApp; from_ocaml_expr x0; from_ocaml_expr x1]
+  | ELet (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_ELet; from_ocaml_expr x0; from_ocaml_expr x1]
+  | ETrue ->
+    Memo.appends [Memo.from_constructor tag_ETrue]
+  | EFalse ->
+    Memo.appends [Memo.from_constructor tag_EFalse]
   | EIf (x0, x1, x2) ->
-      Memo.appends [ Memo.from_constructor tag_EIf; from_ocaml_expr x0; from_ocaml_expr x1; from_ocaml_expr x2 ]
-  | ENil -> Memo.appends [ Memo.from_constructor tag_ENil ]
-  | ECons (x0, x1) -> Memo.appends [ Memo.from_constructor tag_ECons; from_ocaml_expr x0; from_ocaml_expr x1 ]
+    Memo.appends [Memo.from_constructor tag_EIf; from_ocaml_expr x0; from_ocaml_expr x1; from_ocaml_expr x2]
+  | ENil ->
+    Memo.appends [Memo.from_constructor tag_ENil]
+  | ECons (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_ECons; from_ocaml_expr x0; from_ocaml_expr x1]
   | EMatchList (x0, x1, x2) ->
-      Memo.appends [ Memo.from_constructor tag_EMatchList; from_ocaml_expr x0; from_ocaml_expr x1; from_ocaml_expr x2 ]
-  | EPair (x0, x1) -> Memo.appends [ Memo.from_constructor tag_EPair; from_ocaml_expr x0; from_ocaml_expr x1 ]
-  | EZro x0 -> Memo.appends [ Memo.from_constructor tag_EZro; from_ocaml_expr x0 ]
-  | EFst x0 -> Memo.appends [ Memo.from_constructor tag_EFst; from_ocaml_expr x0 ]
-  | EFix x0 -> Memo.appends [ Memo.from_constructor tag_EFix; from_ocaml_expr x0 ]
-  | EHole x0 -> Memo.appends [ Memo.from_constructor tag_EHole; from_ocaml_option (fun x -> Memo.from_int x) x0 ]
-  | EUnit -> Memo.appends [ Memo.from_constructor tag_EUnit ]
-
+    Memo.appends [Memo.from_constructor tag_EMatchList; from_ocaml_expr x0; from_ocaml_expr x1; from_ocaml_expr x2]
+  | EPair (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_EPair; from_ocaml_expr x0; from_ocaml_expr x1]
+  | EZro (x0) ->
+    Memo.appends [Memo.from_constructor tag_EZro; from_ocaml_expr x0]
+  | EFst (x0) ->
+    Memo.appends [Memo.from_constructor tag_EFst; from_ocaml_expr x0]
+  | EFix (x0) ->
+    Memo.appends [Memo.from_constructor tag_EFix; from_ocaml_expr x0]
+  | EHole (x0) ->
+    Memo.appends [Memo.from_constructor tag_EHole; from_ocaml_option (fun x -> (Memo.from_int x)) x0]
+  | EUnit ->
+    Memo.appends [Memo.from_constructor tag_EUnit]
 let rec to_ocaml_expr x =
   let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with
-  | 7 (* tag_EInt *) ->
-      let x0 = Memo.splits_1 t in
-      EInt (Word.get_value (Memo.to_word x0))
-  | 8 (* tag_EPlus *) ->
-      let x0, x1 = Memo.splits_2 t in
-      EPlus (to_ocaml_expr x0, to_ocaml_expr x1)
-  | 9 (* tag_ELt *) ->
-      let x0, x1 = Memo.splits_2 t in
-      ELt (to_ocaml_expr x0, to_ocaml_expr x1)
-  | 10 (* tag_ELe *) ->
-      let x0, x1 = Memo.splits_2 t in
-      ELe (to_ocaml_expr x0, to_ocaml_expr x1)
-  | 11 (* tag_EGt *) ->
-      let x0, x1 = Memo.splits_2 t in
-      EGt (to_ocaml_expr x0, to_ocaml_expr x1)
-  | 12 (* tag_EGe *) ->
-      let x0, x1 = Memo.splits_2 t in
-      EGe (to_ocaml_expr x0, to_ocaml_expr x1)
-  | 13 (* tag_EVar *) ->
-      let x0 = Memo.splits_1 t in
-      EVar (to_ocaml_nat x0)
-  | 14 (* tag_EAbs *) ->
-      let x0 = Memo.splits_1 t in
-      EAbs (to_ocaml_expr x0)
-  | 15 (* tag_EApp *) ->
-      let x0, x1 = Memo.splits_2 t in
-      EApp (to_ocaml_expr x0, to_ocaml_expr x1)
-  | 16 (* tag_ELet *) ->
-      let x0, x1 = Memo.splits_2 t in
-      ELet (to_ocaml_expr x0, to_ocaml_expr x1)
-  | 17 (* tag_ETrue *) -> ETrue
-  | 18 (* tag_EFalse *) -> EFalse
-  | 19 (* tag_EIf *) ->
-      let x0, x1, x2 = Memo.splits_3 t in
-      EIf (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)
-  | 20 (* tag_ENil *) -> ENil
-  | 21 (* tag_ECons *) ->
-      let x0, x1 = Memo.splits_2 t in
-      ECons (to_ocaml_expr x0, to_ocaml_expr x1)
-  | 22 (* tag_EMatchList *) ->
-      let x0, x1, x2 = Memo.splits_3 t in
-      EMatchList (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)
-  | 23 (* tag_EPair *) ->
-      let x0, x1 = Memo.splits_2 t in
-      EPair (to_ocaml_expr x0, to_ocaml_expr x1)
-  | 24 (* tag_EZro *) ->
-      let x0 = Memo.splits_1 t in
-      EZro (to_ocaml_expr x0)
-  | 25 (* tag_EFst *) ->
-      let x0 = Memo.splits_1 t in
-      EFst (to_ocaml_expr x0)
-  | 26 (* tag_EFix *) ->
-      let x0 = Memo.splits_1 t in
-      EFix (to_ocaml_expr x0)
-  | 27 (* tag_EHole *) ->
-      let x0 = Memo.splits_1 t in
-      EHole (to_ocaml_option (fun x -> Word.get_value (Memo.to_word x)) x0)
-  | 28 (* tag_EUnit *) -> EUnit
+  match Word.get_value h with| 7 (* tag_EInt *) ->
+    let x0 = Memo.splits_1 t in
+    EInt ((Word.get_value (Memo.to_word x0)))| 8 (* tag_EPlus *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    EPlus (to_ocaml_expr x0, to_ocaml_expr x1)| 9 (* tag_ELt *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    ELt (to_ocaml_expr x0, to_ocaml_expr x1)| 10 (* tag_ELe *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    ELe (to_ocaml_expr x0, to_ocaml_expr x1)| 11 (* tag_EGt *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    EGt (to_ocaml_expr x0, to_ocaml_expr x1)| 12 (* tag_EGe *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    EGe (to_ocaml_expr x0, to_ocaml_expr x1)| 13 (* tag_EVar *) ->
+    let x0 = Memo.splits_1 t in
+    EVar (to_ocaml_nat x0)| 14 (* tag_EAbs *) ->
+    let x0 = Memo.splits_1 t in
+    EAbs (to_ocaml_expr x0)| 15 (* tag_EApp *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    EApp (to_ocaml_expr x0, to_ocaml_expr x1)| 16 (* tag_ELet *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    ELet (to_ocaml_expr x0, to_ocaml_expr x1)| 17 (* tag_ETrue *) ->
+    ETrue| 18 (* tag_EFalse *) ->
+    EFalse| 19 (* tag_EIf *) ->
+    let (x0, x1, x2) = Memo.splits_3 t in
+    EIf (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)| 20 (* tag_ENil *) ->
+    ENil| 21 (* tag_ECons *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    ECons (to_ocaml_expr x0, to_ocaml_expr x1)| 22 (* tag_EMatchList *) ->
+    let (x0, x1, x2) = Memo.splits_3 t in
+    EMatchList (to_ocaml_expr x0, to_ocaml_expr x1, to_ocaml_expr x2)| 23 (* tag_EPair *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    EPair (to_ocaml_expr x0, to_ocaml_expr x1)| 24 (* tag_EZro *) ->
+    let x0 = Memo.splits_1 t in
+    EZro (to_ocaml_expr x0)| 25 (* tag_EFst *) ->
+    let x0 = Memo.splits_1 t in
+    EFst (to_ocaml_expr x0)| 26 (* tag_EFix *) ->
+    let x0 = Memo.splits_1 t in
+    EFix (to_ocaml_expr x0)| 27 (* tag_EHole *) ->
+    let x0 = Memo.splits_1 t in
+    EHole (to_ocaml_option (fun x -> (Word.get_value (Memo.to_word x))) x0)| 28 (* tag_EUnit *) ->
+    EUnit
   | _ -> failwith "unreachable"
-
 type value =
-  | VInt of int
-  | VAbs of expr * value list
-  | VUnit
-  | VTrue
-  | VFalse
-  | VNil
-  | VCons of value * value
-  | VPair of value * value
-  | VFix of expr * value list
-  | VStuck of stuck
-
-and vtype = VTInt | VTFunc | VTBool | VTList | VTPair
-
+| VInt of int
+| VAbs of expr * value list
+| VUnit
+| VTrue
+| VFalse
+| VNil
+| VCons of value * value
+| VPair of value * value
+| VFix of expr * value list
+| VStuck of stuck
+and vtype =
+| VTInt
+| VTFunc
+| VTBool
+| VTList
+| VTPair
 and stuck =
   | SHole of int option
   | STypeError of value * vtype
@@ -274,100 +273,80 @@ and stuck =
   | SMatchList of stuck * expr * expr
   | SZro of stuck
   | SFst of stuck
-
 let rec from_ocaml_value x =
   match x with
-  | VInt x0 -> Memo.appends [ Memo.from_constructor tag_VInt; Memo.from_int x0 ]
+  | VInt (x0) ->
+    Memo.appends [Memo.from_constructor tag_VInt; (Memo.from_int x0)]
   | VAbs (x0, x1) ->
-      Memo.appends
-        [ Memo.from_constructor tag_VAbs; from_ocaml_expr x0; from_ocaml_list (fun x -> from_ocaml_value x) x1 ]
-  | VUnit -> Memo.appends [ Memo.from_constructor tag_VUnit ]
-  | VTrue -> Memo.appends [ Memo.from_constructor tag_VTrue ]
-  | VFalse -> Memo.appends [ Memo.from_constructor tag_VFalse ]
-  | VNil -> Memo.appends [ Memo.from_constructor tag_VNil ]
-  | VCons (x0, x1) -> Memo.appends [ Memo.from_constructor tag_VCons; from_ocaml_value x0; from_ocaml_value x1 ]
-  | VPair (x0, x1) -> Memo.appends [ Memo.from_constructor tag_VPair; from_ocaml_value x0; from_ocaml_value x1 ]
+    Memo.appends [Memo.from_constructor tag_VAbs; from_ocaml_expr x0; from_ocaml_list (fun x -> from_ocaml_value x) x1]
+  | VUnit ->
+    Memo.appends [Memo.from_constructor tag_VUnit]
+  | VTrue ->
+    Memo.appends [Memo.from_constructor tag_VTrue]
+  | VFalse ->
+    Memo.appends [Memo.from_constructor tag_VFalse]
+  | VNil ->
+    Memo.appends [Memo.from_constructor tag_VNil]
+  | VCons (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_VCons; from_ocaml_value x0; from_ocaml_value x1]
+  | VPair (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_VPair; from_ocaml_value x0; from_ocaml_value x1]
   | VFix (x0, x1) ->
-      Memo.appends
-        [ Memo.from_constructor tag_VFix; from_ocaml_expr x0; from_ocaml_list (fun x -> from_ocaml_value x) x1 ]
-  | VStuck x0 -> Memo.appends [ Memo.from_constructor tag_VStuck; from_ocaml_stuck x0 ]
-
+    Memo.appends [Memo.from_constructor tag_VFix; from_ocaml_expr x0; from_ocaml_list (fun x -> from_ocaml_value x) x1]
+  | VStuck (x0) ->
+    Memo.appends [Memo.from_constructor tag_VStuck; from_ocaml_stuck x0]
 and from_ocaml_vtype x =
   match x with
-  | VTInt -> Memo.appends [ Memo.from_constructor tag_VTInt ]
-  | VTFunc -> Memo.appends [ Memo.from_constructor tag_VTFunc ]
-  | VTBool -> Memo.appends [ Memo.from_constructor tag_VTBool ]
-  | VTList -> Memo.appends [ Memo.from_constructor tag_VTList ]
-  | VTPair -> Memo.appends [ Memo.from_constructor tag_VTPair ]
-
+  | VTInt ->
+    Memo.appends [Memo.from_constructor tag_VTInt]
+  | VTFunc ->
+    Memo.appends [Memo.from_constructor tag_VTFunc]
+  | VTBool ->
+    Memo.appends [Memo.from_constructor tag_VTBool]
+  | VTList ->
+    Memo.appends [Memo.from_constructor tag_VTList]
+  | VTPair ->
+    Memo.appends [Memo.from_constructor tag_VTPair]
 and from_ocaml_stuck x =
   match x with
   | SHole x0 -> Memo.appends [ Memo.from_constructor tag_SHole; from_ocaml_option (fun x -> Memo.from_int x) x0 ]
   | STypeError (x0, x1) ->
-      Memo.appends [ Memo.from_constructor tag_STypeError; from_ocaml_value x0; from_ocaml_vtype x1 ]
-  | SIndexError -> Memo.appends [ Memo.from_constructor tag_SIndexError ]
-  | SApp (x0, x1) -> Memo.appends [ Memo.from_constructor tag_SApp; from_ocaml_stuck x0; from_ocaml_expr x1 ]
-  | SAdd0 (x0, x1) -> Memo.appends [ Memo.from_constructor tag_SAdd0; from_ocaml_stuck x0; from_ocaml_expr x1 ]
-  | SAdd1 (x0, x1) -> Memo.appends [ Memo.from_constructor tag_SAdd1; from_ocaml_value x0; from_ocaml_stuck x1 ]
-  | SGt0 (x0, x1) -> Memo.appends [ Memo.from_constructor tag_SGt0; from_ocaml_stuck x0; from_ocaml_expr x1 ]
-  | SGt1 (x0, x1) -> Memo.appends [ Memo.from_constructor tag_SGt1; from_ocaml_value x0; from_ocaml_stuck x1 ]
-  | SIf (x0, x1, x2) ->
-      Memo.appends [ Memo.from_constructor tag_SIf; from_ocaml_stuck x0; from_ocaml_expr x1; from_ocaml_expr x2 ]
-  | SMatchList (x0, x1, x2) ->
-      Memo.appends [ Memo.from_constructor tag_SMatchList; from_ocaml_stuck x0; from_ocaml_expr x1; from_ocaml_expr x2 ]
-  | SZro x0 -> Memo.appends [ Memo.from_constructor tag_SZro; from_ocaml_stuck x0 ]
-  | SFst x0 -> Memo.appends [ Memo.from_constructor tag_SFst; from_ocaml_stuck x0 ]
-
-let rec to_ocaml_value x =
-  let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with
-  | 29 (* tag_VInt *) ->
-      let x0 = Memo.splits_1 t in
-      VInt (Word.get_value (Memo.to_word x0))
-  | 30 (* tag_VAbs *) ->
-      let x0, x1 = Memo.splits_2 t in
-      VAbs (to_ocaml_expr x0, to_ocaml_list (fun x -> to_ocaml_value x) x1)
-  | 31 (* tag_VUnit *) -> VUnit
-  | 32 (* tag_VTrue *) -> VTrue
-  | 33 (* tag_VFalse *) -> VFalse
-  | 34 (* tag_VNil *) -> VNil
-  | 35 (* tag_VCons *) ->
-      let x0, x1 = Memo.splits_2 t in
-      VCons (to_ocaml_value x0, to_ocaml_value x1)
-  | 36 (* tag_VPair *) ->
-      let x0, x1 = Memo.splits_2 t in
-      VPair (to_ocaml_value x0, to_ocaml_value x1)
-  | 37 (* tag_VFix *) ->
-      let x0, x1 = Memo.splits_2 t in
-      VFix (to_ocaml_expr x0, to_ocaml_list (fun x -> to_ocaml_value x) x1)
-  | 38 (* tag_VStuck *) ->
-      let x0 = Memo.splits_1 t in
-      VStuck (to_ocaml_stuck x0)
-  | _ -> failwith "unreachable"
-
-and to_ocaml_vtype x =
-  let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with
-  | 39 (* tag_VTInt *) -> VTInt
-  | 40 (* tag_VTFunc *) -> VTFunc
-  | 41 (* tag_VTBool *) -> VTBool
-  | 42 (* tag_VTList *) -> VTList
-  | 43 (* tag_VTPair *) -> VTPair
-  | _ -> failwith "unreachable"
-
-and to_ocaml_stuck x =
-  let h, t = Option.get (Memo.list_match x) in
-  match Word.get_value h with
-  | 44 (* tag_SHole *) ->
+    Memo.appends [Memo.from_constructor tag_STypeError; from_ocaml_value x0; from_ocaml_vtype x1]
+    match Word.get_value h with
+    | 44 (* tag_SHole *) ->
       let x0 = Memo.splits_1 t in
       SHole (to_ocaml_option (fun x -> Word.get_value (Memo.to_word x)) x0)
-  | 45 (* tag_STypeError *) ->
+    | 45 (* tag_STypeError *) ->
       let x0, x1 = Memo.splits_2 t in
       STypeError (to_ocaml_value x0, to_ocaml_vtype x1)
-  | 46 (* tag_SIndexError *) -> SIndexError
-  | 47 (* tag_SApp *) ->
+    | 46 (* tag_SIndexError *) -> SIndexError
+    | 47 (* tag_SApp *) ->
       let x0, x1 = Memo.splits_2 t in
       SApp (to_ocaml_stuck x0, to_ocaml_expr x1)
+    | 48 (* tag_SAdd0 *) ->
+      let x0, x1 = Memo.splits_2 t in
+      SAdd0 (to_ocaml_stuck x0, to_ocaml_expr x1)
+    | 49 (* tag_SAdd1 *) ->
+      let x0, x1 = Memo.splits_2 t in
+      SAdd1 (to_ocaml_value x0, to_ocaml_stuck x1)
+    | 50 (* tag_SGt0 *) ->
+      let x0, x1 = Memo.splits_2 t in
+      SGt0 (to_ocaml_stuck x0, to_ocaml_expr x1)
+    | 51 (* tag_SGt1 *) ->
+      let x0, x1 = Memo.splits_2 t in
+      SGt1 (to_ocaml_value x0, to_ocaml_stuck x1)
+    | 52 (* tag_SIf *) ->
+      let x0, x1, x2 = Memo.splits_3 t in
+      SIf (to_ocaml_stuck x0, to_ocaml_expr x1, to_ocaml_expr x2)
+    | 53 (* tag_SMatchList *) ->
+      let x0, x1, x2 = Memo.splits_3 t in
+      SMatchList (to_ocaml_stuck x0, to_ocaml_expr x1, to_ocaml_expr x2)
+    | 54 (* tag_SZro *) ->
+      let x0 = Memo.splits_1 t in
+      SZro (to_ocaml_stuck x0)
+    | 55 (* tag_SFst *) ->
+      let x0 = Memo.splits_1 t in
+      SFst (to_ocaml_stuck x0)
   | 48 (* tag_SAdd0 *) ->
       let x0, x1 = Memo.splits_2 t in
       SAdd0 (to_ocaml_stuck x0, to_ocaml_expr x1)
@@ -392,14 +371,33 @@ and to_ocaml_stuck x =
   | 55 (* tag_SFst *) ->
       let x0 = Memo.splits_1 t in
       SFst (to_ocaml_stuck x0)
+  match Word.get_value h with| 44 (* tag_SHole *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    SHole (to_ocaml_option (fun x -> (Word.get_value (Memo.to_word x))) x0, to_ocaml_list (fun x -> to_ocaml_value x) x1)| 45 (* tag_STypeError *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    STypeError (to_ocaml_value x0, to_ocaml_vtype x1)| 46 (* tag_SIndexError *) ->
+    SIndexError| 47 (* tag_SApp *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    SApp (to_ocaml_stuck x0, to_ocaml_expr x1)| 48 (* tag_SAdd0 *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    SAdd0 (to_ocaml_stuck x0, to_ocaml_expr x1)| 49 (* tag_SAdd1 *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    SAdd1 (to_ocaml_value x0, to_ocaml_stuck x1)| 50 (* tag_SGt0 *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    SGt0 (to_ocaml_stuck x0, to_ocaml_expr x1)| 51 (* tag_SGt1 *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    SGt1 (to_ocaml_value x0, to_ocaml_stuck x1)| 52 (* tag_SIf *) ->
+    let (x0, x1, x2) = Memo.splits_3 t in
+    SIf (to_ocaml_stuck x0, to_ocaml_expr x1, to_ocaml_expr x2)| 53 (* tag_SMatchList *) ->
+    let (x0, x1, x2) = Memo.splits_3 t in
+    SMatchList (to_ocaml_stuck x0, to_ocaml_expr x1, to_ocaml_expr x2)| 54 (* tag_SZro *) ->
+    let x0 = Memo.splits_1 t in
+    SZro (to_ocaml_stuck x0)| 55 (* tag_SFst *) ->
+    let x0 = Memo.splits_1 t in
+    SFst (to_ocaml_stuck x0)
   | _ -> failwith "unreachable"
-
-let rec index memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
-
-let rec eval memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 4)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
-
+let rec index memo (x0 : Value.seq) (x1 : Value.seq): exec_result = (exec_cek (pc_to_exp (int_to_pc 1))(Dynarray.of_list[(x0);(x1)])((Memo.from_constructor tag_cont_done)) memo)
+let rec eval memo (x0 : Value.seq) (x1 : Value.seq): exec_result = (exec_cek (pc_to_exp (int_to_pc 4))(Dynarray.of_list[(x0);(x1)])((Memo.from_constructor tag_cont_done)) memo)
 let populate_state () =
   Memo.reset ();
   Words.reset ();

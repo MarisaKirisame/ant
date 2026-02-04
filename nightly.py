@@ -185,6 +185,8 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "--compile",
             "--backend",
             "plain",
+            "--type-alias",
+            "LiveCEK",
         ],
         env=env,
     )
