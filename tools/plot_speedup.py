@@ -250,6 +250,28 @@ def plot_rule_stat_insert_time(
     return output_path.name
 
 
+def plot_rule_stat_pvar_length_insert_time(
+    rule_stat: Sequence[MemoRuleStat], output_dir: Path
+) -> str:
+    if not rule_stat:
+        raise ValueError("rule_stat is empty")
+    output_path = output_dir / _fresh_plot_name()
+    plt.figure(figsize=(6, 4.5))
+    pvar_lengths = [entry.pvar_length for entry in rule_stat]
+    insert_times = [entry.insert_time for entry in rule_stat]
+    plt.scatter(pvar_lengths, insert_times, alpha=0.6)
+    if REPORT_ABSOLUTE_TIME_LOG_SCALE:
+        plt.yscale("log")
+    plt.xlabel("Pattern pvar length")
+    plt.ylabel("Insert time (ns)")
+    plt.title("Memo rule pvar length vs insert time")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    return output_path.name
+
+
 def plot_rule_stat_depth_insert_time(
     rule_stat: Sequence[MemoRuleStat], output_dir: Path
 ) -> str:

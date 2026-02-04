@@ -32,6 +32,7 @@ class MemoStatsNode:
 @dataclass(frozen=True)
 class MemoRuleStat:
     size: int
+    pvar_length: int
     sc: int
     hit_count: int
     insert_time: int
@@ -144,6 +145,7 @@ def load_records(
                         if not isinstance(entry, dict):
                             raise ValueError(f"rule_stat[{idx}] must be an object")
                         size = entry.get("size")
+                        pvar_length = entry.get("pvar_length")
                         sc = entry.get("sc")
                         hit_count = entry.get("hit_count")
                         insert_time = entry.get("insert_time")
@@ -151,6 +153,8 @@ def load_records(
                         rule = entry.get("rule")
                         if not isinstance(size, int):
                             raise ValueError(f"rule_stat[{idx}].size must be an int")
+                        if not isinstance(pvar_length, int):
+                            raise ValueError(f"rule_stat[{idx}].pvar_length must be an int")
                         if not isinstance(sc, int):
                             raise ValueError(f"rule_stat[{idx}].sc must be an int")
                         if not isinstance(hit_count, int):
@@ -164,6 +168,7 @@ def load_records(
                         rule_stat_entries.append(
                             MemoRuleStat(
                                 size=size,
+                                pvar_length=pvar_length,
                                 sc=sc,
                                 hit_count=hit_count,
                                 insert_time=insert_time,

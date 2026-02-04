@@ -455,6 +455,7 @@ let set_reads_of_trie (t : trie) (r : reads) : trie =
   match t with Stem x -> Stem { x with reads = r } | Branch x -> Branch { x with reads = r }
 
 let rec merge (x : trie) (y : trie) : trie =
+  let iter_old_table = false in
   let rebase_merging (delta : reads) (m : merging) : merging =
     { reads = unmatch_reads delta m.reads; children = m.children; miss_count = 0 }
   in
@@ -496,11 +497,13 @@ let rec merge (x : trie) (y : trie) : trie =
           let children = Hashtbl.create (module Int) in
           let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
           Hashtbl.set children x_key (Stem { x with reads = x_reads });
-          (*Hashtbl.iter y.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash (Lazy.force j.reads) (unmatch_reads y.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
+          if iter_old_table then
+            Hashtbl.iter y.children ~f:(fun child_trie ->
+                let child_key, child_reads =
+                  Option.value_exn
+                    (reads_hash (Lazy.force j.reads) (unmatch_reads y.reads (reads_from_trie child_trie)))
+                in
+                Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
           Branch
             {
               reads = Lazy.force j.reads;
@@ -527,17 +530,19 @@ let rec merge (x : trie) (y : trie) : trie =
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
           let children = Hashtbl.create (module Int) in
-          (*
-          Hashtbl.iter x.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
-          Hashtbl.iter y.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
+          if iter_old_table then (
+            Hashtbl.iter x.children ~f:(fun child_trie ->
+                let child_key, child_reads =
+                  Option.value_exn
+                    (reads_hash (Lazy.force j.reads) (unmatch_reads x.reads (reads_from_trie child_trie)))
+                in
+                Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
+            Hashtbl.iter y.children ~f:(fun child_trie ->
+                let child_key, child_reads =
+                  Option.value_exn
+                    (reads_hash (Lazy.force j.reads) (unmatch_reads y.reads (reads_from_trie child_trie)))
+                in
+                Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads))));
           Branch
             {
               reads = Lazy.force j.reads;
@@ -550,12 +555,13 @@ let rec merge (x : trie) (y : trie) : trie =
                   :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
             }
       | true, false ->
-          (*
-          Hashtbl.iter x.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update y.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
+          if iter_old_table then
+            Hashtbl.iter x.children ~f:(fun child_trie ->
+                let child_key, child_reads =
+                  Option.value_exn
+                    (reads_hash (Lazy.force j.reads) (unmatch_reads x.reads (reads_from_trie child_trie)))
+                in
+                Hashtbl.update y.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
           Branch
             {
               reads = y.reads;
@@ -567,11 +573,13 @@ let rec merge (x : trie) (y : trie) : trie =
                 @ y.merging;*)
             }
       | false, true ->
-          (*Hashtbl.iter y.children ~f:(fun child_trie ->
-              let child_key, child_reads =
-                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
-              in
-              Hashtbl.update x.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
+          if iter_old_table then
+            Hashtbl.iter y.children ~f:(fun child_trie ->
+                let child_key, child_reads =
+                  Option.value_exn
+                    (reads_hash (Lazy.force j.reads) (unmatch_reads y.reads (reads_from_trie child_trie)))
+                in
+                Hashtbl.update x.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
           Branch
             {
               reads = x.reads;
@@ -594,6 +602,7 @@ and insert_option (x : trie) (y : trie option) : trie = match y with None -> x |
 
 let pattern_size (p : Pattern.pattern) = Generic.size p
 let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
+let patterns_pvar_length (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + Pattern.pattern_pvar_length p)
 let max_rule_size = 25
 
 let insert_step (m : memo) (step : step) : unit =
@@ -798,7 +807,7 @@ let exec_done _ = failwith "exec is done, should not call step anymore"
 
 type memo_stats = { by_depth : by_depth Dynarray.t; rule_stat : rule_stat list }
 and by_depth = { depth : int; mutable node_count : int }
-and rule_stat = { size : int; sc : int; hit_count : int; insert_time : int; depth : int; rule : string Lazy.t }
+and rule_stat = { size : int; pvar_length : int; sc : int; hit_count : int; insert_time : int; depth : int; rule : string Lazy.t }
 
 let memo_stats (m : memo) : memo_stats =
   let by_depth = Dynarray.create () in
@@ -812,6 +821,7 @@ let memo_stats (m : memo) : memo_stats =
         rule_stat :=
           {
             size = patterns_size st.step.src;
+            pvar_length = patterns_pvar_length st.step.src;
             sc = st.step.sc;
             hit_count = st.step.hit;
             insert_time = st.step.insert_time;

@@ -127,3 +127,9 @@ let rec pattern_pvar_count x : int =
   else
     let xh, xt = pattern_front_exn x in
     (match xh with PVar _ -> 1 | PCon _ -> 0) + pattern_pvar_count xt
+
+let rec pattern_pvar_length x : int =
+  if pattern_is_empty x then 0
+  else
+    let xh, xt = pattern_front_exn x in
+    (match xh with PVar xh -> xh | PCon _ -> 0) + pattern_pvar_length xt
