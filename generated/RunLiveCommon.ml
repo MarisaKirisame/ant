@@ -394,6 +394,20 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
     Buffer.add_string buf (string_of_int node.node_count);
     Buffer.add_char buf '}'
   done;
+  Buffer.add_string buf "],\"node_stat\":[";
+  List.iteri
+    (fun i (entry : Memo.node_stat) ->
+      if i > 0 then Buffer.add_char buf ',';
+      Buffer.add_string buf "{\"depth\":";
+      Buffer.add_string buf (string_of_int entry.depth);
+      Buffer.add_string buf ",\"rread_length\":";
+      Buffer.add_string buf (string_of_int entry.rread_length);
+      Buffer.add_string buf ",\"reads_size\":";
+      Buffer.add_string buf (string_of_int entry.reads_size);
+      Buffer.add_string buf ",\"insert_time\":";
+      Buffer.add_string buf (string_of_int entry.insert_time);
+      Buffer.add_char buf '}')
+    stats.node_stat;
   Buffer.add_string buf "],\"rule_stat\":[";
   List.iteri
     (fun i (entry : Memo.rule_stat) ->

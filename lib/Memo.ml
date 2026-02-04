@@ -602,7 +602,12 @@ and insert_option (x : trie) (y : trie option) : trie = match y with None -> x |
 
 let pattern_size (p : Pattern.pattern) = Generic.size p
 let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
-let patterns_pvar_length (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + Pattern.pattern_pvar_length p)
+
+let patterns_pvar_length (p : Pattern.pattern cek) : int =
+  fold_ek p 0 (fun acc p -> acc + Pattern.pattern_pvar_length p)
+
+let reads_rread_length (r : reads) : int = fold_ek r 0 (fun acc r -> acc + Read.read_rread_length r)
+let reads_size (r : reads) : int = fold_ek r 0 (fun acc r -> acc + Generic.size r)
 let max_rule_size = 25
 
 let insert_step (m : memo) (step : step) : unit =
@@ -805,19 +810,38 @@ let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) =
 
 let exec_done _ = failwith "exec is done, should not call step anymore"
 
-type memo_stats = { by_depth : by_depth Dynarray.t; rule_stat : rule_stat list }
+type memo_stats = { by_depth : by_depth Dynarray.t; node_stat : node_stat list; rule_stat : rule_stat list }
 and by_depth = { depth : int; mutable node_count : int }
-and rule_stat = { size : int; pvar_length : int; sc : int; hit_count : int; insert_time : int; depth : int; rule : string Lazy.t }
+and node_stat = { depth : int; rread_length : int; reads_size : int; insert_time : int }
+
+and rule_stat = {
+  size : int;
+  pvar_length : int;
+  sc : int;
+  hit_count : int;
+  insert_time : int;
+  depth : int;
+  rule : string Lazy.t;
+}
 
 let memo_stats (m : memo) : memo_stats =
   let by_depth = Dynarray.create () in
+  let node_stats = ref [] in
   let rule_stat = ref [] in
   let rec aux (t : trie) (depth : int) : unit =
     if Dynarray.length by_depth <= depth then Dynarray.add_last by_depth { depth; node_count = 0 };
-    let node_stat = Dynarray.get by_depth depth in
-    node_stat.node_count <- node_stat.node_count + 1;
+    let by_depth_stat = Dynarray.get by_depth depth in
+    by_depth_stat.node_count <- by_depth_stat.node_count + 1;
     match t with
     | Stem st -> (
+        node_stats :=
+          {
+            depth;
+            rread_length = reads_rread_length st.reads;
+            reads_size = reads_size st.reads;
+            insert_time = st.step.insert_time;
+          }
+          :: !node_stats;
         rule_stat :=
           {
             size = patterns_size st.step.src;
@@ -831,8 +855,11 @@ let memo_stats (m : memo) : memo_stats =
           :: !rule_stat;
         match st.next with None -> () | Some child -> aux child (depth + 1))
     | Branch br ->
+        node_stats :=
+          { depth; rread_length = reads_rread_length br.reads; reads_size = reads_size br.reads; insert_time = 1 }
+          :: !node_stats;
         Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1));
         List.iter br.merging ~f:(fun m -> Hashtbl.iter m.children ~f:(fun child -> aux child (depth + 1)))
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
-  { by_depth; rule_stat = !rule_stat }
+  { by_depth; node_stat = !node_stats; rule_stat = !rule_stat }

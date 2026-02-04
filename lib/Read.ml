@@ -133,6 +133,12 @@ let read_pop_n (r : read) n : read =
   assert ((read_measure y).degree = (read_measure r).degree - n);*)
   y
 
+let rec read_rread_length (r : read) : int =
+  if read_is_empty r then 0
+  else
+    let rh, rt = read_front_exn r in
+    (match rh with RRead n -> n | RSkip _ | RCon _ -> 0) + read_rread_length rt
+
 let rec unmatch_read (x : read) (y : read) : read =
   if Generic.is_empty x then (
     assert (Generic.is_empty y);

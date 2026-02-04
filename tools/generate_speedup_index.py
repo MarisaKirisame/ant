@@ -20,6 +20,8 @@ from plot_speedup import (
     plot_rule_stat_insert_time,
     plot_rule_stat_pvar_length_insert_time,
     plot_rule_stat_depth_insert_time,
+    plot_node_stat_rread_length_insert_time,
+    plot_node_stat_reads_size_insert_time,
     plot_depth_breakdown,
     plot_depth_breakdown_cdf,
     profile_totals_from_result,
@@ -41,6 +43,8 @@ def render_html(
     insert_time_scatter_plot = plot_rule_stat_insert_time(records.rule_stat, output_dir)
     pvar_insert_time_scatter_plot = plot_rule_stat_pvar_length_insert_time(records.rule_stat, output_dir)
     depth_insert_time_scatter_plot = plot_rule_stat_depth_insert_time(records.rule_stat, output_dir)
+    rread_insert_time_scatter_plot = plot_node_stat_rread_length_insert_time(records.node_stat, output_dir)
+    reads_size_insert_time_scatter_plot = plot_node_stat_reads_size_insert_time(records.node_stat, output_dir)
     profile_totals, profile_total_time = profile_totals_from_result(records)
     profile_table = render_profile_table(profile_totals, profile_total_time)
     doc = document(title="Memoization Speedup")
@@ -86,6 +90,8 @@ def render_html(
             _plot_image(insert_time_scatter_plot, "Memo rule size vs insert time scatter plot")
             _plot_image(pvar_insert_time_scatter_plot, "Memo rule pvar length vs insert time scatter plot")
             _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
+            _plot_image(rread_insert_time_scatter_plot, "Memo node rread length vs insert time scatter plot")
+            _plot_image(reads_size_insert_time_scatter_plot, "Memo node reads size vs insert time scatter plot")
             _render_large_rule_stats(records, min_size=40, limit=5)
             with tag.section(cls="profile"):
                 raw(profile_table)

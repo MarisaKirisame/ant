@@ -30,6 +30,14 @@ class MemoStatsNode:
 
 
 @dataclass(frozen=True)
+class MemoNodeStat:
+    depth: int
+    rread_length: int
+    reads_size: int
+    insert_time: int
+
+
+@dataclass(frozen=True)
 class MemoRuleStat:
     size: int
     pvar_length: int
@@ -59,6 +67,7 @@ class ExecTimeRecord:
 class Result:
     exec_times: list[ExecTimeRecord]
     depth_breakdown: list[MemoStatsNode]
+    node_stat: list[MemoNodeStat]
     rule_stat: list[MemoRuleStat]
 
 
@@ -84,6 +93,7 @@ def load_records(
     """Return parsed records from a JSONL file."""
     exec_times: list[ExecTimeRecord] = []
     depth_breakdown: list[MemoStatsNode] = []
+    node_stat: list[MemoNodeStat] = []
     rule_stat: list[MemoRuleStat] = []
     seen_memo_stats = False
     with path.open() as f:
@@ -137,6 +147,34 @@ def load_records(
                             raise ValueError(f"depth_breakdown[{idx}].node_count must be an int")
                         nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
                     depth_breakdown = nodes
+                    raw_node_stat = rec.get("node_stat", [])
+                    if not isinstance(raw_node_stat, list):
+                        raise ValueError("node_stat must be a list")
+                    node_stat_entries: list[MemoNodeStat] = []
+                    for idx, entry in enumerate(raw_node_stat):
+                        if not isinstance(entry, dict):
+                            raise ValueError(f"node_stat[{idx}] must be an object")
+                        depth = entry.get("depth")
+                        rread_length = entry.get("rread_length")
+                        reads_size = entry.get("reads_size")
+                        insert_time = entry.get("insert_time")
+                        if not isinstance(depth, int):
+                            raise ValueError(f"node_stat[{idx}].depth must be an int")
+                        if not isinstance(rread_length, int):
+                            raise ValueError(f"node_stat[{idx}].rread_length must be an int")
+                        if not isinstance(reads_size, int):
+                            raise ValueError(f"node_stat[{idx}].reads_size must be an int")
+                        if not isinstance(insert_time, int):
+                            raise ValueError(f"node_stat[{idx}].insert_time must be an int")
+                        node_stat_entries.append(
+                            MemoNodeStat(
+                                depth=depth,
+                                rread_length=rread_length,
+                                reads_size=reads_size,
+                                insert_time=insert_time,
+                            )
+                        )
+                    node_stat = node_stat_entries
                     raw_rule_stat = rec.get("rule_stat", [])
                     if not isinstance(raw_rule_stat, list):
                         raise ValueError("rule_stat must be a list")
@@ -184,5 +222,8 @@ def load_records(
     if not exec_times:
         raise RuntimeError("no exec_time records found in file")
     return Result(
-        exec_times=exec_times, depth_breakdown=depth_breakdown, rule_stat=rule_stat
+        exec_times=exec_times,
+        depth_breakdown=depth_breakdown,
+        node_stat=node_stat,
+        rule_stat=rule_stat,
     )
