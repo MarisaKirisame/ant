@@ -78,15 +78,8 @@ let compile_conversions (ops : 'a ops) (ctx : (string, int) Hashtbl.t) (binding 
             let lhs = if arity > 1 then parens (separate (comma ^^ space) vars) else List.hd vars in
             break 1 ^^ string "let" ^^ space ^^ lhs ^^ space ^^ equals ^^ space ^^ rhs ^^ space ^^ string "in"
         | None ->
-            break 1 ^^ string "let args_list = "
-            ^^ ops.splits (string "t")
-            ^^ string " in"
-            ^^ concat_map
-                 (fun (i, v) ->
-                   break 1 ^^ string "let " ^^ v ^^ string " = List.nth args_list "
-                   ^^ string (string_of_int i)
-                   ^^ string " in")
-                 (List.mapi (fun i v -> (i, v)) vars)
+            let lhs = if arity = 1 then List.hd vars else brackets (separate (semi ^^ space) vars) in
+            break 1 ^^ string "let " ^^ lhs ^^ space ^^ equals ^^ space ^^ ops.splits (string "t") ^^ string " in"
     in
     let reconstruction =
       let ctor_app =
