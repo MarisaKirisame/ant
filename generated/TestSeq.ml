@@ -18,9 +18,7 @@ let rec to_ocaml_int_list x =
   match Word.get_value h with
   | 0 -> Nil
   | 1 ->
-      let args_list = Seq.splits t in
-      let x0 = List.nth args_list 0 in
-      let x1 = List.nth args_list 1 in
+      let [ x0; x1 ] = Seq.splits t in
       Cons (Seq.to_int x0, x1)
   | _ -> failwith "unreachable"
 

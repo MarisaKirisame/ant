@@ -6,7 +6,26 @@ open State
 open Code
 
 let type_alias_module : string option ref = ref None
-let set_type_alias_module value = type_alias_module := value
+
+let is_valid_module_path (value : string) : bool =
+  let is_upper = function 'A' .. 'Z' -> true | _ -> false in
+  let is_ident_char = function 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' -> true | _ -> false in
+  let is_valid_segment (segment : string) : bool =
+    let len = String.length segment in
+    if len = 0 then false
+    else if not (is_upper segment.[0]) then false
+    else
+      let rec loop i = if i >= len then true else if is_ident_char segment.[i] then loop (i + 1) else false in
+      loop 1
+  in
+  List.for_all is_valid_segment (String.split_on_char '.' value)
+
+let set_type_alias_module value =
+  (match value with
+  | None -> ()
+  | Some module_name ->
+      if not (is_valid_module_path module_name) then invalid_arg ("Invalid module path for --type-alias: " ^ module_name));
+  type_alias_module := value
 
 let rec compile_ty (x : 'a ty) : document =
   match x with
@@ -38,20 +57,14 @@ let compile_type_binding x =
       ^^ separate_map (hardline ^^ string "and ") (fun (name, ty_kind) -> comple_type_decl name ty_kind) decls
 
 let compile_type_alias module_name =
-  let params_decl params =
-    match params with
-    | [] -> empty
-    | [ x ] -> string ("'" ^ x) ^^ space
-    | _ -> parens (separate_map (string ", ") (fun p -> string ("'" ^ p)) params) ^^ space
-  in
-  let params_use params =
+  let params_doc params =
     match params with
     | [] -> empty
     | [ x ] -> string ("'" ^ x) ^^ space
     | _ -> parens (separate_map (string ", ") (fun p -> string ("'" ^ p)) params) ^^ space
   in
   let alias_decl name params =
-    params_decl params ^^ string name ^^ space ^^ string "=" ^^ space ^^ params_use params ^^ string module_name
+    params_doc params ^^ string name ^^ space ^^ string "=" ^^ space ^^ params_doc params ^^ string module_name
     ^^ string "." ^^ string name
   in
   function
@@ -123,9 +136,11 @@ let compile_stmt (x : 'a stmt) : document =
   | _ -> failwith "Not implemented (TODO)"
 
 let compile_plain (xs : 'a stmt list) : document =
+  let alias_module = !type_alias_module in
   let ys = List.map compile_stmt xs in
+  type_alias_module := None;
   let body = separate (string ";;" ^^ hardline ^^ hardline) ys in
-  match !type_alias_module with
+  match alias_module with
   | None -> body
   | Some module_name -> string "open " ^^ string module_name ^^ hardline ^^ hardline ^^ body
 
