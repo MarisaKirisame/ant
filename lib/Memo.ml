@@ -454,8 +454,12 @@ let reads_from_trie (t : trie) : reads = match t with Stem { reads; _ } -> reads
 let set_reads_of_trie (t : trie) (r : reads) : trie =
   match t with Stem x -> Stem { x with reads = r } | Branch x -> Branch { x with reads = r }
 
+let iter_old_table =
+  false (*not working yet due to reads with 0 RRead. turning it on requrie fixing the inside code w.r.t strip_matched.*)
+
+let strip_matched = false
+
 let rec merge (x : trie) (y : trie) : trie =
-  let iter_old_table = false in
   let rebase_merging (delta : reads) (m : merging) : merging =
     { reads = unmatch_reads delta m.reads; children = m.children; miss_count = 0 }
   in
@@ -471,6 +475,8 @@ let rec merge (x : trie) (y : trie) : trie =
           let children = Hashtbl.create (module Int) in
           let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
           let y_key, y_reads = Option.value_exn (reads_hash (Lazy.force j.reads) y.reads) in
+          let x_reads = if strip_matched then x_reads else x.reads in
+          let y_reads = if strip_matched then y_reads else y.reads in
           if x_key = y_key then Stem y (*todo: fix*)
           else (
             assert (x_key <> y_key);
@@ -478,10 +484,10 @@ let rec merge (x : trie) (y : trie) : trie =
             Hashtbl.set children y_key (Stem { y with reads = y_reads });
             Branch { reads = Lazy.force j.reads; children; merging = [] })
       | false, true ->
-          let y_reads = Option.value_exn (match_reads x.reads y.reads) in
+          let y_reads = if strip_matched then Option.value_exn (match_reads x.reads y.reads) else y.reads in
           Stem { x with next = merge_option x.next (Some (Stem { y with reads = y_reads })) }
       | true, false ->
-          let x_reads = Option.value_exn (match_reads y.reads x.reads) in
+          let x_reads = if strip_matched then Option.value_exn (match_reads y.reads x.reads) else x.reads in
           Stem { y with next = merge_option y.next (Some (Stem { x with reads = x_reads })) }
       | false, false ->
           let next = merge_option x.next y.next in
@@ -496,6 +502,7 @@ let rec merge (x : trie) (y : trie) : trie =
       | true, true ->
           let children = Hashtbl.create (module Int) in
           let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
+          let x_reads = if strip_matched then x_reads else x.reads in
           Hashtbl.set children x_key (Stem { x with reads = x_reads });
           if iter_old_table then
             Hashtbl.iter y.children ~f:(fun child_trie ->
@@ -513,10 +520,11 @@ let rec merge (x : trie) (y : trie) : trie =
                 :: List.map y.merging ~f:(rebase_merging y.reads);*)
             }
       | false, true ->
-          let y_reads = Option.value_exn (match_reads x.reads y.reads) in
+          let y_reads = if strip_matched then Option.value_exn (match_reads x.reads y.reads) else y.reads in
           Stem { x with next = merge_option x.next (Some (Branch { y with reads = y_reads })) }
       | true, false ->
           let x_key, x_reads = Option.value_exn (reads_hash y.reads x.reads) in
+          let x_reads = if strip_matched then x_reads else x.reads in
           Hashtbl.update y.children x_key ~f:(insert_option (Stem { x with reads = x_reads }));
           Branch y
       | false, false -> (*weird case, i think due to hack on instantiation, todo: remove*) Branch y
@@ -633,12 +641,13 @@ let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step
   | Stem st -> (
       match values_hash st.reads value with
       | None -> acc
-      | Some (_, value) -> (
+      | Some (_, value') -> (
           let acc =
             match acc with
             | None -> Some st.step
             | Some step' -> if st.step.sc > step'.sc then Some st.step else Some step'
           in
+          let value = if strip_matched then value' else value in
           match st.next with None -> acc | Some child -> lookup_step_aux value child acc))
   | Branch br -> (
       br.merging <-
@@ -667,7 +676,8 @@ let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step
                     Some m));
       match values_hash br.reads value with
       | None -> acc
-      | Some (key, value) -> (
+      | Some (key, value') -> (
+          let value = if strip_matched then value' else value in
           match Hashtbl.find br.children key with
           | None -> acc
           | Some child_trie -> lookup_step_aux value child_trie acc))

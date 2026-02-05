@@ -170,7 +170,7 @@ and lc_value_of_lp = function
   | LP.VStuck s -> LC.VStuck (lc_stuck_of_lp s)
 
 and lp_stuck_of_lc = function
-  | LC.SHole (id, env) -> LP.SHole (lp_option_of_lc (fun x -> x) id, lp_list_of_lc lp_value_of_lc env)
+  | LC.SHole id -> LP.SHole (lp_option_of_lc (fun x -> x) id)
   | LC.STypeError (v, ty) -> LP.STypeError (lp_value_of_lc v, lp_vtype_of_lc ty)
   | LC.SIndexError -> LP.SIndexError
   | LC.SApp (s, e) -> LP.SApp (lp_stuck_of_lc s, lp_expr_of_lc e)
@@ -184,7 +184,7 @@ and lp_stuck_of_lc = function
   | LC.SFst s -> LP.SFst (lp_stuck_of_lc s)
 
 and lc_stuck_of_lp = function
-  | LP.SHole (id, env) -> LC.SHole (lc_option_of_lp (fun x -> x) id, lc_list_of_lp lc_value_of_lp env)
+  | LP.SHole id -> LC.SHole (lc_option_of_lp (fun x -> x) id)
   | LP.STypeError (v, ty) -> LC.STypeError (lc_value_of_lp v, lc_vtype_of_lp ty)
   | LP.SIndexError -> LC.SIndexError
   | LP.SApp (s, e) -> LC.SApp (lc_stuck_of_lp s, lc_expr_of_lp e)
@@ -308,7 +308,7 @@ let rec pp_value fmt value =
   | LC.VStuck stuck -> pp_stuck fmt stuck
 
 and pp_stuck fmt = function
-  | LC.SHole (_, env) -> Format.fprintf fmt "<hole env=%d>" (len_live_list env)
+  | LC.SHole _ -> Format.fprintf fmt "<hole>"
   | LC.STypeError (value, ty) -> Format.fprintf fmt "<type-error %a : %a>" pp_value value pp_vtype ty
   | LC.SIndexError -> Format.pp_print_string fmt "<index-error>"
   | LC.SApp (stuck, expr) -> Format.fprintf fmt "<stuck app %a %a>" pp_stuck stuck pp_expr expr
