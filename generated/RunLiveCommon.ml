@@ -1,5 +1,6 @@
 open Ant
 open NamedExpr
+open Yojson.Safe
 module LC = LiveCEK
 module LP = LivePlain
 
@@ -208,86 +209,50 @@ let with_outchannel steps_path f =
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 
 let write_steps_json oc (r : Memo.exec_result) : unit =
-  let escape_json s =
-    let buf = Buffer.create (String.length s) in
-    String.iter
-      (function
-        | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
-      s;
-    Buffer.contents buf
+  let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
+  let json =
+    `Assoc
+      [
+        ("name", `String "exec_time");
+        ("step", `Int r.step);
+        ("without_memo_step", `Int r.without_memo_step);
+        ("memo_profile", Profile.dump_profile Profile.memo_profile |> json_of_profile);
+        ("plain_profile", Profile.dump_profile Profile.plain_profile |> json_of_profile);
+        ("cek_profile", Profile.dump_profile Profile.cek_profile |> json_of_profile);
+      ]
   in
-  let json_of_profile entries =
-    let buf = Buffer.create 64 in
-    Buffer.add_char buf '[';
-    let rec loop first = function
-      | [] -> ()
-      | (name, time) :: rest ->
-          if not first then Buffer.add_char buf ',';
-          Buffer.add_char buf '[';
-          Buffer.add_char buf '"';
-          Buffer.add_string buf (escape_json name);
-          Buffer.add_char buf '"';
-          Buffer.add_char buf ',';
-          Buffer.add_string buf (string_of_int time);
-          Buffer.add_char buf ']';
-          loop false rest
-    in
-    loop true entries;
-    Buffer.add_char buf ']';
-    Buffer.contents buf
-  in
-  let memo_profile = Profile.dump_profile Profile.memo_profile |> json_of_profile in
-  let cek_profile = Profile.dump_profile Profile.cek_profile |> json_of_profile in
-  let plain_profile = Profile.dump_profile Profile.plain_profile |> json_of_profile in
-  Printf.fprintf oc
-    "{\"name\":\"exec_time\",\"step\":%d,\"without_memo_step\":%d,\"memo_profile\":%s,\"plain_profile\":%s, \
-     \"cek_profile\":%s}\n"
-    r.step r.without_memo_step memo_profile plain_profile cek_profile;
+  Yojson.Safe.to_string json |> output_string oc;
+  output_char oc '\n';
   flush oc
 
 let write_memo_stats_json oc (memo : State.memo) : unit =
   let stats = Memo.memo_stats memo in
-  let escape_json s =
-    let buf = Buffer.create (String.length s) in
-    String.iter
-      (function
-        | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
-      s;
-    Buffer.contents buf
+  let depth_breakdown =
+    `List
+      (List.init (Stdlib.Dynarray.length stats.by_depth) (fun i ->
+           let node = Stdlib.Dynarray.get stats.by_depth i in
+           `Assoc [ ("depth", `Int node.depth); ("node_count", `Int node.node_count) ]))
   in
-  let buf = Buffer.create 64 in
-  Buffer.add_string buf "{\"name\":\"memo_stats\",\"depth_breakdown\":[";
-  let len = Stdlib.Dynarray.length stats.by_depth in
-  for i = 0 to len - 1 do
-    let node = Stdlib.Dynarray.get stats.by_depth i in
-    if i > 0 then Buffer.add_char buf ',';
-    Buffer.add_string buf "{\"depth\":";
-    Buffer.add_string buf (string_of_int node.depth);
-    Buffer.add_string buf ",\"node_count\":";
-    Buffer.add_string buf (string_of_int node.node_count);
-    Buffer.add_char buf '}'
-  done;
-  Buffer.add_string buf "],\"rule_stat\":[";
-  List.iteri
-    (fun i (entry : Memo.rule_stat) ->
-      if i > 0 then Buffer.add_char buf ',';
-      Buffer.add_string buf "{\"size\":";
-      Buffer.add_string buf (string_of_int entry.size);
-      Buffer.add_string buf ",\"sc\":";
-      Buffer.add_string buf (string_of_int entry.sc);
-      Buffer.add_string buf ",\"hit_count\":";
-      Buffer.add_string buf (string_of_int entry.hit_count);
-      Buffer.add_string buf ",\"insert_time\":";
-      Buffer.add_string buf (string_of_int entry.insert_time);
-      Buffer.add_string buf ",\"depth\":";
-      Buffer.add_string buf (string_of_int entry.depth);
-      Buffer.add_string buf ",\"rule\":\"";
-      Buffer.add_string buf "" (*escape_json (Lazy.force entry.rule)*);
-      Buffer.add_char buf '"';
-      Buffer.add_char buf '}')
-    stats.rule_stat;
-  Buffer.add_string buf "]}\n";
-  Buffer.output_buffer oc buf;
+  let rule_stat =
+    `List
+      (List.map
+         (fun (entry : Memo.rule_stat) ->
+           `Assoc
+             [
+               ("size", `Int entry.size);
+               ("sc", `Int entry.sc);
+               ("hit_count", `Int entry.hit_count);
+               ("insert_time", `Int entry.insert_time);
+               ("depth", `Int entry.depth);
+               ("rule", `String "");
+             ])
+         stats.rule_stat)
+  in
+  let json =
+    `Assoc [ ("name", `String "memo_stats"); ("depth_breakdown", depth_breakdown); ("rule_stat", rule_stat) ]
+  in
+  Yojson.Safe.to_string json |> output_string oc;
+  output_char oc '\n';
   flush oc
 
 (* Evaluate using the direct (non-CEK) interpreter defined in LivePlain.  LivePlain
