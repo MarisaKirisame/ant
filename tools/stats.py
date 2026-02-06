@@ -87,18 +87,39 @@ class Result:
     hashtable_stat: list[MemoHashtableStat]
 
 
+def _require_dict(value: object, *, ctx: str) -> dict:
+    if not isinstance(value, dict):
+        raise ValueError(f"{ctx} must be an object")
+    return value
+
+
+def _require_list(value: object, *, ctx: str) -> list:
+    if not isinstance(value, list):
+        raise ValueError(f"{ctx} must be a list")
+    return value
+
+
+def _require_int(value: object, *, ctx: str) -> int:
+    if not isinstance(value, int):
+        raise ValueError(f"{ctx} must be an int")
+    return value
+
+
+def _require_str(value: object, *, ctx: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{ctx} must be a string")
+    return value
+
+
 def _parse_profile(entries: object, *, key_name: str) -> list[ProfileEntry]:
-    if not isinstance(entries, list):
-        raise ValueError(f"{key_name} must be a list")
     parsed: list[ProfileEntry] = []
-    for idx, entry in enumerate(entries):
+    for idx, entry in enumerate(_require_list(entries, ctx=key_name)):
         if not (isinstance(entry, list) and len(entry) == 2):
             raise ValueError(f"{key_name}[{idx}] must be a [name, time] pair")
         name, value = entry
-        if not isinstance(name, str):
-            raise ValueError(f"{key_name}[{idx}] name must be a string")
+        name = _require_str(name, ctx=f"{key_name}[{idx}].name")
         if not isinstance(value, (int, float)):
-            raise ValueError(f"{key_name}[{idx}] time must be numeric")
+            raise ValueError(f"{key_name}[{idx}].time must be numeric")
         parsed.append(ProfileEntry(name=name, time_ns=float(value)))
     return parsed
 
@@ -119,11 +140,13 @@ def load_records(
             if not line.strip():
                 continue
             try:
-                rec = json.loads(line)
+                rec = _require_dict(json.loads(line), ctx="record")
                 name = rec.get("name")
                 if name == "exec_time":
-                    step = rec.get("step")
-                    without_memo_step = rec.get("without_memo_step")
+                    step = _require_int(rec.get("step"), ctx="exec_time.step")
+                    without_memo_step = _require_int(
+                        rec.get("without_memo_step"), ctx="exec_time.without_memo_step"
+                    )
                     memo_profile = _parse_profile(
                         rec.get("memo_profile"), key_name="memo_profile"
                     )
@@ -133,10 +156,6 @@ def load_records(
                     plain_profile = _parse_profile(
                         rec.get("plain_profile"), key_name="plain_profile"
                     )
-                    if not isinstance(step, int):
-                        raise ValueError("step must be an int")
-                    if not isinstance(without_memo_step, int):
-                        raise ValueError("without_memo_step must be an int")
                     exec_times.append(
                         ExecTimeRecord(
                             step=step,
@@ -150,19 +169,22 @@ def load_records(
                     if seen_memo_stats:
                         raise ValueError("memo_stats record appears more than once")
                     seen_memo_stats = True
-                    stats = rec.get("depth_breakdown")
-                    if not isinstance(stats, list):
-                        raise ValueError("depth_breakdown must be a list")
+                    stats = _require_list(
+                        rec.get("depth_breakdown"), ctx="depth_breakdown"
+                    )
                     nodes: list[MemoStatsNode] = []
                     for idx, entry in enumerate(stats):
-                        if not isinstance(entry, dict):
-                            raise ValueError(f"depth_breakdown[{idx}] must be an object")
-                        depth = entry.get("depth")
-                        node_count = entry.get("node_count")
-                        if not isinstance(depth, int):
-                            raise ValueError(f"depth_breakdown[{idx}].depth must be an int")
-                        if not isinstance(node_count, int):
-                            raise ValueError(f"depth_breakdown[{idx}].node_count must be an int")
+                        entry = _require_dict(
+                            entry, ctx=f"depth_breakdown[{idx}]"
+                        )
+                        depth = _require_int(
+                            entry.get("depth"),
+                            ctx=f"depth_breakdown[{idx}].depth",
+                        )
+                        node_count = _require_int(
+                            entry.get("node_count"),
+                            ctx=f"depth_breakdown[{idx}].node_count",
+                        )
                         nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
                     depth_breakdown = nodes
                     stem_nodes = rec.get("stem_nodes")
