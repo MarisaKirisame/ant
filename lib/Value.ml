@@ -41,6 +41,7 @@ let rec value_valid x : bool =
           && value_valid rest)
 
 let summary x = Generic.measure ~monoid ~measure x
+let value_measure x = summary x
 
 let append (x : seq) (y : seq) : seq =
   if Generic.is_empty x then y

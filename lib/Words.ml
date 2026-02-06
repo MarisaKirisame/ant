@@ -113,6 +113,8 @@ let words_front_exn (s : words) : Word.t * words =
   let w, v = Generic.front_exn ~monoid ~measure s in
   (v, w)
 
+let words_rear_exn (s : words) : words * Word.t = Generic.rear_exn ~monoid ~measure s
+
 let lcp (x : words) (y : words) : words * words * words =
   (* Invariants:
    *   hi = max length of common prefix remaining to search

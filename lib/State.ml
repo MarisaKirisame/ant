@@ -18,13 +18,11 @@ and 'a cek = { mutable c : exp; mutable e : 'a Dynarray.t; mutable k : 'a }
 and state = value cek
 and step = { src : pattern cek; dst : value cek; sc : int; mutable hit : int; mutable insert_time : int }
 and memo = trie option Array.t
-and reads = Read.read cek
 
 and trie =
-  | Stem of { reads : reads; step : step; next : trie option }
-  | Branch of { reads : reads; children : (int, trie) Hashtbl.t; mutable merging : merging list }
+  | Leaf of Pattern.pattern * step
+  | Branch of { creator : string; degree : int; prefix : Words.words; var : trie option; const : (int, trie) Hashtbl.t }
 
-and merging = { reads : reads; children : (int, trie) Hashtbl.t; mutable miss_count : int }
 and world = { state : state; memo : memo; resolved : bool cek }
 
 let cek_get (cek : 'a cek) (src : Source.t) : 'a =
@@ -106,6 +104,11 @@ let string_of_cek_generic (string_of_a : 'a -> string) (s : 'a cek) : string =
 let is_done (s : state) : bool =
   match Generic.front_exn s.k ~monoid:Value.monoid ~measure:Value.measure with
   | _, Words w -> (
-      let wt, wh = Generic.front_exn ~monoid:Words.monoid ~measure:Words.measure w in
+      let _, wh = Generic.front_exn ~monoid:Words.monoid ~measure:Words.measure w in
       match wh with ConstructorTag ct when ct = 0 -> s.c.pc = 0 | _ -> false)
   | _ -> failwith "unreachable"
+
+(*kinda make sense that continuation is last because it without env is not that useful. should experiment a bit*)
+let ek_to_list (s : 'a cek) : 'a list =
+  let lst = Dynarray.to_list s.e in
+  lst @ [ s.k ]
