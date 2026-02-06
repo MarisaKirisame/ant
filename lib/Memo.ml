@@ -820,9 +820,20 @@ let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) =
 
 let exec_done _ = failwith "exec is done, should not call step anymore"
 
-type memo_stats = { by_depth : by_depth Dynarray.t; node_stat : node_stat list; rule_stat : rule_stat list }
+type node_state = Stem_node | Branch_node
+type node_counts = { stem_nodes : int; branch_nodes : int; total_nodes : int }
+type hashtable_stat = { depth : int; size : int }
+
+type memo_stats = {
+  by_depth : by_depth Dynarray.t;
+  node_stat : node_stat list;
+  rule_stat : rule_stat list;
+  hashtable_stat : hashtable_stat list;
+  node_counts : node_counts;
+}
+
 and by_depth = { depth : int; mutable node_count : int }
-and node_stat = { depth : int; rread_length : int; reads_size : int; insert_time : int }
+and node_stat = { depth : int; rread_length : int; reads_size : int; insert_time : int; node_state : node_state }
 
 and rule_stat = {
   size : int;
@@ -838,18 +849,25 @@ let memo_stats (m : memo) : memo_stats =
   let by_depth = Dynarray.create () in
   let node_stats = ref [] in
   let rule_stat = ref [] in
+  let hashtable_stats = ref [] in
+  let stem_nodes = ref 0 in
+  let branch_nodes = ref 0 in
+  let total_nodes = ref 0 in
   let rec aux (t : trie) (depth : int) : unit =
     if Dynarray.length by_depth <= depth then Dynarray.add_last by_depth { depth; node_count = 0 };
     let by_depth_stat = Dynarray.get by_depth depth in
     by_depth_stat.node_count <- by_depth_stat.node_count + 1;
+    total_nodes := !total_nodes + 1;
     match t with
     | Stem st -> (
+        stem_nodes := !stem_nodes + 1;
         node_stats :=
           {
             depth;
             rread_length = reads_rread_length st.reads;
             reads_size = reads_size st.reads;
             insert_time = st.step.insert_time;
+            node_state = Stem_node;
           }
           :: !node_stats;
         rule_stat :=
@@ -865,11 +883,27 @@ let memo_stats (m : memo) : memo_stats =
           :: !rule_stat;
         match st.next with None -> () | Some child -> aux child (depth + 1))
     | Branch br ->
+        branch_nodes := !branch_nodes + 1;
         node_stats :=
-          { depth; rread_length = reads_rread_length br.reads; reads_size = reads_size br.reads; insert_time = 1 }
+          {
+            depth;
+            rread_length = reads_rread_length br.reads;
+            reads_size = reads_size br.reads;
+            insert_time = 1;
+            node_state = Branch_node;
+          }
           :: !node_stats;
+        hashtable_stats := { depth; size = Hashtbl.length br.children } :: !hashtable_stats;
         Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1));
-        List.iter br.merging ~f:(fun m -> Hashtbl.iter m.children ~f:(fun child -> aux child (depth + 1)))
+        List.iter br.merging ~f:(fun m ->
+            hashtable_stats := { depth; size = Hashtbl.length m.children } :: !hashtable_stats;
+            Hashtbl.iter m.children ~f:(fun child -> aux child (depth + 1)))
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
-  { by_depth; node_stat = !node_stats; rule_stat = !rule_stat }
+  {
+    by_depth;
+    node_stat = !node_stats;
+    rule_stat = !rule_stat;
+    hashtable_stat = !hashtable_stats;
+    node_counts = { stem_nodes = !stem_nodes; branch_nodes = !branch_nodes; total_nodes = !total_nodes };
+  }

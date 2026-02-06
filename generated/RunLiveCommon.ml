@@ -394,6 +394,22 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
     Buffer.add_string buf (string_of_int node.node_count);
     Buffer.add_char buf '}'
   done;
+  Buffer.add_string buf "],\"stem_nodes\":";
+  Buffer.add_string buf (string_of_int stats.node_counts.stem_nodes);
+  Buffer.add_string buf ",\"branch_nodes\":";
+  Buffer.add_string buf (string_of_int stats.node_counts.branch_nodes);
+  Buffer.add_string buf ",\"total_nodes\":";
+  Buffer.add_string buf (string_of_int stats.node_counts.total_nodes);
+  Buffer.add_string buf ",\"hashtable_stat\":[";
+  List.iteri
+    (fun i (entry : Memo.hashtable_stat) ->
+      if i > 0 then Buffer.add_char buf ',';
+      Buffer.add_string buf "{\"depth\":";
+      Buffer.add_string buf (string_of_int entry.depth);
+      Buffer.add_string buf ",\"size\":";
+      Buffer.add_string buf (string_of_int entry.size);
+      Buffer.add_char buf '}')
+    stats.hashtable_stat;
   Buffer.add_string buf "],\"node_stat\":[";
   List.iteri
     (fun i (entry : Memo.node_stat) ->
@@ -406,6 +422,9 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
       Buffer.add_string buf (string_of_int entry.reads_size);
       Buffer.add_string buf ",\"insert_time\":";
       Buffer.add_string buf (string_of_int entry.insert_time);
+      Buffer.add_string buf ",\"node_state\":\"";
+      Buffer.add_string buf (match entry.node_state with Memo.Stem_node -> "stem" | Memo.Branch_node -> "branch");
+      Buffer.add_char buf '"';
       Buffer.add_char buf '}')
     stats.node_stat;
   Buffer.add_string buf "],\"rule_stat\":[";

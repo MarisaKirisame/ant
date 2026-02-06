@@ -35,6 +35,20 @@ class MemoNodeStat:
     rread_length: int
     reads_size: int
     insert_time: int
+    node_state: str
+
+
+@dataclass(frozen=True)
+class MemoHashtableStat:
+    depth: int
+    size: int
+
+
+@dataclass(frozen=True)
+class MemoNodeCounts:
+    stem_nodes: int
+    branch_nodes: int
+    total_nodes: int
 
 
 @dataclass(frozen=True)
@@ -69,6 +83,8 @@ class Result:
     depth_breakdown: list[MemoStatsNode]
     node_stat: list[MemoNodeStat]
     rule_stat: list[MemoRuleStat]
+    node_counts: MemoNodeCounts | None
+    hashtable_stat: list[MemoHashtableStat]
 
 
 def _parse_profile(entries: object, *, key_name: str) -> list[ProfileEntry]:
@@ -95,6 +111,8 @@ def load_records(
     depth_breakdown: list[MemoStatsNode] = []
     node_stat: list[MemoNodeStat] = []
     rule_stat: list[MemoRuleStat] = []
+    node_counts: MemoNodeCounts | None = None
+    hashtable_stat: list[MemoHashtableStat] = []
     seen_memo_stats = False
     with path.open() as f:
         for line_no, line in enumerate(f, 1):
@@ -147,6 +165,34 @@ def load_records(
                             raise ValueError(f"depth_breakdown[{idx}].node_count must be an int")
                         nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
                     depth_breakdown = nodes
+                    stem_nodes = rec.get("stem_nodes")
+                    branch_nodes = rec.get("branch_nodes")
+                    total_nodes = rec.get("total_nodes")
+                    if (
+                        isinstance(stem_nodes, int)
+                        and isinstance(branch_nodes, int)
+                        and isinstance(total_nodes, int)
+                    ):
+                        node_counts = MemoNodeCounts(
+                            stem_nodes=stem_nodes,
+                            branch_nodes=branch_nodes,
+                            total_nodes=total_nodes,
+                        )
+                    raw_hashtable_stat = rec.get("hashtable_stat", [])
+                    if not isinstance(raw_hashtable_stat, list):
+                        raise ValueError("hashtable_stat must be a list")
+                    hashtable_entries: list[MemoHashtableStat] = []
+                    for idx, entry in enumerate(raw_hashtable_stat):
+                        if not isinstance(entry, dict):
+                            raise ValueError(f"hashtable_stat[{idx}] must be an object")
+                        depth = entry.get("depth")
+                        size = entry.get("size")
+                        if not isinstance(depth, int):
+                            raise ValueError(f"hashtable_stat[{idx}].depth must be an int")
+                        if not isinstance(size, int):
+                            raise ValueError(f"hashtable_stat[{idx}].size must be an int")
+                        hashtable_entries.append(MemoHashtableStat(depth=depth, size=size))
+                    hashtable_stat = hashtable_entries
                     raw_node_stat = rec.get("node_stat", [])
                     if not isinstance(raw_node_stat, list):
                         raise ValueError("node_stat must be a list")
@@ -158,6 +204,7 @@ def load_records(
                         rread_length = entry.get("rread_length")
                         reads_size = entry.get("reads_size")
                         insert_time = entry.get("insert_time")
+                        node_state = entry.get("node_state")
                         if not isinstance(depth, int):
                             raise ValueError(f"node_stat[{idx}].depth must be an int")
                         if not isinstance(rread_length, int):
@@ -166,12 +213,19 @@ def load_records(
                             raise ValueError(f"node_stat[{idx}].reads_size must be an int")
                         if not isinstance(insert_time, int):
                             raise ValueError(f"node_stat[{idx}].insert_time must be an int")
+                        if node_state is None:
+                            node_state = "unknown"
+                        if not isinstance(node_state, str):
+                            raise ValueError(f"node_stat[{idx}].node_state must be a string")
+                        if node_state not in ("stem", "branch", "unknown"):
+                            raise ValueError(f"node_stat[{idx}].node_state must be stem or branch")
                         node_stat_entries.append(
                             MemoNodeStat(
                                 depth=depth,
                                 rread_length=rread_length,
                                 reads_size=reads_size,
                                 insert_time=insert_time,
+                                node_state=node_state,
                             )
                         )
                     node_stat = node_stat_entries
@@ -226,4 +280,6 @@ def load_records(
         depth_breakdown=depth_breakdown,
         node_stat=node_stat,
         rule_stat=rule_stat,
+        node_counts=node_counts,
+        hashtable_stat=hashtable_stat,
     )

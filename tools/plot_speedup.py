@@ -29,6 +29,7 @@ import numpy as np
 
 from common import fresh
 from stats import (
+    MemoHashtableStat,
     MemoNodeStat,
     MemoRuleStat,
     MemoStatsNode,
@@ -332,6 +333,27 @@ def plot_node_stat_reads_size_insert_time(
     plt.xlabel("Node reads size")
     plt.ylabel("Insert time (ns)")
     plt.title("Memo node reads size vs insert time")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    return output_path.name
+
+
+def plot_hashtable_stat_depth_size(
+    hashtable_stat: Sequence[MemoHashtableStat], output_dir: Path
+) -> str:
+    if not hashtable_stat:
+        raise ValueError("hashtable_stat is empty")
+    output_path = output_dir / _fresh_plot_name()
+    plt.figure(figsize=(6, 4.5))
+    depths = [entry.depth for entry in hashtable_stat]
+    sizes = [entry.size for entry in hashtable_stat]
+    plt.scatter(depths, sizes, alpha=0.6)
+    plt.xlabel("Depth")
+    plt.ylabel("Hashtable size")
+    plt.title("Memo hashtable size vs depth")
+    plt.yscale("log")
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     plt.tight_layout()
     plt.savefig(output_path)

@@ -22,6 +22,7 @@ from plot_speedup import (
     plot_rule_stat_depth_insert_time,
     plot_node_stat_rread_length_insert_time,
     plot_node_stat_reads_size_insert_time,
+    plot_hashtable_stat_depth_size,
     plot_depth_breakdown,
     plot_depth_breakdown_cdf,
     profile_totals_from_result,
@@ -45,6 +46,11 @@ def render_html(
     depth_insert_time_scatter_plot = plot_rule_stat_depth_insert_time(records.rule_stat, output_dir)
     rread_insert_time_scatter_plot = plot_node_stat_rread_length_insert_time(records.node_stat, output_dir)
     reads_size_insert_time_scatter_plot = plot_node_stat_reads_size_insert_time(records.node_stat, output_dir)
+    hashtable_depth_size_scatter_plot = None
+    if records.hashtable_stat:
+        hashtable_depth_size_scatter_plot = plot_hashtable_stat_depth_size(
+            records.hashtable_stat, output_dir
+        )
     profile_totals, profile_total_time = profile_totals_from_result(records)
     profile_table = render_profile_table(profile_totals, profile_total_time)
     doc = document(title="Memoization Speedup")
@@ -56,6 +62,7 @@ def render_html(
         with tag.main(cls="panel"):
             tag.h1("Memoization Speedup")
             tag.p(f"Data source: {data_label}", cls="meta")
+            _render_node_counts(records)
             _render_speedup_comparison(
                 records,
                 output_dir,
@@ -92,10 +99,26 @@ def render_html(
             _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
             _plot_image(rread_insert_time_scatter_plot, "Memo node rread length vs insert time scatter plot")
             _plot_image(reads_size_insert_time_scatter_plot, "Memo node reads size vs insert time scatter plot")
+            if hashtable_depth_size_scatter_plot is not None:
+                _plot_image(
+                    hashtable_depth_size_scatter_plot,
+                    "Memo hashtable size vs depth scatter plot",
+                )
             _render_large_rule_stats(records, min_size=40, limit=5)
             with tag.section(cls="profile"):
                 raw(profile_table)
     return doc.render()
+
+
+def _render_node_counts(records: Result) -> None:
+    counts = records.node_counts
+    if counts is None:
+        return None
+    with tag.section(cls="stats"):
+        stat_card("Stem nodes", str(counts.stem_nodes))
+        stat_card("Branch nodes", str(counts.branch_nodes))
+        stat_card("Total nodes", str(counts.total_nodes))
+    return None
 
 
 def _render_speedup_comparison(
