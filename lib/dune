@@ -31,6 +31,7 @@
   Code
   Tail
   Compile
+  CompileFfi
   CompileType
   CompileSeq
   CompileMemo

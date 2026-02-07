@@ -28,100 +28,32 @@ let compile_ty_binding (ctx : (string, int) Core.Hashtbl.t) (binding : 'a ty_bin
     | TTuple _ -> string "failwith \"tuples not supported directly\""
     | _ -> string "failwith \"complex type not supported\""
   in
-
-  let compile_from_ctor (cname, args, _) =
-    let pat_args =
-      if args = [] then empty
-      else
-        space ^^ parens
-        @@ separate_map (comma ^^ space) (fun i -> string ("x" ^ string_of_int i)) (List.mapi (fun i _ -> i) args)
-    in
-    let pattern = string cname ^^ pat_args in
-    let body_list =
-      string ("Memo.from_constructor tag_" ^ cname)
-      :: List.mapi (fun i ty -> compile_conv false ty (string ("x" ^ string_of_int i))) args
-    in
-    let body = string "Memo.appends" ^^ space ^^ brackets (separate (semi ^^ space) body_list) in
-    break 1 ^^ string "|" ^^ space ^^ pattern ^^ space ^^ string "->" ^^ nest 2 (break 1 ^^ body)
+  let ops : 'a CompileFfi.ops =
+    {
+      type_name_of = (fun name -> name);
+      compile_ty = Syntax.pp_ty;
+      compile_conv = (fun ~is_to ty v -> compile_conv is_to ty v);
+      appends = (fun xs -> string "Memo.appends" ^^ space ^^ brackets (separate (semi ^^ space) xs));
+      from_constructor = (fun tag -> string "Memo.from_constructor" ^^ space ^^ tag);
+      list_match = (fun v -> string "Memo.list_match" ^^ space ^^ v);
+      word_get_value = (fun v -> string "Word.get_value" ^^ space ^^ v);
+      splits = (fun v -> string "Memo.splits" ^^ space ^^ v);
+      splits_n =
+        (fun n ->
+          match n with
+          | 1 -> Some (fun v -> string "Memo.splits_1" ^^ space ^^ v)
+          | 2 -> Some (fun v -> string "Memo.splits_2" ^^ space ^^ v)
+          | 3 -> Some (fun v -> string "Memo.splits_3" ^^ space ^^ v)
+          | 4 -> Some (fun v -> string "Memo.splits_4" ^^ space ^^ v)
+          | _ -> None);
+      tag_expr = (fun ~cname ~tag_id:_ -> string ("tag_" ^ cname));
+      match_tag =
+        (fun ~cname ~tag_id ->
+          string "|" ^^ space
+          ^^ string (string_of_int tag_id)
+          ^^ space ^^ string "(*" ^^ space
+          ^^ string ("tag_" ^ cname)
+          ^^ space ^^ string "*) ->");
+    }
   in
-
-  let compile_to_ctor (cname, args, _) =
-    let tag_name = "tag_" ^ cname in
-    let tag_id = Core.Hashtbl.find_exn ctx cname in
-    let match_case =
-      string "|" ^^ space
-      ^^ string (string_of_int tag_id)
-      ^^ space ^^ string "(*" ^^ space ^^ string tag_name ^^ space ^^ string "*) ->"
-    in
-    let extraction =
-      if args = [] then empty
-      else
-        let vars = List.mapi (fun i _ -> string ("x" ^ string_of_int i)) args in
-        if List.length args > 4 then
-          break 1
-          ^^ string "let args_list = Memo.splits t in"
-          ^^ concat_map
-               (fun (i, v) ->
-                 break 1 ^^ string "let " ^^ v ^^ string " = List.nth args_list "
-                 ^^ string (string_of_int i)
-                 ^^ string " in")
-               (List.mapi (fun i v -> (i, v)) vars)
-        else
-          let split_func =
-            match List.length args with
-            | 1 -> string "Memo.splits_1"
-            | 2 -> string "Memo.splits_2"
-            | 3 -> string "Memo.splits_3"
-            | 4 -> string "Memo.splits_4"
-            | _ -> failwith "unreachable"
-          in
-          let rhs = split_func ^^ space ^^ string "t" in
-          let lhs = if List.length args > 1 then parens (separate (comma ^^ space) vars) else List.hd vars in
-          break 1 ^^ string "let" ^^ space ^^ lhs ^^ space ^^ equals ^^ space ^^ rhs ^^ string " in"
-    in
-    let reconstruction =
-      let ctor_app =
-        if args = [] then string cname
-        else
-          let conv_args = List.mapi (fun i ty -> compile_conv true ty (string ("x" ^ string_of_int i))) args in
-          string cname ^^ space ^^ parens (separate (comma ^^ space) conv_args)
-      in
-      break 1 ^^ ctor_app
-    in
-    match_case ^^ nest 2 (extraction ^^ reconstruction)
-  in
-
-  let compile_funcs (name, Enum { params; ctors }) is_first =
-    let params_pat =
-      match params with [] -> empty | _ -> separate_map space (fun p -> string ("from_generic_" ^ p)) params ^^ space
-    in
-    let header_from =
-      (if is_first then string "let rec" else string "and")
-      ^^ space
-      ^^ string ("from_ocaml_" ^ name)
-      ^^ space ^^ params_pat ^^ string "x ="
-      ^^ nest 2 (break 1 ^^ string "match x with" ^^ concat_map compile_from_ctor ctors)
-    in
-
-    let params_pat_to =
-      match params with [] -> empty | _ -> separate_map space (fun p -> string ("to_generic_" ^ p)) params ^^ space
-    in
-    let header_to =
-      (if is_first then string "let rec" else string "and")
-      ^^ space
-      ^^ string ("to_ocaml_" ^ name)
-      ^^ space ^^ params_pat_to ^^ string "x ="
-      ^^ nest 2
-           (break 1
-           ^^ string "let h, t = Option.get (Memo.list_match x) in"
-           ^^ break 1 ^^ string "match Word.get_value h with" ^^ concat_map compile_to_ctor ctors ^^ break 1
-           ^^ string "| _ -> failwith \"unreachable\"")
-    in
-    (header_from, header_to)
-  in
-
-  let decls = match binding with TBOne (n, k) -> [ (n, k) ] | TBRec ds -> ds in
-
-  let from_docs, to_docs = List.split (List.mapi (fun i d -> compile_funcs d (i = 0)) decls) in
-
-  pp_stmt (Type binding) ^^ hardline ^^ separate (break 1) from_docs ^^ hardline ^^ separate (break 1) to_docs
+  CompileFfi.compile_type_defs ops binding ^^ hardline ^^ CompileFfi.compile_conversions ops ctx binding

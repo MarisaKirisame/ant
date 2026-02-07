@@ -20,11 +20,12 @@ let parse content =
       Printf.eprintf "Lexing error at line %d, character %d: %s\n" line cnum @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input output print_ast compile_pat compile_ant (module Backend : Compile.Backend) typing print_level
-    print_cps_transformed print_de print_cps_de =
+let driver input output print_ast compile_pat compile_ant type_alias (module Backend : Compile.Backend) typing
+    print_level print_cps_transformed print_de print_cps_de =
   let src = read_all input in
   let syn = parse src in
   let ast = Typing.top_type_of_prog syn in
+  CompilePlain.set_type_alias_module type_alias;
   let debug_pp = PPrint.ToChannel.pretty 0.8 80 stdout in
   let debug = false in
   let output_pp = PPrint.ToChannel.pretty 0.8 80 (Out_channel.open_text output) in
@@ -69,6 +70,11 @@ let compile_ant =
   let doc = "Compile the ant source" in
   Arg.(value & flag & info [ "compile" ] ~doc)
 
+let type_alias =
+  let doc = "Alias type definitions to types from MODULE (plain backend only)" in
+  let docv = "MODULE" in
+  Arg.(value & opt (some string) None & info [ "type-alias" ] ~doc ~docv)
+
 let compile_pat =
   let doc = "Compile the pattern" in
   Arg.(value & flag & info [ "pat"; "compile-pat" ] ~doc)
@@ -99,8 +105,8 @@ let cmd =
   let info = Cmd.info "ant" ~version:"0.1" ~doc ~man in
   Cmd.v info
     Term.(
-      const driver $ input $ output $ print_ast $ compile_pat $ compile_ant $ backend $ typing $ print_level
-      $ print_cps_transformed $ print_de $ print_cps_de)
+      const driver $ input $ output $ print_ast $ compile_pat $ compile_ant $ type_alias $ backend $ typing
+      $ print_level $ print_cps_transformed $ print_de $ print_cps_de)
 
 let i = Cmd.eval cmd
 
