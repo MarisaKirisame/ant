@@ -525,9 +525,11 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
     let$ last = src_E_ (s.env_length - 1) in
     let$ x = resolve_ w last in
     let s = pop_s s in
-    let dummy = gensym "c" in
-    let g cname =
-      string dummy ^^ string " when " ^^ string dummy ^^ string " = " ^^ string (Hashtbl.find_exn ctx.ctag_name cname)
+    let case cname =
+      string (string_of_int @@ Hashtbl.find_exn ctx.ctag cname)
+      ^^ space ^^ string "(*" ^^ space
+      ^^ string (Hashtbl.find_exn ctx.ctag_name cname)
+      ^^ space ^^ string "*)"
     in
     let t =
       Stdlib.List.map
@@ -535,12 +537,12 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
           (*todo: special casing for now, as pat design need changes. *)
           match pat with
           | PCtorApp (cname, None, _) ->
-              ( g cname,
+              ( case cname,
                 [%seqs
                   to_unit_ $ pop_env_ w;
                   compile_pp_expr ctx s expr k w] )
           | PCtorApp (cname, Some (PVar (x0, _)), _) ->
-              ( g cname,
+              ( case cname,
                 with_splits 1
                   (memo_splits_ (pair_value_ x))
                   (function
@@ -553,7 +555,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
           | PCtorApp (cname, Some (PTup (xs, _)), _) when List.for_all (function PVar _ -> true | _ -> false) xs ->
               let xs = List.map (function PVar (name, _) -> name | _ -> failwith "impossible") xs in
               let n = List.length xs in
-              ( g cname,
+              ( case cname,
                 with_splits n
                   (memo_splits_ (pair_value_ x))
                   (function
@@ -634,7 +636,7 @@ let generate_apply_cont ctx =
            if i == Dynarray.length ctx.conts then cont_codes
            else
              let name, action = Dynarray.get ctx.conts i in
-             let code = (Hashtbl.find_exn ctx.ctag_name name, action w tl) in
+             let code = (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl) in
              Dynarray.add_last cont_codes code;
              loop tl (i + 1)
          in
@@ -646,7 +648,7 @@ let generate_apply_cont ctx =
            let_pat_in_ pat
              (resolve_ w (raw "K"))
              (paren
-             $ match_ctor_tag_default_ (word_get_value_ hd)
+             $ match_ctor_tag_literal_default_ (word_get_value_ hd)
                  (Dynarray.to_list (loop tl 0))
                  (unreachable_ (pc_to_int apply_cont)))]))
 
@@ -661,10 +663,10 @@ let generate_apply_cont_ ctx =
            let_pat_in_ pat
              (resolve_ w (raw "K"))
              (paren
-             $ match_ctor_tag_default_ (word_get_value_ hd)
+             $ match_ctor_tag_literal_default_ (word_get_value_ hd)
                  (List.init (Dynarray.length ctx.conts) (fun i ->
                       let name, action = Dynarray.get ctx.conts i in
-                      (Hashtbl.find_exn ctx.ctag_name name, action w tl)))
+                      (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl)))
                  (unreachable_ (pc_to_int apply_cont)))]))
 
 let ctor_tag_decls ctx =

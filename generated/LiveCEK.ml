@@ -408,42 +408,42 @@ let populate_state () =
       assert_env_length w_5 1;
       let hd_0, tl_0 = resolve w_5 K in
       match Word.get_value hd_0 with
-      | c_19 when c_19 = tag_cont_done -> exec_done w_5
-      | c_19 when c_19 = tag_cont_1 ->
+      | 0 (* tag_cont_done *) -> exec_done w_5
+      | 56 (* tag_cont_1 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 6)
-      | c_19 when c_19 = tag_cont_2 ->
+      | 57 (* tag_cont_2 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 7)
-      | c_19 when c_19 = tag_cont_3 ->
+      | 58 (* tag_cont_3 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 8)
-      | c_19 when c_19 = tag_cont_4 ->
+      | 59 (* tag_cont_4 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 9)
-      | c_19 when c_19 = tag_cont_5 ->
+      | 60 (* tag_cont_5 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 10)
-      | c_19 when c_19 = tag_cont_6 ->
+      | 61 (* tag_cont_6 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 0 tl_0;
           w_5.state.c <- pc_to_exp (int_to_pc 11)
-      | c_19 when c_19 = tag_cont_7 ->
+      | 62 (* tag_cont_7 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
@@ -455,17 +455,17 @@ let populate_state () =
           assert_env_length w_5 3;
           ignore (env_call w_5 [] 2);
           w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | c_19 when c_19 = tag_cont_8 ->
+      | 63 (* tag_cont_8 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 12)
-      | c_19 when c_19 = tag_cont_9 ->
+      | 64 (* tag_cont_9 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 3 tl_0;
           w_5.state.c <- pc_to_exp (int_to_pc 13)
-      | c_19 when c_19 = tag_cont_10 ->
+      | 65 (* tag_cont_10 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
@@ -476,7 +476,7 @@ let populate_state () =
           let keep_21 = env_call w_5 [ 2 ] 2 in
           w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_21; w_5.state.k ];
           w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | c_19 when c_19 = tag_cont_11 ->
+      | 66 (* tag_cont_11 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
@@ -487,49 +487,49 @@ let populate_state () =
           let keep_22 = env_call w_5 [ 2 ] 2 in
           w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; keep_22; w_5.state.k ];
           w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | c_19 when c_19 = tag_cont_12 ->
+      | 67 (* tag_cont_12 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 0 tl_0;
           w_5.state.c <- pc_to_exp (int_to_pc 14)
-      | c_19 when c_19 = tag_cont_13 ->
+      | 68 (* tag_cont_13 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 0 tl_0;
           w_5.state.c <- pc_to_exp (int_to_pc 15)
-      | c_19 when c_19 = tag_cont_14 ->
+      | 69 (* tag_cont_14 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 3 tl_0;
           w_5.state.c <- pc_to_exp (int_to_pc 16)
-      | c_19 when c_19 = tag_cont_15 ->
+      | 70 (* tag_cont_15 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 18)
-      | c_19 when c_19 = tag_cont_16 ->
+      | 71 (* tag_cont_16 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 20)
-      | c_19 when c_19 = tag_cont_17 ->
+      | 72 (* tag_cont_17 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 22)
-      | c_19 when c_19 = tag_cont_18 ->
+      | 73 (* tag_cont_18 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 24)
-      | c_19 when c_19 = tag_cont_19 ->
+      | 74 (* tag_cont_19 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
           push_env w_5 (Dynarray.get w_5.state.e 2);
           w_5.state.c <- pc_to_exp (int_to_pc 26)
-      | c_19 when c_19 = tag_cont_20 ->
+      | 75 (* tag_cont_20 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 2 tl_0;
           assert_env_length w_5 3;
@@ -541,7 +541,7 @@ let populate_state () =
           assert_env_length w_5 3;
           ignore (env_call w_5 [] 2);
           w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | c_19 when c_19 = tag_cont_21 ->
+      | 76 (* tag_cont_21 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 3 tl_0;
           assert_env_length w_5 4;
@@ -559,7 +559,7 @@ let populate_state () =
           assert_env_length w_5 4;
           ignore (env_call w_5 [] 2);
           w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | c_19 when c_19 = tag_cont_22 ->
+      | 77 (* tag_cont_22 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 1 tl_0;
           assert_env_length w_5 2;
@@ -570,7 +570,7 @@ let populate_state () =
           drop_n w_5 1 0;
           assert_env_length w_5 1;
           return_n w_5 1 (pc_to_exp (int_to_pc 0))
-      | c_19 when c_19 = tag_cont_23 ->
+      | 78 (* tag_cont_23 *) ->
           w_5.state.k <- get_next_cont tl_0;
           restore_env w_5 1 tl_0;
           assert_env_length w_5 2;
@@ -595,7 +595,7 @@ let populate_state () =
       let last_1 = Source.E 4 in
       let x_1 = resolve w_2 last_1 in
       match Word.get_value (fst x_1) with
-      | c_1 when c_1 = tag_Z ->
+      | 1 (* tag_Z *) ->
           ignore (pop_env w_2);
           assert_env_length w_2 4;
           push_env w_2 (Dynarray.get w_2.state.e 2);
@@ -606,7 +606,7 @@ let populate_state () =
           drop_n w_2 5 2;
           assert_env_length w_2 3;
           return_n w_2 3 (pc_to_exp (int_to_pc 0))
-      | c_1 when c_1 = tag_S ->
+      | 2 (* tag_S *) ->
           let splits_1 = Memo.splits (snd x_1) in
           let split0_1 = List.nth splits_1 0 in
           ignore (pop_env w_2);
@@ -626,7 +626,7 @@ let populate_state () =
       let last_0 = Source.E 2 in
       let x_0 = resolve w_1 last_0 in
       match Word.get_value (fst x_0) with
-      | c_0 when c_0 = tag_Cons ->
+      | 4 (* tag_Cons *) ->
           let splits_0 = Memo.splits (snd x_0) in
           let split0_0 = List.nth splits_0 0 in
           let split1_0 = List.nth splits_0 1 in
@@ -656,7 +656,7 @@ let populate_state () =
       let last_2 = Source.E 2 in
       let x_2 = resolve w_4 last_2 in
       match Word.get_value (fst x_2) with
-      | c_2 when c_2 = tag_EInt ->
+      | 7 (* tag_EInt *) ->
           let splits_2 = Memo.splits (snd x_2) in
           let split0_2 = List.nth splits_2 0 in
           ignore (pop_env w_4);
@@ -670,7 +670,7 @@ let populate_state () =
           drop_n w_4 4 1;
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
-      | c_2 when c_2 = tag_EPlus ->
+      | 8 (* tag_EPlus *) ->
           let splits_3 = Memo.splits (snd x_2) in
           let split0_3 = List.nth splits_3 0 in
           let split1_1 = List.nth splits_3 1 in
@@ -685,7 +685,7 @@ let populate_state () =
           let keep_0 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_0; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_ELt ->
+      | 9 (* tag_ELt *) ->
           let splits_4 = Memo.splits (snd x_2) in
           let split0_4 = List.nth splits_4 0 in
           let split1_2 = List.nth splits_4 1 in
@@ -700,7 +700,7 @@ let populate_state () =
           let keep_1 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; keep_1; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_ELe ->
+      | 10 (* tag_ELe *) ->
           let splits_5 = Memo.splits (snd x_2) in
           let split0_5 = List.nth splits_5 0 in
           let split1_3 = List.nth splits_5 1 in
@@ -715,7 +715,7 @@ let populate_state () =
           let keep_2 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_3; keep_2; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EGt ->
+      | 11 (* tag_EGt *) ->
           let splits_6 = Memo.splits (snd x_2) in
           let split0_6 = List.nth splits_6 0 in
           let split1_4 = List.nth splits_6 1 in
@@ -730,7 +730,7 @@ let populate_state () =
           let keep_3 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_3; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EGe ->
+      | 12 (* tag_EGe *) ->
           let splits_7 = Memo.splits (snd x_2) in
           let split0_7 = List.nth splits_7 0 in
           let split1_5 = List.nth splits_7 1 in
@@ -745,7 +745,7 @@ let populate_state () =
           let keep_4 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_4; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EVar ->
+      | 13 (* tag_EVar *) ->
           let splits_8 = Memo.splits (snd x_2) in
           let split0_8 = List.nth splits_8 0 in
           ignore (pop_env w_4);
@@ -758,7 +758,7 @@ let populate_state () =
           let keep_5 = env_call w_4 [] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_5; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 1)
-      | c_2 when c_2 = tag_EAbs ->
+      | 14 (* tag_EAbs *) ->
           let splits_9 = Memo.splits (snd x_2) in
           let split0_9 = List.nth splits_9 0 in
           ignore (pop_env w_4);
@@ -775,7 +775,7 @@ let populate_state () =
           drop_n w_4 4 1;
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
-      | c_2 when c_2 = tag_ELet ->
+      | 16 (* tag_ELet *) ->
           let splits_10 = Memo.splits (snd x_2) in
           let split0_10 = List.nth splits_10 0 in
           let split1_6 = List.nth splits_10 1 in
@@ -792,7 +792,7 @@ let populate_state () =
           let keep_6 = env_call w_4 [ 1; 4 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_6; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EFix ->
+      | 26 (* tag_EFix *) ->
           let splits_11 = Memo.splits (snd x_2) in
           let split0_11 = List.nth splits_11 0 in
           ignore (pop_env w_4);
@@ -809,7 +809,7 @@ let populate_state () =
           drop_n w_4 4 1;
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
-      | c_2 when c_2 = tag_EApp ->
+      | 15 (* tag_EApp *) ->
           let splits_12 = Memo.splits (snd x_2) in
           let split0_12 = List.nth splits_12 0 in
           let split1_7 = List.nth splits_12 1 in
@@ -824,7 +824,7 @@ let populate_state () =
           let keep_7 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_7; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EHole ->
+      | 27 (* tag_EHole *) ->
           let splits_13 = Memo.splits (snd x_2) in
           let split0_13 = List.nth splits_13 0 in
           ignore (pop_env w_4);
@@ -841,19 +841,19 @@ let populate_state () =
           drop_n w_4 4 1;
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
-      | c_2 when c_2 = tag_ETrue ->
+      | 17 (* tag_ETrue *) ->
           ignore (pop_env w_4);
           assert_env_length w_4 2;
           push_env w_4 (Memo.from_constructor tag_VTrue);
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
-      | c_2 when c_2 = tag_EFalse ->
+      | 18 (* tag_EFalse *) ->
           ignore (pop_env w_4);
           assert_env_length w_4 2;
           push_env w_4 (Memo.from_constructor tag_VFalse);
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
-      | c_2 when c_2 = tag_EIf ->
+      | 19 (* tag_EIf *) ->
           let splits_14 = Memo.splits (snd x_2) in
           let split0_14 = List.nth splits_14 0 in
           let split1_8 = List.nth splits_14 1 in
@@ -870,13 +870,13 @@ let populate_state () =
           let keep_8 = env_call w_4 [ 1; 3; 4 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_8; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_ENil ->
+      | 20 (* tag_ENil *) ->
           ignore (pop_env w_4);
           assert_env_length w_4 2;
           push_env w_4 (Memo.from_constructor tag_VNil);
           assert_env_length w_4 3;
           return_n w_4 3 (pc_to_exp (int_to_pc 0))
-      | c_2 when c_2 = tag_ECons ->
+      | 21 (* tag_ECons *) ->
           let splits_15 = Memo.splits (snd x_2) in
           let split0_15 = List.nth splits_15 0 in
           let split1_9 = List.nth splits_15 1 in
@@ -891,7 +891,7 @@ let populate_state () =
           let keep_9 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_9; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EPair ->
+      | 23 (* tag_EPair *) ->
           let splits_16 = Memo.splits (snd x_2) in
           let split0_16 = List.nth splits_16 0 in
           let split1_10 = List.nth splits_16 1 in
@@ -906,7 +906,7 @@ let populate_state () =
           let keep_10 = env_call w_4 [ 1; 3 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_10; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EZro ->
+      | 24 (* tag_EZro *) ->
           let splits_17 = Memo.splits (snd x_2) in
           let split0_17 = List.nth splits_17 0 in
           ignore (pop_env w_4);
@@ -919,7 +919,7 @@ let populate_state () =
           let keep_11 = env_call w_4 [] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_12; keep_11; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EFst ->
+      | 25 (* tag_EFst *) ->
           let splits_18 = Memo.splits (snd x_2) in
           let split0_18 = List.nth splits_18 0 in
           ignore (pop_env w_4);
@@ -932,7 +932,7 @@ let populate_state () =
           let keep_12 = env_call w_4 [] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; keep_12; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EMatchList ->
+      | 22 (* tag_EMatchList *) ->
           let splits_19 = Memo.splits (snd x_2) in
           let split0_19 = List.nth splits_19 0 in
           let split1_11 = List.nth splits_19 1 in
@@ -949,7 +949,7 @@ let populate_state () =
           let keep_13 = env_call w_4 [ 1; 3; 4 ] 2 in
           w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_13; w_4.state.k ];
           w_4.state.c <- pc_to_exp (int_to_pc 4)
-      | c_2 when c_2 = tag_EUnit ->
+      | 28 (* tag_EUnit *) ->
           ignore (pop_env w_4);
           assert_env_length w_4 2;
           push_env w_4 (Memo.from_constructor tag_VUnit);
@@ -963,7 +963,7 @@ let populate_state () =
       let last_3 = Source.E 3 in
       let x_3 = resolve w_6 last_3 in
       match Word.get_value (fst x_3) with
-      | c_3 when c_3 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_20 = Memo.splits (snd x_3) in
           let split0_20 = List.nth splits_20 0 in
           ignore (pop_env w_6);
@@ -976,7 +976,7 @@ let populate_state () =
           let keep_14 = env_call w_6 [ 2; 3 ] 2 in
           w_6.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; keep_14; w_6.state.k ];
           w_6.state.c <- pc_to_exp (int_to_pc 4)
-      | c_3 when c_3 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_21 = Memo.splits (snd x_3) in
           let split0_21 = List.nth splits_21 0 in
           ignore (pop_env w_6);
@@ -1027,7 +1027,7 @@ let populate_state () =
       let last_4 = Source.E 3 in
       let x_4 = resolve w_7 last_4 in
       match Word.get_value (fst x_4) with
-      | c_4 when c_4 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_22 = Memo.splits (snd x_4) in
           let split0_22 = List.nth splits_22 0 in
           ignore (pop_env w_7);
@@ -1040,7 +1040,7 @@ let populate_state () =
           let keep_15 = env_call w_7 [ 2; 3 ] 2 in
           w_7.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; keep_15; w_7.state.k ];
           w_7.state.c <- pc_to_exp (int_to_pc 4)
-      | c_4 when c_4 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_23 = Memo.splits (snd x_4) in
           let split0_23 = List.nth splits_23 0 in
           ignore (pop_env w_7);
@@ -1091,7 +1091,7 @@ let populate_state () =
       let last_5 = Source.E 3 in
       let x_5 = resolve w_8 last_5 in
       match Word.get_value (fst x_5) with
-      | c_5 when c_5 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_24 = Memo.splits (snd x_5) in
           let split0_24 = List.nth splits_24 0 in
           ignore (pop_env w_8);
@@ -1104,7 +1104,7 @@ let populate_state () =
           let keep_16 = env_call w_8 [ 2; 3 ] 2 in
           w_8.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; keep_16; w_8.state.k ];
           w_8.state.c <- pc_to_exp (int_to_pc 4)
-      | c_5 when c_5 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_25 = Memo.splits (snd x_5) in
           let split0_25 = List.nth splits_25 0 in
           ignore (pop_env w_8);
@@ -1155,7 +1155,7 @@ let populate_state () =
       let last_6 = Source.E 3 in
       let x_6 = resolve w_9 last_6 in
       match Word.get_value (fst x_6) with
-      | c_6 when c_6 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_26 = Memo.splits (snd x_6) in
           let split0_26 = List.nth splits_26 0 in
           ignore (pop_env w_9);
@@ -1168,7 +1168,7 @@ let populate_state () =
           let keep_17 = env_call w_9 [ 2; 3 ] 2 in
           w_9.state.k <- Memo.appends [ Memo.from_constructor tag_cont_18; keep_17; w_9.state.k ];
           w_9.state.c <- pc_to_exp (int_to_pc 4)
-      | c_6 when c_6 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_27 = Memo.splits (snd x_6) in
           let split0_27 = List.nth splits_27 0 in
           ignore (pop_env w_9);
@@ -1219,7 +1219,7 @@ let populate_state () =
       let last_7 = Source.E 3 in
       let x_7 = resolve w_10 last_7 in
       match Word.get_value (fst x_7) with
-      | c_7 when c_7 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_28 = Memo.splits (snd x_7) in
           let split0_28 = List.nth splits_28 0 in
           ignore (pop_env w_10);
@@ -1232,7 +1232,7 @@ let populate_state () =
           let keep_18 = env_call w_10 [ 2; 3 ] 2 in
           w_10.state.k <- Memo.appends [ Memo.from_constructor tag_cont_19; keep_18; w_10.state.k ];
           w_10.state.c <- pc_to_exp (int_to_pc 4)
-      | c_7 when c_7 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_29 = Memo.splits (snd x_7) in
           let split0_29 = List.nth splits_29 0 in
           ignore (pop_env w_10);
@@ -1283,7 +1283,7 @@ let populate_state () =
       let last_8 = Source.E 0 in
       let x_8 = resolve w_11 last_8 in
       match Word.get_value (fst x_8) with
-      | c_8 when c_8 = tag_Some ->
+      | 6 (* tag_Some *) ->
           let splits_30 = Memo.splits (snd x_8) in
           let split0_30 = List.nth splits_30 0 in
           ignore (pop_env w_11);
@@ -1296,7 +1296,7 @@ let populate_state () =
           drop_n w_11 1 0;
           assert_env_length w_11 1;
           return_n w_11 1 (pc_to_exp (int_to_pc 0))
-      | c_8 when c_8 = tag_None ->
+      | 5 (* tag_None *) ->
           ignore (pop_env w_11);
           assert_env_length w_11 0;
           push_env w_11 (Memo.from_constructor tag_SIndexError);
@@ -1315,7 +1315,7 @@ let populate_state () =
       let last_9 = Source.E 3 in
       let x_9 = resolve w_12 last_9 in
       match Word.get_value (fst x_9) with
-      | c_9 when c_9 = tag_VAbs ->
+      | 30 (* tag_VAbs *) ->
           let splits_31 = Memo.splits (snd x_9) in
           let split0_31 = List.nth splits_31 0 in
           let split1_12 = List.nth splits_31 1 in
@@ -1332,7 +1332,7 @@ let populate_state () =
           let keep_19 = env_call w_12 [ 4; 5 ] 2 in
           w_12.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; keep_19; w_12.state.k ];
           w_12.state.c <- pc_to_exp (int_to_pc 4)
-      | c_9 when c_9 = tag_VFix ->
+      | 37 (* tag_VFix *) ->
           let splits_32 = Memo.splits (snd x_9) in
           let split0_32 = List.nth splits_32 0 in
           let split1_13 = List.nth splits_32 1 in
@@ -1349,7 +1349,7 @@ let populate_state () =
           let keep_20 = env_call w_12 [ 2; 4; 5 ] 2 in
           w_12.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; keep_20; w_12.state.k ];
           w_12.state.c <- pc_to_exp (int_to_pc 4)
-      | c_9 when c_9 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_33 = Memo.splits (snd x_9) in
           let split0_33 = List.nth splits_33 0 in
           ignore (pop_env w_12);
@@ -1400,7 +1400,7 @@ let populate_state () =
       let last_10 = Source.E 3 in
       let x_10 = resolve w_13 last_10 in
       match Word.get_value (fst x_10) with
-      | c_10 when c_10 = tag_VTrue ->
+      | 32 (* tag_VTrue *) ->
           ignore (pop_env w_13);
           assert_env_length w_13 3;
           push_env w_13 (Dynarray.get w_13.state.e 1);
@@ -1409,7 +1409,7 @@ let populate_state () =
           assert_env_length w_13 5;
           ignore (env_call w_13 [] 2);
           w_13.state.c <- pc_to_exp (int_to_pc 4)
-      | c_10 when c_10 = tag_VFalse ->
+      | 33 (* tag_VFalse *) ->
           ignore (pop_env w_13);
           assert_env_length w_13 3;
           push_env w_13 (Dynarray.get w_13.state.e 2);
@@ -1418,7 +1418,7 @@ let populate_state () =
           assert_env_length w_13 5;
           ignore (env_call w_13 [] 2);
           w_13.state.c <- pc_to_exp (int_to_pc 4)
-      | c_10 when c_10 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_34 = Memo.splits (snd x_10) in
           let split0_34 = List.nth splits_34 0 in
           ignore (pop_env w_13);
@@ -1471,7 +1471,7 @@ let populate_state () =
       let last_11 = Source.E 0 in
       let x_11 = resolve w_14 last_11 in
       match Word.get_value (fst x_11) with
-      | c_11 when c_11 = tag_VPair ->
+      | 36 (* tag_VPair *) ->
           let splits_35 = Memo.splits (snd x_11) in
           let split0_35 = List.nth splits_35 0 in
           let split1_14 = List.nth splits_35 1 in
@@ -1486,7 +1486,7 @@ let populate_state () =
           drop_n w_14 1 0;
           assert_env_length w_14 1;
           return_n w_14 1 (pc_to_exp (int_to_pc 0))
-      | c_11 when c_11 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_36 = Memo.splits (snd x_11) in
           let split0_36 = List.nth splits_36 0 in
           ignore (pop_env w_14);
@@ -1533,7 +1533,7 @@ let populate_state () =
       let last_12 = Source.E 0 in
       let x_12 = resolve w_15 last_12 in
       match Word.get_value (fst x_12) with
-      | c_12 when c_12 = tag_VPair ->
+      | 36 (* tag_VPair *) ->
           let splits_37 = Memo.splits (snd x_12) in
           let split0_37 = List.nth splits_37 0 in
           let split1_15 = List.nth splits_37 1 in
@@ -1548,7 +1548,7 @@ let populate_state () =
           drop_n w_15 1 0;
           assert_env_length w_15 1;
           return_n w_15 1 (pc_to_exp (int_to_pc 0))
-      | c_12 when c_12 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_38 = Memo.splits (snd x_12) in
           let split0_38 = List.nth splits_38 0 in
           ignore (pop_env w_15);
@@ -1595,7 +1595,7 @@ let populate_state () =
       let last_13 = Source.E 3 in
       let x_13 = resolve w_16 last_13 in
       match Word.get_value (fst x_13) with
-      | c_13 when c_13 = tag_VNil ->
+      | 34 (* tag_VNil *) ->
           ignore (pop_env w_16);
           assert_env_length w_16 3;
           push_env w_16 (Dynarray.get w_16.state.e 1);
@@ -1604,7 +1604,7 @@ let populate_state () =
           assert_env_length w_16 5;
           ignore (env_call w_16 [] 2);
           w_16.state.c <- pc_to_exp (int_to_pc 4)
-      | c_13 when c_13 = tag_VCons ->
+      | 35 (* tag_VCons *) ->
           let splits_39 = Memo.splits (snd x_13) in
           let split0_39 = List.nth splits_39 0 in
           let split1_16 = List.nth splits_39 1 in
@@ -1630,7 +1630,7 @@ let populate_state () =
           assert_env_length w_16 7;
           ignore (env_call w_16 [] 2);
           w_16.state.c <- pc_to_exp (int_to_pc 4)
-      | c_13 when c_13 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_40 = Memo.splits (snd x_13) in
           let split0_40 = List.nth splits_40 0 in
           ignore (pop_env w_16);
@@ -1707,7 +1707,7 @@ let populate_state () =
       let last_14 = Source.E 3 in
       let x_14 = resolve w_17 last_14 in
       match Word.get_value (fst x_14) with
-      | c_14 when c_14 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_41 = Memo.splits (snd x_14) in
           let split0_41 = List.nth splits_41 0 in
           ignore (pop_env w_17);
@@ -1717,7 +1717,7 @@ let populate_state () =
           assert_env_length w_17 5;
           push_env w_17 (Dynarray.get w_17.state.e 3);
           w_17.state.c <- pc_to_exp (int_to_pc 17)
-      | c_14 when c_14 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_42 = Memo.splits (snd x_14) in
           let split0_42 = List.nth splits_42 0 in
           ignore (pop_env w_17);
@@ -1811,7 +1811,7 @@ let populate_state () =
       let last_15 = Source.E 3 in
       let x_15 = resolve w_19 last_15 in
       match Word.get_value (fst x_15) with
-      | c_15 when c_15 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_43 = Memo.splits (snd x_15) in
           let split0_43 = List.nth splits_43 0 in
           ignore (pop_env w_19);
@@ -1821,7 +1821,7 @@ let populate_state () =
           assert_env_length w_19 5;
           push_env w_19 (Dynarray.get w_19.state.e 3);
           w_19.state.c <- pc_to_exp (int_to_pc 19)
-      | c_15 when c_15 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_44 = Memo.splits (snd x_15) in
           let split0_44 = List.nth splits_44 0 in
           ignore (pop_env w_19);
@@ -1915,7 +1915,7 @@ let populate_state () =
       let last_16 = Source.E 3 in
       let x_16 = resolve w_21 last_16 in
       match Word.get_value (fst x_16) with
-      | c_16 when c_16 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_45 = Memo.splits (snd x_16) in
           let split0_45 = List.nth splits_45 0 in
           ignore (pop_env w_21);
@@ -1925,7 +1925,7 @@ let populate_state () =
           assert_env_length w_21 5;
           push_env w_21 (Dynarray.get w_21.state.e 3);
           w_21.state.c <- pc_to_exp (int_to_pc 21)
-      | c_16 when c_16 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_46 = Memo.splits (snd x_16) in
           let split0_46 = List.nth splits_46 0 in
           ignore (pop_env w_21);
@@ -2019,7 +2019,7 @@ let populate_state () =
       let last_17 = Source.E 3 in
       let x_17 = resolve w_23 last_17 in
       match Word.get_value (fst x_17) with
-      | c_17 when c_17 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_47 = Memo.splits (snd x_17) in
           let split0_47 = List.nth splits_47 0 in
           ignore (pop_env w_23);
@@ -2029,7 +2029,7 @@ let populate_state () =
           assert_env_length w_23 5;
           push_env w_23 (Dynarray.get w_23.state.e 3);
           w_23.state.c <- pc_to_exp (int_to_pc 23)
-      | c_17 when c_17 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_48 = Memo.splits (snd x_17) in
           let split0_48 = List.nth splits_48 0 in
           ignore (pop_env w_23);
@@ -2123,7 +2123,7 @@ let populate_state () =
       let last_18 = Source.E 3 in
       let x_18 = resolve w_25 last_18 in
       match Word.get_value (fst x_18) with
-      | c_18 when c_18 = tag_VInt ->
+      | 29 (* tag_VInt *) ->
           let splits_49 = Memo.splits (snd x_18) in
           let split0_49 = List.nth splits_49 0 in
           ignore (pop_env w_25);
@@ -2133,7 +2133,7 @@ let populate_state () =
           assert_env_length w_25 5;
           push_env w_25 (Dynarray.get w_25.state.e 3);
           w_25.state.c <- pc_to_exp (int_to_pc 25)
-      | c_18 when c_18 = tag_VStuck ->
+      | 38 (* tag_VStuck *) ->
           let splits_50 = Memo.splits (snd x_18) in
           let split0_50 = List.nth splits_50 0 in
           ignore (pop_env w_25);

@@ -242,3 +242,12 @@ let match_ctor_tag_default_ (x : int code) (fs : (string * 'a code) list) (dflt 
       fs
   in
   from_ir (Match (to_ir x, alts @ [ (Raw (string "_"), to_ir dflt) ]))
+
+let match_ctor_tag_literal_default_ (x : int code) (fs : (int * string * 'a code) list) (dflt : 'a code) : 'a code =
+  let alts =
+    Stdlib.List.map
+      (fun (tag, tag_name, body) ->
+        (Raw (string (string_of_int tag) ^^ string " (* " ^^ string tag_name ^^ string " *)"), to_ir body))
+      fs
+  in
+  from_ir (Match (to_ir x, alts @ [ (Raw (string "_"), to_ir dflt) ]))

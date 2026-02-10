@@ -34,7 +34,7 @@ let populate_state () =
     (fun w_3 ->
       assert_env_length w_3 1;
       let hd_0, tl_0 = resolve w_3 K in
-      match Word.get_value hd_0 with c_1 when c_1 = tag_cont_done -> exec_done w_3 | _ -> failwith "unreachable (0)")
+      match Word.get_value hd_0 with 0 (* tag_cont_done *) -> exec_done w_3 | _ -> failwith "unreachable (0)")
     0;
   add_exp
     (fun w_0 ->
@@ -60,13 +60,13 @@ let populate_state () =
       let last_0 = Source.E 2 in
       let x_0 = resolve w_1 last_0 in
       match Word.get_value (fst x_0) with
-      | c_0 when c_0 = tag_Nil ->
+      | 1 (* tag_Nil *) ->
           ignore (pop_env w_1);
           assert_env_length w_1 2;
           push_env w_1 (Dynarray.get w_1.state.e 1);
           assert_env_length w_1 3;
           return_n w_1 3 (pc_to_exp (int_to_pc 0))
-      | c_0 when c_0 = tag_Cons ->
+      | 2 (* tag_Cons *) ->
           let splits_0 = Memo.splits (snd x_0) in
           let split0_0 = List.nth splits_0 0 in
           let split1_0 = List.nth splits_0 1 in
