@@ -168,7 +168,7 @@ let set_env (w : world) (i : int) (v : seq) : unit =
 
 let grow_env (w : world) (n : int) : unit =
   let rec grow_aux f n =
-    if n < 0 then ()
+    if n <= 0 then ()
     else begin
       f (from_int 0);
       grow_aux f (n - 1)
