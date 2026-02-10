@@ -2,7 +2,7 @@ type profile = { slots : profile_slot Dynarray.t; mutable timer : timer_top opti
 and profile_slot = { mutable total_time : int; name : string }
 and profile_index = (profile * int) option
 and timer_bot = { index : int }
-and timer_top = { index : int; start_time : Time_stamp_counter.t; stack : timer_bot list }
+and timer_top = { index : int; start_time : Timer.t; end_time : Timer.t; stack : timer_bot list }
 
 let create_profile () : profile = { slots = Dynarray.create (); timer = None }
 
@@ -13,17 +13,13 @@ let register_slot (p : profile) (name : string) : profile_index =
 
 let with_slot (index : profile_index) (f : unit -> 'a) : 'a =
   let start_timer p index stack =
-    let start_time = Time_stamp_counter.now () in
-    p.timer <- Some { index; start_time; stack }
+    let buf = Timer.create () in
+    p.timer <- Some { index; start_time = buf; end_time = Timer.create (); stack };
+    Timer.record buf
   in
   let stop_timer p timer =
-    let end_time = Time_stamp_counter.now () in
-    let calibrator = Lazy.force Time_stamp_counter.calibrator in
-    let elapsed_time =
-      Time_stamp_counter.diff end_time timer.start_time
-      |> Time_stamp_counter.Span.to_time_ns_span ~calibrator
-      |> Core.Time_ns.Span.to_int63_ns |> Core.Int63.to_int_exn
-    in
+    Timer.record timer.end_time;
+    let elapsed_time = Int64.to_int @@ Timer.diff_nanoseconds timer.start_time timer.end_time in
     let slot = Dynarray.get p.slots timer.index in
     slot.total_time <- slot.total_time + elapsed_time
   in

@@ -29,6 +29,7 @@
   SynInfo
   Code
   Tail
+  Timer
   Compile
   CompileFfi
   CompileType
@@ -39,7 +40,7 @@
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq ppx_codegen))
  (foreign_stubs
   (language c)
-  (names sl2_stubs sl2_slow_stubs crc32c_stubs hashtbl_stubs)
+  (names sl2_stubs sl2_slow_stubs crc32c_stubs hashtbl_stubs timer_stubs)
   (flags -g -fPIC -Wall -march=native -O3 -DSSE2NEON_SUPPRESS_WARNINGS)))
 
 (include_subdirs qualified)
