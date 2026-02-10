@@ -167,11 +167,14 @@ let set_env (w : world) (i : int) (v : seq) : unit =
   Dynarray.set w.state.e i v
 
 let grow_env (w : world) (n : int) : unit =
-  let rec aux f n =
-    if n < 0 then () else f (from_int 0);
-    aux f (n - 1)
+  let rec grow_aux f n =
+    if n < 0 then ()
+    else begin
+      f (from_int 0);
+      grow_aux f (n - 1)
+    end
   in
-  Dynarray.append_iter w.state.e aux n
+  Dynarray.append_iter w.state.e grow_aux n
 
 let shrink_env (w : world) (n : int) : unit =
   assert (Dynarray.length w.state.e >= n);
