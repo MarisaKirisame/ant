@@ -1,0 +1,17 @@
+[project]
+name = "ant"
+version = "0.1.0"
+description = "Python project \"ant\"."
+readme = "docs/README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "cycler>=0.12.1",
+    "image>=1.5.33",
+    "kiwisolver>=1.4.9",
+    "packaging>=26.0",
+    "pyparsing>=3.3.2",
+    "python-dateutil>=2.9.0.post0",
+    "dominate",
+    "matplotlib",
+    "numpy",
+]
