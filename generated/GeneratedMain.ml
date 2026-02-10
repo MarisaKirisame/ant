@@ -7,6 +7,7 @@ let () =
       | "live-simple" -> RunLiveSimple.run ()
       | "live-left-to-right" -> RunLiveLeftToRight.run ()
       | "live-demand-driven" -> RunLiveDemandDriven.run ()
+      | "test" -> RunTest.run ()
       | "tailrec" -> RunTailRec.run ()
       | "hazel" -> FromHazel.run ()
       | _ ->

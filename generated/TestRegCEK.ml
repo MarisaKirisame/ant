@@ -108,181 +108,181 @@ let populate_state () =
       | 5 (* tag_cont_1 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 2 tl_0;
-          set_env w_22 2 (Dynarray.get w_22.state.e 3);
-          assert_env_length w_22 4;
+          set_env w_22 2 (Dynarray.get w_22.state.e 2);
+          assert_env_length w_22 3;
           grow_env (* let *) w_22 1;
-          assert_env_length w_22 5;
+          assert_env_length w_22 4;
           grow_env (* call args *) w_22 2;
-          assert_env_length w_22 7;
+          assert_env_length w_22 6;
+          set_env w_22 4 (Dynarray.get w_22.state.e 2);
+          assert_env_length w_22 6;
           set_env w_22 5 (Dynarray.get w_22.state.e 2);
-          assert_env_length w_22 7;
-          set_env w_22 6 (Dynarray.get w_22.state.e 2);
-          assert_env_length w_22 7;
-          let keep_1 = env_call w_22 [ 1; 3; 4 ] 2 in
+          assert_env_length w_22 6;
+          let keep_1 = env_call w_22 [ 0; 1; 3 ] 2 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; keep_1; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 2)
       | 6 (* tag_cont_2 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 3 tl_0;
-          set_env w_22 4 (Dynarray.get w_22.state.e 5);
-          assert_env_length w_22 6;
+          set_env w_22 3 (Dynarray.get w_22.state.e 3);
+          assert_env_length w_22 4;
           grow_env (* let *) w_22 1;
-          assert_env_length w_22 7;
+          assert_env_length w_22 5;
           grow_env (* call args *) w_22 2;
-          set_env w_22 7 (Memo.from_int 1);
-          set_env w_22 8 (Memo.from_int 2);
-          assert_env_length w_22 9;
-          let keep_2 = env_call w_22 [ 1; 3; 5; 6 ] 2 in
+          set_env w_22 5 (Memo.from_int 1);
+          set_env w_22 6 (Memo.from_int 2);
+          assert_env_length w_22 7;
+          let keep_2 = env_call w_22 [ 0; 1; 2; 4 ] 2 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_3; keep_2; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 3)
       | 7 (* tag_cont_3 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 4 tl_0;
-          set_env w_22 6 (Dynarray.get w_22.state.e 7);
+          set_env w_22 4 (Dynarray.get w_22.state.e 4);
+          assert_env_length w_22 5;
+          grow_env (* let *) w_22 1;
+          assert_env_length w_22 6;
+          grow_env (* call args *) w_22 1;
+          set_env w_22 6 (Memo.from_int 0);
+          assert_env_length w_22 7;
+          let keep_3 = env_call w_22 [ 0; 1; 2; 3; 5 ] 1 in
+          w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_3; w_22.state.k ];
+          w_22.state.c <- pc_to_exp (int_to_pc 5)
+      | 8 (* tag_cont_4 *) ->
+          w_22.state.k <- get_next_cont tl_0;
+          restore_env w_22 5 tl_0;
+          set_env w_22 5 (Dynarray.get w_22.state.e 5);
+          assert_env_length w_22 6;
+          grow_env (* let *) w_22 1;
+          assert_env_length w_22 7;
+          grow_env (* call args *) w_22 1;
+          set_env w_22 7 (Memo.from_int 0);
+          assert_env_length w_22 8;
+          let keep_4 = env_call w_22 [ 0; 1; 2; 3; 4; 6 ] 1 in
+          w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_4; w_22.state.k ];
+          w_22.state.c <- pc_to_exp (int_to_pc 7)
+      | 9 (* tag_cont_5 *) ->
+          w_22.state.k <- get_next_cont tl_0;
+          restore_env w_22 6 tl_0;
+          set_env w_22 6 (Dynarray.get w_22.state.e 6);
+          assert_env_length w_22 7;
+          grow_env (* let *) w_22 1;
+          assert_env_length w_22 8;
+          grow_env (* call args *) w_22 1;
+          set_env w_22 8 (Memo.from_int 0);
+          assert_env_length w_22 9;
+          let keep_5 = env_call w_22 [ 0; 1; 2; 3; 4; 5; 7 ] 1 in
+          w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_5; w_22.state.k ];
+          w_22.state.c <- pc_to_exp (int_to_pc 9)
+      | 10 (* tag_cont_6 *) ->
+          w_22.state.k <- get_next_cont tl_0;
+          restore_env w_22 7 tl_0;
+          set_env w_22 7 (Dynarray.get w_22.state.e 7);
           assert_env_length w_22 8;
           grow_env (* let *) w_22 1;
           assert_env_length w_22 9;
           grow_env (* call args *) w_22 1;
           set_env w_22 9 (Memo.from_int 0);
           assert_env_length w_22 10;
-          let keep_3 = env_call w_22 [ 1; 3; 5; 7; 8 ] 1 in
-          w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_3; w_22.state.k ];
-          w_22.state.c <- pc_to_exp (int_to_pc 5)
-      | 8 (* tag_cont_4 *) ->
-          w_22.state.k <- get_next_cont tl_0;
-          restore_env w_22 5 tl_0;
-          set_env w_22 8 (Dynarray.get w_22.state.e 9);
-          assert_env_length w_22 10;
-          grow_env (* let *) w_22 1;
-          assert_env_length w_22 11;
-          grow_env (* call args *) w_22 1;
-          set_env w_22 11 (Memo.from_int 0);
-          assert_env_length w_22 12;
-          let keep_4 = env_call w_22 [ 1; 3; 5; 7; 9; 10 ] 1 in
-          w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_4; w_22.state.k ];
-          w_22.state.c <- pc_to_exp (int_to_pc 7)
-      | 9 (* tag_cont_5 *) ->
-          w_22.state.k <- get_next_cont tl_0;
-          restore_env w_22 6 tl_0;
-          set_env w_22 10 (Dynarray.get w_22.state.e 11);
-          assert_env_length w_22 12;
-          grow_env (* let *) w_22 1;
-          assert_env_length w_22 13;
-          grow_env (* call args *) w_22 1;
-          set_env w_22 13 (Memo.from_int 0);
-          assert_env_length w_22 14;
-          let keep_5 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 12 ] 1 in
-          w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_5; w_22.state.k ];
-          w_22.state.c <- pc_to_exp (int_to_pc 9)
-      | 10 (* tag_cont_6 *) ->
-          w_22.state.k <- get_next_cont tl_0;
-          restore_env w_22 7 tl_0;
-          set_env w_22 12 (Dynarray.get w_22.state.e 13);
-          assert_env_length w_22 14;
-          grow_env (* let *) w_22 1;
-          assert_env_length w_22 15;
-          grow_env (* call args *) w_22 1;
-          set_env w_22 15 (Memo.from_int 0);
-          assert_env_length w_22 16;
-          let keep_6 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 13; 14 ] 1 in
+          let keep_6 = env_call w_22 [ 0; 1; 2; 3; 4; 5; 6; 8 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_6; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 11)
       | 11 (* tag_cont_7 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 8 tl_0;
-          set_env w_22 14 (Dynarray.get w_22.state.e 15);
-          assert_env_length w_22 16;
+          set_env w_22 8 (Dynarray.get w_22.state.e 8);
+          assert_env_length w_22 9;
           grow_env (* let *) w_22 1;
-          assert_env_length w_22 17;
+          assert_env_length w_22 10;
           grow_env (* call args *) w_22 1;
-          assert_env_length w_22 18;
+          assert_env_length w_22 11;
           grow_env (* call to constructor *) w_22 2;
-          set_env w_22 18 (Memo.from_int 0);
-          set_env w_22 19 (Memo.from_constructor tag_Nil);
-          set_env w_22 17
+          set_env w_22 11 (Memo.from_int 0);
+          set_env w_22 12 (Memo.from_constructor tag_Nil);
+          set_env w_22 10
             (Memo.appends
-               [ Memo.from_constructor tag_Cons; Dynarray.get w_22.state.e 18; Dynarray.get w_22.state.e 19 ]);
-          assert_env_length w_22 20;
+               [ Memo.from_constructor tag_Cons; Dynarray.get w_22.state.e 11; Dynarray.get w_22.state.e 12 ]);
+          assert_env_length w_22 13;
           shrink_env w_22 2;
-          assert_env_length w_22 18;
-          let keep_7 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 13; 15; 16 ] 1 in
+          assert_env_length w_22 11;
+          let keep_7 = env_call w_22 [ 0; 1; 2; 3; 4; 5; 6; 7; 9 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_7; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 15)
       | 12 (* tag_cont_8 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 9 tl_0;
-          set_env w_22 16 (Dynarray.get w_22.state.e 17);
-          assert_env_length w_22 18;
+          set_env w_22 9 (Dynarray.get w_22.state.e 9);
+          assert_env_length w_22 10;
           grow_env (* let *) w_22 1;
-          assert_env_length w_22 19;
+          assert_env_length w_22 11;
           grow_env (* call args *) w_22 1;
-          assert_env_length w_22 20;
+          assert_env_length w_22 12;
           grow_env (* call to constructor *) w_22 2;
-          set_env w_22 20 (Memo.from_int 1);
-          set_env w_22 21 (Memo.from_int 2);
-          set_env w_22 19
+          set_env w_22 12 (Memo.from_int 1);
+          set_env w_22 13 (Memo.from_int 2);
+          set_env w_22 11
             (Memo.appends
-               [ Memo.from_constructor tag_Pair; Dynarray.get w_22.state.e 20; Dynarray.get w_22.state.e 21 ]);
-          assert_env_length w_22 22;
+               [ Memo.from_constructor tag_Pair; Dynarray.get w_22.state.e 12; Dynarray.get w_22.state.e 13 ]);
+          assert_env_length w_22 14;
           shrink_env w_22 2;
-          assert_env_length w_22 20;
-          let keep_8 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 13; 15; 17; 18 ] 1 in
+          assert_env_length w_22 12;
+          let keep_8 = env_call w_22 [ 0; 1; 2; 3; 4; 5; 6; 7; 8; 10 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_8; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 17)
       | 13 (* tag_cont_9 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 10 tl_0;
-          set_env w_22 18 (Dynarray.get w_22.state.e 19);
-          assert_env_length w_22 20;
+          set_env w_22 10 (Dynarray.get w_22.state.e 10);
+          assert_env_length w_22 11;
           grow_env (* let *) w_22 1;
-          assert_env_length w_22 21;
+          assert_env_length w_22 12;
           grow_env (* call args *) w_22 1;
-          assert_env_length w_22 22;
+          assert_env_length w_22 13;
           grow_env (* call to constructor *) w_22 1;
-          set_env w_22 22 (Memo.from_int 0);
-          set_env w_22 21 (Memo.appends [ Memo.from_constructor tag_Wrap; Dynarray.get w_22.state.e 22 ]);
-          assert_env_length w_22 23;
+          set_env w_22 13 (Memo.from_int 0);
+          set_env w_22 12 (Memo.appends [ Memo.from_constructor tag_Wrap; Dynarray.get w_22.state.e 13 ]);
+          assert_env_length w_22 14;
           shrink_env w_22 1;
-          assert_env_length w_22 22;
-          let keep_9 = env_call w_22 [ 1; 3; 5; 7; 9; 11; 13; 15; 17; 19; 20 ] 1 in
+          assert_env_length w_22 13;
+          let keep_9 = env_call w_22 [ 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 11 ] 1 in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_9; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 20)
       | 14 (* tag_cont_10 *) ->
           w_22.state.k <- get_next_cont tl_0;
           restore_env w_22 11 tl_0;
-          set_env w_22 20 (Dynarray.get w_22.state.e 21);
-          set_env w_22 20 (Memo.from_int 0);
-          set_env w_22 18 (Dynarray.get w_22.state.e 20);
-          assert_env_length w_22 22;
+          set_env w_22 11 (Dynarray.get w_22.state.e 11);
+          set_env w_22 11 (Memo.from_int 0);
+          set_env w_22 10 (Dynarray.get w_22.state.e 11);
+          assert_env_length w_22 12;
           shrink_env w_22 1;
-          set_env w_22 16 (Dynarray.get w_22.state.e 18);
-          assert_env_length w_22 21;
+          set_env w_22 9 (Dynarray.get w_22.state.e 10);
+          assert_env_length w_22 11;
           shrink_env w_22 1;
-          set_env w_22 14 (Dynarray.get w_22.state.e 16);
-          assert_env_length w_22 20;
+          set_env w_22 8 (Dynarray.get w_22.state.e 9);
+          assert_env_length w_22 11;
           shrink_env w_22 1;
-          set_env w_22 12 (Dynarray.get w_22.state.e 14);
-          assert_env_length w_22 19;
+          set_env w_22 7 (Dynarray.get w_22.state.e 8);
+          assert_env_length w_22 11;
           shrink_env w_22 1;
-          set_env w_22 10 (Dynarray.get w_22.state.e 12);
-          assert_env_length w_22 18;
+          set_env w_22 6 (Dynarray.get w_22.state.e 7);
+          assert_env_length w_22 11;
           shrink_env w_22 1;
-          set_env w_22 8 (Dynarray.get w_22.state.e 10);
-          assert_env_length w_22 17;
+          set_env w_22 5 (Dynarray.get w_22.state.e 6);
+          assert_env_length w_22 11;
           shrink_env w_22 1;
-          set_env w_22 6 (Dynarray.get w_22.state.e 8);
-          assert_env_length w_22 16;
+          set_env w_22 4 (Dynarray.get w_22.state.e 5);
+          assert_env_length w_22 11;
           shrink_env w_22 1;
-          set_env w_22 4 (Dynarray.get w_22.state.e 6);
-          assert_env_length w_22 15;
+          set_env w_22 3 (Dynarray.get w_22.state.e 4);
+          assert_env_length w_22 11;
           shrink_env w_22 1;
-          set_env w_22 2 (Dynarray.get w_22.state.e 4);
-          assert_env_length w_22 14;
+          set_env w_22 2 (Dynarray.get w_22.state.e 3);
+          assert_env_length w_22 11;
           shrink_env w_22 1;
           set_env w_22 1 (Dynarray.get w_22.state.e 2);
-          assert_env_length w_22 13;
+          assert_env_length w_22 11;
           shrink_env w_22 1;
-          return_n_with w_22 12 (Dynarray.get w_22.state.e 1) (pc_to_exp (int_to_pc 0))
+          return_n_with w_22 11 (Dynarray.get w_22.state.e 1) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (0)")
     0;
   add_exp

@@ -348,7 +348,7 @@ and compile_expr (ctx : ctx) (s : scope) (dst : loc) (c : 'a expr) (k : kont_wit
             [%seqs
               set_k_ w (get_next_cont_ tl);
               restore_env_ w (int_ keep_length) tl;
-              let l_ret, s = alloc_slot s in
+              let l_ret, s = alloc_slot keep_s in
               [%seqs
                 set_loc dst (get_loc l_ret w) w;
                 k (dst, s) w]]);
