@@ -1,5 +1,6 @@
 open BatFingerTree
 open Words
+open SeqOps
 
 (* A read is an abstraction on patterns.
  * RCon: corresponding patterns must have this constants.
@@ -24,6 +25,13 @@ let red_measure (r : red) : Pattern.measure =
   | RRead n -> { degree = n; max_degree = n }
   | RSkip n -> { degree = n; max_degree = n }
   | RCon c -> { degree = (Words.summary c).degree; max_degree = (Words.summary c).max_degree }
+
+let merge_red (x : red) (y : red) : red option =
+  match (x, y) with
+  | RRead x, RRead y -> Some (RRead (x + y))
+  | RSkip x, RSkip y -> Some (RSkip (x + y))
+  | RCon x, RCon y -> Some (RCon (Words.append x y))
+  | _ -> None
 
 let rec read_valid x : bool =
   match Generic.front x ~monoid ~measure:red_measure with
@@ -50,41 +58,17 @@ let read_front_exn (r : read) : red * read =
   (first_r, rest_r)
 
 let read_cons (p : red) (q : read) : read =
-  if Generic.is_empty q then Generic.singleton p
-  else
-    let qh, qt = read_front_exn q in
-    match (p, qh) with
-    | RRead p, RRead qh -> Generic.cons ~monoid ~measure:red_measure qt (RRead (p + qh))
-    | RSkip p, RSkip qh -> Generic.cons ~monoid ~measure:red_measure qt (RSkip (p + qh))
-    | RCon p, RCon qh -> Generic.cons ~monoid ~measure:red_measure qt (RCon (Words.append p qh))
-    | _ -> Generic.cons ~monoid ~measure:red_measure q p
+  cons_merge ~monoid ~measure:red_measure ~merge:merge_red p q
 
 let read_snoc (p : read) (q : red) : read =
-  if Generic.is_empty p then Generic.singleton q
-  else
-    let ph, pt = read_rear_exn p in
-    match (pt, q) with
-    | RRead pt, RRead q -> Generic.snoc ~monoid ~measure:red_measure ph (RRead (pt + q))
-    | RSkip pt, RSkip q -> Generic.snoc ~monoid ~measure:red_measure ph (RSkip (pt + q))
-    | RCon pt, RCon q -> Generic.snoc ~monoid ~measure:red_measure ph (RCon (Words.append pt q))
-    | _ -> Generic.snoc ~monoid ~measure:red_measure p q
+  snoc_merge ~monoid ~measure:red_measure ~merge:merge_red p q
 
 let read_append_unsafe (x : read) (y : read) : read = Generic.append ~monoid ~measure:red_measure x y
 let read_cons_unsafe (p : red) (q : read) : read = Generic.cons ~monoid ~measure:red_measure q p
 let read_snoc_unsafe (p : read) (q : red) : read = Generic.snoc ~monoid ~measure:red_measure p q
 
 let rec read_append (x : read) (y : read) : read =
-  if Generic.is_empty x then y
-  else if Generic.is_empty y then x
-  else
-    let rest_x, last_x = read_rear_exn x in
-    let first_y, rest_y = read_front_exn y in
-    let with_middle middle = read_append_unsafe rest_x (read_cons_unsafe middle rest_y) in
-    match (last_x, first_y) with
-    | RRead n1, RRead n2 -> with_middle (make_rread (n1 + n2))
-    | RSkip n1, RSkip n2 -> with_middle (make_rskip (n1 + n2))
-    | RCon c1, RCon c2 -> with_middle (RCon (Words.append c1 c2))
-    | _ -> read_append_unsafe x y
+  append_merge ~monoid ~measure:red_measure ~merge:merge_red x y
 
 let rec read_slice (r : read) (offset : int) : read * read =
   assert (offset >= 0);
@@ -250,7 +234,11 @@ let read_empty : read = Generic.empty
 let read_from_pattern (p : Pattern.pattern) : read =
   (*assert (Pattern.pattern_valid p);*)
   Generic.map ~monoid ~measure:red_measure
-    (fun pat -> match pat with Pattern.PVar n -> make_rskip n | Pattern.PCon c -> RCon c)
+    (fun pat ->
+      match pat with
+      | Pattern.PVar n -> make_rskip n
+      | Pattern.Words c -> RCon c
+      | Pattern.Reference _ -> failwith "read_from_pattern: pattern contains Reference")
     p
 
 let read_equal (x : read) (y : read) : bool =

@@ -43,6 +43,7 @@ let rec subst (resolve : source -> seq option) (x : seq) : seq =
     match xh with
     | Words xh -> Value.value_cons (Words xh) (subst resolve xt)
     | Reference r -> Value.append (subst_reference resolve r) (subst resolve xt)
+    | PVar _ -> failwith "subst: unexpected PVar in value"
 
 and subst_reference (resolve : source -> seq option) (r : reference) : seq =
   match resolve r.src with Some seq -> slice seq r.offset r.values_count | None -> Generic.singleton (Reference r)
@@ -70,6 +71,7 @@ let rec val_refs_aux (x : value) (rs : reference list) : reference list =
   | None -> rs
   | Some (rest, Words w) -> val_refs_aux rest rs
   | Some (rest, Reference r) -> val_refs_aux rest (r :: rs)
+  | Some (rest, PVar _) -> val_refs_aux rest rs
 
 let state_refs (state : state) : reference list =
   let e = Dynarray.fold_left (fun rs x -> val_refs_aux x rs) [] state.e in
@@ -85,7 +87,8 @@ let rec resolve (w : world) (src : source) : Word.t * seq =
       let vht, vhh = Generic.front_exn ~monoid:Words.monoid ~measure:Words.measure vh in
       let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
       (vhh, vt)
-  | _ -> failwith "cannot resolve reference"
+  | Reference _ -> failwith "cannot resolve reference"
+  | PVar _ -> failwith "cannot resolve pattern hole"
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
 let reset () = Dynarray.clear pc_map
@@ -108,7 +111,8 @@ let to_word (s : seq) : Word.t =
       let wh, wt = Words.words_front_exn w in
       assert (Generic.is_empty wt);
       wh
-  | Reference _ -> failwith "conveting reference to_int"
+  | Reference _ -> failwith "converting reference to_int"
+  | PVar _ -> failwith "converting PVar to_int"
 
 let append (x : seq) (y : seq) : seq = Value.append x y
 let appends (x : seq list) : seq = List.fold_right x ~init:empty ~f:append
@@ -149,6 +153,7 @@ let list_match (x : seq) : (Word.t * seq) option =
       let wh, wt = Words.words_front_exn w in
       Some (wh, if Words.is_empty wt then rest else Generic.cons ~monoid ~measure rest (Words wt))
   | Some (rest, Reference r) -> failwith "list_match on Reference"
+  | Some (rest, PVar _) -> failwith "list_match on PVar"
 
 let push_env (w : world) (v : value) : unit =
   assert ((Generic.measure ~monoid ~measure v).degree = 1);
