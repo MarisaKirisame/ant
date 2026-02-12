@@ -67,9 +67,10 @@ and step = { src : pattern cek; dst : value cek; sc : int; mutable hit : int; mu
 and memo = trie option Array.t
 
 and trie =
-  | Leaf of Pattern.pattern * step
-  | Branch of { creator : string; degree : int; prefix : Words.words; var : trie option; const : trie Children.t }
+  | Stem of { reads : reads; step : step; next : trie option; max_sc : int }
+  | Branch of { reads : reads; children : (int, trie) Hashtbl.t; mutable merging : merging list; mutable max_sc : int }
 
+and merging = { reads : reads; children : (int, trie) Hashtbl.t; mutable miss_count : int; mutable max_sc : int }
 and world = { state : state; memo : memo; resolved : bool cek }
 
 let cek_get (cek : 'a cek) (src : Source.t) : 'a =

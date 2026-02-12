@@ -332,19 +332,300 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
           let pt = if ph = 1 then pt else Pattern.pattern_cons (Pattern.PVar (ph - 1)) pt in
           if Generic.is_empty br.prefix then ret (Branch { br with var = Some (insert_option br.var pt step') })
           else
-            let const = Children.create () in
-            let brh, brt = Words.words_front_exn br.prefix in
-            let brkey = Word.hash brh in
-            let x = Branch { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
-            Children.set const brkey x;
-            Branch
-              {
-                creator = "inserting var case";
-                degree = (Pattern.pattern_measure prefix').degree;
-                prefix = Generic.empty;
-                var = Some (Leaf (pt, step'));
-                const;
-              })
+            let xr, _ = Read.read_front_exn x in
+            match xr with
+            | RCon con ->
+                let w, _ = Words.words_front_exn con in
+                let xh, xt = Read.read_slice x 1 in
+                let hash_acc = Read.hash hash_acc (Word.hash w) in
+                loop (n - 1) xt hash_acc (Read.read_append read_acc xh)
+            | RRead _ | RSkip _ -> return None
+        in
+        loop n x hash_acc read_acc
+    | RCon c -> (
+        let xh, xt = Read.read_front_exn x in
+        match xh with
+        | RCon con -> (
+            match Words.unwords con c with
+            | None -> return None
+            | Some xrest ->
+                let x = if Generic.is_empty xrest then xt else Read.read_cons (RCon xrest) xt in
+                return (read_hash rt x hash_acc read_acc))
+        | RRead _ | RSkip _ -> return None)
+
+let reads_equal (x : reads) (y : reads) : bool =
+  x.c.pc = y.c.pc && List.equal Read.read_equal (Dynarray.to_list x.e) (Dynarray.to_list y.e) && Read.read_equal x.k y.k
+
+let unmatch_reads (x : reads) (y : reads) : reads = zipwith_ek Read.unmatch_read x y
+
+let reads_hash_aux (r : reads) (x : reads) : (int * reads) option =
+  assert (Dynarray.length r.e = Dynarray.length x.e);
+  let ret re =
+    re
+    (*match re with
+    | None -> None
+    | Some ((_, re) as full_re) ->
+        assert (reads_equal x (unmatch_reads r re));
+        Some full_re*)
+  in
+  let acc = read_hash r.k x.k 0 Generic.empty in
+  match acc with
+  | None -> ret None
+  | Some (k_hash, k_rest) ->
+      let e = Dynarray.create () in
+      Dynarray.set_capacity e (Dynarray.length r.e);
+      let rec loop i j acc =
+        if i < j then (
+          let r_e = Dynarray.get r.e i in
+          let x_e = Dynarray.get x.e i in
+          match read_hash r_e x_e acc Generic.empty with
+          | None -> None
+          | Some (r_e_hash, r_e_rest) ->
+              Dynarray.add_last e r_e_rest;
+              loop (i + 1) j r_e_hash)
+        else ret (Some (acc, { c = x.c; e; k = k_rest }))
+      in
+      loop 0 (Dynarray.length r.e) k_hash
+
+let reads_hash_slot = Profile.register_slot Profile.memo_profile "reads_hash"
+
+let reads_hash (r : reads) (x : reads) : (int * reads) option =
+  Profile.with_slot reads_hash_slot (fun () -> reads_hash_aux r x)
+
+let rec match_read (r : Read.read) (x : Read.read) (read_acc : Read.read) : Read.read option =
+  (*assert (Read.read_valid r);
+  assert (Read.read_valid x);*)
+  let return ret = ret in
+  if Generic.is_empty r then (
+    assert (Generic.is_empty x);
+    return (Some read_acc))
+  else
+    let rh, rt = Read.read_front_exn r in
+    match rh with
+    | RSkip n ->
+        let xh, xt = Read.read_slice x n in
+        return (match_read rt xt (Read.read_append read_acc xh))
+    | RRead n ->
+        let rec loop n x read_acc =
+          if n = 0 then return (match_read rt x read_acc)
+          else
+            let xr, _ = Read.read_front_exn x in
+            match xr with
+            | RCon con ->
+                let xh, xt = Read.read_slice x 1 in
+                loop (n - 1) xt (Read.read_append read_acc xh)
+            | RRead _ | RSkip _ -> return None
+        in
+        loop n x read_acc
+    | RCon c -> (
+        let xh, xt = Read.read_front_exn x in
+        match xh with
+        | RCon con -> (
+            match Words.unwords con c with
+            | None -> return None
+            | Some xrest ->
+                let x = if Generic.is_empty xrest then xt else Read.read_cons (RCon xrest) xt in
+                return (match_read rt x read_acc))
+        | RRead _ | RSkip _ -> return None)
+
+let match_reads_aux (r : reads) (x : reads) : reads option =
+  assert (Dynarray.length r.e = Dynarray.length x.e);
+  let ret re =
+    re
+    (*match re with
+    | None -> None
+    | Some ((_, re) as full_re) ->
+        assert (reads_equal x (unmatch_reads r re));
+        Some full_re*)
+  in
+  let acc = match_read r.k x.k Generic.empty in
+  match acc with
+  | None -> ret None
+  | Some k_rest ->
+      let e = Dynarray.create () in
+      Dynarray.set_capacity e (Dynarray.length r.e);
+      let rec loop i j =
+        if i < j then (
+          let r_e = Dynarray.get r.e i in
+          let x_e = Dynarray.get x.e i in
+          match match_read r_e x_e Generic.empty with
+          | None -> None
+          | Some r_e_rest ->
+              Dynarray.add_last e r_e_rest;
+              loop (i + 1) j)
+        else ret (Some { c = x.c; e; k = k_rest })
+      in
+      loop 0 (Dynarray.length r.e)
+
+let match_reads_slot = Profile.register_slot Profile.memo_profile "match_reads"
+
+let match_reads (r : reads) (x : reads) : reads option =
+  Profile.with_slot match_reads_slot (fun () -> match_reads_aux r x)
+
+let join_reads_slot = Profile.register_slot Profile.memo_profile "join_reads"
+
+type join_reads = { reads : reads Lazy.t; x_weaken : bool; y_weaken : bool }
+
+let join_reads (x : reads) (y : reads) : join_reads =
+  Profile.with_slot join_reads_slot (fun () ->
+      (*print_endline "calling joining reads:";*)
+      let x_weaken = ref false in
+      let y_weaken = ref false in
+      let join a b =
+        let ret = Read.join a x_weaken b y_weaken (lazy Generic.empty) in
+        (*print_endline ("join reads:\n  " ^ string_of_read a ^ "\n  " ^ string_of_read b ^ "\n= " ^ string_of_read ret);*)
+        ret
+      in
+      let reads = zipwith_ek join x y in
+      let ret = { reads = lazy (map_ek Lazy.force reads); x_weaken = !x_weaken; y_weaken = !y_weaken } in
+      (*assert (reads_equal x (unmatch_reads ret.reads ret.x_rest));
+      assert (reads_equal y (unmatch_reads ret.reads ret.y_rest));*)
+      ret)
+
+let reads_from_patterns (p : Pattern.pattern cek) : reads = map_ek Read.read_from_pattern p
+let string_of_trie (t : trie) : string = match t with Stem _ -> "Stem" | Branch _ -> "Branch"
+let reads_from_trie (t : trie) : reads = match t with Stem { reads; _ } -> reads | Branch { reads; _ } -> reads
+let max_sc_of_trie (t : trie) : int = match t with Stem { max_sc; _ } -> max_sc | Branch { max_sc; _ } -> max_sc
+let max_sc_of_trie_opt (t : trie option) : int = match t with None -> 0 | Some t -> max_sc_of_trie t
+
+let max_sc_of_children (children : (int, trie) Hashtbl.t) : int =
+  Hashtbl.fold children ~init:0 ~f:(fun ~key:_ ~data:child acc -> max acc (max_sc_of_trie child))
+
+let max_sc_of_merging (ms : merging list) : int = List.fold ms ~init:0 ~f:(fun acc m -> max acc m.max_sc)
+
+let make_stem ~(reads : reads) ~(step : step) ~(next : trie option) : trie =
+  let max_sc = max step.sc (max_sc_of_trie_opt next) in
+  Stem { reads; step; next; max_sc }
+
+let make_branch ~(reads : reads) ~(children : (int, trie) Hashtbl.t) ~(merging : merging list) : trie =
+  let max_sc = max (max_sc_of_children children) (max_sc_of_merging merging) in
+  Branch { reads; children; merging; max_sc }
+
+let set_reads_of_trie (t : trie) (r : reads) : trie =
+  match t with Stem x -> Stem { x with reads = r } | Branch x -> Branch { x with reads = r }
+
+let rec merge (x : trie) (y : trie) : trie =
+  let rebase_merging (delta : reads) (m : merging) : merging =
+    { reads = unmatch_reads delta m.reads; children = m.children; miss_count = 0; max_sc = m.max_sc }
+  in
+  match (x, y) with
+  | Stem x, Stem y -> (
+      let j = join_reads x.reads y.reads in
+      (*print_endline
+        ("Merging Stem/Stem:\n  x reads: " ^ string_of_reads x.reads ^ "\n  y reads: " ^ string_of_reads y.reads
+       ^ "\n  result:  " ^ string_of_reads j.reads ^ "\n  x_rest:  " ^ string_of_reads j.x_rest ^ "\n  y_rest:  "
+       ^ string_of_reads j.y_rest);*)
+      match (j.x_weaken, j.y_weaken) with
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
+          let y_key, y_reads = Option.value_exn (reads_hash (Lazy.force j.reads) y.reads) in
+          assert (x_key <> y_key);
+          Hashtbl.set children x_key (Stem { x with reads = x_reads });
+          Hashtbl.set children y_key (Stem { y with reads = y_reads });
+          make_branch ~reads:(Lazy.force j.reads) ~children ~merging:[]
+      | false, true ->
+          let y_reads = Option.value_exn (match_reads x.reads y.reads) in
+          let next = merge_option x.next (Some (Stem { y with reads = y_reads })) in
+          make_stem ~reads:x.reads ~step:x.step ~next
+      | true, false ->
+          let x_reads = Option.value_exn (match_reads y.reads x.reads) in
+          let next = merge_option y.next (Some (Stem { x with reads = x_reads })) in
+          make_stem ~reads:y.reads ~step:y.step ~next
+      | false, false ->
+          let next = merge_option x.next y.next in
+          if x.step.sc >= y.step.sc then make_stem ~reads:x.reads ~step:x.step ~next
+          else make_stem ~reads:y.reads ~step:y.step ~next)
+  | Stem x, Branch y -> (
+      let j = join_reads x.reads y.reads in
+      (*print_endline
+        ("Merging Stem/Branch:\n  x reads: " ^ string_of_reads x.reads ^ "\n  y reads: " ^ string_of_reads y.reads
+       ^ "\n  result:  " ^ string_of_reads j.reads ^ "\n  x_rest:  " ^ string_of_reads j.x_rest ^ "\n  y_rest:  "
+       ^ string_of_reads j.y_rest);*)
+      match (j.x_weaken, j.y_weaken) with
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
+          Hashtbl.set children x_key (Stem { x with reads = x_reads });
+          (*Hashtbl.iter y.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash (Lazy.force j.reads) (unmatch_reads y.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
+          make_branch ~reads:(Lazy.force j.reads) ~children ~merging:[]
+          (*{ reads = y.reads; children = y.children; miss_count = 0; max_sc = y.max_sc }
+            :: List.map y.merging ~f:(rebase_merging y.reads);*)
+      | false, true ->
+          let y_reads = Option.value_exn (match_reads x.reads y.reads) in
+          let next = merge_option x.next (Some (Branch { y with reads = y_reads })) in
+          make_stem ~reads:x.reads ~step:x.step ~next
+      | true, false ->
+          let x_key, x_reads = Option.value_exn (reads_hash y.reads x.reads) in
+          Hashtbl.update y.children x_key ~f:(fun existing ->
+              let merged = insert_option (Stem { x with reads = x_reads }) existing in
+              let merged_max = max_sc_of_trie merged in
+              if merged_max > y.max_sc then y.max_sc <- merged_max;
+              merged);
+          Branch y
+      | _ ->
+          failwith
+            ("merge not implemented yet for Stem/Branch:" ^ string_of_bool j.x_weaken ^ "," ^ string_of_bool j.y_weaken)
+      )
+  | Branch x, Stem y -> merge (Stem y) (Branch x)
+  | Branch x, Branch y -> (
+      let j = join_reads x.reads y.reads in
+      match (j.x_weaken, j.y_weaken) with
+      | true, true ->
+          let children = Hashtbl.create (module Int) in
+          (*
+          Hashtbl.iter x.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
+          Hashtbl.iter y.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
+          make_branch ~reads:(Lazy.force j.reads) ~children ~merging:[]
+          (*merging =
+            { reads = j.x_rest; children = x.children; miss_count = 0; max_sc = max_sc_of_children x.children }
+            :: List.map x.merging ~f:(rebase_merging j.x_rest)
+            @ { reads = j.y_rest; children = y.children; miss_count = 0; max_sc = max_sc_of_children y.children }
+              :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
+      | true, false ->
+          (*
+          Hashtbl.iter x.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update y.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
+          make_branch ~reads:y.reads ~children:y.children ~merging:[]
+          (*merging =
+            { reads = j.x_rest; children = x.children; miss_count = 0; max_sc = max_sc_of_children x.children }
+            :: List.map x.merging ~f:(rebase_merging j.x_rest)
+            @ y.merging;*)
+      | false, true ->
+          (*Hashtbl.iter y.children ~f:(fun child_trie ->
+              let child_key, child_reads =
+                Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
+              in
+              Hashtbl.update x.children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
+          make_branch ~reads:x.reads ~children:x.children ~merging:[]
+          (*merging =
+            x.merging
+            @ { reads = j.y_rest; children = y.children; miss_count = 0; max_sc = max_sc_of_children y.children }
+              :: List.map y.merging ~f:(rebase_merging j.y_rest);*)
+      | _ ->
+          failwith
+            ("merge not implemented yet for Branch/Branch:" ^ string_of_bool j.x_weaken ^ ","
+           ^ string_of_bool j.y_weaken))
+
+and merge_option (x : trie option) (y : trie option) : trie option =
+  match (x, y) with None, _ -> y | _, None -> x | Some x, Some y -> Some (merge x y)
+
+and insert_option (x : trie) (y : trie option) : trie = match y with None -> x | Some y -> merge x y
 
 let pattern_size (p : Pattern.pattern) = Generic.size p
 let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
@@ -356,51 +637,80 @@ let rec list_to_pattern (x : Pattern.pattern list) : Pattern.pattern =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Pattern.pattern_append h (list_to_pattern t)
 
 let insert_step (m : memo) (step : step) : unit =
-  let start_time = Time_stamp_counter.now () in
-  Array.set m step.src.c.pc
-    (Some (insert_option (Array.get m step.src.c.pc) (list_to_pattern (ek_to_list step.src)) step));
-  let end_time = Time_stamp_counter.now () in
-  let calibrator = Lazy.force Time_stamp_counter.calibrator in
-  let elapsed_time =
-    Time_stamp_counter.diff end_time start_time
-    |> Time_stamp_counter.Span.to_time_ns_span ~calibrator
-    |> Core.Time_ns.Span.to_int63_ns |> Core.Int63.to_int_exn
-  in
-  step.insert_time <- elapsed_time
+  if false && patterns_size step.src > max_rule_size then (
+    step.insert_time <- 0;
+    ())
+  else
+    let start_time = Time_stamp_counter.now () in
+    Array.set m step.src.c.pc
+      (Some
+         (insert_option (make_stem ~reads:(reads_from_patterns step.src) ~step ~next:None) (Array.get m step.src.c.pc)));
+    let end_time = Time_stamp_counter.now () in
+    let calibrator = Lazy.force Time_stamp_counter.calibrator in
+    let elapsed_time =
+      Time_stamp_counter.diff end_time start_time
+      |> Time_stamp_counter.Span.to_time_ns_span ~calibrator
+      |> Core.Time_ns.Span.to_int63_ns |> Core.Int63.to_int_exn
+    in
+    step.insert_time <- elapsed_time
 
-let rec lookup_step_aux (x : trie option) (value : Value.value) : step option =
-  (match x with None -> () | Some x -> assert (trie_degree x = (Value.value_measure value).degree));
-  match x with
-  | None -> None
-  | Some (Leaf (p, step)) ->
-      assert ((Pattern.pattern_measure p).degree = (Value.value_measure value).degree);
-      assert ((Pattern.pattern_measure p).max_degree = (Value.value_measure value).max_degree);
-      if Option.is_some (Dependency.value_match_pattern_aux value p) then Some step else None
-  | Some (Branch br) -> (
-      match Value.unwords value br.prefix with
-      | None -> None
-      | Some value ->
-          let var =
-            match br.var with
-            | None -> None
-            | Some var ->
-                let _, value = Value.pop_n value 1 in
-                lookup_step_aux (Some var) value
-          in
-          let const =
-            let Words vh, vt = Value.front_exn value in
-            let vhh, vht = Words.words_front_exn vh in
-            let key = Word.hash vhh in
-            match Children.find br.const key with
-            | None -> None
-            | Some const ->
-                let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
-                lookup_step_aux (Some const) vt
-          in
-          choose_step_option var const)
+let acc_sc (acc : step option) : int = match acc with None -> 0 | Some step -> step.sc
 
-let rec list_to_value (x : Value.value list) : Value.value =
-  match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Value.append h (list_to_value t)
+let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step option =
+  match trie with
+  | Stem st -> (
+      if acc_sc acc >= st.max_sc then acc
+      else
+        match values_hash st.reads value with
+        | None -> acc
+        | Some (_, value) -> (
+            let acc =
+              match acc with
+              | None -> Some st.step
+              | Some step' -> if st.step.sc > step'.sc then Some st.step else Some step'
+            in
+            match st.next with
+            | None -> acc
+            | Some child -> if acc_sc acc >= max_sc_of_trie child then acc else lookup_step_aux value child acc))
+  | Branch br -> (
+      br.merging <-
+        List.filter_map br.merging ~f:(fun m ->
+            let merge m_trie =
+              let m_hash, m_reads =
+                reads_hash br.reads (unmatch_reads m.reads (reads_from_trie m_trie)) |> Option.value_exn
+              in
+              Hashtbl.update br.children m_hash ~f:(fun existing ->
+                  let merged = insert_option (set_reads_of_trie m_trie m_reads) existing in
+                  let merged_max = max_sc_of_trie merged in
+                  if merged_max > br.max_sc then br.max_sc <- merged_max;
+                  merged)
+            in
+            let on_miss () =
+              m.miss_count <- m.miss_count + 1;
+              if m.miss_count >= Hashtbl.length m.children then (
+                Hashtbl.iter m.children ~f:merge;
+                None)
+              else Some m
+            in
+            match values_hash m.reads value with
+            | None -> on_miss ()
+            | Some (key, _) -> (
+                match Hashtbl.find m.children key with
+                | None -> on_miss ()
+                | Some m_trie ->
+                    Hashtbl.remove m.children key;
+                    if max_sc_of_trie m_trie = m.max_sc then m.max_sc <- max_sc_of_children m.children;
+                    merge m_trie;
+                    Some m));
+      if acc_sc acc >= br.max_sc then acc
+      else
+        match values_hash br.reads value with
+        | None -> acc
+        | Some (key, value) -> (
+            match Hashtbl.find br.children key with
+            | None -> acc
+            | Some child_trie ->
+                if acc_sc acc >= max_sc_of_trie child_trie then acc else lookup_step_aux value child_trie acc))
 
 let lookup_step (value : state) (m : memo) : step option =
   let pc = value.c.pc in
