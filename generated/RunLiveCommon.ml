@@ -1,6 +1,5 @@
 open Ant
 open NamedExpr
-open Yojson.Safe
 module LC = LiveCEK
 module LP = LivePlain
 
@@ -336,29 +335,52 @@ let with_outchannel steps_path f =
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 
 let write_steps_json oc (r : Memo.exec_result) : unit =
-  let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
-  let json =
-    `Assoc
-      [
-        ("name", `String "exec_time");
-        ("step", `Int r.step);
-        ("without_memo_step", `Int r.without_memo_step);
-        ("memo_profile", Profile.dump_profile Profile.memo_profile |> json_of_profile);
-        ("plain_profile", Profile.dump_profile Profile.plain_profile |> json_of_profile);
-        ("cek_profile", Profile.dump_profile Profile.cek_profile |> json_of_profile);
-      ]
+  let escape_json s =
+    let buf = Buffer.create (String.length s) in
+    String.iter
+      (function
+        | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
+      s;
+    Buffer.contents buf
   in
-  Yojson.Safe.to_string json |> output_string oc;
-  output_char oc '\n';
+  let json_of_profile entries =
+    let buf = Buffer.create 64 in
+    Buffer.add_char buf '[';
+    let rec loop first = function
+      | [] -> ()
+      | (name, time) :: rest ->
+          if not first then Buffer.add_char buf ',';
+          Buffer.add_char buf '[';
+          Buffer.add_char buf '"';
+          Buffer.add_string buf (escape_json name);
+          Buffer.add_char buf '"';
+          Buffer.add_char buf ',';
+          Buffer.add_string buf (string_of_int time);
+          Buffer.add_char buf ']';
+          loop false rest
+    in
+    loop true entries;
+    Buffer.add_char buf ']';
+    Buffer.contents buf
+  in
+  let memo_profile = Profile.dump_profile Profile.memo_profile |> json_of_profile in
+  let cek_profile = Profile.dump_profile Profile.cek_profile |> json_of_profile in
+  let plain_profile = Profile.dump_profile Profile.plain_profile |> json_of_profile in
+  Printf.fprintf oc
+    "{\"name\":\"exec_time\",\"step\":%d,\"without_memo_step\":%d,\"memo_profile\":%s,\"plain_profile\":%s, \
+     \"cek_profile\":%s}\n"
+    r.step r.without_memo_step memo_profile plain_profile cek_profile;
   flush oc
 
 let write_memo_stats_json oc (memo : State.memo) : unit =
   let stats = Memo.memo_stats memo in
-  let depth_breakdown =
-    `List
-      (List.init (Stdlib.Dynarray.length stats.by_depth) (fun i ->
-           let node = Stdlib.Dynarray.get stats.by_depth i in
-           `Assoc [ ("depth", `Int node.depth); ("node_count", `Int node.node_count) ]))
+  let escape_json s =
+    let buf = Buffer.create (String.length s) in
+    String.iter
+      (function
+        | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
+      s;
+    Buffer.contents buf
   in
   let buf = Buffer.create 64 in
   Buffer.add_string buf "{\"name\":\"memo_stats\",\"depth_breakdown\":[";
@@ -430,15 +452,26 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
   Buffer.output_buffer oc buf;
   flush oc
 
-(* Evaluate using the direct (non-CEK) interpreter defined in LivePlain.  LivePlain
-   shares types with LiveCEK, so no conversion is necessary.  Timing is recorded via
-   the shared profiler and consumed by write_steps_json. *)
+(* Evaluate using the direct (non-CEK) interpreter defined in LivePlain.  We expose
+   the same LC.value interface by converting the input expression and environment
+   to LivePlain, running it, then converting the resulting value back.  Timing is
+   recorded via the shared profiler and consumed by write_steps_json. *)
 let eval_plain_slot = Profile.register_slot Profile.plain_profile "eval_plain"
+let eval_cek_slot = Profile.register_slot Profile.cek_profile "eval_cek"
 
 let eval_plain (expr : LC.expr) : LC.value =
   let env = LC.Nil in
+  let lp_expr = lp_expr_of_lc expr in
+  let lp_env = lp_list_of_lc lp_value_of_lc env in
   Gc.full_major ();
-  Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env)
+  let lp_result = Profile.with_slot eval_plain_slot (fun () -> LP.eval lp_expr lp_env) in
+  (*lc_value_of_lp lp_result*)
+  Profile.with_slot eval_cek_slot (fun () ->
+      LC.to_ocaml_value
+        (Memo.exec_cek_raw
+           (Memo.pc_to_exp (Common.int_to_pc 4))
+           (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
+           (Memo.from_constructor LC.tag_cont_done)))
 
 let eval_expression ~memo ~write_steps x =
   let exec_res = LC.eval memo (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in

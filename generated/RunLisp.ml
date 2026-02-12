@@ -89,32 +89,82 @@ let string_of_symbol = function
 
 let write_memo_stats_json oc (memo : State.memo) : unit =
   let stats = Memo.memo_stats memo in
-  let depth_breakdown =
-    `List
-      (List.init (Stdlib.Dynarray.length stats.by_depth) (fun i ->
-           let node = Stdlib.Dynarray.get stats.by_depth i in
-           `Assoc [ ("depth", `Int node.depth); ("node_count", `Int node.node_count) ]))
+  let escape_json s =
+    let buf = Buffer.create (String.length s) in
+    String.iter
+      (function
+        | '"' -> Buffer.add_string buf "\\\"" | '\\' -> Buffer.add_string buf "\\\\" | c -> Buffer.add_char buf c)
+      s;
+    Buffer.contents buf
   in
-  let rule_stat =
-    `List
-      (List.map
-         (fun (entry : Memo.rule_stat) ->
-           `Assoc
-             [
-               ("size", `Int entry.size);
-               ("sc", `Int entry.sc);
-               ("hit_count", `Int entry.hit_count);
-               ("insert_time", `Int entry.insert_time);
-               ("depth", `Int entry.depth);
-               ("rule", `String "");
-             ])
-         stats.rule_stat)
-  in
-  let json =
-    `Assoc [ ("name", `String "memo_stats"); ("depth_breakdown", depth_breakdown); ("rule_stat", rule_stat) ]
-  in
-  Yojson.Safe.to_string json |> output_string oc;
-  output_char oc '\n';
+  let buf = Buffer.create 64 in
+  Buffer.add_string buf "{\"name\":\"memo_stats\",\"depth_breakdown\":[";
+  let len = Stdlib.Dynarray.length stats.by_depth in
+  for i = 0 to len - 1 do
+    let node = Stdlib.Dynarray.get stats.by_depth i in
+    if i > 0 then Buffer.add_char buf ',';
+    Buffer.add_string buf "{\"depth\":";
+    Buffer.add_string buf (string_of_int node.depth);
+    Buffer.add_string buf ",\"node_count\":";
+    Buffer.add_string buf (string_of_int node.node_count);
+    Buffer.add_char buf '}'
+  done;
+  Buffer.add_string buf "],\"stem_nodes\":";
+  Buffer.add_string buf (string_of_int stats.node_counts.stem_nodes);
+  Buffer.add_string buf ",\"branch_nodes\":";
+  Buffer.add_string buf (string_of_int stats.node_counts.branch_nodes);
+  Buffer.add_string buf ",\"total_nodes\":";
+  Buffer.add_string buf (string_of_int stats.node_counts.total_nodes);
+  Buffer.add_string buf ",\"hashtable_stat\":[";
+  List.iteri
+    (fun i (entry : Memo.hashtable_stat) ->
+      if i > 0 then Buffer.add_char buf ',';
+      Buffer.add_string buf "{\"depth\":";
+      Buffer.add_string buf (string_of_int entry.depth);
+      Buffer.add_string buf ",\"size\":";
+      Buffer.add_string buf (string_of_int entry.size);
+      Buffer.add_char buf '}')
+    stats.hashtable_stat;
+  Buffer.add_string buf "],\"node_stat\":[";
+  List.iteri
+    (fun i (entry : Memo.node_stat) ->
+      if i > 0 then Buffer.add_char buf ',';
+      Buffer.add_string buf "{\"depth\":";
+      Buffer.add_string buf (string_of_int entry.depth);
+      Buffer.add_string buf ",\"rread_length\":";
+      Buffer.add_string buf (string_of_int entry.rread_length);
+      Buffer.add_string buf ",\"reads_size\":";
+      Buffer.add_string buf (string_of_int entry.reads_size);
+      Buffer.add_string buf ",\"insert_time\":";
+      Buffer.add_string buf (string_of_int entry.insert_time);
+      Buffer.add_string buf ",\"node_state\":\"";
+      Buffer.add_string buf (match entry.node_state with Memo.Stem_node -> "stem" | Memo.Branch_node -> "branch");
+      Buffer.add_char buf '"';
+      Buffer.add_char buf '}')
+    stats.node_stat;
+  Buffer.add_string buf "],\"rule_stat\":[";
+  List.iteri
+    (fun i (entry : Memo.rule_stat) ->
+      if i > 0 then Buffer.add_char buf ',';
+      Buffer.add_string buf "{\"size\":";
+      Buffer.add_string buf (string_of_int entry.size);
+      Buffer.add_string buf ",\"pvar_length\":";
+      Buffer.add_string buf (string_of_int entry.pvar_length);
+      Buffer.add_string buf ",\"sc\":";
+      Buffer.add_string buf (string_of_int entry.sc);
+      Buffer.add_string buf ",\"hit_count\":";
+      Buffer.add_string buf (string_of_int entry.hit_count);
+      Buffer.add_string buf ",\"insert_time\":";
+      Buffer.add_string buf (string_of_int entry.insert_time);
+      Buffer.add_string buf ",\"depth\":";
+      Buffer.add_string buf (string_of_int entry.depth);
+      Buffer.add_string buf ",\"rule\":\"";
+      Buffer.add_string buf "" (*escape_json (Lazy.force entry.rule)*);
+      Buffer.add_char buf '"';
+      Buffer.add_char buf '}')
+    stats.rule_stat;
+  Buffer.add_string buf "]}\n";
+  Buffer.output_buffer oc buf;
   flush oc
 
 let write_steps_json oc (r : Memo.exec_result) : unit =
@@ -135,10 +185,22 @@ let write_steps_json oc (r : Memo.exec_result) : unit =
   flush oc
 
 let eval_plain_slot = Ant.Profile.register_slot Ant.Profile.plain_profile "eval_plain"
+let eval_cek_slot = Ant.Profile.register_slot Ant.Profile.cek_profile "eval_cek"
 
 let eval_plain expr =
   let plain_expr = plain_expr_of_lc expr in
-  ignore (Ant.Profile.with_slot eval_plain_slot (fun () -> Plain.eval plain_expr Plain.Nil))
+  (* ignore (Ant.Profile.with_slot eval_plain_slot (fun () -> Plain.eval plain_expr Plain.Nil)) *)
+
+  Gc.full_major ();
+  let lp_result = Ant.Profile.with_slot eval_plain_slot (fun () -> Plain.eval plain_expr Plain.Nil) in
+  Ant.Profile.with_slot eval_cek_slot (fun () ->
+      let seq = LC.from_ocaml_expr expr in
+      let res =
+        match !current_memo with
+        | Some memo -> LC.eval memo seq empty_env_seq
+        | None -> with_memo (fun memo -> LC.eval memo seq empty_env_seq)
+      in
+      ())
 
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "#%d" i
@@ -351,6 +413,6 @@ let run () =
           test_cond_short_circuits ();
           test_car_after_cons ();
           test_mapinc_list ();
-          (* run_wrap_code_tests (); *)
+          run_wrap_code_tests ();
           write_memo_stats_json oc memo));
   print_endline "LispCEK smoke tests completed."

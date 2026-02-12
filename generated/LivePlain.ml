@@ -1,11 +1,44 @@
-open LiveCEK
+type nat = Z | S of nat
+type 'a list = Nil | Cons of 'a * 'a list
+type 'a option = None | Some of 'a
 
-<<<<<<< HEAD
-type nat = LiveCEK.nat;;
+type expr =
+  | EInt of int
+  | EPlus of expr * expr
+  | ELt of expr * expr
+  | ELe of expr * expr
+  | EGt of expr * expr
+  | EGe of expr * expr
+  | EVar of nat
+  | EAbs of expr
+  | EApp of expr * expr
+  | ELet of expr * expr
+  | ETrue
+  | EFalse
+  | EIf of expr * expr * expr
+  | ENil
+  | ECons of expr * expr
+  | EMatchList of expr * expr * expr
+  | EPair of expr * expr
+  | EZro of expr
+  | EFst of expr
+  | EFix of expr
+  | EHole of int option
+  | EUnit
 
-type 'a list = 'a LiveCEK.list;;
+type value =
+  | VInt of int
+  | VAbs of expr * value list
+  | VUnit
+  | VTrue
+  | VFalse
+  | VNil
+  | VCons of value * value
+  | VPair of value * value
+  | VFix of expr * value list
+  | VStuck of stuck
 
-type 'a option = 'a LiveCEK.option;;
+and vtype = VTInt | VTFunc | VTBool | VTList | VTPair
 
 and stuck =
   | SHole of int option
@@ -20,23 +53,10 @@ and stuck =
   | SMatchList of stuck * expr * expr
   | SZro of stuck
   | SFst of stuck
-=======
-type nat = LiveCEK.nat
-type 'a list = 'a LiveCEK.list
-type 'a option = 'a LiveCEK.option
-type expr = LiveCEK.expr
->>>>>>> 7b9a579 (fmt)
 
-type value = LiveCEK.value
-and vtype = LiveCEK.vtype
-and stuck = LiveCEK.stuck
-
-<<<<<<< HEAD
-=======
 let rec index =
  fun x n -> match x with Cons (xh, xt) -> ( match n with Z -> Some xh | S m -> index xt m) | _ -> None
 
->>>>>>> 7b9a579 (fmt)
 let rec eval =
  fun expr env ->
   match expr with
@@ -107,11 +127,7 @@ let rec eval =
       | VFix (e, env_) -> eval e (Cons (eval x env, Cons (fv, env_)))
       | VStuck fs -> VStuck (SApp (fs, x))
       | _ -> VStuck (STypeError (fv, VTFunc)))
-<<<<<<< HEAD
   | EHole x -> VStuck (SHole x)
-=======
-  | EHole x -> VStuck (SHole (x, env))
->>>>>>> 7b9a579 (fmt)
   | ETrue -> VTrue
   | EFalse -> VFalse
   | EIf (i, t, e) -> (
