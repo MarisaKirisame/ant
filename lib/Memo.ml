@@ -467,12 +467,12 @@ let rec merge (x : trie) (y : trie) : trie =
        ^ string_of_reads j.y_rest);*)
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
-          let children = Hashtbl.create (module Int) in
+          let children = Children.create () in
           let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
           let y_key, y_reads = Option.value_exn (reads_hash (Lazy.force j.reads) y.reads) in
           assert (x_key <> y_key);
-          Hashtbl.set children x_key (Stem { x with reads = x_reads });
-          Hashtbl.set children y_key (Stem { y with reads = y_reads });
+          Children.set children x_key (Stem { x with reads = x_reads });
+          Children.set children y_key (Stem { y with reads = y_reads });
           Branch { reads = Lazy.force j.reads; children; merging = [] }
       | false, true ->
           let y_reads = Option.value_exn (match_reads x.reads y.reads) in
@@ -491,9 +491,9 @@ let rec merge (x : trie) (y : trie) : trie =
        ^ string_of_reads j.y_rest);*)
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
-          let children = Hashtbl.create (module Int) in
+          let children = Children.create () in
           let x_key, x_reads = Option.value_exn (reads_hash (Lazy.force j.reads) x.reads) in
-          Hashtbl.set children x_key (Stem { x with reads = x_reads });
+          Children.set children x_key (Stem { x with reads = x_reads });
           (*Hashtbl.iter y.children ~f:(fun child_trie ->
               let child_key, child_reads =
                 Option.value_exn (reads_hash (Lazy.force j.reads) (unmatch_reads y.reads (reads_from_trie child_trie)))
@@ -512,7 +512,7 @@ let rec merge (x : trie) (y : trie) : trie =
           Stem { x with next = merge_option x.next (Some (Branch { y with reads = y_reads })) }
       | true, false ->
           let x_key, x_reads = Option.value_exn (reads_hash y.reads x.reads) in
-          Hashtbl.update y.children x_key ~f:(insert_option (Stem { x with reads = x_reads }));
+          Children.update y.children x_key ~f:(insert_option (Stem { x with reads = x_reads }));
           Branch y
       | _ ->
           failwith
@@ -523,18 +523,18 @@ let rec merge (x : trie) (y : trie) : trie =
       let j = join_reads x.reads y.reads in
       match (j.x_weaken, j.y_weaken) with
       | true, true ->
-          let children = Hashtbl.create (module Int) in
+          let children = Children.create () in
           (*
-          Hashtbl.iter x.children ~f:(fun child_trie ->
+          Children.iter x.children ~f:(fun child_trie ->
               let child_key, child_reads =
                 Option.value_exn (reads_hash j.reads (unmatch_reads x.reads (reads_from_trie child_trie)))
               in
-              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
-          Hashtbl.iter y.children ~f:(fun child_trie ->
+              Children.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));
+          Children.iter y.children ~f:(fun child_trie ->
               let child_key, child_reads =
                 Option.value_exn (reads_hash j.reads (unmatch_reads y.reads (reads_from_trie child_trie)))
               in
-              Hashtbl.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
+              Children.update children child_key ~f:(insert_option (set_reads_of_trie child_trie child_reads)));*)
           Branch
             {
               reads = Lazy.force j.reads;
@@ -630,28 +630,28 @@ let rec lookup_step_aux (value : state) (trie : trie) (acc : step option) : step
               let m_hash, m_reads =
                 reads_hash br.reads (unmatch_reads m.reads (reads_from_trie m_trie)) |> Option.value_exn
               in
-              Hashtbl.update br.children m_hash ~f:(insert_option (set_reads_of_trie m_trie m_reads))
+              Children.update br.children m_hash ~f:(insert_option (set_reads_of_trie m_trie m_reads))
             in
             let on_miss () =
               m.miss_count <- m.miss_count + 1;
-              if m.miss_count >= Hashtbl.length m.children then (
-                Hashtbl.iter m.children ~f:merge;
+              if m.miss_count >= Children.length m.children then (
+                Children.iter m.children ~f:merge;
                 None)
               else Some m
             in
             match values_hash m.reads value with
             | None -> on_miss ()
             | Some (key, _) -> (
-                match Hashtbl.find m.children key with
+                match Children.find m.children key with
                 | None -> on_miss ()
                 | Some m_trie ->
-                    Hashtbl.remove m.children key;
+                    Children.remove m.children key;
                     merge m_trie;
                     Some m));
       match values_hash br.reads value with
       | None -> acc
       | Some (key, value) -> (
-          match Hashtbl.find br.children key with
+          match Children.find br.children key with
           | None -> acc
           | Some child_trie -> lookup_step_aux value child_trie acc))
 
@@ -794,8 +794,8 @@ let memo_stats (m : memo) : memo_stats =
           :: !rule_stat;
         match st.next with None -> () | Some child -> aux child (depth + 1))
     | Branch br ->
-        Hashtbl.iter br.children ~f:(fun child -> aux child (depth + 1));
-        List.iter br.merging ~f:(fun m -> Hashtbl.iter m.children ~f:(fun child -> aux child (depth + 1)))
+        Children.iter br.children ~f:(fun child -> aux child (depth + 1));
+        List.iter br.merging ~f:(fun m -> Children.iter m.children ~f:(fun child -> aux child (depth + 1)))
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
   { by_depth; rule_stat = !rule_stat }

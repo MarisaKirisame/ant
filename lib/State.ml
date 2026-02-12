@@ -3,6 +3,53 @@ open Pattern
 open BatFingerTree
 module Hashtbl = Core.Hashtbl
 
+module Children = struct
+  type 'a repr = Small of (int * 'a) list | Hash of (int, 'a) Hashtbl.t
+  type 'a t = { mutable repr : 'a repr }
+
+  let small_limit = 4
+  let create () = { repr = Small [] }
+  let length (t : 'a t) : int = match t.repr with Small lst -> List.length lst | Hash tbl -> Hashtbl.length tbl
+
+  let find (t : 'a t) (key : int) : 'a option =
+    match t.repr with Small lst -> List.assoc_opt key lst | Hash tbl -> Hashtbl.find tbl key
+
+  let to_hash (lst : (int * 'a) list) : (int, 'a) Hashtbl.t =
+    let tbl = Hashtbl.create (module Core.Int) in
+    List.iter (fun (k, v) -> Hashtbl.set tbl ~key:k ~data:v) lst;
+    tbl
+
+  let promote_if_needed (t : 'a t) : unit =
+    match t.repr with Small lst when List.length lst > small_limit -> t.repr <- Hash (to_hash lst) | _ -> ()
+
+  let demote_if_needed (t : 'a t) : unit =
+    match t.repr with
+    | Hash tbl when Hashtbl.length tbl <= small_limit -> t.repr <- Small (Hashtbl.to_alist tbl)
+    | _ -> ()
+
+  let set (t : 'a t) (key : int) (data : 'a) : unit =
+    match t.repr with
+    | Small lst ->
+        let lst' = (key, data) :: List.filter (fun (k, _) -> k <> key) lst in
+        t.repr <- Small lst';
+        promote_if_needed t
+    | Hash tbl -> Hashtbl.set tbl ~key ~data
+
+  let update (t : 'a t) (key : int) ~(f : 'a option -> 'a) : unit =
+    let current = find t key in
+    set t key (f current)
+
+  let remove (t : 'a t) (key : int) : unit =
+    match t.repr with
+    | Small lst -> t.repr <- Small (List.filter (fun (k, _) -> k <> key) lst)
+    | Hash tbl ->
+        Hashtbl.remove tbl key;
+        demote_if_needed t
+
+  let iter (t : 'a t) ~(f : 'a -> unit) : unit =
+    match t.repr with Small lst -> List.iter (fun (_, v) -> f v) lst | Hash tbl -> Hashtbl.iter tbl ~f
+end
+
 type env = value Dynarray.t
 
 (* Notes on the control representation are in docs/internal.md#cek-state-representation-stateml. *)
@@ -22,9 +69,9 @@ and reads = Read.read cek
 
 and trie =
   | Stem of { reads : reads; step : step; next : trie option }
-  | Branch of { reads : reads; children : (int, trie) Hashtbl.t; mutable merging : merging list }
+  | Branch of { reads : reads; children : trie Children.t; mutable merging : merging list }
 
-and merging = { reads : reads; children : (int, trie) Hashtbl.t; mutable miss_count : int }
+and merging = { reads : reads; children : trie Children.t; mutable miss_count : int }
 and world = { state : state; memo : memo; resolved : bool cek }
 
 let cek_get (cek : 'a cek) (src : Source.t) : 'a =
