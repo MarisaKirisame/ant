@@ -42,7 +42,7 @@ static struct custom_operations timer_ops = {
   custom_fixed_length_default
 };
 
-CAMLprim value timer_create(value v_unit) {
+CAMLprim value ns_timer_create(value v_unit) {
   CAMLparam1(v_unit);
   value res = caml_alloc_custom(&timer_ops, sizeof(timestamp_t), 0, 1);
   memset(Data_custom_val(res), 0, sizeof(timestamp_t));
@@ -54,7 +54,7 @@ CAMLprim value timer_create(value v_unit) {
   CAMLreturn(res);
 }
 
-CAMLprim value timer_record(value v_timer) {
+CAMLprim value ns_timer_record(value v_timer) {
   CAMLparam1(v_timer);
   timestamp_t *t = Timestamp_val(v_timer);
   
@@ -71,7 +71,7 @@ CAMLprim value timer_record(value v_timer) {
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value timer_diff_nanoseconds(value v_t1, value v_t2) {
+CAMLprim value ns_timer_diff(value v_t1, value v_t2) {
   CAMLparam2(v_t1, v_t2);
   timestamp_t *t1 = Timestamp_val(v_t1);
   timestamp_t *t2 = Timestamp_val(v_t2);
