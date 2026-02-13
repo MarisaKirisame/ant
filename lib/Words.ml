@@ -140,8 +140,7 @@ let lcp (x : words) (y : words) : words * words * words =
   let hi = min lx ly in
   let x, x_rest = (x, Generic.empty) in
   let y, y_rest = (y, Generic.empty) in
-  if false && lx = ly && equal_words x y then (x, Generic.empty, Generic.empty)
-  else search hi Generic.empty x x_rest y y_rest
+  search hi Generic.empty x x_rest y y_rest
 
 let unwords (v : words) (w : words) : words option =
   let wl = length w in
