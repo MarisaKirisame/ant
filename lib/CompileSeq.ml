@@ -1,7 +1,7 @@
 open Syntax
 open PPrint
 open Code
-module Hashtbl = Core.Hashtbl
+module Hashtbl = AntHashtbl
 
 let doc_of_code (c : 'a code) : document = Ir.ir_to_doc (Code.to_ir c)
 let seq_fn name = from_ir (Ir.Function ("Seq." ^ name))
@@ -19,7 +19,7 @@ let paren_if_negative (i : int code) value = if value < 0 then from_ir (Ir.Paren
 
 type env = { arity : (string, int) Hashtbl.t; ctag : (string, int) Hashtbl.t }
 
-let new_env () : env = { arity = Hashtbl.create (module Core.String); ctag = Hashtbl.create (module Core.String) }
+let new_env () : env = { arity = Hashtbl.create (); ctag = Hashtbl.create () }
 
 let compile_seq_ty ty =
   match ty with

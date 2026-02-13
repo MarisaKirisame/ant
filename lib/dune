@@ -23,6 +23,7 @@
   Hash
   Intmap
   Common
+  AntHashtbl
   Profile
   batFingerTree
   Ir
