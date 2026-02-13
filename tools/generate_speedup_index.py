@@ -20,8 +20,6 @@ from plot_speedup import (
     plot_rule_stat_insert_time,
     plot_rule_stat_pvar_length_insert_time,
     plot_rule_stat_depth_insert_time,
-    plot_node_stat_rread_length_insert_time,
-    plot_node_stat_reads_size_insert_time,
     plot_hashtable_stat_depth_size,
     plot_depth_breakdown,
     plot_depth_breakdown_cdf,
@@ -44,8 +42,6 @@ def render_html(
     insert_time_scatter_plot = plot_rule_stat_insert_time(records.rule_stat, output_dir)
     pvar_insert_time_scatter_plot = plot_rule_stat_pvar_length_insert_time(records.rule_stat, output_dir)
     depth_insert_time_scatter_plot = plot_rule_stat_depth_insert_time(records.rule_stat, output_dir)
-    rread_insert_time_scatter_plot = plot_node_stat_rread_length_insert_time(records.node_stat, output_dir)
-    reads_size_insert_time_scatter_plot = plot_node_stat_reads_size_insert_time(records.node_stat, output_dir)
     hashtable_depth_size_scatter_plot = None
     if records.hashtable_stat:
         hashtable_depth_size_scatter_plot = plot_hashtable_stat_depth_size(
@@ -97,8 +93,6 @@ def render_html(
             _plot_image(insert_time_scatter_plot, "Memo rule size vs insert time scatter plot")
             _plot_image(pvar_insert_time_scatter_plot, "Memo rule pvar length vs insert time scatter plot")
             _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
-            _plot_image(rread_insert_time_scatter_plot, "Memo node rread length vs insert time scatter plot")
-            _plot_image(reads_size_insert_time_scatter_plot, "Memo node reads size vs insert time scatter plot")
             if hashtable_depth_size_scatter_plot is not None:
                 _plot_image(
                     hashtable_depth_size_scatter_plot,

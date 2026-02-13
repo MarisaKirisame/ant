@@ -308,7 +308,7 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
                   ret
                     (Branch
                        {
-                         creator = "unexhuasted lcp (var case)";
+                         creator = "unexhausted lcp (var case)";
                          degree = (Pattern.pattern_measure prefix').degree;
                          prefix = lcp;
                          var;
@@ -322,7 +322,7 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
               ret
                 (Branch
                    {
-                     creator = "unexhuasted lcp (const case)";
+                     creator = "unexhausted lcp (const case)";
                      degree = (Pattern.pattern_measure prefix').degree;
                      prefix = lcp;
                      var = None;
@@ -553,7 +553,7 @@ type memo_stats = {
 }
 
 and by_depth = { depth : int; mutable node_count : int }
-and node_stat = { depth : int; rread_length : int; reads_size : int; insert_time : int; node_state : node_state }
+and node_stat = { depth : int; insert_time : int; node_state : node_state }
 
 and rule_stat = {
   size : int;
@@ -581,9 +581,7 @@ let memo_stats (m : memo) : memo_stats =
     match t with
     | Leaf (_, st) ->
         stem_nodes := !stem_nodes + 1;
-        node_stats :=
-          { depth; rread_length = 1; reads_size = 1; insert_time = st.insert_time; node_state = Stem_node }
-          :: !node_stats;
+        node_stats := { depth; insert_time = st.insert_time; node_state = Stem_node } :: !node_stats;
         rule_stat :=
           {
             size = patterns_size st.src;
@@ -597,8 +595,7 @@ let memo_stats (m : memo) : memo_stats =
           :: !rule_stat
     | Branch br -> (
         branch_nodes := !branch_nodes + 1;
-        node_stats :=
-          { depth; rread_length = 1; reads_size = 1; insert_time = 1; node_state = Branch_node } :: !node_stats;
+        node_stats := { depth; insert_time = 1; node_state = Branch_node } :: !node_stats;
         hashtable_stats := { depth; size = Hashtbl.length br.const } :: !hashtable_stats;
         Hashtbl.iter br.const ~f:(fun child -> aux child (depth + 1));
         match br.var with None -> () | Some var -> aux var (depth + 1))

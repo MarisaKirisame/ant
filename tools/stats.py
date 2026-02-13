@@ -255,30 +255,6 @@ def load_records(
                     #if not isinstance(raw_rule_stat, list):
                     #    raise ValueError("rule_stat must be a list")
                     #rule_stat_entries: list[MemoRuleStat] = []
-                    #for idx, entry in enumerate(raw_rule_stat):
-                    #    if not isinstance(entry, dict):
-                    #        raise ValueError(f"rule_stat[{idx}] must be an object")
-                    #    size = entry.get("size")
-                    #    pvar_length = entry.get("pvar_length")
-                    #    sc = entry.get("sc")
-                    #    hit_count = entry.get("hit_count")
-                    #    insert_time = entry.get("insert_time")
-                    #    depth = entry.get("depth")
-                    #    rule = entry.get("rule")
-                    #    if not isinstance(size, int):
-                    #        raise ValueError(f"rule_stat[{idx}].size must be an int")
-                    #    if not isinstance(pvar_length, int):
-                    #        raise ValueError(f"rule_stat[{idx}].pvar_length must be an int")
-                    #    if not isinstance(sc, int):
-                    #        raise ValueError(f"rule_stat[{idx}].sc must be an int")
-                    #    if not isinstance(hit_count, int):
-                    #        raise ValueError(f"rule_stat[{idx}].hit_count must be an int")
-                    #    if not isinstance(insert_time, int):
-                    #        raise ValueError(f"rule_stat[{idx}].insert_time must be an int")
-                    #    if not isinstance(depth, int):
-                    #        raise ValueError(f"rule_stat[{idx}].depth must be an int")
-                    #    if not isinstance(rule, str):
-                    #        raise ValueError(f"rule_stat[{idx}].rule must be a string")
                     raw_rule_stat = _require_list(
                         rec.get("rule_stat", []), ctx="rule_stat"
                     )
@@ -289,6 +265,9 @@ def load_records(
                         )
                         size = _require_int(
                             entry.get("size"), ctx=f"rule_stat[{idx}].size"
+                        )
+                        pvar_length = _require_int(
+                            entry.get("pvar_length"), ctx=f"rule_stat[{idx}].pvar_length"
                         )
                         sc = _require_int(
                             entry.get("sc"), ctx=f"rule_stat[{idx}].sc"

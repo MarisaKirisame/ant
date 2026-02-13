@@ -162,5 +162,4 @@ let value_to_words (v : value) : Words.words =
   assert (Generic.is_empty vt);
   match vh with
   | Words vh_words -> vh_words
-  | Reference r ->
-      failwith ("value_to_words: expected Words but found Reference " ^ string_of_reference r)
+  | Reference r -> failwith ("value_to_words: expected Words but found Reference " ^ string_of_reference r)

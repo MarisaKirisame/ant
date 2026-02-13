@@ -293,51 +293,6 @@ def plot_rule_stat_depth_insert_time(
         plotter=lambda ax: ax.scatter(depths, insert_times, alpha=0.6),
     )
 
-
-def plot_node_stat_rread_length_insert_time(
-    node_stat: Sequence[MemoNodeStat], output_dir: Path
-) -> str:
-    if not node_stat:
-        raise ValueError("node_stat is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
-    rread_lengths = [entry.rread_length for entry in node_stat]
-    insert_times = [entry.insert_time for entry in node_stat]
-    plt.scatter(rread_lengths, insert_times, alpha=0.6)
-    if REPORT_ABSOLUTE_TIME_LOG_SCALE:
-        plt.yscale("log")
-    plt.xlabel("Reads rread length")
-    plt.ylabel("Insert time (ns)")
-    plt.title("Memo node rread length vs insert time")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
-
-
-def plot_node_stat_reads_size_insert_time(
-    node_stat: Sequence[MemoNodeStat], output_dir: Path
-) -> str:
-    if not node_stat:
-        raise ValueError("node_stat is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
-    reads_sizes = [entry.reads_size for entry in node_stat]
-    insert_times = [entry.insert_time for entry in node_stat]
-    plt.scatter(reads_sizes, insert_times, alpha=0.6)
-    if REPORT_ABSOLUTE_TIME_LOG_SCALE:
-        plt.yscale("log")
-    plt.xlabel("Node reads size")
-    plt.ylabel("Insert time (ns)")
-    plt.title("Memo node reads size vs insert time")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
-
-
 def plot_hashtable_stat_depth_size(
     hashtable_stat: Sequence[MemoHashtableStat], output_dir: Path
 ) -> str:
