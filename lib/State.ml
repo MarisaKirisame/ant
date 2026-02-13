@@ -108,7 +108,7 @@ let is_done (s : state) : bool =
       match wh with ConstructorTag ct when ct = 0 -> s.c.pc = 0 | _ -> false)
   | _ -> failwith "unreachable"
 
-(*kinda make sense that continuation is last because it without env is not that useful. should experiment a bit*)
+(* The continuation is stored last since it is mainly meaningful together with the environment. *)
 let ek_to_list (s : 'a cek) : 'a list =
   let lst = Dynarray.to_list s.e in
   lst @ [ s.k ]
