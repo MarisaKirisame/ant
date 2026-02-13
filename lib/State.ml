@@ -1,6 +1,6 @@
 open Value
 open Pattern
-open BatFingerTree
+open PlainTree
 module Hashtbl = Core.Hashtbl
 
 module Children = struct

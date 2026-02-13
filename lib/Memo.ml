@@ -1,4 +1,4 @@
-open BatFingerTree
+open PlainTree
 open Word
 module Hasher = Hash.MCRC32C
 open Base
@@ -111,11 +111,11 @@ let to_word (s : seq) : Word.t =
   | Reference _ -> failwith "conveting reference to_int"
 
 let append (x : seq) (y : seq) : seq = Value.append x y
-let appends (x : seq list) : seq = List.fold_right x ~init:empty ~f:append
+let appends (x : seq list) : seq = List.fold_right x ~init:Generic.empty ~f:append
 let pop (s : seq) = pop_n s 1
 
 let rec splits (x : seq) : seq list =
-  if is_empty x then []
+  if Generic.is_empty x then []
   else
     let h, t = pop x in
     h :: splits t
