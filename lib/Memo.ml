@@ -230,7 +230,7 @@ let rec build x xstep y ystep (acc : Words.words) =
     | Pattern.PCon xh, Pattern.PCon yh ->
         let lcp, xh, yh = Words.lcp xh yh in
         if Generic.is_empty lcp then (
-          let const = Hashtbl.create (module Int) in
+          let const = Children.create (module Int) in
           let xhh, xht = Words.words_front_exn xh in
           let xkey = Word.hash xhh in
           let xt = if Generic.is_empty xht then xt else Pattern.pattern_cons (Pattern.PCon xht) xt in
@@ -238,8 +238,8 @@ let rec build x xstep y ystep (acc : Words.words) =
           let ykey = Word.hash yhh in
           let yt = if Generic.is_empty yht then yt else Pattern.pattern_cons (Pattern.PCon yht) yt in
           assert (xkey <> ykey);
-          Hashtbl.add_exn const ~key:xkey ~data:(Leaf (xt, xstep));
-          Hashtbl.add_exn const ~key:ykey ~data:(Leaf (yt, ystep));
+          Children.add_exn const ~key:xkey ~data:(Leaf (xt, xstep));
+          Children.add_exn const ~key:ykey ~data:(Leaf (yt, ystep));
           Branch { creator = "build disagree on cons"; degree = x_degree + acc_degree; prefix = acc; var = None; const })
         else
           let acc = Words.append acc lcp in
@@ -249,7 +249,7 @@ let rec build x xstep y ystep (acc : Words.words) =
     | Pattern.PCon xh, Pattern.PVar yh ->
         let yt = if yh = 1 then yt else Pattern.pattern_cons (Pattern.PVar (yh - 1)) yt in
         let var = Some (Leaf (yt, ystep)) in
-        let const = Hashtbl.create (module Int) in
+        let const = Children.create (module Int) in
         let xhh, xht = Words.words_front_exn xh in
         let key = Word.hash xhh in
         let xt = if Generic.is_empty xht then xt else Pattern.pattern_cons (Pattern.PCon xht) xt in
@@ -260,7 +260,7 @@ let rec build x xstep y ystep (acc : Words.words) =
         let xt = if xh = 1 then xt else Pattern.pattern_cons (Pattern.PVar (xh - 1)) xt in
         let yt = if yh = 1 then yt else Pattern.pattern_cons (Pattern.PVar (yh - 1)) yt in
         let var = Some (build xt xstep yt ystep Generic.empty) in
-        let const = Hashtbl.create (module Int) in
+        let const = Children.create (module Int) in
         Branch { creator = "build disagree on var"; degree = x_degree + acc_degree; prefix = acc; var; const })
 
 let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : step) : trie =
@@ -290,14 +290,14 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
               let phh, pht = Words.words_front_exn ph in
               let key = Word.hash phh in
               let pt = if Generic.is_empty pht then pt else Pattern.pattern_cons (Pattern.PCon pht) pt in
-              Hashtbl.update br.const key ~f:(fun x -> insert_option x pt step');
+              Children.update br.const key ~f:(fun x -> insert_option x pt step');
               ret (Branch br))
           else
-            let const = Hashtbl.create (module Int) in
+            let const = Children.create (module Int) in
             let brh, brt = Words.words_front_exn br_prefix in
             let brkey = Word.hash brh in
             let x = Branch { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
-            Hashtbl.add_exn const ~key:brkey ~data:x;
+            Children.add_exn const ~key:brkey ~data:x;
             if Generic.is_empty ph then
               let ph, pt = Pattern.pattern_front_exn pt in
               match ph with
@@ -332,7 +332,7 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
           let pt = if ph = 1 then pt else Pattern.pattern_cons (Pattern.PVar (ph - 1)) pt in
           if Generic.is_empty br.prefix then ret (Branch { br with var = Some (insert_option br.var pt step') })
           else
-            let const = Hashtbl.create (module Int) in
+            let const = Children.create (module Int) in
             let brh, brt = Words.words_front_exn br.prefix in
             let brkey = Word.hash brh in
             let x = Branch { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
@@ -391,7 +391,7 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) : step option =
             let Words vh, vt = Value.front_exn value in
             let vhh, vht = Words.words_front_exn vh in
             let key = Word.hash vhh in
-            match Hashtbl.find br.const key with
+            match Children.find br.const key with
             | None -> None
             | Some const ->
                 let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
@@ -596,8 +596,8 @@ let memo_stats (m : memo) : memo_stats =
     | Branch br -> (
         branch_nodes := !branch_nodes + 1;
         node_stats := { depth; insert_time = 1; node_state = Branch_node } :: !node_stats;
-        hashtable_stats := { depth; size = Hashtbl.length br.const } :: !hashtable_stats;
-        Hashtbl.iter br.const ~f:(fun child -> aux child (depth + 1));
+        hashtable_stats := { depth; size = Children.length br.const } :: !hashtable_stats;
+        Children.iter br.const ~f:(fun child -> aux child (depth + 1));
         match br.var with None -> () | Some var -> aux var (depth + 1))
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
