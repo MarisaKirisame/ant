@@ -211,7 +211,7 @@ def run_project() -> None:
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
     opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
-    for mode in ("live-simple", "live-left-to-right", "live-demand-driven", "hazel"):
+    for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
         opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
 
 
@@ -222,7 +222,7 @@ def profile_project() -> None:
     generate_ml_files(env=env)
     opam_exec(["dune", "build", "generated/GeneratedMain.exe"], env=env)
     binary = os.path.join("_build", "default", "generated", "GeneratedMain.exe")
-    for mode in ("live-simple", "live-left-to-right", "live-demand-driven", "hazel"):
+    for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
         opam_exec(
             ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
             env=env,

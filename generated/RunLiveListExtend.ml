@@ -10,7 +10,7 @@ let (random_lists_exprs, _) =
             let new_acc = LC.ECons (LC.EInt n, acc) in
             (new_acc :: res, new_acc)
         )
-        Common.random_list
+        (List.take 100 Common.random_list) (* Using the whole list takes kinda long *)
         ([], LC.ENil)
 let random_lists_exprs = List.rev random_lists_exprs
 
