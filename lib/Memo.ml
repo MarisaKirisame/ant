@@ -230,7 +230,7 @@ let rec build x xstep y ystep (acc : Words.words) =
     | Pattern.PCon xh, Pattern.PCon yh ->
         let lcp, xh, yh = Words.lcp xh yh in
         if Generic.is_empty lcp then (
-          let const = Children.create (module Int) in
+          let const = Children.create () in
           let xhh, xht = Words.words_front_exn xh in
           let xkey = Word.hash xhh in
           let xt = if Generic.is_empty xht then xt else Pattern.pattern_cons (Pattern.PCon xht) xt in
@@ -238,8 +238,8 @@ let rec build x xstep y ystep (acc : Words.words) =
           let ykey = Word.hash yhh in
           let yt = if Generic.is_empty yht then yt else Pattern.pattern_cons (Pattern.PCon yht) yt in
           assert (xkey <> ykey);
-          Children.add_exn const ~key:xkey ~data:(Leaf (xt, xstep));
-          Children.add_exn const ~key:ykey ~data:(Leaf (yt, ystep));
+          Children.set const xkey (Leaf (xt, xstep));
+          Children.set const ykey (Leaf (yt, ystep));
           Branch { creator = "build disagree on cons"; degree = x_degree + acc_degree; prefix = acc; var = None; const })
         else
           let acc = Words.append acc lcp in
@@ -249,18 +249,18 @@ let rec build x xstep y ystep (acc : Words.words) =
     | Pattern.PCon xh, Pattern.PVar yh ->
         let yt = if yh = 1 then yt else Pattern.pattern_cons (Pattern.PVar (yh - 1)) yt in
         let var = Some (Leaf (yt, ystep)) in
-        let const = Children.create (module Int) in
+        let const = Children.create () in
         let xhh, xht = Words.words_front_exn xh in
         let key = Word.hash xhh in
         let xt = if Generic.is_empty xht then xt else Pattern.pattern_cons (Pattern.PCon xht) xt in
-        Hashtbl.add_exn const ~key ~data:(Leaf (xt, xstep));
+        Children.set const key (Leaf (xt, xstep));
         Branch { creator = "build disagree on var"; degree = x_degree + acc_degree; prefix = acc; var; const }
     | Pattern.PVar _, Pattern.PCon _ -> build y ystep x xstep acc
     | Pattern.PVar xh, Pattern.PVar yh ->
         let xt = if xh = 1 then xt else Pattern.pattern_cons (Pattern.PVar (xh - 1)) xt in
         let yt = if yh = 1 then yt else Pattern.pattern_cons (Pattern.PVar (yh - 1)) yt in
         let var = Some (build xt xstep yt ystep Generic.empty) in
-        let const = Children.create (module Int) in
+        let const = Children.create () in
         Branch { creator = "build disagree on var"; degree = x_degree + acc_degree; prefix = acc; var; const })
 
 let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : step) : trie =
@@ -293,11 +293,11 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
               Children.update br.const key ~f:(fun x -> insert_option x pt step');
               ret (Branch br))
           else
-            let const = Children.create (module Int) in
+            let const = Children.create () in
             let brh, brt = Words.words_front_exn br_prefix in
             let brkey = Word.hash brh in
             let x = Branch { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
-            Children.add_exn const ~key:brkey ~data:x;
+            Children.set const brkey x;
             if Generic.is_empty ph then
               let ph, pt = Pattern.pattern_front_exn pt in
               match ph with
@@ -318,7 +318,7 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
               let phh, pht = Words.words_front_exn ph in
               let key = Word.hash phh in
               let pt = if Generic.is_empty pht then pt else Pattern.pattern_cons (Pattern.PCon pht) pt in
-              Hashtbl.update const key ~f:(fun x -> insert_option x pt step');
+              Children.update const key ~f:(fun x -> insert_option x pt step');
               ret
                 (Branch
                    {
@@ -332,11 +332,11 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
           let pt = if ph = 1 then pt else Pattern.pattern_cons (Pattern.PVar (ph - 1)) pt in
           if Generic.is_empty br.prefix then ret (Branch { br with var = Some (insert_option br.var pt step') })
           else
-            let const = Children.create (module Int) in
+            let const = Children.create () in
             let brh, brt = Words.words_front_exn br.prefix in
             let brkey = Word.hash brh in
             let x = Branch { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
-            Hashtbl.add_exn const ~key:brkey ~data:x;
+            Children.set const brkey x;
             Branch
               {
                 creator = "inserting var case";

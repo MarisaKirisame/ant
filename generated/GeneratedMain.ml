@@ -1,4 +1,5 @@
-let usage = "Usage: GeneratedMain <live-simple|live-left-to-right|live-list-extend|live-demand-driven|test|tailrec|hazel>"
+let usage =
+  "Usage: GeneratedMain <live-simple|live-left-to-right|live-list-extend|live-demand-driven|test|tailrec|hazel>"
 
 let () =
   match Array.to_list Sys.argv with

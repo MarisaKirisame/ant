@@ -68,7 +68,7 @@ and memo = trie option Array.t
 
 and trie =
   | Leaf of Pattern.pattern * step
-  | Branch of { creator : string; degree : int; prefix : Words.words; var : trie option; const : trie Children.t.t }
+  | Branch of { creator : string; degree : int; prefix : Words.words; var : trie option; const : trie Children.t }
 
 and world = { state : state; memo : memo; resolved : bool cek }
 

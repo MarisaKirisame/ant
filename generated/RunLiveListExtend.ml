@@ -2,16 +2,17 @@ let steps_file = "eval_steps_list_extend.json"
 
 module Common = RunLiveCommon
 module LC = Common.LC
+open Core
 
 (* List of increasing-length prefixes of Common.random_list *)
-let (random_lists_exprs, _) =
-    List.fold_right
-        (fun n (res, acc) ->
-            let new_acc = LC.ECons (LC.EInt n, acc) in
-            (new_acc :: res, new_acc)
-        )
-        (List.take 100 Common.random_list) (* Using the whole list takes kinda long *)
-        ([], LC.ENil)
+let random_lists_exprs, _ =
+  List.fold_right
+    ~f:(fun n (res, acc) ->
+      let new_acc = LC.ECons (LC.EInt n, acc) in
+      (new_acc :: res, new_acc))
+    (List.take Common.random_list 100) (* Using the whole list takes kinda long *)
+    ~init:([], LC.ENil)
+
 let random_lists_exprs = List.rev random_lists_exprs
 
 let run () =
@@ -22,7 +23,7 @@ let run () =
       let eval expr = Common.eval_expression ~memo ~write_steps expr in
       print_endline "list_extend quicksort (quicksort expression fixed):";
       random_lists_exprs
-      |> List.iteri (fun i e ->
+      |> List.iteri ~f:(fun i e ->
           let applied = LC.EApp (Common.quicksort_expr, e) in
           Printf.printf "step %d value: %s\n" i (Common.value_to_string (eval applied)));
       Common.write_memo_stats_json oc memo)
