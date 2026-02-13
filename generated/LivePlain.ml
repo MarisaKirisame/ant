@@ -1,58 +1,13 @@
-type nat = Z | S of nat
-type 'a list = Nil | Cons of 'a * 'a list
-type 'a option = None | Some of 'a
+open LiveCEK
 
-type expr =
-  | EInt of int
-  | EPlus of expr * expr
-  | ELt of expr * expr
-  | ELe of expr * expr
-  | EGt of expr * expr
-  | EGe of expr * expr
-  | EVar of nat
-  | EAbs of expr
-  | EApp of expr * expr
-  | ELet of expr * expr
-  | ETrue
-  | EFalse
-  | EIf of expr * expr * expr
-  | ENil
-  | ECons of expr * expr
-  | EMatchList of expr * expr * expr
-  | EPair of expr * expr
-  | EZro of expr
-  | EFst of expr
-  | EFix of expr
-  | EHole of int option
-  | EUnit
+type nat = LiveCEK.nat
+type 'a list = 'a LiveCEK.list
+type 'a option = 'a LiveCEK.option
+type expr = LiveCEK.expr
 
-type value =
-  | VInt of int
-  | VAbs of expr * value list
-  | VUnit
-  | VTrue
-  | VFalse
-  | VNil
-  | VCons of value * value
-  | VPair of value * value
-  | VFix of expr * value list
-  | VStuck of stuck
-
-and vtype = VTInt | VTFunc | VTBool | VTList | VTPair
-
-and stuck =
-  | SHole of int option
-  | STypeError of value * vtype
-  | SIndexError
-  | SApp of stuck * expr
-  | SAdd0 of stuck * expr
-  | SAdd1 of value * stuck
-  | SGt0 of stuck * expr
-  | SGt1 of value * stuck
-  | SIf of stuck * expr * expr
-  | SMatchList of stuck * expr * expr
-  | SZro of stuck
-  | SFst of stuck
+type value = LiveCEK.value
+and vtype = LiveCEK.vtype
+and stuck = LiveCEK.stuck
 
 let rec index =
  fun x n -> match x with Cons (xh, xt) -> ( match n with Z -> Some xh | S m -> index xt m) | _ -> None

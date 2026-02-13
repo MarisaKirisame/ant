@@ -7,9 +7,13 @@ let () = Seq.set_constructor_degree 0 1
 let int_list_Nil : Seq.seq = Seq.appends [ Seq.from_constructor 0 ]
 let () = Seq.set_constructor_degree 1 (-1)
 let int_list_Cons x0 x1 : Seq.seq = Seq.appends [ Seq.from_constructor 1; Seq.from_int x0; x1 ]
-let from_ocaml_int_list x = match x with Nil -> int_list_Nil | Cons (x0, x1) -> int_list_Cons x0 x1
 
-let to_ocaml_int_list x =
+let rec from_ocaml_int_list x =
+  match x with
+  | Nil -> Seq.appends [ Seq.from_constructor 0 ]
+  | Cons (x0, x1) -> Seq.appends [ Seq.from_constructor 1; Seq.from_int x0; x1 ]
+
+let rec to_ocaml_int_list x =
   let h, t = Option.get (Seq.list_match x) in
   match Word.get_value h with
   | 0 -> Nil

@@ -21,7 +21,7 @@ from __future__ import annotations
 import math
 import statistics
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 from dominate import tags as tag
 import matplotlib.pyplot as plt
@@ -81,14 +81,40 @@ def compare_stats(
 def _fresh_plot_name() -> str:
     return f"{fresh()}.png"
 
+def _save_plot(
+    output_dir: Path,
+    *,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    plotter: Callable[[plt.Axes], None],
+    xscale: str | None = None,
+    yscale: str | None = None,
+    legend: bool = False,
+) -> str:
+    output_path = output_dir / _fresh_plot_name()
+    fig, ax = plt.subplots(figsize=(6, 4.5))
+    plotter(ax)
+    if xscale:
+        ax.set_xscale(xscale)
+    if yscale:
+        ax.set_yscale(yscale)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    if legend:
+        ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_path)
+    plt.close(fig)
+    return output_path.name
+
 
 def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
     pairs_list = list(pairs)
     baselines = [baseline for baseline, _ in pairs_list]
     memos = [memo for _, memo in pairs_list]
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
-    plt.scatter(memos, baselines, alpha=0.75)
     min_time = min(min(baselines), min(memos))
     max_time = max(max(baselines), max(memos))
     log_memos = np.log10(memos)
@@ -96,51 +122,49 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
     slope, intercept = np.polyfit(log_memos, log_baselines, 1)
     reg_x = np.array([min_time, max_time])
     reg_y = 10 ** (slope * np.log10(reg_x) + intercept)
-    plt.plot(reg_x, reg_y, color="tab:blue", linewidth=1.5, label="Linear fit")
-    plt.plot(
-        [min_time, max_time],
-        [min_time, max_time],
-        color="black",
-        linestyle="--",
-        linewidth=1,
-    )
-    if REPORT_WALL_CLOCK_TIME:
-        if REPORT_ABSOLUTE_TIME_LOG_SCALE:
-            plt.xscale("log")
-            plt.yscale("log")
-    else:
-        plt.xscale("log")
-        plt.yscale("log")
-    plt.xlabel(f"Our ({METRIC_LABEL})")
-    plt.ylabel(f"Their ({METRIC_LABEL})")
     scale_label = (
         "linear"
         if REPORT_WALL_CLOCK_TIME and not REPORT_ABSOLUTE_TIME_LOG_SCALE
         else "log-log"
     )
-    plt.title(f"Our vs Their ({METRIC_LABEL}, {scale_label})")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    xscale = (
+        "log"
+        if (not REPORT_WALL_CLOCK_TIME or REPORT_ABSOLUTE_TIME_LOG_SCALE)
+        else None
+    )
+    yscale = xscale
+    return _save_plot(
+        output_dir,
+        title=f"Our vs Their ({METRIC_LABEL}, {scale_label})",
+        xlabel=f"Our ({METRIC_LABEL})",
+        ylabel=f"Their ({METRIC_LABEL})",
+        xscale=xscale,
+        yscale=yscale,
+        legend=True,
+        plotter=lambda ax: (
+            ax.scatter(memos, baselines, alpha=0.75),
+            ax.plot(reg_x, reg_y, color="tab:blue", linewidth=1.5, label="Linear fit"),
+            ax.plot(
+                [min_time, max_time],
+                [min_time, max_time],
+                color="black",
+                linestyle="--",
+                linewidth=1,
+            ),
+        ),
+    )
 
 
 def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
     xs = list(range(1, len(ratios) + 1))
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
-    plt.plot(xs, ratios, marker="o", linewidth=1.5)
-    plt.yscale("log")
-    plt.xlabel("Execution number (nth run)")
-    plt.ylabel(f"Speedup ({METRIC_LABEL}, baseline / memoized, log scale)")
-    plt.title(f"Speedup per Execution ({METRIC_LABEL}, log scale)")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    return _save_plot(
+        output_dir,
+        title=f"Speedup per Execution ({METRIC_LABEL}, log scale)",
+        xlabel="Execution number (nth run)",
+        ylabel=f"Speedup ({METRIC_LABEL}, baseline / memoized, log scale)",
+        yscale="log",
+        plotter=lambda ax: ax.plot(xs, ratios, marker="o", linewidth=1.5),
+    )
 
 
 def plot_depth_breakdown(
@@ -148,19 +172,15 @@ def plot_depth_breakdown(
 ) -> str:
     if not depth_breakdown:
         raise ValueError("depth_breakdown is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
     depths = [node.depth for node in depth_breakdown]
     counts = [node.node_count for node in depth_breakdown]
-    plt.plot(depths, counts, marker="o", linewidth=1.5)
-    plt.xlabel("Depth")
-    plt.ylabel("Node count")
-    plt.title("Memo stats by depth")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    return _save_plot(
+        output_dir,
+        title="Memo stats by depth",
+        xlabel="Depth",
+        ylabel="Node count",
+        plotter=lambda ax: ax.plot(depths, counts, marker="o", linewidth=1.5),
+    )
 
 
 def plot_depth_breakdown_cdf(
@@ -168,8 +188,6 @@ def plot_depth_breakdown_cdf(
 ) -> str:
     if not depth_breakdown:
         raise ValueError("depth_breakdown is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
     nodes_sorted = sorted(depth_breakdown, key=lambda node: node.depth)
     total = sum(node.node_count for node in nodes_sorted)
     if total <= 0:
@@ -181,53 +199,43 @@ def plot_depth_breakdown_cdf(
         cumulative += node.node_count
         depths.append(node.depth)
         cdf.append(100.0 * cumulative / total)
-    plt.plot(depths, cdf, marker="o", linewidth=1.5)
-    plt.xlabel("Depth")
-    plt.ylabel("Nodes <= depth (%)")
-    plt.title("Memo stats CDF")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    return _save_plot(
+        output_dir,
+        title="Memo stats CDF",
+        xlabel="Depth",
+        ylabel="Nodes <= depth (%)",
+        plotter=lambda ax: ax.plot(depths, cdf, marker="o", linewidth=1.5),
+    )
 
 
 def plot_rule_stat(rule_stat: Sequence[MemoRuleStat], output_dir: Path) -> str:
     if not rule_stat:
         raise ValueError("rule_stat is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
     sizes = [entry.size for entry in rule_stat]
     scs = [entry.sc for entry in rule_stat]
-    plt.scatter(sizes, scs, alpha=0.6)
-    plt.xlabel("Pattern size")
-    plt.ylabel("Step count (sc)")
-    plt.title("Memo rule size vs step count")
-    plt.yscale("log")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    return _save_plot(
+        output_dir,
+        title="Memo rule size vs step count",
+        xlabel="Pattern size",
+        ylabel="Step count (sc)",
+        yscale="log",
+        plotter=lambda ax: ax.scatter(sizes, scs, alpha=0.6),
+    )
 
 
 def plot_rule_stat_hits(rule_stat: Sequence[MemoRuleStat], output_dir: Path) -> str:
     if not rule_stat:
         raise ValueError("rule_stat is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
     sizes = [entry.size for entry in rule_stat]
     hits = [entry.hit_count for entry in rule_stat]
-    plt.scatter(sizes, hits, alpha=0.6)
-    plt.xlabel("Pattern size")
-    plt.ylabel("Hit count")
-    plt.title("Memo rule size vs hit count")
-    plt.yscale("log")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    return _save_plot(
+        output_dir,
+        title="Memo rule size vs hit count",
+        xlabel="Pattern size",
+        ylabel="Hit count",
+        yscale="log",
+        plotter=lambda ax: ax.scatter(sizes, hits, alpha=0.6),
+    )
 
 
 def plot_rule_stat_insert_time(
@@ -235,21 +243,16 @@ def plot_rule_stat_insert_time(
 ) -> str:
     if not rule_stat:
         raise ValueError("rule_stat is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
     sizes = [entry.size for entry in rule_stat]
     insert_times = [entry.insert_time for entry in rule_stat]
-    plt.scatter(sizes, insert_times, alpha=0.6)
-    if REPORT_ABSOLUTE_TIME_LOG_SCALE:
-        plt.yscale("log")
-    plt.xlabel("Pattern size")
-    plt.ylabel("Insert time (ns)")
-    plt.title("Memo rule size vs insert time")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    return _save_plot(
+        output_dir,
+        title="Memo rule size vs insert time",
+        xlabel="Pattern size",
+        ylabel="Insert time (ns)",
+        yscale="log" if REPORT_ABSOLUTE_TIME_LOG_SCALE else None,
+        plotter=lambda ax: ax.scatter(sizes, insert_times, alpha=0.6),
+    )
 
 
 def plot_rule_stat_pvar_length_insert_time(
@@ -279,21 +282,16 @@ def plot_rule_stat_depth_insert_time(
 ) -> str:
     if not rule_stat:
         raise ValueError("rule_stat is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
     depths = [entry.depth for entry in rule_stat]
     insert_times = [entry.insert_time for entry in rule_stat]
-    plt.scatter(depths, insert_times, alpha=0.6)
-    if REPORT_ABSOLUTE_TIME_LOG_SCALE:
-        plt.yscale("log")
-    plt.xlabel("Depth")
-    plt.ylabel("Insert time (ns)")
-    plt.title("Memo rule depth vs insert time")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    return _save_plot(
+        output_dir,
+        title="Memo rule depth vs insert time",
+        xlabel="Depth",
+        ylabel="Insert time (ns)",
+        yscale="log" if REPORT_ABSOLUTE_TIME_LOG_SCALE else None,
+        plotter=lambda ax: ax.scatter(depths, insert_times, alpha=0.6),
+    )
 
 
 def plot_node_stat_rread_length_insert_time(
@@ -472,12 +470,12 @@ def render_profile_table(totals: dict[str, float], total_time: float) -> str:
 
 def generate_plot(
     result: Result, output_dir: Path
-) -> tuple[list[float], SpeedupStats, str, str]:
+) -> tuple[SpeedupStats, str, str]:
     """Write plots for result into output_dir and return ratios, stats, and filenames."""
     baselines, memos = pairs_from_result(result)
     pairs = list(zip(baselines, memos))
-    ratios, stats, line_plot, scatter_plot = generate_plot_for_pairs(pairs, output_dir)
-    return ratios, stats, line_plot, scatter_plot
+    stats, line_plot, scatter_plot = generate_plot_for_pairs(pairs, output_dir)
+    return stats, line_plot, scatter_plot
 
 
 def generate_plot_for_pairs(
