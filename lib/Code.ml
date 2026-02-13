@@ -4,6 +4,7 @@ open Ir
 open State
 open Word
 open Common
+module Hashtbl = AntHashtbl
 
 type 'a code = Code of ir | Pat of pat
 
@@ -28,7 +29,7 @@ let ctor_pat'_ (name : string) : 'a code = Pat (Ctor (name, None))
 let uncode c : document =
   match c with Code ir -> ir_to_doc (optimize_ir ir) | Pat pat -> pat_to_doc (optimize_pat pat)
 
-let fresh_name : (string, int) Hashtbl.t = Hashtbl.create (module String)
+let fresh_name : (string, int) Hashtbl.t = Hashtbl.create ()
 
 let gensym (base : string) : string =
   let n = Option.value (Hashtbl.find fresh_name base) ~default:0 in

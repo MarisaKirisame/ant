@@ -2,10 +2,12 @@ open! Core
 open Type
 open Syntax
 open SynInfo
+module Hashtbl = AntHashtbl
 
 module ResolveGlobal = struct
   open Syntax
   open Core
+  module Hashtbl = AntHashtbl
 
   type env = { globals : (string, unit) Hashtbl.t; locals : String.Set.t }
 
@@ -344,7 +346,7 @@ let rec bind_pattern_variables_nodup ctx p =
 
 let rec bind_pattern_variables_shadow ctx p =
   (* NOTE: We still need ensure no duplicate bindings inside the same pattern. *)
-  let dup = Hashtbl.create (module String) in
+  let dup = Hashtbl.create () in
   let rec loop ctx = function
     | PAny -> ctx
     | PInt _ -> ctx
@@ -592,7 +594,7 @@ let top_type_of_prog (p : info prog) : info prog =
         in
         (TBRec new_rec_groups, ctx, arity)
   in
-  let resolve_ctx = Hashtbl.create (module String) in
+  let resolve_ctx = Hashtbl.create () in
   let infer_top_level (ctx : ty StrMap.t) (arity : int StrMap.t) stmt =
     let stmt_resolved =
       match stmt with
