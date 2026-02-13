@@ -41,6 +41,7 @@ let rec value_valid x : bool =
           && value_valid rest)
 
 let summary x = Generic.measure ~monoid ~measure x
+let value_measure x = summary x
 
 let append (x : seq) (y : seq) : seq =
   if Generic.is_empty x then y
@@ -155,3 +156,10 @@ let unwords (v : value) (w : Words.words) : value option =
           Some ret
       | None -> None)
   | Reference _ -> None
+
+let value_to_words (v : value) : Words.words =
+  let vt, vh = Generic.front_exn ~measure ~monoid v in
+  assert (Generic.is_empty vt);
+  match vh with
+  | Words vh_words -> vh_words
+  | Reference r -> failwith ("value_to_words: expected Words but found Reference " ^ string_of_reference r)

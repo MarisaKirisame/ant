@@ -29,6 +29,8 @@ import numpy as np
 
 from common import fresh
 from stats import (
+    MemoHashtableStat,
+    MemoNodeStat,
     MemoRuleStat,
     MemoStatsNode,
     ProfileEntry,
@@ -253,6 +255,28 @@ def plot_rule_stat_insert_time(
     )
 
 
+def plot_rule_stat_pvar_length_insert_time(
+    rule_stat: Sequence[MemoRuleStat], output_dir: Path
+) -> str:
+    if not rule_stat:
+        raise ValueError("rule_stat is empty")
+    output_path = output_dir / _fresh_plot_name()
+    plt.figure(figsize=(6, 4.5))
+    pvar_lengths = [entry.pvar_length for entry in rule_stat]
+    insert_times = [entry.insert_time for entry in rule_stat]
+    plt.scatter(pvar_lengths, insert_times, alpha=0.6)
+    if REPORT_ABSOLUTE_TIME_LOG_SCALE:
+        plt.yscale("log")
+    plt.xlabel("Pattern pvar length")
+    plt.ylabel("Insert time (ns)")
+    plt.title("Memo rule pvar length vs insert time")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    return output_path.name
+
+
 def plot_rule_stat_depth_insert_time(
     rule_stat: Sequence[MemoRuleStat], output_dir: Path
 ) -> str:
@@ -268,6 +292,26 @@ def plot_rule_stat_depth_insert_time(
         yscale="log" if REPORT_ABSOLUTE_TIME_LOG_SCALE else None,
         plotter=lambda ax: ax.scatter(depths, insert_times, alpha=0.6),
     )
+
+def plot_hashtable_stat_depth_size(
+    hashtable_stat: Sequence[MemoHashtableStat], output_dir: Path
+) -> str:
+    if not hashtable_stat:
+        raise ValueError("hashtable_stat is empty")
+    output_path = output_dir / _fresh_plot_name()
+    plt.figure(figsize=(6, 4.5))
+    depths = [entry.depth for entry in hashtable_stat]
+    sizes = [entry.size for entry in hashtable_stat]
+    plt.scatter(depths, sizes, alpha=0.6)
+    plt.xlabel("Depth")
+    plt.ylabel("Hashtable size")
+    plt.title("Memo hashtable size vs depth")
+    plt.yscale("log")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    return output_path.name
 
 
 def _sum_profile(entries: Sequence[ProfileEntry], *, key_name: str) -> float:

@@ -91,6 +91,7 @@ let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
         assert ((Value.summary vh).degree = ph);*)
         return (Option.map (fun vs -> vh :: vs) (value_match_pattern_aux vt pt))
     | PCon ph -> (
+        assert (not (Generic.is_empty ph));
         match Value.unwords v ph with None -> return None | Some v -> return (value_match_pattern_aux v pt))
 
 let value_match_pattern (v : value) (p : pattern) : value_subst_map option =

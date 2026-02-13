@@ -82,7 +82,7 @@ let rec eval =
       | VFix (e, env_) -> eval e (Cons (eval x env, Cons (fv, env_)))
       | VStuck fs -> VStuck (SApp (fs, x))
       | _ -> VStuck (STypeError (fv, VTFunc)))
-  | EHole x -> VStuck (SHole (x, env))
+  | EHole x -> VStuck (SHole x)
   | ETrue -> VTrue
   | EFalse -> VFalse
   | EIf (i, t, e) -> (

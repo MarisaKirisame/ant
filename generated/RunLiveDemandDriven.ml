@@ -26,7 +26,7 @@ module DemandedExpansion = struct
 
   and get_blocking_id_stuck stuck =
     match stuck with
-    | SHole (id, _) -> id
+    | SHole id -> id
     | STypeError _ -> None
     | SIndexError -> None
     | SApp (s, _) | SAdd0 (s, _) | SGt0 (s, _) | SIf (s, _, _) | SMatchList (s, _, _) -> get_blocking_id_stuck s

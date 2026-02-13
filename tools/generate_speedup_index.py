@@ -18,7 +18,9 @@ from plot_speedup import (
     plot_rule_stat,
     plot_rule_stat_hits,
     plot_rule_stat_insert_time,
+    plot_rule_stat_pvar_length_insert_time,
     plot_rule_stat_depth_insert_time,
+    plot_hashtable_stat_depth_size,
     plot_depth_breakdown,
     plot_depth_breakdown_cdf,
     profile_totals_from_result,
@@ -38,7 +40,13 @@ def render_html(
     size_scatter_plot = plot_rule_stat(records.rule_stat, output_dir)
     hit_scatter_plot = plot_rule_stat_hits(records.rule_stat, output_dir)
     insert_time_scatter_plot = plot_rule_stat_insert_time(records.rule_stat, output_dir)
+    pvar_insert_time_scatter_plot = plot_rule_stat_pvar_length_insert_time(records.rule_stat, output_dir)
     depth_insert_time_scatter_plot = plot_rule_stat_depth_insert_time(records.rule_stat, output_dir)
+    hashtable_depth_size_scatter_plot = None
+    if records.hashtable_stat:
+        hashtable_depth_size_scatter_plot = plot_hashtable_stat_depth_size(
+            records.hashtable_stat, output_dir
+        )
     profile_totals, profile_total_time = profile_totals_from_result(records)
     profile_table = render_profile_table(profile_totals, profile_total_time)
     doc = document(title="Memoization Speedup")
@@ -50,6 +58,7 @@ def render_html(
         with tag.main(cls="panel"):
             tag.h1("Memoization Speedup")
             tag.p(f"Data source: {data_label}", cls="meta")
+            _render_node_counts(records)
             _render_speedup_comparison(
                 records,
                 output_dir,
@@ -82,11 +91,28 @@ def render_html(
             _plot_image(size_scatter_plot, "Memo rule size vs sc scatter plot")
             _plot_image(hit_scatter_plot, "Memo rule size vs hit count scatter plot")
             _plot_image(insert_time_scatter_plot, "Memo rule size vs insert time scatter plot")
+            _plot_image(pvar_insert_time_scatter_plot, "Memo rule pvar length vs insert time scatter plot")
             _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
+            if hashtable_depth_size_scatter_plot is not None:
+                _plot_image(
+                    hashtable_depth_size_scatter_plot,
+                    "Memo hashtable size vs depth scatter plot",
+                )
             _render_large_rule_stats(records, min_size=40, limit=5)
             with tag.section(cls="profile"):
                 raw(profile_table)
     return doc.render()
+
+
+def _render_node_counts(records: Result) -> None:
+    counts = records.node_counts
+    if counts is None:
+        return None
+    with tag.section(cls="stats"):
+        stat_card("Stem nodes", str(counts.stem_nodes))
+        stat_card("Branch nodes", str(counts.branch_nodes))
+        stat_card("Total nodes", str(counts.total_nodes))
+    return None
 
 
 def _render_speedup_comparison(
@@ -138,6 +164,7 @@ def _render_large_rule_stats(records: Result, *, min_size: int, limit: int) -> N
                     tag.th("SC")
                     tag.th("Hit count")
                     tag.th("Insert time (ns)")
+                    tag.th("PVar length")
                     tag.th("Depth")
                     tag.th("Rule")
             with tag.tbody():
@@ -147,6 +174,7 @@ def _render_large_rule_stats(records: Result, *, min_size: int, limit: int) -> N
                         tag.td(str(rule.sc))
                         tag.td(str(rule.hit_count))
                         tag.td(str(rule.insert_time))
+                        tag.td(str(rule.pvar_length))
                         tag.td(str(rule.depth))
                         tag.td(tag.code(rule.rule))
     return None
