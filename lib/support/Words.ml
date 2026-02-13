@@ -1,4 +1,4 @@
-open BatFingerTree
+open PlainTree
 open Word
 open Common
 module Hasher = Hash.MCRC32C
@@ -126,7 +126,7 @@ let lcp (x : words) (y : words) : words * words * words =
     else if hi < 8 then
       let xh, xt = words_front_exn x in
       let yh, yt = words_front_exn y in
-      if Word.equal xh yh then search (hi - 1) (append common (singleton xh)) xt x_rest yt y_rest
+      if Word.equal xh yh then search (hi - 1) (append common (Generic.singleton xh)) xt x_rest yt y_rest
       else (common, append x x_rest, append y y_rest)
     else
       let mid = (hi + 1) / 2 in

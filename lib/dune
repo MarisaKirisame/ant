@@ -29,7 +29,7 @@
   Common
   AntHashtbl
   Profile
-  batFingerTree
+  PlainTree
   Ir
   SynInfo
   Code

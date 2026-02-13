@@ -1,6 +1,6 @@
 open Value
 open Words
-open BatFingerTree
+open PlainTree
 
 (* Design notes on the pattern/value/word relationship now live in
    docs/internal.md#patterns-as-finger-trees-patternml. *)

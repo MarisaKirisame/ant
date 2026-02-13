@@ -1,7 +1,7 @@
 open Value
 open Pattern
-open BatFingerTree
-module Hashtbl = AntHashtbl
+open PlainTree
+module Hashtbl = Core.Hashtbl
 
 module Children = struct
   type 'a repr = Small of (int * 'a) list | Hash of (int, 'a) Hashtbl.t
