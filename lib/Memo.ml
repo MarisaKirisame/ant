@@ -208,6 +208,16 @@ let string_of_trie (t : trie) : string = match t with Leaf _ -> "Leaf" | Branch 
 let choose_step x y = if x.sc > y.sc then x else y
 let choose_step_option x y = match (x, y) with None, y -> y | x, None -> x | Some x, Some y -> Some (choose_step x y)
 
+let rec max_sc_of_trie (t : trie) : int =
+  match t with
+  | Leaf (_, step) -> step.sc
+  | Branch br ->
+      let acc = ref (max_sc_of_trie_opt br.var) in
+      Children.iter br.const ~f:(fun child -> acc := max !acc (max_sc_of_trie child));
+      !acc
+
+and max_sc_of_trie_opt (t : trie option) : int = match t with None -> 0 | Some t -> max_sc_of_trie t
+
 let trie_degree (x : trie) : int =
   match x with Leaf (p, _) -> (Pattern.pattern_measure p).degree | Branch br -> br.degree
 
@@ -368,43 +378,61 @@ let insert_step (m : memo) (step : step) : unit =
   in
   step.insert_time <- elapsed_time
 
-let rec lookup_step_aux (x : trie option) (value : Value.value) : step option =
+let acc_sc (acc : step option) : int = match acc with None -> 0 | Some step -> step.sc
+
+let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : step option) : step option =
   (match x with None -> () | Some x -> assert (trie_degree x = (Value.value_measure value).degree));
   match x with
-  | None -> None
-  | Some (Leaf (p, step)) ->
-      assert ((Pattern.pattern_measure p).degree = (Value.value_measure value).degree);
-      assert ((Pattern.pattern_measure p).max_degree = (Value.value_measure value).max_degree);
-      if Option.is_some (Dependency.value_match_pattern_aux value p) then Some step else None
-  | Some (Branch br) -> (
-      match Value.unwords value br.prefix with
-      | None -> None
-      | Some value ->
-          let var =
-            match br.var with
-            | None -> None
-            | Some var ->
-                let _, value = Value.pop_n value 1 in
-                lookup_step_aux (Some var) value
-          in
-          let const =
-            let Words vh, vt = Value.front_exn value in
-            let vhh, vht = Words.words_front_exn vh in
-            let key = Word.hash vhh in
-            match Children.find br.const key with
-            | None -> None
-            | Some const ->
-                let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
-                lookup_step_aux (Some const) vt
-          in
-          choose_step_option var const)
+  | None -> acc
+  | Some trie -> (
+      if acc_sc acc >= max_sc_of_trie trie then acc
+      else
+        match trie with
+        | Leaf (p, step) ->
+            assert ((Pattern.pattern_measure p).degree = (Value.value_measure value).degree);
+            assert ((Pattern.pattern_measure p).max_degree = (Value.value_measure value).max_degree);
+            if Option.is_some (Dependency.value_match_pattern_aux value p) then choose_step_option acc (Some step)
+            else acc
+        | Branch br -> (
+            match Value.unwords value br.prefix with
+            | None -> acc
+            | Some value ->
+                let var_child =
+                  match br.var with
+                  | None -> None
+                  | Some var ->
+                      let _, value = Value.pop_n value 1 in
+                      Some (var, value)
+                in
+                let const_child =
+                  let Words vh, vt = Value.front_exn value in
+                  let vhh, vht = Words.words_front_exn vh in
+                  let key = Word.hash vhh in
+                  match Children.find br.const key with
+                  | None -> None
+                  | Some const ->
+                      let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
+                      Some (const, vt)
+                in
+                let var_max = match var_child with None -> 0 | Some (var, _) -> max_sc_of_trie var in
+                let const_max = match const_child with None -> 0 | Some (const, _) -> max_sc_of_trie const in
+                let explore child child_max acc =
+                  if child_max = 0 || acc_sc acc >= child_max then acc
+                  else match child with None -> acc | Some (trie, value) -> lookup_step_aux (Some trie) value acc
+                in
+                if var_max >= const_max then
+                  let acc = explore var_child var_max acc in
+                  explore const_child const_max acc
+                else
+                  let acc = explore const_child const_max acc in
+                  explore var_child var_max acc))
 
 let rec list_to_value (x : Value.value list) : Value.value =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Value.append h (list_to_value t)
 
 let lookup_step (value : state) (m : memo) : step option =
   let pc = value.c.pc in
-  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value))
+  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) None
 
 type 'a bin = 'a digit list
 and 'a digit = Zero | One of 'a
