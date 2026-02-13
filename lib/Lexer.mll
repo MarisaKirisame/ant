@@ -1,6 +1,7 @@
 {
 open Lexing
 open Tokens
+module Hashtbl = AntHashtbl
 
 type error =
   | UnexpectedToken of string
