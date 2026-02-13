@@ -24,7 +24,7 @@
   Intmap
   Common
   Profile
-  batFingerTree
+  PlainTree
   Ir
   SynInfo
   Code
