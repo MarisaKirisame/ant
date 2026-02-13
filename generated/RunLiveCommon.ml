@@ -182,7 +182,7 @@ let rec pp_value fmt value =
   | LC.VStuck stuck -> pp_stuck fmt stuck
 
 and pp_stuck fmt = function
-  | LC.SHole (_, env) -> Format.fprintf fmt "<hole env=%d>" (len_live_list env)
+  | LC.SHole _ -> Format.fprintf fmt "<hole>"
   | LC.STypeError (value, ty) -> Format.fprintf fmt "<type-error %a : %a>" pp_value value pp_vtype ty
   | LC.SIndexError -> Format.pp_print_string fmt "<index-error>"
   | LC.SApp (stuck, expr) -> Format.fprintf fmt "<stuck app %a %a>" pp_stuck stuck pp_expr expr
@@ -240,6 +240,7 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
            `Assoc
              [
                ("size", `Int entry.size);
+               ("pvar_length", `Int entry.pvar_length);
                ("sc", `Int entry.sc);
                ("hit_count", `Int entry.hit_count);
                ("insert_time", `Int entry.insert_time);
@@ -248,8 +249,38 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
              ])
          stats.rule_stat)
   in
+  let node_stat =
+    `List
+      (List.map
+         (fun (entry : Memo.node_stat) ->
+           `Assoc
+             [
+               ("depth", `Int entry.depth);
+               ("insert_time", `Int entry.insert_time);
+               ( "node_state",
+                 `String (match entry.node_state with Memo.Stem_node -> "stem" | Memo.Branch_node -> "branch") );
+               ("rule", `String "");
+             ])
+         stats.node_stat)
+  in
+  let hashtable_stat =
+    `List
+      (List.map
+         (fun (entry : Memo.hashtable_stat) -> `Assoc [ ("depth", `Int entry.depth); ("size", `Int entry.size) ])
+         stats.hashtable_stat)
+  in
   let json =
-    `Assoc [ ("name", `String "memo_stats"); ("depth_breakdown", depth_breakdown); ("rule_stat", rule_stat) ]
+    `Assoc
+      [
+        ("name", `String "memo_stats");
+        ("depth_breakdown", depth_breakdown);
+        ("rule_stat", rule_stat);
+        ("node_stat", node_stat);
+        ("stem_nodes", `Int stats.node_counts.stem_nodes);
+        ("branch_nodes", `Int stats.node_counts.branch_nodes);
+        ("total_nodes", `Int stats.node_counts.total_nodes);
+        ("hashtable_stat", hashtable_stat);
+      ]
   in
   Yojson.Safe.to_string json |> output_string oc;
   output_char oc '\n';
@@ -259,15 +290,26 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
    shares types with LiveCEK, so no conversion is necessary.  Timing is recorded via
    the shared profiler and consumed by write_steps_json. *)
 let eval_plain_slot = Profile.register_slot Profile.plain_profile "eval_plain"
+let eval_cek_slot = Profile.register_slot Profile.cek_profile "eval_cek"
 
 let eval_plain (expr : LC.expr) : LC.value =
   let env = LC.Nil in
   Gc.full_major ();
+  let _ =
+    Profile.with_slot eval_cek_slot (fun () ->
+        LC.to_ocaml_value
+          (Memo.exec_cek_raw
+             (Memo.pc_to_exp (Common.int_to_pc 4))
+             (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
+             (Memo.from_constructor LC.tag_cont_done)))
+  in
+  Gc.full_major ();
   Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env)
 
-let eval_expression ~memo ~write_steps x =
-  let exec_res = LC.eval memo (LC.from_ocaml_expr x) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
-  let _ = eval_plain x in
+let eval_expression ~memo ~write_steps expr =
+  Gc.full_major ();
+  let exec_res = LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
+  let _ = eval_plain expr in
   write_steps exec_res;
   LC.to_ocaml_value exec_res.words
 
@@ -334,6 +376,8 @@ let random_list =
     58;
   ]
 
-let random_list = random_list @ random_list @ random_list
-let random_list = random_list @ random_list
+(*let random_list = random_list @ random_list @ random_list*)
+let random_list =
+  random_list @ random_list @ random_list @ random_list @ random_list @ random_list @ random_list @ random_list
+
 let random_list_expr = List.fold_right (fun n acc -> LC.ECons (LC.EInt n, acc)) random_list LC.ENil

@@ -1,4 +1,4 @@
-let usage = "Usage: GeneratedMain <live-simple|live-left-to-right|live-demand-driven|test|tailrec|hazel>"
+let usage = "Usage: GeneratedMain <live-simple|live-left-to-right|live-list-extend|live-demand-driven|test|tailrec|hazel>"
 
 let () =
   match Array.to_list Sys.argv with
@@ -6,6 +6,7 @@ let () =
       match String.lowercase_ascii mode with
       | "live-simple" -> RunLiveSimple.run ()
       | "live-left-to-right" -> RunLiveLeftToRight.run ()
+      | "live-list-extend" -> RunLiveListExtend.run ()
       | "live-demand-driven" -> RunLiveDemandDriven.run ()
       | "test" -> RunTest.run ()
       | "tailrec" -> RunTailRec.run ()

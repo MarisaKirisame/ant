@@ -58,7 +58,7 @@ and vtype =
   | VTPair
 
 and stuck =
-  | SHole of option int * list value
+  | SHole of option int
   | STypeError of value * vtype
   | SIndexError
   | SApp of stuck * expr
@@ -152,7 +152,7 @@ let rec eval = fun expr env ->
     | VFix e env_ -> eval e (Cons (eval x env) (Cons fv env_))
     | VStuck fs -> VStuck (SApp fs x)
     | _ -> VStuck (STypeError fv VTFunc))
-  | EHole x -> VStuck (SHole x env)
+  | EHole x -> VStuck (SHole x)
   | ETrue -> VTrue
   | EFalse -> VFalse
   | EIf i t e -> 

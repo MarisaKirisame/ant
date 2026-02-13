@@ -151,6 +151,11 @@ def generate_reports() -> None:
         css_source=css_source,
     )
     speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_list_extend.json"),
+        output_dir=Path("output/live-list-extend"),
+        css_source=css_source,
+    )
+    speedup_module.generate_speedup_report(
         input_path=Path("eval_steps_left_to_right.json"),
         output_dir=Path("output/live-left-to-right"),
         css_source=css_source,
@@ -170,6 +175,7 @@ def generate_reports() -> None:
         output=Path("output/index.html"),
         entries=[
             ("Simple Benchmark", Path("output/live-simple/index.html")),
+            ("List Extend Benchmark", Path("output/live-list-extend/index.html")),
             ("Left-to-right Benchmark", Path("output/live-left-to-right/index.html")),
             ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
             ("Hazel Benchmark", Path("output/hazel/index.html")),
