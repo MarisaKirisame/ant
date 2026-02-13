@@ -160,4 +160,7 @@ let unwords (v : value) (w : Words.words) : value option =
 let value_to_words (v : value) : Words.words =
   let vt, vh = Generic.front_exn ~measure ~monoid v in
   assert (Generic.is_empty vt);
-  match vh with Words vh -> vh | _ -> failwith "impossible"
+  match vh with
+  | Words vh_words -> vh_words
+  | Reference r ->
+      failwith ("value_to_words: expected Words but found Reference " ^ string_of_reference r)
