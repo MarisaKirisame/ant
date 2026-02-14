@@ -356,16 +356,13 @@ let rec list_to_pattern (x : Pattern.pattern list) : Pattern.pattern =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Pattern.pattern_append h (list_to_pattern t)
 
 let insert_step (m : memo) (step : step) : unit =
-  let start_time = Time_stamp_counter.now () in
+  let start_time = Timer.create () in
+  let end_time = Timer.create () in
+  Timer.record start_time;
   Array.set m step.src.c.pc
     (Some (insert_option (Array.get m step.src.c.pc) (list_to_pattern (ek_to_list step.src)) step));
-  let end_time = Time_stamp_counter.now () in
-  let calibrator = Lazy.force Time_stamp_counter.calibrator in
-  let elapsed_time =
-    Time_stamp_counter.diff end_time start_time
-    |> Time_stamp_counter.Span.to_time_ns_span ~calibrator
-    |> Core.Time_ns.Span.to_int63_ns |> Core.Int63.to_int_exn
-  in
+  Timer.record end_time;
+  let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
   step.insert_time <- elapsed_time
 
 let rec lookup_step_aux (x : trie option) (value : Value.value) : step option =

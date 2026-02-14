@@ -19,7 +19,7 @@ let with_slot (index : profile_index) (f : unit -> 'a) : 'a =
   in
   let stop_timer p timer =
     Timer.record timer.end_time;
-    let elapsed_time = Int64.to_int @@ Timer.diff_nanoseconds timer.start_time timer.end_time in
+    let elapsed_time = Int64.to_int @@ Timer.diff_nanoseconds_positive timer.start_time timer.end_time in
     let slot = Dynarray.get p.slots timer.index in
     slot.total_time <- slot.total_time + elapsed_time
   in

@@ -60,7 +60,7 @@ CAMLprim value ns_timer_record(value v_timer) {
   
 #if defined(_WIN32) || defined(_WIN64)
   QueryPerformanceCounter(&t->value);
-#elif defined(APPLE)
+#elif defined(__APPLE__)
   clock_gettime(CLOCK_MONOTONIC_RAW, &t->value);
 #else
   clock_gettime(CLOCK_MONOTONIC, &t->value);
@@ -75,16 +75,18 @@ CAMLprim value ns_timer_diff(value v_t1, value v_t2) {
   CAMLparam2(v_t1, v_t2);
   timestamp_t *t1 = Timestamp_val(v_t1);
   timestamp_t *t2 = Timestamp_val(v_t2);
-  uint64_t diff_ns;
+  int64_t diff_ns;
   
   if (!t1->is_initialized || !t2->is_initialized) {
     caml_failwith("Both timestamps must be initialized with `timer_record` before calculating difference");
   }
 
 #if defined(_WIN32) || defined(_WIN64)
-  diff_ns = (uint64_t)(((double)(t2->value.QuadPart - t1->value.QuadPart) * 1000000000.0) / (double)frequency.QuadPart);
+  diff_ns = (int64_t)(((double)(t2->value.QuadPart - t1->value.QuadPart) * 1000000000.0) / (double)frequency.QuadPart);
 #else
-  diff_ns = (uint64_t)(t2->value.tv_sec - t1->value.tv_sec) * 1000000000ULL + (uint64_t)(t2->value.tv_nsec - t1->value.tv_nsec);
+  int64_t sec_diff = (int64_t)t2->value.tv_sec - (int64_t)t1->value.tv_sec;
+  int64_t nsec_diff = (int64_t)t2->value.tv_nsec - (int64_t)t1->value.tv_nsec;
+  diff_ns = sec_diff * 1000000000LL + nsec_diff;
 #endif
 
   CAMLreturn(caml_copy_int64(diff_ns));
