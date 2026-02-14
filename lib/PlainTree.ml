@@ -6,6 +6,7 @@ module Generic = struct
   type ('a, 'm) fg = 'a list
   type ('wrapped_type, 'a, 'm) wrap = 'wrapped_type
 
+  (* Plain list backend: simple but asymptotically slower than finger trees. *)
   let empty = []
   let singleton x = [ x ]
   let is_empty = function [] -> true | _ -> false
@@ -15,12 +16,27 @@ module Generic = struct
   let append ~monoid:_ ~measure:_ x y = x @ y
   let front ~monoid:_ ~measure:_ = function [] -> None | x :: xs -> Some (xs, x)
   let front_exn ~monoid ~measure t = match front ~monoid ~measure t with Some v -> v | None -> raise Empty
-  let rear ~monoid:_ ~measure:_ t = match List.rev t with [] -> None | x :: xs -> Some (List.rev xs, x)
+
+  let rear ~monoid:_ ~measure:_ t =
+    let rec aux prev = function [] -> None | [ x ] -> Some (List.rev prev, x) | x :: xs -> aux (x :: prev) xs in
+    aux [] t
+
   let rear_exn ~monoid ~measure t = match rear ~monoid ~measure t with Some v -> v | None -> raise Empty
   let head = function [] -> None | x :: _ -> Some x
   let head_exn = function [] -> raise Empty | x :: _ -> x
-  let last = function [] -> None | xs -> Some (List.nth xs (List.length xs - 1))
-  let last_exn = function [] -> raise Empty | xs -> List.nth xs (List.length xs - 1)
+
+  let last = function
+    | [] -> None
+    | xs ->
+        let rec aux = function [ x ] -> x | _ :: tl -> aux tl | [] -> assert false in
+        Some (aux xs)
+
+  let last_exn = function
+    | [] -> raise Empty
+    | xs ->
+        let rec aux = function [ x ] -> x | _ :: tl -> aux tl | [] -> assert false in
+        aux xs
+
   let fold_left f acc t = List.fold_left f acc t
   let fold_right f acc t = List.fold_right (fun x acc -> f acc x) t acc
   let iter f t = List.iter f t
