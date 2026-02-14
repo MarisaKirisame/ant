@@ -170,6 +170,11 @@ def generate_reports() -> None:
         output_dir=Path("output/hazel"),
         css_source=css_source,
     )
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_lisp.json"),
+        output_dir=Path("output/lisp"),
+        css_source=css_source,
+    )
     generate_html(
         title="Live Benchmark Index",
         output=Path("output/index.html"),
@@ -179,6 +184,7 @@ def generate_reports() -> None:
             ("Left-to-right Benchmark", Path("output/live-left-to-right/index.html")),
             ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
             ("Hazel Benchmark", Path("output/hazel/index.html")),
+            ("Lisp Benchmark", Path("output/lisp/index.html")),
         ],
         css_source=css_source,
     )

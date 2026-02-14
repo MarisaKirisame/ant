@@ -102,6 +102,7 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
            `Assoc
              [
                ("size", `Int entry.size);
+               ("pvar_length", `Int entry.pvar_length);
                ("sc", `Int entry.sc);
                ("hit_count", `Int entry.hit_count);
                ("insert_time", `Int entry.insert_time);
@@ -110,8 +111,38 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
              ])
          stats.rule_stat)
   in
+  let node_stat =
+    `List
+      (List.map
+         (fun (entry : Memo.node_stat) ->
+           `Assoc
+             [
+               ("depth", `Int entry.depth);
+               ("insert_time", `Int entry.insert_time);
+               ( "node_state",
+                 `String (match entry.node_state with Memo.Stem_node -> "stem" | Memo.Branch_node -> "branch") );
+               ("rule", `String "");
+             ])
+         stats.node_stat)
+  in
+  let hashtable_stat =
+    `List
+      (List.map
+         (fun (entry : Memo.hashtable_stat) -> `Assoc [ ("depth", `Int entry.depth); ("size", `Int entry.size) ])
+         stats.hashtable_stat)
+  in
   let json =
-    `Assoc [ ("name", `String "memo_stats"); ("depth_breakdown", depth_breakdown); ("rule_stat", rule_stat) ]
+    `Assoc
+      [
+        ("name", `String "memo_stats");
+        ("depth_breakdown", depth_breakdown);
+        ("rule_stat", rule_stat);
+        ("node_stat", node_stat);
+        ("stem_nodes", `Int stats.node_counts.stem_nodes);
+        ("branch_nodes", `Int stats.node_counts.branch_nodes);
+        ("total_nodes", `Int stats.node_counts.total_nodes);
+        ("hashtable_stat", hashtable_stat);
+      ]
   in
   Yojson.Safe.to_string json |> output_string oc;
   output_char oc '\n';
@@ -135,10 +166,22 @@ let write_steps_json oc (r : Memo.exec_result) : unit =
   flush oc
 
 let eval_plain_slot = Ant.Profile.register_slot Ant.Profile.plain_profile "eval_plain"
+let eval_cek_slot = Ant.Profile.register_slot Ant.Profile.cek_profile "eval_cek"
 
 let eval_plain expr =
   let plain_expr = plain_expr_of_lc expr in
-  ignore (Ant.Profile.with_slot eval_plain_slot (fun () -> Plain.eval plain_expr Plain.Nil))
+  (* ignore (Ant.Profile.with_slot eval_plain_slot (fun () -> Plain.eval plain_expr Plain.Nil)) *)
+
+  Gc.full_major ();
+  let lp_result = Ant.Profile.with_slot eval_plain_slot (fun () -> Plain.eval plain_expr Plain.Nil) in
+  Ant.Profile.with_slot eval_cek_slot (fun () ->
+      let seq = LC.from_ocaml_expr expr in
+      let res =
+        match !current_memo with
+        | Some memo -> LC.eval memo seq empty_env_seq
+        | None -> with_memo (fun memo -> LC.eval memo seq empty_env_seq)
+      in
+      ())
 
 let string_of_atom = function
   | LC.AVar i -> Printf.sprintf "#%d" i

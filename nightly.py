@@ -241,6 +241,7 @@ def run_project() -> None:
     opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
     for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
         opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
+    opam_exec(["dune", "exec", "GeneratedMain", "lisp"], env=env)
 
 
 def profile_project() -> None:

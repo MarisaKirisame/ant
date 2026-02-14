@@ -633,10 +633,7 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
           | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
         c
     in
-    let default_case =
-      ( string dummy,
-        unreachable__ (Dynarray.length codes) (code (string "(string_of_int (" ^^ string dummy ^^ string "))")) )
-    in
+    let default_case = (string "_", unreachable_ (Dynarray.length codes)) in
     paren $ match_raw_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])]
 
 let compile_binding (ctx : ctx) name ps term entry_code : document =
