@@ -1,6 +1,6 @@
-open Value
-open Pattern
-open BatFingerTree
+open ValueTree
+open PatternTree
+open Word
 module Hashtbl = Core.Hashtbl
 
 module Children = struct
@@ -15,7 +15,7 @@ module Children = struct
     match t.repr with Small lst -> List.assoc_opt key lst | Hash tbl -> Hashtbl.find tbl key
 
   let to_hash (lst : (int * 'a) list) : (int, 'a) Hashtbl.t =
-    let tbl = Hashtbl.create ~size:(List.length lst) () in
+    let tbl = Hashtbl.create (module Core.Int) in
     List.iter (fun (k, v) -> Hashtbl.set tbl ~key:k ~data:v) lst;
     tbl
 
@@ -65,17 +65,7 @@ and 'a cek = { mutable c : exp; mutable e : 'a Dynarray.t; mutable k : 'a }
 and state = value cek
 and step = { src : pattern cek; dst : value cek; sc : int; mutable hit : int; mutable insert_time : int }
 and memo = trie option Array.t
-and trie = Leaf of { prefix : Pattern.pattern; step : step; max_sc : int } | Branch of branch
-
-and branch = {
-  creator : string;
-  degree : int;
-  prefix : Words.words;
-  var : trie option;
-  const : trie Children.t;
-  mutable max_sc : int;
-}
-
+and trie = { mutable steps : step option; mutable var : trie option; const : trie Children.t; mutable max_sc : int }
 and world = { state : state; memo : memo; resolved : bool cek }
 
 let cek_get (cek : 'a cek) (src : Source.t) : 'a =
@@ -154,12 +144,7 @@ let string_of_cek_generic (string_of_a : 'a -> string) (s : 'a cek) : string =
   ^ (", e: " ^ (Dynarray.to_list s.e |> List.map string_of_a |> String.concat ", "))
   ^ ", k: " ^ string_of_a s.k
 
-let is_done (s : state) : bool =
-  match Generic.front_exn s.k ~monoid:Value.monoid ~measure:Value.measure with
-  | _, Words w -> (
-      let _, wh = Generic.front_exn ~monoid:Words.monoid ~measure:Words.measure w in
-      match wh with ConstructorTag ct when ct = 0 -> s.c.pc = 0 | _ -> false)
-  | _ -> failwith "unreachable"
+let is_done (s : state) : bool = match s.k with Node (ConstructorTag ct, _) when ct = 0 -> s.c.pc = 0 | _ -> false
 
 (* The continuation is stored last since it is mainly meaningful together with the environment. *)
 let ek_to_list (s : 'a cek) : 'a list =

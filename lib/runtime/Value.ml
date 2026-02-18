@@ -1,4 +1,4 @@
-open PlainTree
+open BatFingerTree
 module Hasher = Hash.MCRC32C
 open Word
 include Reference

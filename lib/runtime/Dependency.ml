@@ -1,7 +1,7 @@
 open Value
 open Word
 open Words
-open PlainTree
+open BatFingerTree
 open State
 open Pattern
 open Common
