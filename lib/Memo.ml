@@ -98,12 +98,13 @@ let to_word (s : seq) : Word.t =
 
 let append (x : seq) (y : seq) : seq = Value.pack (Value.unpack_seq x @ Value.unpack_seq y)
 let empty_seq : seq = Value.pack []
+let flatten_seqs (xs : seq list) : seq list = List.concat_map xs ~f:Value.unpack_seq
 
 let appends (x : seq list) : seq =
   match x with
   | [] -> empty_seq
-  | Node (ConstructorTag tag, []) :: rest when tag <> Value.pack_tag -> Node (ConstructorTag tag, rest)
-  | head :: rest -> Value.pack (head :: rest)
+  | Node (ConstructorTag tag, []) :: rest when tag <> Value.pack_tag -> Node (ConstructorTag tag, flatten_seqs rest)
+  | _ -> Value.pack (flatten_seqs x)
 
 let splits (x : seq) : seq list = Value.unpack_seq x
 let rec splits_1 x = match splits x with h :: _ -> h | [] -> failwith "splits_1: empty"
