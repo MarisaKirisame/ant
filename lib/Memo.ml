@@ -1,4 +1,3 @@
-open PlainTree
 open Word
 module Hasher = Hash.MCRC32C
 open Base
@@ -37,15 +36,12 @@ let set_value (state : 'a cek) (src : source) (v : 'a) : unit =
   | K -> state.k <- v
 
 let rec subst (resolve : source -> seq option) (x : seq) : seq =
-  if Generic.is_empty x then x
-  else
-    let xt, xh = Generic.front_exn ~monoid ~measure x in
-    match xh with
-    | Words xh -> Value.value_cons (Words xh) (subst resolve xt)
-    | Reference r -> Value.append (subst_reference resolve r) (subst resolve xt)
+  match x with
+  | Reference r -> subst_reference resolve r
+  | Node (label, children) -> Node (label, List.map children ~f:(subst resolve))
 
 and subst_reference (resolve : source -> seq option) (r : reference) : seq =
-  match resolve r.src with Some seq -> slice seq r.offset r.values_count | None -> Generic.singleton (Reference r)
+  match resolve r.src with Some seq -> seq | None -> Reference r
 
 let subst_state (x : state) (resolve : source -> seq option) : state =
   let c = x.c in
@@ -66,10 +62,9 @@ let dyn_array_rev_update (f : 'a -> 'a) (arr : 'a Dynarray.t) : unit =
   done
 
 let rec val_refs_aux (x : value) (rs : reference list) : reference list =
-  match Generic.front ~monoid ~measure x with
-  | None -> rs
-  | Some (rest, Words w) -> val_refs_aux rest rs
-  | Some (rest, Reference r) -> val_refs_aux rest (r :: rs)
+  match x with
+  | Reference r -> r :: rs
+  | Node (_, children) -> List.fold_left children ~init:rs ~f:(fun acc c -> val_refs_aux c acc)
 
 let state_refs (state : state) : reference list =
   let e = Dynarray.fold_left (fun rs x -> val_refs_aux x rs) [] state.e in
@@ -79,13 +74,9 @@ let state_refs (state : state) : reference list =
 let rec resolve (w : world) (src : source) : Word.t * seq =
   set_value w.resolved src true;
   let v = get_value w.state src in
-  let vt, vh = Generic.front_exn ~monoid ~measure v in
-  match vh with
-  | Words vh ->
-      let vht, vhh = Generic.front_exn ~monoid:Words.monoid ~measure:Words.measure vh in
-      let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
-      (vhh, vt)
-  | _ -> failwith "cannot resolve reference"
+  match v with
+  | Reference _ -> failwith "cannot resolve reference"
+  | Node (label, children) -> (label, Value.pack children)
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
 let reset () = Dynarray.clear pc_map
@@ -96,77 +87,50 @@ let add_exp (f : world -> unit) (pc_ : int) : unit =
   Dynarray.add_last pc_map { step = f; pc }
 
 let pc_to_exp (Pc pc) : exp = Dynarray.get pc_map pc
-let from_constructor (ctag : int) : seq = Generic.singleton (Words (Generic.singleton (Word.ConstructorTag ctag)))
-let from_int (i : int) : seq = Generic.singleton (Words (Generic.singleton (Word.Int i)))
+let from_constructor (ctag : int) : seq = Node (Word.ConstructorTag ctag, [])
+let from_int (i : int) : seq = Node (Word.Int i, [])
 
 let to_word (s : seq) : Word.t =
-  assert ((Generic.measure ~monoid ~measure s).degree = 1);
-  assert ((Generic.measure ~monoid ~measure s).max_degree = 1);
-  assert (Generic.size s = 1);
-  match Generic.head_exn s with
-  | Words w ->
-      let wh, wt = Words.words_front_exn w in
-      assert (Generic.is_empty wt);
-      wh
-  | Reference _ -> failwith "conveting reference to_int"
+  match s with
+  | Node (label, []) -> label
+  | Reference _ -> failwith "converting reference to word"
+  | Node (_, _ :: _) -> failwith "converting non-leaf node to word"
 
-let append (x : seq) (y : seq) : seq = Value.append x y
-let appends (x : seq list) : seq = List.fold_right x ~init:Generic.empty ~f:append
-let pop (s : seq) = pop_n s 1
+let append (x : seq) (y : seq) : seq = Value.pack (Value.unpack_seq x @ Value.unpack_seq y)
+let empty_seq : seq = Value.pack []
 
-let rec splits (x : seq) : seq list =
-  if Generic.is_empty x then []
-  else
-    let h, t = pop x in
-    h :: splits t
+let appends (x : seq list) : seq =
+  match x with
+  | [] -> empty_seq
+  | Node (ConstructorTag tag, []) :: rest when tag <> Value.pack_tag -> Node (ConstructorTag tag, rest)
+  | head :: rest -> Value.pack (head :: rest)
 
-let rec splits_1 x =
-  let h, _ = pop x in
-  h
-
-let rec splits_2 x =
-  let h, t = pop x in
-  let h2, _ = pop t in
-  (h, h2)
+let splits (x : seq) : seq list = Value.unpack_seq x
+let rec splits_1 x = match splits x with h :: _ -> h | [] -> failwith "splits_1: empty"
+let rec splits_2 x = match splits x with h1 :: h2 :: _ -> (h1, h2) | _ -> failwith "splits_2: not enough elements"
 
 let rec splits_3 x =
-  let h, t = pop x in
-  let h2, t2 = pop t in
-  let h3, _ = pop t2 in
-  (h, h2, h3)
+  match splits x with h1 :: h2 :: h3 :: _ -> (h1, h2, h3) | _ -> failwith "splits_3: not enough elements"
 
 let rec splits_4 x =
-  let h, t = pop x in
-  let h2, t2 = pop t in
-  let h3, t3 = pop t2 in
-  let h4, _ = pop t3 in
-  (h, h2, h3, h4)
+  match splits x with h1 :: h2 :: h3 :: h4 :: _ -> (h1, h2, h3, h4) | _ -> failwith "splits_4: not enough elements"
 
 let list_match (x : seq) : (Word.t * seq) option =
-  match Generic.front ~monoid ~measure x with
-  | None -> None
-  | Some (rest, Words w) ->
-      let wh, wt = Words.words_front_exn w in
-      Some (wh, if Words.is_empty wt then rest else Generic.cons ~monoid ~measure rest (Words wt))
-  | Some (rest, Reference r) -> failwith "list_match on Reference"
+  match x with
+  | Reference _ -> failwith "list_match on Reference"
+  | Node (label, children) -> Some (label, Value.pack children)
 
-let push_env (w : world) (v : value) : unit =
-  assert ((Generic.measure ~monoid ~measure v).degree = 1);
-  assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
-  Dynarray.add_last w.state.e v
+let push_env (w : world) (v : value) : unit = Dynarray.add_last w.state.e v
 
 let pop_env (w : world) : value =
   let v = Dynarray.pop_last w.state.e in
-  assert ((Generic.measure ~monoid ~measure v).degree = 1);
-  assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
   v
 
 let env_call (w : world) (keep : int list) (nargs : int) : seq =
   let l = Dynarray.length w.state.e in
-  let ret = appends (List.map keep ~f:(fun i -> Dynarray.get w.state.e i)) in
+  let keep_values = List.map keep ~f:(fun i -> Dynarray.get w.state.e i) in
+  let ret = Value.pack keep_values in
   w.state.e <- Dynarray.init nargs (fun i -> Dynarray.get w.state.e (l - nargs + i));
-  assert ((Generic.measure ~monoid ~measure ret).degree = List.length keep);
-  assert ((Generic.measure ~monoid ~measure ret).max_degree = List.length keep);
   ret
 
 let restore_env (w : world) (n : int) (seqs : seq) : unit =
@@ -204,204 +168,133 @@ let assert_env_length (w : world) (e : int) : unit =
   assert (l = e)
 
 let init_memo () : memo = Array.create ~len:(Dynarray.length pc_map) None
-let string_of_trie (t : trie) : string = match t with Leaf _ -> "Leaf" | Branch _ -> "Branch"
 let choose_step x y = if x.sc > y.sc then x else y
 let choose_step_option x y = match (x, y) with None, y -> y | x, None -> x | Some x, Some y -> Some (choose_step x y)
 
-let trie_degree (x : trie) : int =
-  match x with Leaf (p, _) -> (Pattern.pattern_measure p).degree | Branch br -> br.degree
+type token = TVar | TNode of Word.t * int
 
-let rec build x xstep y ystep (acc : Words.words) =
-  let x_degree = (Pattern.pattern_measure x).degree in
-  let y_degree = (Pattern.pattern_measure y).degree in
-  let acc_degree = (Words.summary acc).degree in
-  assert (x_degree = y_degree);
-  if Pattern.pattern_is_empty x then (
-    assert (Pattern.pattern_is_empty y);
-    let prefix =
-      if Generic.is_empty acc then Generic.empty else Pattern.pattern_cons (Pattern.PCon acc) Generic.empty
-    in
-    Leaf (prefix, choose_step xstep ystep))
-  else (
-    assert (not (Pattern.pattern_is_empty y));
-    let xh, xt = Pattern.pattern_front_exn x in
-    let yh, yt = Pattern.pattern_front_exn y in
-    match (xh, yh) with
-    | Pattern.PCon xh, Pattern.PCon yh ->
-        let lcp, xh, yh = Words.lcp xh yh in
-        if Generic.is_empty lcp then (
-          let const = Children.create () in
-          let xhh, xht = Words.words_front_exn xh in
-          let xkey = Word.hash xhh in
-          let xt = if Generic.is_empty xht then xt else Pattern.pattern_cons (Pattern.PCon xht) xt in
-          let yhh, yht = Words.words_front_exn yh in
-          let ykey = Word.hash yhh in
-          let yt = if Generic.is_empty yht then yt else Pattern.pattern_cons (Pattern.PCon yht) yt in
-          assert (xkey <> ykey);
-          Children.set const xkey (Leaf (xt, xstep));
-          Children.set const ykey (Leaf (yt, ystep));
-          Branch { creator = "build disagree on cons"; degree = x_degree + acc_degree; prefix = acc; var = None; const })
-        else
-          let acc = Words.append acc lcp in
-          let xt = if Generic.is_empty xh then xt else Pattern.pattern_cons (Pattern.PCon xh) xt in
-          let yt = if Generic.is_empty yh then yt else Pattern.pattern_cons (Pattern.PCon yh) yt in
-          build xt xstep yt ystep acc
-    | Pattern.PCon xh, Pattern.PVar yh ->
-        let yt = if yh = 1 then yt else Pattern.pattern_cons (Pattern.PVar (yh - 1)) yt in
-        let var = Some (Leaf (yt, ystep)) in
-        let const = Children.create () in
-        let xhh, xht = Words.words_front_exn xh in
-        let key = Word.hash xhh in
-        let xt = if Generic.is_empty xht then xt else Pattern.pattern_cons (Pattern.PCon xht) xt in
-        Children.set const key (Leaf (xt, xstep));
-        Branch { creator = "build disagree on var"; degree = x_degree + acc_degree; prefix = acc; var; const }
-    | Pattern.PVar _, Pattern.PCon _ -> build y ystep x xstep acc
-    | Pattern.PVar xh, Pattern.PVar yh ->
-        let xt = if xh = 1 then xt else Pattern.pattern_cons (Pattern.PVar (xh - 1)) xt in
-        let yt = if yh = 1 then yt else Pattern.pattern_cons (Pattern.PVar (yh - 1)) yt in
-        let var = Some (build xt xstep yt ystep Generic.empty) in
-        let const = Children.create () in
-        Branch { creator = "build disagree on var"; degree = x_degree + acc_degree; prefix = acc; var; const })
+let token_key (label : Word.t) (arity : int) : int = Stdlib.Hashtbl.hash (Word.hash label, arity)
 
-let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : step) : trie =
-  let ret x =
-    assert (trie_degree x = (Pattern.pattern_measure prefix').degree);
-    x
+let rec tokens_of_pattern (p : Pattern.pattern) : token list =
+  match p with
+  | Pattern.PVar _ -> [ TVar ]
+  | Pattern.PNode (label, children) ->
+      TNode (label, List.length children) :: List.concat_map children ~f:tokens_of_pattern
+
+let rec tokens_of_value (v : Value.value) : token list =
+  match v with
+  | Reference _ -> failwith "tokens_of_value: reference in value"
+  | Node (label, children) -> TNode (label, List.length children) :: List.concat_map children ~f:tokens_of_value
+
+let compute_subtree_end (tokens : token array) : int array =
+  let n = Array.length tokens in
+  let end_pos = Array.create ~len:n 0 in
+  let rec compute i =
+    match tokens.(i) with
+    | TVar ->
+        end_pos.(i) <- i + 1;
+        i + 1
+    | TNode (_, arity) ->
+        let j = ref (i + 1) in
+        for _ = 1 to arity do
+          j := compute !j
+        done;
+        end_pos.(i) <- !j;
+        !j
   in
-  (match x with None -> () | Some x -> assert (trie_degree x = (Pattern.pattern_measure prefix').degree));
-  match x with
-  | None -> ret (Leaf (prefix', step'))
-  | Some (Leaf (prefix, step)) -> ret (build prefix step prefix' step' Generic.empty)
-  | Some (Branch br) -> (
-      let ph, pt = Pattern.pattern_front_exn prefix' in
-      match ph with
-      | Pattern.PCon ph ->
-          let lcp, ph, br_prefix = Words.lcp ph br.prefix in
-          if Generic.is_empty br_prefix then (
-            if Generic.is_empty ph then
-              let ph, pt = Pattern.pattern_front_exn pt in
-              match ph with
-              | Pattern.PCon _ -> failwith "impossible"
-              | Pattern.PVar ph ->
-                  let pt = if ph = 1 then pt else Pattern.pattern_cons (Pattern.PVar (ph - 1)) pt in
-                  let var = Some (insert_option br.var pt step') in
-                  ret (Branch { br with var })
-            else
-              let phh, pht = Words.words_front_exn ph in
-              let key = Word.hash phh in
-              let pt = if Generic.is_empty pht then pt else Pattern.pattern_cons (Pattern.PCon pht) pt in
-              Children.update br.const key ~f:(fun x -> insert_option x pt step');
-              ret (Branch br))
-          else
-            let const = Children.create () in
-            let brh, brt = Words.words_front_exn br_prefix in
-            let brkey = Word.hash brh in
-            let x = Branch { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
-            Children.set const brkey x;
-            if Generic.is_empty ph then
-              let ph, pt = Pattern.pattern_front_exn pt in
-              match ph with
-              | Pattern.PCon _ -> failwith "impossible"
-              | Pattern.PVar ph ->
-                  let pt = if ph = 1 then pt else Pattern.pattern_cons (Pattern.PVar (ph - 1)) pt in
-                  let var = Some (Leaf (pt, step')) in
-                  ret
-                    (Branch
-                       {
-                         creator = "unexhausted lcp (var case)";
-                         degree = (Pattern.pattern_measure prefix').degree;
-                         prefix = lcp;
-                         var;
-                         const;
-                       })
-            else
-              let phh, pht = Words.words_front_exn ph in
-              let key = Word.hash phh in
-              let pt = if Generic.is_empty pht then pt else Pattern.pattern_cons (Pattern.PCon pht) pt in
-              Children.update const key ~f:(fun x -> insert_option x pt step');
-              ret
-                (Branch
-                   {
-                     creator = "unexhausted lcp (const case)";
-                     degree = (Pattern.pattern_measure prefix').degree;
-                     prefix = lcp;
-                     var = None;
-                     const;
-                   })
-      | Pattern.PVar ph ->
-          let pt = if ph = 1 then pt else Pattern.pattern_cons (Pattern.PVar (ph - 1)) pt in
-          if Generic.is_empty br.prefix then ret (Branch { br with var = Some (insert_option br.var pt step') })
-          else
-            let const = Children.create () in
-            let brh, brt = Words.words_front_exn br.prefix in
-            let brkey = Word.hash brh in
-            let x = Branch { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
-            Children.set const brkey x;
-            Branch
-              {
-                creator = "inserting var case";
-                degree = (Pattern.pattern_measure prefix').degree;
-                prefix = Generic.empty;
-                var = Some (Leaf (pt, step'));
-                const;
-              })
+  if n = 0 then end_pos
+  else (
+    ignore (compute 0);
+    end_pos)
 
-let pattern_size (p : Pattern.pattern) = Generic.size p
+let empty_trie () : trie = { steps = None; var = None; const = Children.create () }
+
+let rec insert_tokens (t : trie) (tokens : token list) (step : step) : unit =
+  match tokens with
+  | [] -> t.steps <- Some (match t.steps with None -> step | Some s -> choose_step s step)
+  | TVar :: rest ->
+      let child =
+        match t.var with
+        | Some child -> child
+        | None ->
+            let child = empty_trie () in
+            t.var <- Some child;
+            child
+      in
+      insert_tokens child rest step
+  | TNode (label, arity) :: rest ->
+      let key = token_key label arity in
+      let child =
+        match Children.find t.const key with
+        | Some child -> child
+        | None ->
+            let child = empty_trie () in
+            Children.set t.const key child;
+            child
+      in
+      insert_tokens child rest step
+
+let pattern_size (p : Pattern.pattern) = Pattern.pattern_size p
 let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
 
 let patterns_pvar_length (p : Pattern.pattern cek) : int =
   fold_ek p 0 (fun acc p -> acc + Pattern.pattern_pvar_length p)
 
-let rec list_to_pattern (x : Pattern.pattern list) : Pattern.pattern =
-  match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Pattern.pattern_append h (list_to_pattern t)
+let pack_pattern (ps : Pattern.pattern list) : Pattern.pattern = Pattern.pack ps
+let pack_value (vs : Value.value list) : Value.value = Value.pack vs
 
 let insert_step (m : memo) (step : step) : unit =
   let start_time = Timer.create () in
   let end_time = Timer.create () in
   Timer.record start_time;
-  Array.set m step.src.c.pc
-    (Some (insert_option (Array.get m step.src.c.pc) (list_to_pattern (ek_to_list step.src)) step));
+  let packed = pack_pattern (ek_to_list step.src) in
+  let tokens = tokens_of_pattern packed in
+  let root =
+    match Array.get m step.src.c.pc with
+    | Some t -> t
+    | None ->
+        let t = empty_trie () in
+        Array.set m step.src.c.pc (Some t);
+        t
+  in
+  insert_tokens root tokens step;
   Timer.record end_time;
   let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
   step.insert_time <- elapsed_time
 
-let rec lookup_step_aux (x : trie option) (value : Value.value) : step option =
-  (match x with None -> () | Some x -> assert (trie_degree x = (Value.value_measure value).degree));
-  match x with
-  | None -> None
-  | Some (Leaf (p, step)) ->
-      assert ((Pattern.pattern_measure p).degree = (Value.value_measure value).degree);
-      assert ((Pattern.pattern_measure p).max_degree = (Value.value_measure value).max_degree);
-      if Option.is_some (Dependency.value_match_pattern_aux value p) then Some step else None
-  | Some (Branch br) -> (
-      match Value.unwords value br.prefix with
-      | None -> None
-      | Some value ->
-          let var =
-            match br.var with
-            | None -> None
-            | Some var ->
-                let _, value = Value.pop_n value 1 in
-                lookup_step_aux (Some var) value
-          in
-          let const =
-            let Words vh, vt = Value.front_exn value in
-            let vhh, vht = Words.words_front_exn vh in
-            let key = Word.hash vhh in
-            match Children.find br.const key with
-            | None -> None
-            | Some const ->
-                let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
-                lookup_step_aux (Some const) vt
-          in
-          choose_step_option var const)
-
-let rec list_to_value (x : Value.value list) : Value.value =
-  match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Value.append h (list_to_value t)
+let rec lookup_tokens (t : trie) (tokens : token array) (end_pos : int array) (pos : int) (expected_end : int) :
+    step option =
+  if pos = expected_end then t.steps
+  else if pos > expected_end then None
+  else
+    let best =
+      match t.var with None -> None | Some var -> lookup_tokens var tokens end_pos end_pos.(pos) expected_end
+    in
+    match tokens.(pos) with
+    | TVar -> best
+    | TNode (label, arity) ->
+        let key = token_key label arity in
+        let const =
+          match Children.find t.const key with
+          | None -> None
+          | Some child -> lookup_tokens child tokens end_pos (pos + 1) expected_end
+        in
+        choose_step_option best const
 
 let lookup_step (value : state) (m : memo) : step option =
   let pc = value.c.pc in
-  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value))
+  match Array.get m pc with
+  | None -> None
+  | Some t -> (
+      let packed = pack_value (ek_to_list value) in
+      let tokens = tokens_of_value packed |> Array.of_list in
+      if Array.length tokens = 0 then None
+      else
+        let end_pos = compute_subtree_end tokens in
+        let expected_end = end_pos.(0) in
+        match lookup_tokens t tokens end_pos 0 expected_end with
+        | Some step as res -> if Dependency.can_step_through step value then res else None
+        | None -> None)
 
 type 'a bin = 'a digit list
 and 'a digit = Zero | One of 'a
@@ -425,29 +318,7 @@ let step_through_slot = Profile.register_slot Profile.memo_profile "step_through
 let compose_step_slot = Profile.register_slot Profile.memo_profile "compose_step"
 let insert_step_slot = Profile.register_slot Profile.memo_profile "insert_step"
 let lookup_step_slot = Profile.register_slot Profile.memo_profile "lookup_step"
-
-let instantiate (step : step) (state : state) : step =
-  let keep_last_count = 10 in
-  let join p v : Pattern.pattern =
-    let pvar_count = Pattern.pattern_pvar_count p in
-    let rec instantiate_aux p v (count : int) =
-      assert (count >= 0);
-      if count = 0 then p
-      else
-        let ph, pt = Pattern.pattern_front_exn p in
-        match ph with
-        | Pattern.PCon ph ->
-            let v = Option.value_exn (Value.unwords v ph) in
-            Pattern.pattern_cons (PCon ph) (instantiate_aux pt v count)
-        | Pattern.PVar ph ->
-            let vh, vt = Value.pop_n v ph in
-            Pattern.pattern_cons (PCon (Value.value_to_words vh)) (instantiate_aux pt vt (count - 1))
-    in
-    if pvar_count <= keep_last_count then p else instantiate_aux p v (pvar_count - keep_last_count)
-  in
-  let src = zipwith_ek join step.src state in
-  let dst : state = Dependency.step_through step (Dependency.pattern_to_value src) in
-  { step with src; dst }
+let instantiate (step : step) (_state : state) : step = step
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
   let run () =
@@ -575,10 +446,19 @@ let memo_stats (m : memo) : memo_stats =
     let by_depth_stat = Dynarray.get by_depth depth in
     by_depth_stat.node_count <- by_depth_stat.node_count + 1;
     total_nodes := !total_nodes + 1;
-    match t with
-    | Leaf (_, st) ->
-        stem_nodes := !stem_nodes + 1;
-        node_stats := { depth; insert_time = st.insert_time; node_state = Stem_node } :: !node_stats;
+    let has_children = Option.is_some t.var || Children.length t.const > 0 in
+    if has_children then (
+      branch_nodes := !branch_nodes + 1;
+      node_stats := { depth; insert_time = 1; node_state = Branch_node } :: !node_stats;
+      hashtable_stats := { depth; size = Children.length t.const } :: !hashtable_stats;
+      Children.iter t.const ~f:(fun child -> aux child (depth + 1));
+      match t.var with None -> () | Some var -> aux var (depth + 1))
+    else (
+      stem_nodes := !stem_nodes + 1;
+      node_stats := { depth; insert_time = 1; node_state = Stem_node } :: !node_stats);
+    match t.steps with
+    | None -> ()
+    | Some st ->
         rule_stat :=
           {
             size = patterns_size st.src;
@@ -590,12 +470,6 @@ let memo_stats (m : memo) : memo_stats =
             rule = lazy (Dependency.string_of_step st);
           }
           :: !rule_stat
-    | Branch br -> (
-        branch_nodes := !branch_nodes + 1;
-        node_stats := { depth; insert_time = 1; node_state = Branch_node } :: !node_stats;
-        hashtable_stats := { depth; size = Children.length br.const } :: !hashtable_stats;
-        Children.iter br.const ~f:(fun child -> aux child (depth + 1));
-        match br.var with None -> () | Some var -> aux var (depth + 1))
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
   {

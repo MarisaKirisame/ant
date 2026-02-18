@@ -10,4 +10,4 @@ module Source = struct
 end
 
 type source = Source.t [@@deriving eq]
-type reference = { src : source; hole_idx : int; offset : int; values_count : int } [@@deriving eq]
+type reference = { src : source; hole_idx : int } [@@deriving eq]
