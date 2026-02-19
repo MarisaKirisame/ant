@@ -94,10 +94,11 @@ let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
         assert (not (Generic.is_empty ph));
         match Value.unwords v ph with None -> return None | Some v -> return (value_match_pattern_aux v pt))
 
+let to_value_subst_map (v : value list) : value_subst_map = Array.of_list v
+
 let value_match_pattern (v : value) (p : pattern) : value_subst_map option =
   (*assert (value_valid v);*)
-  let return x = x in
-  return (Option.map (fun lst -> Array.of_list lst) (value_match_pattern_aux v p))
+  Option.map to_value_subst_map @@ value_match_pattern_aux v p
 
 let rec pattern_to_value_aux (p : pattern) src (hole_idx : int ref) : value =
   if Generic.is_empty p then Generic.empty
@@ -170,14 +171,11 @@ let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern
   let _ = zipwith_ek (fun v p -> unify_vp_aux v p s) v p in
   s
 
+let value_match_pattern_ek_with (v : value cek) (p : pattern cek) (f : value * pattern -> value_subst_map option) =
+  Option.bind (zip_ek v p) (fun vp -> option_ek_to_ek_option (map_ek f vp))
+
 let value_match_pattern_ek (v : value cek) (p : pattern cek) : value_subst_cek option =
-  Option.bind (zip_ek v p) (fun vp ->
-      option_ek_to_ek_option
-        (map_ek
-           (fun (v, p) ->
-             (*assert (Value.value_valid v);*)
-             value_match_pattern v p)
-           vp))
+  value_match_pattern_ek_with v p (fun (v, p) -> value_match_pattern v p)
 
 let can_step_through (step : step) (state : state) : bool =
   step.src.c.pc = state.c.pc && Option.is_some (value_match_pattern_ek state step.src)
@@ -191,6 +189,18 @@ let step_through (step : step) (state : state) : state =
   in
   assert (step.src.c.pc = state.c.pc);
   let subst = Option.get (value_match_pattern_ek state step.src) in
+  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
+  return (map_ek (subst_value subst) step.dst)
+
+let step_through_with_subst (step : step) (state : state) (subst_map : value_subst_map) : state =
+  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
+  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) state in*)
+  let return x =
+    (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x in*)
+    x
+  in
+  assert (step.src.c.pc = state.c.pc);
+  let subst = Option.get (value_match_pattern_ek_with state step.src (fun _ -> Some subst_map)) in
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
   return (map_ek (subst_value subst) step.dst)
 
