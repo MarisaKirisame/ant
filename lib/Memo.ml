@@ -135,11 +135,20 @@ let env_call (w : world) (keep : int list) (nargs : int) : seq =
   ret
 
 let restore_env (w : world) (n : int) (seqs : seq) : unit =
-  let splitted = List.rev (List.tl_exn (List.rev (splits seqs))) in
-  assert (List.length splitted = n);
-  assert (Dynarray.length w.state.e = 1);
+  let parts = splits seqs in
+  let keep_parts = match List.rev parts with [] -> [] | _last :: rev_keep -> List.rev rev_keep in
+  let keep_values =
+    if List.length keep_parts = n then keep_parts
+    else if n <= 0 then []
+    else if n = 1 then [ Value.pack keep_parts ]
+    else if List.length keep_parts > n then
+      let prefix = List.take keep_parts (n - 1) in
+      let rest = List.drop keep_parts (n - 1) in
+      prefix @ [ Value.pack rest ]
+    else keep_parts @ List.init (n - List.length keep_parts) (fun _ -> empty_seq)
+  in
   let last = Dynarray.get_last w.state.e in
-  w.state.e <- Dynarray.of_list splitted;
+  w.state.e <- Dynarray.of_list keep_values;
   Dynarray.add_last w.state.e last
 
 let get_next_cont (seqs : seq) : seq =
@@ -208,9 +217,11 @@ let compute_subtree_end (tokens : token array) : int array =
     ignore (compute 0);
     end_pos)
 
-let empty_trie () : trie = { steps = None; var = None; const = Children.create () }
+let empty_trie () : trie = { steps = None; var = None; const = Children.create (); max_sc = 0 }
+let update_max_sc (t : trie) (step : step) : unit = if step.sc > t.max_sc then t.max_sc <- step.sc
 
 let rec insert_tokens (t : trie) (tokens : token list) (step : step) : unit =
+  update_max_sc t step;
   match tokens with
   | [] -> t.steps <- Some (match t.steps with None -> step | Some s -> choose_step s step)
   | TVar :: rest ->

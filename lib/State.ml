@@ -64,7 +64,7 @@ and 'a cek = { mutable c : exp; mutable e : 'a Dynarray.t; mutable k : 'a }
 and state = value cek
 and step = { src : pattern cek; dst : value cek; sc : int; mutable hit : int; mutable insert_time : int }
 and memo = trie option Array.t
-and trie = { mutable steps : step option; mutable var : trie option; const : trie Children.t }
+and trie = { mutable steps : step option; mutable var : trie option; const : trie Children.t; mutable max_sc : int }
 and world = { state : state; memo : memo; resolved : bool cek }
 
 let cek_get (cek : 'a cek) (src : Source.t) : 'a =
