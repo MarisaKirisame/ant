@@ -6,6 +6,7 @@ from __future__ import annotations
 import glob
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -222,15 +223,19 @@ def profile_project() -> None:
     generate_ml_files(env=env)
     opam_exec(["dune", "build", "generated/GeneratedMain.exe"], env=env)
     binary = os.path.join("_build", "default", "generated", "GeneratedMain.exe")
-    for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
-        opam_exec(
-            ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
-            env=env,
-        )
-    opam_exec(
-        ["perf", "record", "-o", f"perf-tailrec.data", "--", binary, "tailrec"],
-        env=env,
-    )
+    modes = ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel", "tailrec")
+    for mode in modes:
+        if sys.platform == "darwin":
+            # On macOS, use xctrace (modern replacement for instruments CLI)
+            opam_exec(
+                ["xctrace", "record", "--template", "Time Profiler", "--output", f"perf-{mode}.trace", "--launch", "--", binary, mode],
+                env=env,
+            )
+        else:
+            opam_exec(
+                ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
+                env=env,
+            )
 
 
 def report_project() -> None:
@@ -254,9 +259,13 @@ def _opam_env_with_ocamlrunparam() -> MutableMapping[str, str]:
 
 
 def _remove_perf_data_files() -> None:
-    for path in glob.glob("perf-*.data") + glob.glob("perf-*.data.old"):
+    patterns = glob.glob("perf-*.data") + glob.glob("perf-*.data.old") + glob.glob("perf-*.trace")
+    for path in patterns:
         try:
-            os.remove(path)
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
         except FileNotFoundError:
             continue
 
