@@ -373,15 +373,20 @@ let insert_step (m : memo) (step : step) : unit =
   let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
   step.insert_time <- elapsed_time
 
-let rec lookup_step_aux (x : trie option) (value : Value.value) : (step * Dependency.value_subst_map) option =
-  (match x with None -> () | Some x -> assert (trie_degree x = (Value.value_measure value).degree));
+let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.value) : (step * Value.value) option =
+  (match x with
+  | None -> ()
+  | Some x -> assert (trie_degree x = (Generic.measure ~monoid:Value.monoid ~measure:Value.measure value).degree));
   match x with
   | None -> None
   | Some (Leaf (p, step)) ->
-      assert ((Pattern.pattern_measure p).degree = (Value.value_measure value).degree);
-      assert ((Pattern.pattern_measure p).max_degree = (Value.value_measure value).max_degree);
+      let m = Generic.measure ~monoid:Value.monoid ~measure:Value.measure value in
+      assert ((Pattern.pattern_measure p).degree = m.degree);
+      assert ((Pattern.pattern_measure p).max_degree = m.max_degree);
       begin match Dependency.value_match_pattern_aux value p with
-      | Some vls -> Some (step, Dependency.to_value_subst_map vls)
+      | Some vls ->
+          let leaf_matched = List.fold_left vls ~init:Generic.empty ~f:(fun acc v -> Value.append acc v) in
+          Some (step, Value.append acc leaf_matched)
       | None -> None
       end
   | Some (Branch br) -> (
@@ -392,8 +397,8 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) : (step * Depend
             match br.var with
             | None -> None
             | Some var ->
-                let _, value = Value.pop_n value 1 in
-                lookup_step_aux (Some var) value
+                let vh, vt = Value.pop_n value 1 in
+                lookup_step_aux (Some var) vt (Value.append acc vh)
           in
           let const =
             let Words vh, vt = Value.front_exn value in
@@ -403,16 +408,16 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) : (step * Depend
             | None -> None
             | Some const ->
                 let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
-                lookup_step_aux (Some const) vt
+                lookup_step_aux (Some const) vt acc
           in
           choose_step_and_subst_option var const)
 
 let rec list_to_value (x : Value.value list) : Value.value =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Value.append h (list_to_value t)
 
-let lookup_step (value : state) (m : memo) : (step * Dependency.value_subst_map) option =
+let lookup_step (value : state) (m : memo) : (step * Value.value) option =
   let pc = value.c.pc in
-  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value))
+  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) Generic.empty
 
 type 'a bin = 'a digit list
 and 'a digit = Zero | One of 'a

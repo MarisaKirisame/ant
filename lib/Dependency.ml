@@ -192,17 +192,28 @@ let step_through (step : step) (state : state) : state =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
   return (map_ek (subst_value subst) step.dst)
 
-let step_through_with_subst (step : step) (state : state) (subst_map : value_subst_map) : state =
-  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
-  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) state in*)
-  let return x =
-    (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x in*)
-    x
-  in
+let step_through_with_subst (step : step) (state : state) (subst_val : value) : state =
   assert (step.src.c.pc = state.c.pc);
-  let subst = Option.get (value_match_pattern_ek_with state step.src (fun _ -> Some subst_map)) in
-  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
-  return (map_ek (subst_value subst) step.dst)
+  let current = ref subst_val in
+  let split_subst p =
+    let vs =
+      Generic.fold_left
+        (fun vs pat ->
+          match pat with
+          | PVar n ->
+              let vh, vt = Value.pop_n !current n in
+              current := vt;
+              vh :: vs
+          | PCon _ -> vs)
+        [] p
+    in
+    Array.of_list (List.rev vs)
+  in
+  let e = Dynarray.map split_subst step.src.e in
+  let k = split_subst step.src.k in
+  assert (Generic.is_empty !current);
+  let subst = { c = step.src.c; e; k } in
+  map_ek (subst_value subst) step.dst
 
 let string_of_pat (p : pat) : string =
   match p with PVar n -> "PVar(" ^ string_of_int n ^ ")" | PCon w -> "PCon(" ^ string_of_words w ^ ")"
