@@ -39,7 +39,8 @@ def _resolve_switch() -> str:
 
 
 SWITCH = _resolve_switch()
-TOOLCHAIN_PACKAGES = [
+PACKAGES = [
+    "core",
     "dune",
 ]
 DEV_PACKAGES = [
