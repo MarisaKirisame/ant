@@ -263,7 +263,7 @@ def run_project() -> None:
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
     opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
-    for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
+    for mode in ("map",):
         opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
 
 

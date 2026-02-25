@@ -2,6 +2,9 @@
  (name runmodes)
  (modules
   FromHazel
+  HazelMap
+  HazelQS
+  HazelIsSorted
   LiveCEK
   LivePlain
   LiveLexer

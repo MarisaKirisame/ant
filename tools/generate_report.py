@@ -146,39 +146,15 @@ def generate_html(
 def generate_reports() -> None:
     css_source = Path(__file__).with_name("style.css")
     speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_simple.json"),
-        output_dir=Path("output/live-simple"),
-        css_source=css_source,
-    )
-    speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_list_extend.json"),
-        output_dir=Path("output/live-list-extend"),
-        css_source=css_source,
-    )
-    speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_left_to_right.json"),
-        output_dir=Path("output/live-left-to-right"),
-        css_source=css_source,
-    )
-    speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_demand_driven.json"),
-        output_dir=Path("output/live-demand-driven"),
-        css_source=css_source,
-    )
-    speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_from_hazel.json"),
-        output_dir=Path("output/hazel"),
+        input_path=Path("eval_steps_map.json"),
+        output_dir=Path("output/map"),
         css_source=css_source,
     )
     generate_html(
-        title="Live Benchmark Index",
+        title="Map Benchmark Index",
         output=Path("output/index.html"),
         entries=[
-            ("Simple Benchmark", Path("output/live-simple/index.html")),
-            ("List Extend Benchmark", Path("output/live-list-extend/index.html")),
-            ("Left-to-right Benchmark", Path("output/live-left-to-right/index.html")),
-            ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
-            ("Hazel Benchmark", Path("output/hazel/index.html")),
+            ("map Benchmark", Path("output/map/index.html")),
         ],
         css_source=css_source,
     )
