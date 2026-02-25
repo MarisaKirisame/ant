@@ -416,16 +416,15 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : step opti
                 in
                 let var_max = match var_child with None -> 0 | Some (var, _) -> max_sc_of_trie var in
                 let const_max = match const_child with None -> 0 | Some (const, _) -> max_sc_of_trie const in
-                let explore child child_max acc =
-                  if child_max = 0 || acc_sc acc >= child_max then acc
-                  else match child with None -> acc | Some (trie, value) -> lookup_step_aux (Some trie) value acc
+                let explore child acc =
+                  match child with None -> acc | Some (trie, value) -> lookup_step_aux (Some trie) value acc
                 in
                 if var_max >= const_max then
-                  let acc = explore var_child var_max acc in
-                  explore const_child const_max acc
+                  let acc = explore var_child acc in
+                  explore const_child acc
                 else
-                  let acc = explore const_child const_max acc in
-                  explore var_child var_max acc))
+                  let acc = explore const_child acc in
+                  explore var_child acc))
 
 let rec list_to_value (x : Value.value list) : Value.value =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Value.append h (list_to_value t)
