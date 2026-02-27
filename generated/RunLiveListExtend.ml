@@ -3,6 +3,8 @@ let steps_file = "eval_steps_list_extend.json"
 module Common = RunLiveCommon
 module LC = Common.LC
 open Core
+open Yojson.Safe
+module Ant = Ant
 
 (* List of increasing-length prefixes of Common.random_list *)
 let random_lists_exprs, _ =
@@ -10,10 +12,10 @@ let random_lists_exprs, _ =
     ~f:(fun n (res, acc) ->
       let new_acc = LC.ECons (LC.EInt n, acc) in
       (new_acc :: res, new_acc))
-    (List.take Common.random_list 100) (* Using the whole list takes kinda long *)
+    (List.take Common.random_list 300) (* Using the whole list takes kinda long *)
     ~init:([], LC.ENil)
 
-let random_lists_exprs = List.rev random_lists_exprs
+let random_lists_exprs = List.rev (List.take random_lists_exprs 100)
 
 let run () =
   Common.with_outchannel steps_file (fun oc ->
