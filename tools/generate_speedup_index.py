@@ -198,3 +198,129 @@ def generate_speedup_report(
     output_path.write_text(html, encoding="utf-8")
     shutil.copyfile(css_source, css_path)
     return None
+
+### Specifically for the list_extend test, which contains additional plots ###
+
+def generate_speedup_report_list_extend(
+    *,
+    input_path: Path,
+    output_dir: Path,
+    css_source: Path,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "index.html"
+    if not css_source.exists():
+        raise FileNotFoundError(f"missing stylesheet source: {css_source}")
+    css_path = output_dir / css_source.name
+    css_href = css_source.name
+    data_label = str(input_path)
+    records = load_records(input_path)
+    html = render_html_list_extend(records, output_dir, data_label, css_href)
+    output_path.write_text(html, encoding="utf-8")
+    shutil.copyfile(css_source, css_path)
+    return None
+
+def render_html_list_extend(
+    records: Result,
+    output_dir: Path,
+    data_label: str,
+    css_href: str,
+) -> str:
+    memo_plot = plot_depth_breakdown(records.depth_breakdown, output_dir)
+    memo_cdf_plot = plot_depth_breakdown_cdf(records.depth_breakdown, output_dir)
+    size_scatter_plot = plot_rule_stat(records.rule_stat, output_dir)
+    hit_scatter_plot = plot_rule_stat_hits(records.rule_stat, output_dir)
+    insert_time_scatter_plot = plot_rule_stat_insert_time(records.rule_stat, output_dir)
+    pvar_insert_time_scatter_plot = plot_rule_stat_pvar_length_insert_time(records.rule_stat, output_dir)
+    depth_insert_time_scatter_plot = plot_rule_stat_depth_insert_time(records.rule_stat, output_dir)
+    hashtable_depth_size_scatter_plot = None
+    if records.hashtable_stat:
+        hashtable_depth_size_scatter_plot = plot_hashtable_stat_depth_size(
+            records.hashtable_stat, output_dir
+        )
+    profile_totals, profile_total_time = profile_totals_from_result(records)
+    profile_table = render_profile_table(profile_totals, profile_total_time)
+    doc = document(title="Memoization Speedup")
+    doc["lang"] = "en"
+    with doc.head:
+        tag.meta(charset="utf-8")
+        tag.link(rel="stylesheet", href=css_href)
+    with doc:
+        with tag.main(cls="panel"):
+            tag.h1("Memoization Speedup")
+            tag.p(f"Data source: {data_label}", cls="meta")
+            _render_node_counts(records)
+            _render_speedup_comparison_list_extend(
+                records,
+                output_dir,
+                label="Memo vs CEK",
+                baseline_key="cek_profile",
+                memo_key="memo_profile",
+            )
+            _render_speedup_comparison_list_extend(
+                records,
+                output_dir,
+                label="CEK vs Plain",
+                baseline_key="plain_profile",
+                memo_key="cek_profile",
+            )
+            _render_speedup_comparison_list_extend(
+                records,
+                output_dir,
+                label="Memo vs Plain",
+                baseline_key="plain_profile",
+                memo_key="memo_profile",
+            )
+            _render_speedup_comparison_list_extend(
+                records,
+                output_dir,
+                label="Memo vs Plain (steps)",
+                pairs=pairs_from_steps(records),
+            )
+            _plot_image(memo_plot, "Memo stats depth vs node count plot")
+            _plot_image(memo_cdf_plot, "Memo stats CDF plot")
+            _plot_image(size_scatter_plot, "Memo rule size vs sc scatter plot")
+            _plot_image(hit_scatter_plot, "Memo rule size vs hit count scatter plot")
+            _plot_image(insert_time_scatter_plot, "Memo rule size vs insert time scatter plot")
+            _plot_image(pvar_insert_time_scatter_plot, "Memo rule pvar length vs insert time scatter plot")
+            _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
+            if hashtable_depth_size_scatter_plot is not None:
+                _plot_image(
+                    hashtable_depth_size_scatter_plot,
+                    "Memo hashtable size vs depth scatter plot",
+                )
+            _render_large_rule_stats(records, min_size=40, limit=5)
+            with tag.section(cls="profile"):
+                raw(profile_table)
+    return doc.render()
+
+def _render_speedup_comparison_list_extend(
+    records: Result,
+    output_dir: Path,
+    *,
+    label: str,
+    baseline_key: str | None = None,
+    memo_key: str | None = None,
+    pairs: list[tuple[float, float]] | None = None,
+) -> None:
+    if pairs is None:
+        if baseline_key is None or memo_key is None:
+            raise ValueError("baseline_key and memo_key are required when pairs is None")
+        pairs = pairs_from_profiles(records, baseline_key=baseline_key, memo_key=memo_key)
+    stats, line_plot, scatter_plot = generate_plot_for_pairs(pairs, output_dir)
+    list_sizes = [record.list_size for record in records.exec_times]
+    _, line_plot_list, _ = generate_plot_for_pairs(pairs, output_dir, list_sizes, "Number of list elements") 
+    with tag.section(cls="comparison"):
+        with tag.details():
+            tag.summary(label)
+            with tag.section(cls="stats"):
+                stat_card("Samples", f"{stats.samples}")
+                stat_card("Geometric mean", f"{fmt_speedup(stats.geo_mean)}x")
+                stat_card("Arithmetic mean", f"{fmt_speedup(stats.arith_mean)}x")
+                stat_card("End-to-end speedup", f"{fmt_speedup(stats.end_to_end)}x")
+                stat_card("Best speedup", f"{fmt_speedup(stats.maximum)}x")
+                stat_card("Lowest speedup", f"{fmt_speedup(stats.minimum)}x")
+            _plot_image(line_plot, f"{label} speedup per run plot")
+            _plot_image(scatter_plot, f"{label} scatter plot")
+            _plot_image(line_plot_list, f"{label} speedup per run plot, by list sizes")
+    return None

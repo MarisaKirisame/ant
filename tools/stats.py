@@ -69,6 +69,7 @@ class ProfileEntry:
 @dataclass(frozen=True)
 class ExecTimeRecord:
     step: int
+    list_size: Optional[int]
     without_memo_step: int
     memo_profile: list[ProfileEntry]
     cek_profile: list[ProfileEntry]
@@ -142,6 +143,7 @@ def load_records(
                 name = rec.get("name")
                 if name == "exec_time":
                     step = _require_int(rec.get("step"), ctx="exec_time.step")
+                    list_size = rec.get("list_size")
                     without_memo_step = _require_int(
                         rec.get("without_memo_step"), ctx="exec_time.without_memo_step"
                     )
@@ -157,6 +159,7 @@ def load_records(
                     exec_times.append(
                         ExecTimeRecord(
                             step=step,
+                            list_size=list_size,
                             without_memo_step=without_memo_step,
                             memo_profile=memo_profile,
                             cek_profile=cek_profile,

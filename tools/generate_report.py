@@ -150,7 +150,7 @@ def generate_reports() -> None:
         output_dir=Path("output/live-simple"),
         css_source=css_source,
     )
-    speedup_module.generate_speedup_report(
+    speedup_module.generate_speedup_report_list_extend(
         input_path=Path("eval_steps_list_extend.json"),
         output_dir=Path("output/live-list-extend"),
         css_source=css_source,
