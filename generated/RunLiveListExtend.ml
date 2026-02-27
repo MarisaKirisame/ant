@@ -8,13 +8,13 @@ open NamedExpr
 module Ant = Ant
 
 (* List of increasing-length prefixes of Common.random_list *)
-let random_lists_exprs, _ =
-  List.fold_right
-    ~f:(fun n (res, (acc, list_size)) ->
-      let new_acc = LC.ECons (LC.EInt n, acc) in
-      ((new_acc, list_size + 1) :: res, (new_acc, list_size + 1)))
+let random_lists_exprs, _, _ =
+  List.fold
     Common.random_list
-    ~init:([], (LC.ENil, 0))
+    ~f:(fun (res, acc, list_size) n ->
+      let new_acc = LC.ECons (LC.EInt n, acc) in
+      ((new_acc, list_size + 1) :: res, new_acc, list_size + 1))
+    ~init:([], LC.ENil, 0)
 
 let startingDropCount = 5
 let rec cycleSkip exprs dropCount =
@@ -22,7 +22,7 @@ let rec cycleSkip exprs dropCount =
   | [] -> []
   | hd::tl -> hd :: cycleSkip (List.drop tl dropCount) (if dropCount = 0 then startingDropCount else dropCount - 1)
 
-let random_lists_exprs = List.rev (List.take (cycleSkip random_lists_exprs startingDropCount) 100)
+let random_lists_exprs = List.rev (List.take (cycleSkip random_lists_exprs startingDropCount) 50)
 
 let write_steps_json oc (list_size : int) (r : Ant.Memo.exec_result) : unit =
   let json_of_profile entries = `List (List.map ~f:(fun (name, time) -> `List [ `String name; `Int time ]) entries) in
