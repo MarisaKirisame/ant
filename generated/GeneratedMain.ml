@@ -1,9 +1,11 @@
-let usage = "Usage: GeneratedMain <map|qs>"
+let usage = "Usage: GeneratedMain <append|filter|map|qs>"
 
 let () =
   match Array.to_list Sys.argv with
   | [ _; mode ] -> (
       match String.lowercase_ascii mode with
+      | "append" -> HazelAppend.run ()
+      | "filter" -> HazelFilter.run ()
       | "map" -> HazelMap.run ()
       | "qs" -> HazelQS.run ()
       | _ ->

@@ -19,8 +19,8 @@ from plot_speedup import (
     SpeedupStats,
     compare_stats,
     load_records,
+    plot_scatter,
     pairs_from_profiles,
-    pairs_from_result,
     pairs_from_steps,
 )
 import generate_speedup_index as speedup_module
@@ -31,6 +31,7 @@ def _render_html(
     entries: Sequence[Tuple[str, str]],
     summary: SpeedupStats | None,
     comparison_summaries: Sequence[Tuple[str, SpeedupStats]] | None,
+    combined_scatter_rel: str | None,
     css_href: str,
 ) -> str:
     doc = document(title=title)
@@ -58,14 +59,14 @@ def _render_html(
                     stat_card("End-to-end speedup", f"{fmt_speedup(summary.end_to_end)}x")
                     stat_card("Best speedup", f"{fmt_speedup(summary.maximum)}x")
                     stat_card("Lowest speedup", f"{fmt_speedup(summary.minimum)}x")
+            if combined_scatter_rel:
+                with tag.section(cls="plot"):
+                    tag.img(src=combined_scatter_rel, alt="Combined scatter plot across all benchmarks")
             with tag.section(cls="grid"):
                 for label, rel in entries:
                     with tag.a(href=rel, cls="card"):
                         tag.span(label)
     return doc.render()
-
-
-
 
 def generate_html(
     *,
@@ -93,10 +94,16 @@ def generate_html(
                     inferred_paths.append(inferred)
 
     summary: SpeedupStats | None = None
+    all_pairs: list[tuple[float, float]] = []
     if inferred_paths:
-        pairs = _collect_pairs(inferred_paths)
-        if pairs:
-            _, summary = compare_stats(pairs)
+        all_pairs = _collect_pairs(inferred_paths)
+        if all_pairs:
+            _, summary = compare_stats(all_pairs)
+
+    combined_scatter_rel: str | None = None
+    if all_pairs:
+        scatter_name = plot_scatter(all_pairs, output.parent)
+        combined_scatter_rel = os.path.relpath(output.parent / scatter_name, output.parent)
 
     comparisons: list[tuple[str, list[tuple[float, float]]]] = [
         ("Memo vs CEK", []),
@@ -135,7 +142,7 @@ def generate_html(
 
     output.write_text(
         _render_html(
-            title, entries_with_rel, summary, comparison_summaries, css_href
+            title, entries_with_rel, summary, comparison_summaries, combined_scatter_rel, css_href
         ),
         encoding="utf-8",
     )
@@ -145,17 +152,22 @@ def generate_html(
 
 def generate_reports() -> None:
     css_source = Path(__file__).with_name("style.css")
-    speedup_module.generate_speedup_report(
-        input_path=Path("eval_steps_map.json"),
-        output_dir=Path("output/map"),
-        css_source=css_source,
-    )
+    experiments = [
+        ("Append Benchmark", Path("eval_steps_append.json"), Path("output/append")),
+        ("Filter Benchmark", Path("eval_steps_filter.json"), Path("output/filter")),
+        ("Map Benchmark", Path("eval_steps_map.json"), Path("output/map")),
+        ("Quicksort Benchmark", Path("eval_steps_qs.json"), Path("output/qs")),
+    ]
+    for _, input_path, output_dir in experiments:
+        speedup_module.generate_speedup_report(
+            input_path=input_path,
+            output_dir=output_dir,
+            css_source=css_source,
+        )
     generate_html(
-        title="Map Benchmark Index",
+        title="Benchmark Index",
         output=Path("output/index.html"),
-        entries=[
-            ("map Benchmark", Path("output/map/index.html")),
-        ],
+        entries=[(label, output_dir / "index.html") for label, _, output_dir in experiments],
         css_source=css_source,
     )
 
@@ -192,6 +204,8 @@ def _extract_data_path(report_path: Path) -> Path | None:
 def _collect_pairs(data_paths: Iterable[Path]) -> list[tuple[float, float]]:
     pairs: list[tuple[float, float]] = []
     for path in data_paths:
-        baselines, memos = pairs_from_result(load_records(path))
-        pairs.extend(zip(baselines, memos))
+        result = load_records(path)
+        pairs.extend(
+            pairs_from_profiles(result, baseline_key="cek_profile", memo_key="memo_profile")
+        )
     return pairs

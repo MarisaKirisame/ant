@@ -2,6 +2,8 @@
  (name runmodes)
  (modules
   FromHazel
+  HazelAppend
+  HazelFilter
   HazelMap
   HazelQS
   HazelIsSorted

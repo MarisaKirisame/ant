@@ -1,12 +1,9 @@
 let steps_file = "eval_steps_map.json"
 let program_path = "data/mk_map.json"
-let large_input = [ 1; 2; 3; 4; 5; 6; 7; 8; 9; 10 ]
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
+
+let large_input =
+  let rng = Random.State.make [| 42 |] in
+  List.init 1280 (fun _ -> Random.State.int rng 100)
 
 let large_input_str =
   match large_input with [] -> "[]" | _ -> String.concat " :: " (List.map string_of_int large_input) ^ " :: []"

@@ -1,12 +1,9 @@
 let steps_file = "eval_steps_qs.json"
 let program_path = "data/mk_QS.json"
-let large_input = [ 3; 1; 4; 1; 5; 9; 2; 6; 5; 3; 5; 8; 9; 7; 9 ]
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
-let large_input = large_input @ large_input
+
+let large_input =
+  let rng = Random.State.make [| 42 |] in
+  List.init 480 (fun _ -> Random.State.int rng 100)
 
 let large_input_str =
   match large_input with [] -> "[]" | _ -> String.concat " :: " (List.map string_of_int large_input) ^ " :: []"

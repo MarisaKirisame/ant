@@ -37,39 +37,51 @@ type expr =
   | Ap of expr * expr
   | Cons of expr * expr
 
-let rec expr_of_sexp = function
-  | Sexp.List [ Sexp.Atom "Let"; lhs; rhs; body ] -> Let (expr_of_sexp lhs, expr_of_sexp rhs, expr_of_sexp body)
-  | Sexp.List [ Sexp.Atom "If"; cond; thn; els ] -> If (expr_of_sexp cond, expr_of_sexp thn, expr_of_sexp els)
+let rec expr_of_sexp_helper = function
+  | Sexp.List [ Sexp.Atom "Let"; lhs; rhs; body ] ->
+      Let (expr_of_sexp_helper lhs, expr_of_sexp_helper rhs, expr_of_sexp_helper body)
+  | Sexp.List [ Sexp.Atom "If"; cond; thn; els ] ->
+      If (expr_of_sexp_helper cond, expr_of_sexp_helper thn, expr_of_sexp_helper els)
   | Sexp.Atom "EmptyHole" -> EmptyHole
   | Sexp.Atom "MultiHole" -> MultiHole
-  | Sexp.List [ Sexp.Atom "Fun"; param; body ] -> Fun (expr_of_sexp param, expr_of_sexp body)
-  | Sexp.List [ Sexp.Atom "TuplePat"; Sexp.List elems ] -> TuplePat (List.map expr_of_sexp elems)
-  | Sexp.List [ Sexp.Atom "TupLabelPat"; x; y ] -> TupLabelPat (expr_of_sexp x, expr_of_sexp y)
+  | Sexp.List [ Sexp.Atom "Fun"; param; body ] -> Fun (expr_of_sexp_helper param, expr_of_sexp_helper body)
+  | Sexp.List [ Sexp.Atom "TuplePat"; Sexp.List elems ] -> TuplePat (List.map expr_of_sexp_helper elems)
+  | Sexp.List [ Sexp.Atom "TupLabelPat"; x; y ] -> PEmptyHole
   | Sexp.List [ Sexp.Atom "VarPat"; Sexp.Atom v ] -> VarPat v
   | Sexp.List [ Sexp.Atom "Var"; Sexp.Atom v ] -> Var v
-  | Sexp.List [ Sexp.Atom "Atom"; payload ] -> Atom (expr_of_sexp payload)
+  | Sexp.List [ Sexp.Atom "Atom"; payload ] -> Atom (expr_of_sexp_helper payload)
   | Sexp.List [ Sexp.Atom "Bool"; Sexp.Atom b ] -> Bool (bool_of_string b)
   | Sexp.List [ Sexp.Atom "Int"; Sexp.Atom i ] -> Int (int_of_string i)
-  | Sexp.List [ Sexp.Atom "BinOp"; Sexp.Atom op; lhs; rhs ] -> BinOp (op, expr_of_sexp lhs, expr_of_sexp rhs)
+  | Sexp.List [ Sexp.Atom "BinOp"; Sexp.Atom op; lhs; rhs ] ->
+      BinOp (op, expr_of_sexp_helper lhs, expr_of_sexp_helper rhs)
   | Sexp.List [ Sexp.Atom "Match"; scrut; Sexp.List cases ] ->
       Match
-        ( expr_of_sexp scrut,
+        ( expr_of_sexp_helper scrut,
           List.map
             (function
-              | Sexp.List [ pat; expr ] -> (expr_of_sexp pat, expr_of_sexp expr)
+              | Sexp.List [ pat; expr ] -> (expr_of_sexp_helper pat, expr_of_sexp_helper expr)
               | sexp -> failwith (Printf.sprintf "Unrecognized match case s-expression: %s" (Sexp.to_string_hum sexp)))
             cases )
-  | Sexp.List [ Sexp.Atom "ListPat"; Sexp.List elems ] -> ListPat (List.map expr_of_sexp elems)
+  | Sexp.List [ Sexp.Atom "ListPat"; Sexp.List elems ] -> ListPat (List.map expr_of_sexp_helper elems)
   | Sexp.Atom "Wild" -> Wild
-  | Sexp.List [ Sexp.Atom "ConsPat"; head; tail ] -> ConsPat (expr_of_sexp head, expr_of_sexp tail)
+  | Sexp.List [ Sexp.Atom "ConsPat"; head; tail ] -> ConsPat (expr_of_sexp_helper head, expr_of_sexp_helper tail)
   | Sexp.Atom "PMultiHole" -> PMultiHole
   | Sexp.Atom "PEmptyHole" -> PEmptyHole
-  | Sexp.List [ Sexp.Atom "Ap"; Sexp.Atom "Forward"; func; arg ] -> Ap (expr_of_sexp func, expr_of_sexp arg)
-  | Sexp.List [ Sexp.Atom "Tuple"; Sexp.List elems ] -> Tuple (List.map expr_of_sexp elems)
-  | Sexp.List [ Sexp.Atom "Cons"; head; tail ] -> Cons (expr_of_sexp head, expr_of_sexp tail)
-  | Sexp.List [ Sexp.Atom "ListLit"; Sexp.List elems ] -> ListLit (List.map expr_of_sexp elems)
+  | Sexp.List [ Sexp.Atom "Ap"; Sexp.Atom "Forward"; func; arg ] ->
+      Ap (expr_of_sexp_helper func, expr_of_sexp_helper arg)
+  | Sexp.List [ Sexp.Atom "Tuple"; Sexp.List elems ] -> Tuple (List.map expr_of_sexp_helper elems)
+  | Sexp.List [ Sexp.Atom "TupLabel"; x; y ] -> expr_of_sexp_helper y
+  | Sexp.List [ Sexp.Atom "Cons"; head; tail ] -> Cons (expr_of_sexp_helper head, expr_of_sexp_helper tail)
+  | Sexp.List [ Sexp.Atom "ListLit"; Sexp.List elems ] -> ListLit (List.map expr_of_sexp_helper elems)
   | Sexp.List [ Sexp.Atom "LabelPat"; Sexp.Atom str ] -> LabelPat str
+  | Sexp.List [ Sexp.Atom "Constructor"; _ ] -> EmptyHole
   | sexp -> failwith (Printf.sprintf "Unrecognized expression s-expression: %s" (Sexp.to_string_hum sexp))
+
+let expr_of_sexp sexp =
+  try expr_of_sexp_helper sexp
+  with exn ->
+    Printf.eprintf "expr_of_sexp conversion failed for input: %s\n%!" (Sexp.to_string_hum sexp);
+    raise exn
 
 let rec pp_expr fmt = function
   | Let (v, b, body) -> Format.fprintf fmt "(Let %a %a %a)" pp_expr v pp_expr b pp_expr body
@@ -149,12 +161,15 @@ let rec subst (lhs : string) (rhs : nexpr) (expr : nexpr) =
   | NEApp (f, a) -> NEApp (subst lhs rhs f, subst lhs rhs a)
   | NEAnd (l, r) -> NEAnd (subst lhs rhs l, subst lhs rhs r)
   | NECons (h, t) -> NECons (subst lhs rhs h, subst lhs rhs t)
-  | NELet (name, binding, body) -> assert(name != lhs); NELet(name, subst lhs rhs binding, subst lhs rhs body)
-  | NEFix (name, arg, body) -> NEFix(name, arg, subst lhs rhs body)
-  | NEAbs (arg, body) -> NEAbs(arg, subst lhs rhs body)
-  | NELt (x, y) -> NELt(subst lhs rhs x, subst lhs rhs y)
-  | NEGe (x, y) -> NEGe(subst lhs rhs x, subst lhs rhs y)
-  | NEIf (i, t, e) -> NEIf(subst lhs rhs i, subst lhs rhs t, subst lhs rhs e)
+  | NELet (name, binding, body) ->
+      assert (name != lhs);
+      NELet (name, subst lhs rhs binding, subst lhs rhs body)
+  | NEFix (name, arg, body) -> NEFix (name, arg, subst lhs rhs body)
+  | NEAbs (arg, body) -> NEAbs (arg, subst lhs rhs body)
+  | NELt (x, y) -> NELt (subst lhs rhs x, subst lhs rhs y)
+  | NEGe (x, y) -> NEGe (subst lhs rhs x, subst lhs rhs y)
+  | NELe (x, y) -> NELe (subst lhs rhs x, subst lhs rhs y)
+  | NEIf (i, t, e) -> NEIf (subst lhs rhs i, subst lhs rhs t, subst lhs rhs e)
   | _ -> failwith ("subst not implemented for: " ^ Format.asprintf "%a" pp_nexpr expr)
 
 let rec substs (bindings : (string * nexpr) list) (expr : nexpr) : nexpr =
@@ -189,6 +204,7 @@ let rec compile_pattern (matched : string list) (cases : case list) names =
             match case.patterns with
             | [] -> failwith "compile_pattern (look): case with no patterns"
             | ListPat _ :: _ -> true
+            | ConsPat _ :: _ -> true
             | Wild :: _ -> false
             | VarPat _ :: _ -> false
             | x :: _ -> failwith ("compile_pattern (look) not implemented for expr: " ^ Format.asprintf "%a" pp_expr x))
@@ -294,6 +310,7 @@ let rec nexpr_of_expr_aux e names : nexpr =
         List.map
           (function
             | VarPat p -> p
+            | PEmptyHole -> "WILD"
             | p ->
                 failwith
                   ("Only VarPat supported in recursive function parameters. but got: " ^ Format.asprintf "%a" pp_expr p))
@@ -315,6 +332,7 @@ let rec nexpr_of_expr_aux e names : nexpr =
         match params with
         | [] -> nexpr_of_expr_aux body names
         | VarPat name :: rest -> NEAbs (name, build_nested_fun rest body)
+        | PEmptyHole :: rest -> NEAbs ("WILD", build_nested_fun rest body)
         | TupLabelPat _ :: rest -> NEHole
         | p :: rest ->
             failwith ("Only VarPat supported in function parameters, but got: " ^ Format.asprintf "%a" pp_expr p)
@@ -323,6 +341,7 @@ let rec nexpr_of_expr_aux e names : nexpr =
   | Fun (VarPat name, body) -> NEAbs (name, nexpr_of_expr_aux body names)
   | Fun (PEmptyHole, body) -> NEHole
   | Fun (PMultiHole, body) -> NEHole
+  | Fun (Wild, body) -> NEAbs ("WILD", nexpr_of_expr_aux body names)
   | Ap (func, Tuple [ x; y ]) ->
       NEApp (NEApp (nexpr_of_expr_aux func names, nexpr_of_expr_aux x names), nexpr_of_expr_aux y names)
   | Ap (func, arg) -> NEApp (nexpr_of_expr_aux func names, nexpr_of_expr_aux arg names)
@@ -355,6 +374,7 @@ let rec nexpr_of_expr_aux e names : nexpr =
                cases)
             names )
   | Tuple [] -> NEUnit
+  | Tuple [ x ] -> nexpr_of_expr_aux x names
   | Cons (hd, tl) -> NECons (nexpr_of_expr_aux hd names, nexpr_of_expr_aux tl names)
   | ListLit [] -> NENil
   | ListLit (x :: xs) -> NECons (nexpr_of_expr_aux x names, nexpr_of_expr_aux (ListLit xs) names)

@@ -147,13 +147,22 @@ let parse_nexpr input =
     let open Lexing in
     (pos.pos_lnum, pos.pos_cnum - pos.pos_bol + 1)
   in
+  let line_with_caret line col =
+    let lines = String.split_on_char '\n' input in
+    let line_text = match List.nth_opt lines (line - 1) with Some s -> s | None -> "" in
+    let caret_col =
+      let line_len = String.length line_text in
+      if col <= 1 then 1 else if col > line_len + 1 then line_len + 1 else col
+    in
+    Printf.sprintf "%s\n%s^" line_text (String.make (caret_col - 1) ' ')
+  in
   try LiveParser.nexpr LiveLexer.token lexbuf with
   | LiveLexer.Error (msg, pos) ->
       let line, col = report_position pos in
-      invalid_arg (Printf.sprintf "Lexer error at line %d, column %d: %s" line col msg)
+      invalid_arg (Printf.sprintf "Lexer error at line %d, column %d: %s\n%s" line col msg (line_with_caret line col))
   | LiveParser.Error ->
       let line, col = report_position lexbuf.Lexing.lex_curr_p in
-      invalid_arg (Printf.sprintf "Parse error at line %d, column %d" line col)
+      invalid_arg (Printf.sprintf "Parse error at line %d, column %d\n%s" line col (line_with_caret line col))
 
 let pp_expr fmt expr = pp_nexpr fmt (nexpr_of_expr expr)
 let expr_to_string expr = Format.asprintf "%a" pp_expr expr
@@ -180,6 +189,8 @@ let rec pp_value fmt value =
   | LC.VAbs (body, env) -> Format.fprintf fmt "<fun %a | env=%d>" pp_expr body (len_live_list env)
   | LC.VFix (body, env) -> Format.fprintf fmt "<fix %a | env=%d>" pp_expr body (len_live_list env)
   | LC.VStuck stuck -> pp_stuck fmt stuck
+  | LC.VUnit -> Format.fprintf fmt "()"
+  | LC.VPair (x, y) -> Format.fprintf fmt "(%a, %a)" pp_value x pp_value y
 
 and pp_stuck fmt = function
   | LC.SHole _ -> Format.fprintf fmt "<hole>"
