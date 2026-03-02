@@ -65,10 +65,16 @@ and 'a cek = { mutable c : exp; mutable e : 'a Dynarray.t; mutable k : 'a }
 and state = value cek
 and step = { src : pattern cek; dst : value cek; sc : int; mutable hit : int; mutable insert_time : int }
 and memo = trie option Array.t
+and trie = Leaf of { prefix : Pattern.pattern; step : step; max_sc : int } | Branch of branch
 
-and trie =
-  | Leaf of Pattern.pattern * step
-  | Branch of { creator : string; degree : int; prefix : Words.words; var : trie option; const : trie Children.t }
+and branch = {
+  creator : string;
+  degree : int;
+  prefix : Words.words;
+  var : trie option;
+  const : trie Children.t;
+  mutable max_sc : int;
+}
 
 and world = { state : state; memo : memo; resolved : bool cek }
 

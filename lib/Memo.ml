@@ -207,6 +207,21 @@ let init_memo () : memo = Array.create ~len:(Dynarray.length pc_map) None
 let string_of_trie (t : trie) : string = match t with Leaf _ -> "Leaf" | Branch _ -> "Branch"
 let choose_step x y = if x.sc > y.sc then x else y
 let choose_step_option x y = match (x, y) with None, y -> y | x, None -> x | Some x, Some y -> Some (choose_step x y)
+let make_leaf (prefix : Pattern.pattern) (step : step) : trie = Leaf { prefix; step; max_sc = step.sc }
+let max_sc_of_trie (t : trie) : int = match t with Leaf { max_sc; _ } -> max_sc | Branch br -> br.max_sc
+let max_sc_of_trie_opt (t : trie option) : int = match t with None -> 0 | Some t -> max_sc_of_trie t
+
+let max_sc_of_children (const : trie Children.t) : int =
+  let acc = ref 0 in
+  Children.iter const ~f:(fun child -> acc := max !acc (max_sc_of_trie child));
+  !acc
+
+let bump_branch_max_sc (br : branch) (child_max : int) : unit = if child_max > br.max_sc then br.max_sc <- child_max
+
+let make_branch ~(creator : string) ~(degree : int) ~(prefix : Words.words) ~(var : trie option)
+    ~(const : trie Children.t) : trie =
+  let max_sc = max (max_sc_of_trie_opt var) (max_sc_of_children const) in
+  Branch { creator; degree; prefix; var; const; max_sc }
 
 let choose_step_and_subst m n =
   let x, _ = m in
@@ -217,7 +232,7 @@ let choose_step_and_subst_option x y =
   match (x, y) with None, y -> y | x, None -> x | Some x, Some y -> Some (choose_step_and_subst x y)
 
 let trie_degree (x : trie) : int =
-  match x with Leaf (p, _) -> (Pattern.pattern_measure p).degree | Branch br -> br.degree
+  match x with Leaf { prefix; _ } -> (Pattern.pattern_measure prefix).degree | Branch br -> br.degree
 
 let rec build x xstep y ystep (acc : Words.words) =
   let x_degree = (Pattern.pattern_measure x).degree in
@@ -229,7 +244,7 @@ let rec build x xstep y ystep (acc : Words.words) =
     let prefix =
       if Generic.is_empty acc then Generic.empty else Pattern.pattern_cons (Pattern.PCon acc) Generic.empty
     in
-    Leaf (prefix, choose_step xstep ystep))
+    make_leaf prefix (choose_step xstep ystep))
   else (
     assert (not (Pattern.pattern_is_empty y));
     let xh, xt = Pattern.pattern_front_exn x in
@@ -246,9 +261,9 @@ let rec build x xstep y ystep (acc : Words.words) =
           let ykey = Word.hash yhh in
           let yt = if Generic.is_empty yht then yt else Pattern.pattern_cons (Pattern.PCon yht) yt in
           assert (xkey <> ykey);
-          Children.set const xkey (Leaf (xt, xstep));
-          Children.set const ykey (Leaf (yt, ystep));
-          Branch { creator = "build disagree on cons"; degree = x_degree + acc_degree; prefix = acc; var = None; const })
+          Children.set const xkey (make_leaf xt xstep);
+          Children.set const ykey (make_leaf yt ystep);
+          make_branch ~creator:"build disagree on cons" ~degree:(x_degree + acc_degree) ~prefix:acc ~var:None ~const)
         else
           let acc = Words.append acc lcp in
           let xt = if Generic.is_empty xh then xt else Pattern.pattern_cons (Pattern.PCon xh) xt in
@@ -256,20 +271,20 @@ let rec build x xstep y ystep (acc : Words.words) =
           build xt xstep yt ystep acc
     | Pattern.PCon xh, Pattern.PVar yh ->
         let yt = if yh = 1 then yt else Pattern.pattern_cons (Pattern.PVar (yh - 1)) yt in
-        let var = Some (Leaf (yt, ystep)) in
+        let var = Some (make_leaf yt ystep) in
         let const = Children.create () in
         let xhh, xht = Words.words_front_exn xh in
         let key = Word.hash xhh in
         let xt = if Generic.is_empty xht then xt else Pattern.pattern_cons (Pattern.PCon xht) xt in
-        Children.set const key (Leaf (xt, xstep));
-        Branch { creator = "build disagree on var"; degree = x_degree + acc_degree; prefix = acc; var; const }
+        Children.set const key (make_leaf xt xstep);
+        make_branch ~creator:"build disagree on var" ~degree:(x_degree + acc_degree) ~prefix:acc ~var ~const
     | Pattern.PVar _, Pattern.PCon _ -> build y ystep x xstep acc
     | Pattern.PVar xh, Pattern.PVar yh ->
         let xt = if xh = 1 then xt else Pattern.pattern_cons (Pattern.PVar (xh - 1)) xt in
         let yt = if yh = 1 then yt else Pattern.pattern_cons (Pattern.PVar (yh - 1)) yt in
         let var = Some (build xt xstep yt ystep Generic.empty) in
         let const = Children.create () in
-        Branch { creator = "build disagree on var"; degree = x_degree + acc_degree; prefix = acc; var; const })
+        make_branch ~creator:"build disagree on var" ~degree:(x_degree + acc_degree) ~prefix:acc ~var ~const)
 
 let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : step) : trie =
   let ret x =
@@ -278,33 +293,38 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
   in
   (match x with None -> () | Some x -> assert (trie_degree x = (Pattern.pattern_measure prefix').degree));
   match x with
-  | None -> ret (Leaf (prefix', step'))
-  | Some (Leaf (prefix, step)) -> ret (build prefix step prefix' step' Generic.empty)
+  | None -> ret (make_leaf prefix' step')
+  | Some (Leaf { prefix; step; _ }) -> ret (build prefix step prefix' step' Generic.empty)
   | Some (Branch br) -> (
       let ph, pt = Pattern.pattern_front_exn prefix' in
       match ph with
       | Pattern.PCon ph ->
           let lcp, ph, br_prefix = Words.lcp ph br.prefix in
           if Generic.is_empty br_prefix then (
-            if Generic.is_empty ph then
+            if Generic.is_empty ph then (
               let ph, pt = Pattern.pattern_front_exn pt in
               match ph with
               | Pattern.PCon _ -> failwith "impossible"
               | Pattern.PVar ph ->
                   let pt = if ph = 1 then pt else Pattern.pattern_cons (Pattern.PVar (ph - 1)) pt in
-                  let var = Some (insert_option br.var pt step') in
-                  ret (Branch { br with var })
+                  let var = insert_option br.var pt step' in
+                  let br = { br with var = Some var } in
+                  bump_branch_max_sc br (max_sc_of_trie var);
+                  ret (Branch br))
             else
               let phh, pht = Words.words_front_exn ph in
               let key = Word.hash phh in
               let pt = if Generic.is_empty pht then pt else Pattern.pattern_cons (Pattern.PCon pht) pt in
-              Children.update br.const key ~f:(fun x -> insert_option x pt step');
+              let updated = insert_option (Children.find br.const key) pt step' in
+              Children.set br.const key updated;
+              bump_branch_max_sc br (max_sc_of_trie updated);
               ret (Branch br))
           else
             let const = Children.create () in
             let brh, brt = Words.words_front_exn br_prefix in
             let brkey = Word.hash brh in
-            let x = Branch { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
+            let br' = { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
+            let x = Branch br' in
             Children.set const brkey x;
             if Generic.is_empty ph then
               let ph, pt = Pattern.pattern_front_exn pt in
@@ -312,47 +332,36 @@ let rec insert_option (x : trie option) (prefix' : Pattern.pattern) (step' : ste
               | Pattern.PCon _ -> failwith "impossible"
               | Pattern.PVar ph ->
                   let pt = if ph = 1 then pt else Pattern.pattern_cons (Pattern.PVar (ph - 1)) pt in
-                  let var = Some (Leaf (pt, step')) in
+                  let var = Some (make_leaf pt step') in
                   ret
-                    (Branch
-                       {
-                         creator = "unexhausted lcp (var case)";
-                         degree = (Pattern.pattern_measure prefix').degree;
-                         prefix = lcp;
-                         var;
-                         const;
-                       })
+                    (make_branch ~creator:"unexhausted lcp (var case)" ~degree:(Pattern.pattern_measure prefix').degree
+                       ~prefix:lcp ~var ~const)
             else
               let phh, pht = Words.words_front_exn ph in
               let key = Word.hash phh in
               let pt = if Generic.is_empty pht then pt else Pattern.pattern_cons (Pattern.PCon pht) pt in
               Children.update const key ~f:(fun x -> insert_option x pt step');
               ret
-                (Branch
-                   {
-                     creator = "unexhausted lcp (const case)";
-                     degree = (Pattern.pattern_measure prefix').degree;
-                     prefix = lcp;
-                     var = None;
-                     const;
-                   })
+                (make_branch ~creator:"unexhausted lcp (const case)" ~degree:(Pattern.pattern_measure prefix').degree
+                   ~prefix:lcp ~var:None ~const)
       | Pattern.PVar ph ->
           let pt = if ph = 1 then pt else Pattern.pattern_cons (Pattern.PVar (ph - 1)) pt in
-          if Generic.is_empty br.prefix then ret (Branch { br with var = Some (insert_option br.var pt step') })
+          if Generic.is_empty br.prefix then (
+            let var = insert_option br.var pt step' in
+            let br = { br with var = Some var } in
+            bump_branch_max_sc br (max_sc_of_trie var);
+            ret (Branch br))
           else
             let const = Children.create () in
             let brh, brt = Words.words_front_exn br.prefix in
             let brkey = Word.hash brh in
-            let x = Branch { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
+            let br' = { br with prefix = brt; degree = br.degree - Words.degree br.prefix + Words.degree brt } in
+            let x = Branch br' in
             Children.set const brkey x;
-            Branch
-              {
-                creator = "inserting var case";
-                degree = (Pattern.pattern_measure prefix').degree;
-                prefix = Generic.empty;
-                var = Some (Leaf (pt, step'));
-                const;
-              })
+            make_branch ~creator:"inserting var case" ~degree:(Pattern.pattern_measure prefix').degree
+              ~prefix:Generic.empty
+              ~var:(Some (make_leaf pt step'))
+              ~const)
 
 let pattern_size (p : Pattern.pattern) = Generic.size p
 let patterns_size (p : Pattern.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
@@ -373,51 +382,68 @@ let insert_step (m : memo) (step : step) : unit =
   let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
   step.insert_time <- elapsed_time
 
-let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.value) : (step * Value.value) option =
-  (match x with
-  | None -> ()
-  | Some x -> assert (trie_degree x = (Generic.measure ~monoid:Value.monoid ~measure:Value.measure value).degree));
+let step_sc (step : (step * Value.value) option) : int = match step with None -> 0 | Some (step, _) -> step.sc
+
+let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.value) (step : (step * Value.value) option) : (step * Value.value) option =
+  (match x with None -> () | Some x -> assert (trie_degree x = (Value.value_measure value).degree));
   match x with
-  | None -> None
-  | Some (Leaf (p, step)) ->
+  | None -> step
+  | Some trie -> (
+      if step_sc step >= max_sc_of_trie trie then step
+      else
+      match trie with
+      | Leaf { prefix; step = step_; _ } ->
       let m = Generic.measure ~monoid:Value.monoid ~measure:Value.measure value in
-      assert ((Pattern.pattern_measure p).degree = m.degree);
-      assert ((Pattern.pattern_measure p).max_degree = m.max_degree);
-      begin match Dependency.value_match_pattern_aux value p with
+      let pm = Pattern.pattern_measure prefix in
+      assert (pm.degree = m.degree);
+      assert (pm.max_degree = m.max_degree);
+      (match Dependency.value_match_pattern_aux value prefix with
       | Some vls ->
           let leaf_matched = List.fold_left vls ~init:Generic.empty ~f:(fun acc v -> Value.append acc v) in
-          Some (step, Value.append acc leaf_matched)
-      | None -> None
-      end
-  | Some (Branch br) -> (
-      match Value.unwords value br.prefix with
-      | None -> None
-      | Some value ->
-          let var =
-            match br.var with
-            | None -> None
-            | Some var ->
-                let vh, vt = Value.pop_n value 1 in
-                lookup_step_aux (Some var) vt (Value.append acc vh)
-          in
-          let const =
-            let Words vh, vt = Value.front_exn value in
-            let vhh, vht = Words.words_front_exn vh in
-            let key = Word.hash vhh in
-            match Children.find br.const key with
-            | None -> None
-            | Some const ->
-                let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
-                lookup_step_aux (Some const) vt acc
-          in
-          choose_step_and_subst_option var const)
+          choose_step_option step (Some (step_, Value.append acc leaf_matched))
+      | None -> step)
+      | Branch br -> (
+            match Value.unwords value br.prefix with
+            | None -> step
+            | Some value ->
+                let var_child =
+                  match br.var with
+                  | None -> None
+                  | Some var ->
+                      let vh, vt = Value.pop_n value 1 in
+                      (*                lookup_step_aux (Some var) vt (Value.append acc vh)*)
+                      Some (var, vt)
+                in
+                let const_child =
+                  let Words vh, vt = Value.front_exn value in
+                  let vhh, vht = Words.words_front_exn vh in
+                  let key = Word.hash vhh in
+                  match Children.find br.const key with
+                  | None -> None
+                  | Some const ->
+                      let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
+                      (*lookup_step_aux (Some const) vt acc*)
+                      Some (const, vt)
+                in
+                let var_max = match var_child with None -> 0 | Some (var, _) -> max_sc_of_trie var in
+                let const_max = match const_child with None -> 0 | Some (const, _) -> max_sc_of_trie const in
+                let explore child child_max acc =
+                  if child_max = 0 || acc_sc acc >= child_max then acc
+                  else match child with None -> acc | Some (trie, value) -> lookup_step_aux (Some trie) value acc
+                in
+                if var_max >= const_max then
+                  let acc = explore var_child var_max acc in
+                  explore const_child const_max acc
+                else
+                  let acc = explore const_child const_max acc in
+                  explore var_child var_max acc))
 
 let rec list_to_value (x : Value.value list) : Value.value =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Value.append h (list_to_value t)
 
 let lookup_step (value : state) (m : memo) : (step * Value.value) option =
   let pc = value.c.pc in
-  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) Generic.empty
+  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) Generic.empty None
 
 type 'a bin = 'a digit list
 and 'a digit = Zero | One of 'a
@@ -598,7 +624,7 @@ let memo_stats (m : memo) : memo_stats =
     by_depth_stat.node_count <- by_depth_stat.node_count + 1;
     total_nodes := !total_nodes + 1;
     match t with
-    | Leaf (_, st) ->
+    | Leaf { step = st; _ } ->
         stem_nodes := !stem_nodes + 1;
         node_stats := { depth; insert_time = st.insert_time; node_state = Stem_node } :: !node_stats;
         rule_stat :=

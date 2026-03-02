@@ -13,7 +13,32 @@ from pathlib import Path
 from typing import Iterable, Mapping, MutableMapping, Optional
 
 
-SWITCH = os.environ.get("OPAM_SWITCH", "ant")
+REPO_ROOT = Path(__file__).resolve().parent
+
+
+def _normalize_switch(switch: str) -> str:
+    if switch in (".", "..") or os.sep in switch:
+        return str(Path(switch).resolve())
+    return switch
+
+
+def _detect_local_switch() -> Optional[str]:
+    if (REPO_ROOT / "_opam").exists() or (REPO_ROOT / ".opam-switch").exists():
+        return str(REPO_ROOT)
+    return None
+
+
+def _resolve_switch() -> str:
+    env_switch = os.environ.get("OPAM_SWITCH")
+    if env_switch:
+        return _normalize_switch(env_switch)
+    local_switch = _detect_local_switch()
+    if local_switch:
+        return local_switch
+    return "ant"
+
+
+SWITCH = _resolve_switch()
 PACKAGES = [
     "core",
     "dune",
@@ -41,12 +66,20 @@ def run(
     env: Optional[Mapping[str, str]] = None,
     check: bool = True,
     silent: bool = False,
+    capture: bool = False,
 ) -> subprocess.CompletedProcess[str]:
-    """Execute a shell command, optionally silencing output."""
+    """Execute a shell command, optionally silencing or capturing output."""
 
     cmd_list = list(command)
-    stdout = subprocess.DEVNULL if silent else None
-    stderr = subprocess.DEVNULL if silent else None
+    if capture:
+        stdout = subprocess.PIPE
+        stderr = subprocess.PIPE
+    elif silent:
+        stdout = subprocess.DEVNULL
+        stderr = subprocess.DEVNULL
+    else:
+        stdout = None
+        stderr = None
     result = subprocess.run(
         cmd_list,
         env=env,
@@ -63,11 +96,29 @@ def run(
     return result
 
 
+def _switch_exists(switch: str) -> bool:
+    result = run(
+        ["opam", "switch", "list", "--short"],
+        check=False,
+        capture=True,
+    )
+    if result.returncode != 0 or not result.stdout:
+        return False
+    target = _normalize_switch(switch)
+    for line in result.stdout.splitlines():
+        name = line.strip()
+        if not name:
+            continue
+        if _normalize_switch(name) == target:
+            return True
+    return False
+
+
 def ensure_switch() -> None:
     """Ensure the opam switch exists and enforces the invariant."""
 
-    run(["opam", "switch", "create", SWITCH, "--empty"], check=False)
-    run(["opam", "switch", SWITCH])
+    if not _switch_exists(SWITCH):
+        run(["opam", "switch", "create", SWITCH, "--empty"])
     run(
         [
             "opam",
