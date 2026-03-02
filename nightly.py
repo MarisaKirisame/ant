@@ -257,6 +257,7 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         env=env,
     )
 
+modes = ("append", "filter", "map", "qs")
 
 def run_project() -> None:
     _remove_eval_steps_files()
@@ -264,7 +265,7 @@ def run_project() -> None:
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
     opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
-    for mode in ("append", "filter", "map", "qs"):
+    for mode in modes:
         opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
 
 
@@ -275,11 +276,18 @@ def profile_project() -> None:
     generate_ml_files(env=env)
     opam_exec(["dune", "build", "generated/GeneratedMain.exe"], env=env)
     binary = os.path.join("_build", "default", "generated", "GeneratedMain.exe")
-    for mode in ("map",):
-        opam_exec(
-            ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
-            env=env,
-        )
+    for mode in modes:
+        if sys.platform == "darwin":
+            # On macOS, use xctrace (modern replacement for instruments CLI)
+            opam_exec(
+                ["xctrace", "record", "--template", "Time Profiler", "--output", f"perf-{mode}.trace", "--launch", "--", binary, mode],
+                env=env,
+            )
+        else:
+            opam_exec(
+                ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
+                env=env,
+            )
 
 
 def report_project() -> None:

@@ -4,6 +4,7 @@ open Words
 open BatFingerTree
 open State
 open Pattern
+open Common
 
 type pattern_subst_map = pattern Array.t
 type pattern_subst_cek = pattern_subst_map cek
@@ -192,16 +193,31 @@ let step_through (step : step) (state : state) : state =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
   return (map_ek (subst_value subst) step.dst)
 
-let step_through_with_subst (step : step) (state : state) (subst_val : value) : state =
+let step_through_with_subst (step : step) (state : state) (subst_val : value Rev.t) : state =
   assert (step.src.c.pc = state.c.pc);
-  let current = ref subst_val in
+  let current = ref (Rev.to_list subst_val) in
+  let rec pop_n values n =
+    match values with
+    | vh :: vt ->
+        let m = Value.value_measure vh in
+        assert (m.degree == m.max_degree);
+        if m.degree == n then (vh, vt)
+        else if m.degree > n then
+          let vhh, vht = Value.pop_n vh n in
+          (vhh, vht :: vt)
+        else (
+          assert (m.degree < n);
+          let vhh, vt = pop_n vt (n - m.degree) in
+          (Value.append vh vhh, vt))
+    | [] -> failwith "impossible"
+  in
   let split_subst p =
     let vs =
       Generic.fold_left
         (fun vs pat ->
           match pat with
           | PVar n ->
-              let vh, vt = Value.pop_n !current n in
+              let vh, vt = pop_n !current n in
               current := vt;
               vh :: vs
           | PCon _ -> vs)
@@ -211,7 +227,7 @@ let step_through_with_subst (step : step) (state : state) (subst_val : value) : 
   in
   let e = Dynarray.map split_subst step.src.e in
   let k = split_subst step.src.k in
-  assert (Generic.is_empty !current);
+  assert (List.is_empty !current);
   let subst = { c = step.src.c; e; k } in
   map_ek (subst_value subst) step.dst
 
