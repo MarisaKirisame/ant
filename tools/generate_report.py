@@ -19,6 +19,7 @@ from plot_speedup import (
     SpeedupStats,
     compare_stats,
     load_records,
+    plot_speedup_cdf,
     plot_scatter,
     pairs_from_profiles,
     pairs_from_steps,
@@ -32,6 +33,7 @@ def _render_html(
     summary: SpeedupStats | None,
     comparison_summaries: Sequence[Tuple[str, SpeedupStats]] | None,
     combined_scatter_rel: str | None,
+    combined_cdf_rel: str | None,
     css_href: str,
 ) -> str:
     doc = document(title=title)
@@ -62,6 +64,9 @@ def _render_html(
             if combined_scatter_rel:
                 with tag.section(cls="plot"):
                     tag.img(src=combined_scatter_rel, alt="Combined scatter plot across all benchmarks")
+            if combined_cdf_rel:
+                with tag.section(cls="plot"):
+                    tag.img(src=combined_cdf_rel, alt="Combined speedup CDF across all benchmarks")
             with tag.section(cls="grid"):
                 for label, rel in entries:
                     with tag.a(href=rel, cls="card"):
@@ -95,15 +100,20 @@ def generate_html(
 
     summary: SpeedupStats | None = None
     all_pairs: list[tuple[float, float]] = []
+    ratios: list[float] = []
     if inferred_paths:
         all_pairs = _collect_pairs(inferred_paths)
         if all_pairs:
-            _, summary = compare_stats(all_pairs)
+            ratios, summary = compare_stats(all_pairs)
 
     combined_scatter_rel: str | None = None
+    combined_cdf_rel: str | None = None
     if all_pairs:
         scatter_name = plot_scatter(all_pairs, output.parent)
         combined_scatter_rel = os.path.relpath(output.parent / scatter_name, output.parent)
+    if ratios:
+        cdf_name = plot_speedup_cdf(ratios, output.parent)
+        combined_cdf_rel = os.path.relpath(output.parent / cdf_name, output.parent)
 
     comparisons: list[tuple[str, list[tuple[float, float]]]] = [
         ("Memo vs CEK", []),
@@ -142,7 +152,13 @@ def generate_html(
 
     output.write_text(
         _render_html(
-            title, entries_with_rel, summary, comparison_summaries, combined_scatter_rel, css_href
+            title,
+            entries_with_rel,
+            summary,
+            comparison_summaries,
+            combined_scatter_rel,
+            combined_cdf_rel,
+            css_href,
         ),
         encoding="utf-8",
     )

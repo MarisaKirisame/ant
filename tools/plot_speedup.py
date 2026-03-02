@@ -174,6 +174,23 @@ def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
     )
 
 
+def plot_speedup_cdf(ratios: Sequence[float], output_dir: Path) -> str:
+    if not ratios:
+        raise ValueError("ratios is empty")
+    if any(r <= 0 for r in ratios):
+        raise ValueError("ratios must be positive")
+    xs = sorted(ratios)
+    ys = [100.0 * (i + 1) / len(xs) for i in range(len(xs))]
+    return _save_plot(
+        output_dir,
+        title=f"Speedup CDF ({METRIC_LABEL})",
+        xlabel=f"Speedup ({METRIC_LABEL}, baseline / memoized)",
+        ylabel="Executions <= speedup (%)",
+        xscale="log",
+        plotter=lambda ax: ax.plot(xs, ys, marker="o", linewidth=1.5),
+    )
+
+
 def plot_depth_breakdown(
     depth_breakdown: Sequence[MemoStatsNode], output_dir: Path
 ) -> str:
