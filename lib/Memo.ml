@@ -223,6 +223,14 @@ let make_branch ~(creator : string) ~(degree : int) ~(prefix : Words.words) ~(va
   let max_sc = max (max_sc_of_trie_opt var) (max_sc_of_children const) in
   Branch { creator; degree; prefix; var; const; max_sc }
 
+let choose_step_and_subst m n =
+  let x, _ = m in
+  let y, _ = n in
+  if x.sc > y.sc then m else n
+
+let choose_step_and_subst_option x y =
+  match (x, y) with None, y -> y | x, None -> x | Some x, Some y -> Some (choose_step_and_subst x y)
+
 let trie_degree (x : trie) : int =
   match x with Leaf { prefix; _ } -> (Pattern.pattern_measure prefix).degree | Branch br -> br.degree
 
@@ -374,31 +382,37 @@ let insert_step (m : memo) (step : step) : unit =
   let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
   step.insert_time <- elapsed_time
 
-let acc_sc (acc : step option) : int = match acc with None -> 0 | Some step -> step.sc
+let step_sc (step : (step * Value.value) option) : int = match step with None -> 0 | Some (step, _) -> step.sc
 
-let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : step option) : step option =
+let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.value) (step : (step * Value.value) option) : (step * Value.value) option =
   (match x with None -> () | Some x -> assert (trie_degree x = (Value.value_measure value).degree));
   match x with
-  | None -> acc
+  | None -> step
   | Some trie -> (
-      if acc_sc acc >= max_sc_of_trie trie then acc
+      if step_sc step >= max_sc_of_trie trie then step
       else
-        match trie with
-        | Leaf { prefix; step; _ } ->
-            assert ((Pattern.pattern_measure prefix).degree = (Value.value_measure value).degree);
-            assert ((Pattern.pattern_measure prefix).max_degree = (Value.value_measure value).max_degree);
-            if Option.is_some (Dependency.value_match_pattern_aux value prefix) then choose_step_option acc (Some step)
-            else acc
-        | Branch br -> (
+      match trie with
+      | Leaf { prefix; step = step_; _ } ->
+      let m = Generic.measure ~monoid:Value.monoid ~measure:Value.measure value in
+      let pm = Pattern.pattern_measure prefix in
+      assert (pm.degree = m.degree);
+      assert (pm.max_degree = m.max_degree);
+      (match Dependency.value_match_pattern_aux value prefix with
+      | Some vls ->
+          let leaf_matched = List.fold_left vls ~init:Generic.empty ~f:(fun acc v -> Value.append acc v) in
+          choose_step_option step (Some (step_, Value.append acc leaf_matched))
+      | None -> step)
+      | Branch br -> (
             match Value.unwords value br.prefix with
-            | None -> acc
+            | None -> step
             | Some value ->
                 let var_child =
                   match br.var with
                   | None -> None
                   | Some var ->
-                      let _, value = Value.pop_n value 1 in
-                      Some (var, value)
+                      let vh, vt = Value.pop_n value 1 in
+                      (*                lookup_step_aux (Some var) vt (Value.append acc vh)*)
+                      Some (var, vt)
                 in
                 let const_child =
                   let Words vh, vt = Value.front_exn value in
@@ -408,6 +422,7 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : step opti
                   | None -> None
                   | Some const ->
                       let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
+                      (*lookup_step_aux (Some const) vt acc*)
                       Some (const, vt)
                 in
                 let var_max = match var_child with None -> 0 | Some (var, _) -> max_sc_of_trie var in
@@ -426,9 +441,9 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : step opti
 let rec list_to_value (x : Value.value list) : Value.value =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Value.append h (list_to_value t)
 
-let lookup_step (value : state) (m : memo) : step option =
+let lookup_step (value : state) (m : memo) : (step * Value.value) option =
   let pc = value.c.pc in
-  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) None
+  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) Generic.empty None
 
 type 'a bin = 'a digit list
 and 'a digit = Zero | One of 'a
@@ -501,6 +516,12 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
       assert (Dependency.state_equal x y);*)
       x
     in
+    let dbg_step_through_with_subst step state subst =
+      assert (step.sc > 0);
+      step.hit <- step.hit + 1;
+      let x = Profile.with_slot step_through_slot (fun () -> Dependency.step_through_with_subst step state subst) in
+      x
+    in
     let state = { c; e; k } in
     let i = ref 0 in
     let sc = ref 0 in
@@ -525,10 +546,10 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
         log ("step " ^ string_of_int !i ^ ": " ^ string_of_int !sc);
         i := !i + 1;
         match Profile.with_slot lookup_step_slot (fun () -> lookup_step state m) with
-        | Some step ->
+        | Some (step, subst) ->
             hist := inc compose_slice { state; step } !hist;
             sc := !sc + step.sc;
-            dbg_step_through step state |> exec
+            dbg_step_through_with_subst step state subst |> exec
         | None ->
             let old = copy_state state in
             let w = make_world state m in
