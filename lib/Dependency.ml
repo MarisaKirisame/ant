@@ -246,9 +246,39 @@ let state_equal (x : state) (y : state) : bool =
 let compose_step_step_through_slot = Profile.register_slot Profile.memo_profile "compose_step.step_through"
 let unify_vp_slot = Profile.register_slot Profile.memo_profile "unify_vp"
 let debug_compose = match Sys.getenv_opt "ANT_DEBUG_COMPOSE" with Some ("1" | "true" | "TRUE") -> true | _ -> false
-let fast_compose = match Sys.getenv_opt "ANT_FAST_COMPOSE" with Some ("1" | "true" | "TRUE") -> true | _ -> false
+let fast_compose = match Sys.getenv_opt "ANT_FAST_COMPOSE" with Some ("0" | "false" | "FALSE") -> false | _ -> true
 let pattern_has_pcon (p : pattern) : bool = Generic.to_list p |> List.exists (function PCon _ -> true | _ -> false)
-let pattern_cek_has_pcon (p : pattern cek) : bool = fold_ek p false (fun acc p -> acc || pattern_has_pcon p)
+
+let rec fast_compose_allowed_aux (v : value) (p : pattern) : bool =
+  if pattern_is_empty p then Generic.is_empty v
+  else
+    let ph, pt = pattern_front_exn p in
+    match ph with
+    | PVar ph ->
+        let _, vt = Value.pop_n v ph in
+        fast_compose_allowed_aux vt pt
+    | PCon ph -> (
+        match Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v with
+        | rest, Words w -> (
+            let pl = Words.length ph in
+            let m = Words.summary w in
+            if m.length < pl then
+              let _, pht = Words.slice_length ph m.length in
+              fast_compose_allowed_aux rest (pattern_cons_unsafe (PCon pht) pt)
+            else
+              match Words.unwords w ph with
+              | None -> false
+              | Some wt ->
+                  let rest = if Words.is_empty wt then rest else Value.value_cons (Words wt) rest in
+                  fast_compose_allowed_aux rest pt)
+        | rest, Reference r ->
+            let ph_slice, pt = pattern_slice p r.values_count in
+            if pattern_has_pcon ph_slice then false else fast_compose_allowed_aux rest pt)
+
+let fast_compose_allowed (v : value cek) (p : pattern cek) : bool =
+  match zip_ek v p with
+  | None -> false
+  | Some vp -> fold_ek vp true (fun acc (v, p) -> acc && fast_compose_allowed_aux v p)
 
 let compose_step (x : step) (y : step) : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x.dst in*)
@@ -270,7 +300,7 @@ let compose_step (x : step) (y : step) : step =
     in
     Array.of_list (loop p)
   in
-  let use_fast = fast_compose && not (pattern_cek_has_pcon y.src) in
+  let use_fast = fast_compose && fast_compose_allowed x.dst y.src in
   let s, y_subst_raw =
     if use_fast then
       let s, y_subst =
