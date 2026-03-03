@@ -317,6 +317,9 @@ let pattern_has_nonpositive_max_degree (p : pattern) : bool =
 let pattern_cek_has_nonpositive_max_degree (p : pattern cek) : bool =
   fold_ek p false (fun acc p -> acc || pattern_has_nonpositive_max_degree p)
 
+let pattern_is_all_pcon (p : pattern) : bool =
+  Generic.to_list p |> List.for_all (function PCon _ -> true | PVar _ -> false)
+
 let rec pattern_agree_on_constructors (x : pattern) (y : pattern) : bool =
   if pattern_is_empty x then pattern_is_empty y
   else if pattern_is_empty y then false
@@ -399,14 +402,15 @@ let rec fast_compose_allowed_aux (v : value) (p : pattern) (s : pattern_subst_ce
         | rest, Reference r ->
             let ph_slice, pt = pattern_slice p r.values_count in
             if pattern_has_pcon ph_slice then
-              if pattern_has_nonpositive_max_degree ph_slice then false
-              else
-                let sm = cek_get s r.src in
-                let ref_pat = Array.get sm r.hole_idx in
-                let _, after_offset = pattern_slice ref_pat r.offset in
-                let ref_slice, _ = pattern_slice after_offset r.values_count in
-                if not (pattern_agree_on_constructors ref_slice ph_slice) then false
-                else fast_compose_allowed_aux rest pt s
+              let sm = cek_get s r.src in
+              let ref_pat = Array.get sm r.hole_idx in
+              let _, after_offset = pattern_slice ref_pat r.offset in
+              let ref_slice, _ = pattern_slice after_offset r.values_count in
+              let ok =
+                pattern_is_all_pcon ph_slice && pattern_is_all_pcon ref_slice
+                && pattern_agree_on_constructors ref_slice ph_slice
+              in
+              if not ok then false else fast_compose_allowed_aux rest pt s
             else fast_compose_allowed_aux rest pt s)
 
 let fast_compose_allowed (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : bool =
@@ -435,9 +439,7 @@ let compose_step (x : step) (y : step) : step =
     Array.of_list (loop p)
   in
   let s = Profile.with_slot unify_vp_slot (fun _ -> unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src)) in
-  let use_fast =
-    fast_compose && (not (pattern_cek_has_nonpositive_max_degree y.src)) && fast_compose_allowed x.dst y.src s
-  in
+  let use_fast = fast_compose && fast_compose_allowed x.dst y.src s in
   let y_subst_raw =
     if use_fast then Some (zipwith_ek (fun v p -> Array.of_list (collect_subst_aux v p)) x.dst y.src) else None
   in
@@ -464,16 +466,17 @@ let compose_step (x : step) (y : step) : step =
     if use_fast then
       let y_subst_raw = Option.get y_subst_raw in
       let y_subst = map_ek (fun a -> Array.map (subst_value subst) a) y_subst_raw in
-      map_ek (subst_value y_subst) y.dst
+      let dst_fast = map_ek (subst_value y_subst) y.dst in
+      if debug_compose && not (state_equal dst_old dst_fast) then (
+        print_endline "compose_step debug mismatch:";
+        print_endline ("x step: " ^ string_of_step x);
+        print_endline ("y step: " ^ string_of_step y);
+        print_endline ("dst old: " ^ string_of_cek dst_old);
+        print_endline ("dst new: " ^ string_of_cek dst_fast);
+        dst_old)
+      else dst_fast
     else dst_old
   in
-  if debug_compose && use_fast then
-    if not (state_equal dst_old dst) then (
-      print_endline "compose_step debug mismatch:";
-      print_endline ("x step: " ^ string_of_step x);
-      print_endline ("y step: " ^ string_of_step y);
-      print_endline ("dst old: " ^ string_of_cek dst_old);
-      print_endline ("dst new: " ^ string_of_cek dst));
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
   { src; dst; sc = x.sc + y.sc; hit = 0; insert_time = 0 }
 
