@@ -419,9 +419,6 @@ let compose_step (x : step) (y : step) : step =
   in
   let s = Profile.with_slot unify_vp_slot (fun _ -> unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src)) in
   let use_fast = fast_compose && fast_compose_allowed x.dst y.src s in
-  let y_subst_raw =
-    if use_fast then Some (zipwith_ek (fun v p -> Array.of_list (collect_subst_aux v p)) x.dst y.src) else None
-  in
   let src =
     zipwith_ek
       (fun p s ->
@@ -440,11 +437,13 @@ let compose_step (x : step) (y : step) : step =
       s
   in
   let dst_mid = map_ek (subst_value subst) x.dst in
+  let y_subst =
+    if use_fast then Some (zipwith_ek (fun v p -> Array.of_list (collect_subst_aux v p)) dst_mid y.src) else None
+  in
   let dst_old = Profile.with_slot compose_step_step_through_slot (fun _ -> step_through y dst_mid) in
   let dst =
     if use_fast then
-      let y_subst_raw = Option.get y_subst_raw in
-      let y_subst = map_ek (fun a -> Array.map (subst_value subst) a) y_subst_raw in
+      let y_subst = Option.get y_subst in
       let dst_fast = map_ek (subst_value y_subst) y.dst in
       if debug_compose && not (state_equal dst_old dst_fast) then (
         print_endline "compose_step debug mismatch:";
