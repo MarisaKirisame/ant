@@ -131,59 +131,25 @@ let collect_from_reference (r : reference) (p : pattern) : value list =
   in
   loop p 0 []
 
-(* unify pattern and value, building a substituion map for pattern *)
+(*todo: this code look a lot like value_match_pattern, is there ways to unify them?*)
+(*unify pattern and value, building a substituion map for pattern*)
 let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
+  (*assert ((Value.summary v).degree = (pattern_measure p).degree);
+  assert ((Value.summary v).degree = (Value.summary v).max_degree);
+  assert ((pattern_measure p).degree = (pattern_measure p).max_degree);*)
+  (*assert (Pattern.pattern_valid p);*)
+  let return x = x in
   if pattern_is_empty p then (
     assert (Generic.is_empty v);
-    ())
-  else
-    let ph, pt = pattern_front_exn p in
-    match ph with
-    | PVar ph ->
-        let _, vt = Value.pop_n v ph in
-        unify_vp_aux vt pt s
-    | PCon ph -> (
-        match Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v with
-        | rest, Words w -> (
-            let pl = Words.length ph in
-            let m = Words.summary w in
-            if m.length < pl then (
-              let phh, pht = Words.slice_length ph m.length in
-              if not (Lazy.force m.hash = Words.hash phh) then (
-                print_endline "should not happens:";
-                print_endline ("phh: " ^ string_of_words phh));
-              assert (Lazy.force m.hash = Words.hash phh);
-              unify_vp_aux rest (pattern_cons_unsafe (PCon pht) pt) s)
-            else
-              match Words.unwords w ph with
-              | None -> failwith "unify_vp_aux: cannot unify"
-              | Some wt ->
-                  let rest = if Words.is_empty wt then rest else Value.value_cons (Words wt) rest in
-                  unify_vp_aux rest pt s)
-        | rest, Reference r ->
-            let ph, pt = pattern_slice p r.values_count in
-            let sm = cek_get s r.src in
-            let unify_with = Array.get sm r.hole_idx in
-            let ph = if r.offset > 0 then pattern_cons (make_pvar r.offset) ph else ph in
-            let needed = (pattern_measure unify_with).max_degree - (r.offset + r.values_count) in
-            assert (needed >= 0);
-            let ph = if needed > 0 then pattern_snoc ph (make_pvar needed) else ph in
-            let hole_value = unify unify_with ph in
-            Array.set sm r.hole_idx hole_value;
-            unify_vp_aux rest pt s)
-
-(* Unify value with pattern (like unify_vp), while also collecting the substitution
-   for the pattern variables as value slices in order. *)
-let rec unify_vp_collect_aux (v : value) (p : pattern) (s : pattern_subst_cek) : value list =
-  if pattern_is_empty p then (
-    assert (Generic.is_empty v);
-    [])
+    return ())
   else
     let ph, pt = pattern_front_exn p in
     match ph with
     | PVar ph ->
         let vh, vt = Value.pop_n v ph in
-        vh :: unify_vp_collect_aux vt pt s
+        (*assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
+        assert ((Value.summary vh).degree = ph);*)
+        return (unify_vp_aux vt pt s)
     | PCon ph -> (
         match Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v with
         | rest, Words w ->
@@ -195,31 +161,29 @@ let rec unify_vp_collect_aux (v : value) (p : pattern) (s : pattern_subst_cek) :
                 print_endline "should not happens:";
                 print_endline ("phh: " ^ string_of_words phh));
               assert (Lazy.force m.hash = Words.hash phh);
-              unify_vp_collect_aux rest (pattern_cons_unsafe (PCon pht) pt) s)
+              return (unify_vp_aux rest (pattern_cons_unsafe (PCon pht) pt) s))
             else (
               assert (m.length >= pl);
               match Words.unwords w ph with
-              | None -> failwith "unify_vp_collect_aux: cannot unify"
+              | None -> failwith "unify_vp_aux: cannot unify"
               | Some wt ->
                   let rest = if Words.is_empty wt then rest else Value.value_cons (Words wt) rest in
-                  unify_vp_collect_aux rest pt s)
+                  return (unify_vp_aux rest pt s))
         | rest, Reference r ->
-            let ph_slice, pt = pattern_slice p r.values_count in
+            let ph, pt = pattern_slice p r.values_count in
             let sm = cek_get s r.src in
             let unify_with = Array.get sm r.hole_idx in
-            let ph_unify = if r.offset > 0 then pattern_cons (make_pvar r.offset) ph_slice else ph_slice in
+            (*assert ((pattern_measure ph).degree = (pattern_measure ph).max_degree);*)
+            let ph = if r.offset > 0 then pattern_cons (make_pvar r.offset) ph else ph in
             let needed = (pattern_measure unify_with).max_degree - (r.offset + r.values_count) in
             assert (needed >= 0);
-            let ph_unify = if needed > 0 then pattern_snoc ph_unify (make_pvar needed) else ph_unify in
-            let hole_value = unify unify_with ph_unify in
+            let ph = if needed > 0 then pattern_snoc ph (make_pvar needed) else ph in
+            let hole_value = unify unify_with ph in
+            (*assert (Pattern.pattern_valid unify_with);
+              assert (Pattern.pattern_valid ph);
+              assert (Pattern.pattern_valid hole_value);*)
             Array.set sm r.hole_idx hole_value;
-            let vs_here = collect_from_reference r ph_slice in
-            let vs_rest = unify_vp_collect_aux rest pt s in
-            vs_here @ vs_rest)
-
-let unify_vp_collect (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek * value_subst_cek =
-  let y_subst = zipwith_ek (fun v p -> Array.of_list (unify_vp_collect_aux v p s)) v p in
-  (s, y_subst)
+            return (unify_vp_aux rest pt s))
 
 let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek =
   let _ = zipwith_ek (fun v p -> unify_vp_aux v p s) v p in
@@ -377,47 +341,6 @@ let rec collect_subst_aux (v : value) (p : pattern) : value list =
             let vs_rest = collect_subst_aux rest pt in
             vs_here @ vs_rest)
 
-let rec fast_compose_allowed_aux (v : value) (p : pattern) (s : pattern_subst_cek) : bool =
-  if pattern_is_empty p then Generic.is_empty v
-  else
-    let ph, pt = pattern_front_exn p in
-    match ph with
-    | PVar ph ->
-        let _, vt = Value.pop_n v ph in
-        fast_compose_allowed_aux vt pt s
-    | PCon ph -> (
-        match Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v with
-        | rest, Words w -> (
-            let pl = Words.length ph in
-            let m = Words.summary w in
-            if m.length < pl then
-              let _, pht = Words.slice_length ph m.length in
-              fast_compose_allowed_aux rest (pattern_cons_unsafe (PCon pht) pt) s
-            else
-              match Words.unwords w ph with
-              | None -> false
-              | Some wt ->
-                  let rest = if Words.is_empty wt then rest else Value.value_cons (Words wt) rest in
-                  fast_compose_allowed_aux rest pt s)
-        | rest, Reference r ->
-            let ph_slice, pt = pattern_slice p r.values_count in
-            if pattern_has_pcon ph_slice then
-              let sm = cek_get s r.src in
-              let ref_pat = Array.get sm r.hole_idx in
-              let _, after_offset = pattern_slice ref_pat r.offset in
-              let ref_slice, _ = pattern_slice after_offset r.values_count in
-              let ok =
-                pattern_is_all_pcon ph_slice && pattern_is_all_pcon ref_slice
-                && pattern_agree_on_constructors ref_slice ph_slice
-              in
-              if not ok then false else fast_compose_allowed_aux rest pt s
-            else fast_compose_allowed_aux rest pt s)
-
-let fast_compose_allowed (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : bool =
-  match zip_ek v p with
-  | None -> false
-  | Some vp -> fold_ek vp true (fun acc (v, p) -> acc && fast_compose_allowed_aux v p s)
-
 let compose_step (x : step) (y : step) : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x.dst in*)
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) y.dst in*)
@@ -439,7 +362,6 @@ let compose_step (x : step) (y : step) : step =
     Array.of_list (loop p)
   in
   let s = Profile.with_slot unify_vp_slot (fun _ -> unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src)) in
-  let use_fast = fast_compose && fast_compose_allowed x.dst y.src s in
   let src =
     zipwith_ek
       (fun p s ->
@@ -458,24 +380,8 @@ let compose_step (x : step) (y : step) : step =
       s
   in
   let dst_mid = map_ek (subst_value subst) x.dst in
-  let y_subst =
-    if use_fast then Some (zipwith_ek (fun v p -> Array.of_list (collect_subst_aux v p)) dst_mid y.src) else None
-  in
-  let dst_old = Profile.with_slot compose_step_step_through_slot (fun _ -> step_through y dst_mid) in
-  let dst =
-    if use_fast then
-      let y_subst = Option.get y_subst in
-      let dst_fast = map_ek (subst_value y_subst) y.dst in
-      if debug_compose && not (state_equal dst_old dst_fast) then (
-        print_endline "compose_step debug mismatch:";
-        print_endline ("x step: " ^ string_of_step x);
-        print_endline ("y step: " ^ string_of_step y);
-        print_endline ("dst old: " ^ string_of_cek dst_old);
-        print_endline ("dst new: " ^ string_of_cek dst_fast);
-        dst_old)
-      else dst_fast
-    else dst_old
-  in
+  let y_subst = zipwith_ek (fun v p -> Array.of_list (collect_subst_aux v p)) dst_mid y.src in
+  let dst = map_ek (subst_value y_subst) y.dst in
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
   { src; dst; sc = x.sc + y.sc; hit = 0; insert_time = 0 }
 
@@ -511,3 +417,8 @@ let string_of_step (step : step) : string =
   let src = pattern_to_value step.src in
   let dst = step.dst in
   bracket (string_of_cek src ^ " =>" ^ string_of_int step.sc ^ " " ^ string_of_cek dst)
+
+let value_equal (x : value) (y : value) : bool = Generic.equal equal_fg_et x y
+
+let state_equal (x : state) (y : state) : bool =
+  x.c.pc = y.c.pc && List.equal value_equal (Dynarray.to_list x.e) (Dynarray.to_list y.e) && value_equal x.k y.k
