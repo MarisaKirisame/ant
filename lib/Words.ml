@@ -43,8 +43,8 @@ let measure (w : Word.t) : measure =
 
 type words = (Word.t, measure) Generic.fg
 
-let from_constructor (ctag : int) : words = Generic.singleton (Word.ConstructorTag ctag)
-let from_int (i : int) : words = Generic.singleton (Word.Int i)
+let from_constructor (ctag : int) : words = Generic.singleton ~measure (Word.ConstructorTag ctag)
+let from_int (i : int) : words = Generic.singleton ~measure (Word.Int i)
 
 let to_word (s : words) : Word.t =
   assert (Generic.size s = 1);
@@ -126,7 +126,7 @@ let lcp (x : words) (y : words) : words * words * words =
     else if hi < 8 then
       let xh, xt = words_front_exn x in
       let yh, yt = words_front_exn y in
-      if Word.equal xh yh then search (hi - 1) (append common (singleton xh)) xt x_rest yt y_rest
+      if Word.equal xh yh then search (hi - 1) (append common (Generic.singleton ~measure xh)) xt x_rest yt y_rest
       else (common, append x x_rest, append y y_rest)
     else
       let mid = (hi + 1) / 2 in

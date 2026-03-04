@@ -245,7 +245,7 @@ let compose_step (x : step) (y : step) : step =
       if Generic.is_empty p then []
       else
         let ph, pt = pattern_front_exn p in
-        match ph with PVar n -> Generic.singleton (make_pvar n) :: loop pt | PCon _ -> loop pt
+        match ph with PVar n -> Generic.singleton ~measure:pat_measure (make_pvar n) :: loop pt | PCon _ -> loop pt
     in
     Array.of_list (loop p)
   in
@@ -292,10 +292,10 @@ let make_step (value : state) (resolved : bool cek) m : step =
               let vht, vhh = Generic.front_exn ~monoid:Words.monoid ~measure:Words.measure vh in
               let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
               Generic.of_list ~monoid:Pattern.monoid ~measure:Pattern.pat_measure
-                (if (Value.summary vt).degree = 0 then [ PCon (Generic.singleton vhh) ]
-                 else [ PCon (Generic.singleton vhh); make_pvar (Value.summary vt).degree ])
+                (if (Value.summary vt).degree = 0 then [ PCon (Generic.singleton ~measure:Words.measure vhh) ]
+                 else [ PCon (Generic.singleton ~measure:Words.measure vhh); make_pvar (Value.summary vt).degree ])
           | _ -> failwith "cannot make step"
-        else Generic.singleton (make_pvar (Value.summary v).degree))
+        else Generic.singleton ~measure:pat_measure (make_pvar (Value.summary v).degree))
       value resolved
   in
   let w = make_world (pattern_to_value src) m in

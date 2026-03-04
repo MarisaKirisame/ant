@@ -55,7 +55,7 @@ let append (x : seq) (y : seq) : seq =
     | _ -> Generic.append ~monoid ~measure x y
 
 let value_cons (et : fg_et) (v : seq) : seq =
-  if Generic.is_empty v then Generic.singleton et
+  if Generic.is_empty v then Generic.singleton ~measure et
   else
     let vt, vh = Generic.front_exn ~monoid ~measure v in
     match (et, vh) with
@@ -63,7 +63,7 @@ let value_cons (et : fg_et) (v : seq) : seq =
     | _ -> Generic.cons ~monoid ~measure v et
 
 let value_snoc (v : seq) (et : fg_et) : seq =
-  if Generic.is_empty v then Generic.singleton et
+  if Generic.is_empty v then Generic.singleton ~measure et
   else
     let vh, vt = Generic.rear_exn ~monoid ~measure v in
     match (vt, et) with

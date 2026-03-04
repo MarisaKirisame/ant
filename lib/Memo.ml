@@ -45,7 +45,9 @@ let rec subst (resolve : source -> seq option) (x : seq) : seq =
     | Reference r -> Value.append (subst_reference resolve r) (subst resolve xt)
 
 and subst_reference (resolve : source -> seq option) (r : reference) : seq =
-  match resolve r.src with Some seq -> slice seq r.offset r.values_count | None -> Generic.singleton (Reference r)
+  match resolve r.src with
+  | Some seq -> slice seq r.offset r.values_count
+  | None -> Generic.singleton ~measure (Reference r)
 
 let subst_state (x : state) (resolve : source -> seq option) : state =
   let c = x.c in
@@ -96,8 +98,12 @@ let add_exp (f : world -> unit) (pc_ : int) : unit =
   Dynarray.add_last pc_map { step = f; pc }
 
 let pc_to_exp (Pc pc) : exp = Dynarray.get pc_map pc
-let from_constructor (ctag : int) : seq = Generic.singleton (Words (Generic.singleton (Word.ConstructorTag ctag)))
-let from_int (i : int) : seq = Generic.singleton (Words (Generic.singleton (Word.Int i)))
+
+let from_constructor (ctag : int) : seq =
+  Generic.singleton ~measure (Words (Generic.singleton ~measure:Words.measure (Word.ConstructorTag ctag)))
+
+let from_int (i : int) : seq =
+  Generic.singleton ~measure (Words (Generic.singleton ~measure:Words.measure (Word.Int i)))
 
 let to_word (s : seq) : Word.t =
   assert ((Generic.measure ~monoid ~measure s).degree = 1);

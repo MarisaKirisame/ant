@@ -35,7 +35,7 @@ let pattern_front_exn (p : pattern) : pat * pattern =
   (first_p, rest_p)
 
 let pattern_cons (p : pat) (q : pattern) : pattern =
-  if Generic.is_empty q then Generic.singleton p
+  if Generic.is_empty q then Generic.singleton ~measure:pat_measure p
   else
     let qh, qt = pattern_front_exn q in
     match (p, qh) with
@@ -44,7 +44,7 @@ let pattern_cons (p : pat) (q : pattern) : pattern =
     | PCon _, PVar _ | PVar _, PCon _ -> Generic.cons ~monoid ~measure:pat_measure q p
 
 let pattern_snoc (p : pattern) (q : pat) : pattern =
-  if Generic.is_empty p then Generic.singleton q
+  if Generic.is_empty p then Generic.singleton ~measure:pat_measure q
   else
     let ph, pt = pattern_rear_exn p in
     match (pt, q) with
