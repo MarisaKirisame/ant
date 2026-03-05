@@ -155,12 +155,11 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
     )
 
 
-def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
-    xs = list(range(1, len(ratios) + 1))
+def plot_speedup_line(xs: Sequence[int], xlabel: str, ratios: Sequence[float], output_dir: Path) -> str:
     return _save_plot(
         output_dir,
         title=f"Speedup per Execution ({METRIC_LABEL}, log scale)",
-        xlabel="Execution number (nth run)",
+        xlabel=xlabel,
         ylabel=f"Speedup ({METRIC_LABEL}, baseline / memoized, log scale)",
         yscale="log",
         plotter=lambda ax: ax.plot(xs, ratios, marker="o", linewidth=1.5),
@@ -434,9 +433,11 @@ def generate_plot(
 
 
 def generate_plot_for_pairs(
-    pairs: Sequence[tuple[float, float]], output_dir: Path
+    pairs: Sequence[tuple[float, float]], output_dir: Path, xs: Sequence[int] = None, xlabel: str = "Execution number (nth run)" 
 ) -> tuple[SpeedupStats, str, str]:
     ratios, stats = compare_stats(pairs)
-    line_plot = plot_speedup_line(ratios, output_dir)
+    if xs is None:
+        xs = list(range(1, len(ratios) + 1))
+    line_plot = plot_speedup_line(xs, xlabel, ratios, output_dir)
     scatter_plot = plot_scatter(pairs, output_dir)
     return stats, line_plot, scatter_plot
