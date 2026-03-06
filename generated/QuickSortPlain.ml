@@ -1,0 +1,21 @@
+type int_list = Nil | Cons of int * int_list
+
+let rec concat = fun x1 x2 -> match x1 with Nil -> x2 | Cons (xh, xt) -> Cons (xh, concat xt x2)
+
+let rec filter_gt =
+ fun x pivot ->
+  match x with Nil -> Nil | Cons (xh, xt) -> if xh > pivot then Cons (xh, filter_gt xt pivot) else filter_gt xt pivot
+
+let rec filter_eq =
+ fun x pivot ->
+  match x with Nil -> Nil | Cons (xh, xt) -> if xh = pivot then Cons (xh, filter_eq xt pivot) else filter_eq xt pivot
+
+let rec filter_lt =
+ fun x pivot ->
+  match x with Nil -> Nil | Cons (xh, xt) -> if xh < pivot then Cons (xh, filter_lt xt pivot) else filter_lt xt pivot
+
+let rec quicksort =
+ fun x ->
+  match x with
+  | Nil -> Nil
+  | Cons (xh, xt) -> concat (quicksort (filter_lt x xh)) (concat (filter_eq x xh) (quicksort (filter_gt x xh)))

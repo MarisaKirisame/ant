@@ -293,7 +293,6 @@ hazel_modes = tuple(m for m in hazel_modes if m not in bad)
 arith_modes = ("arith",)
 modes = arith_modes + hazel_modes
 
-
 def _remove_eval_steps_files_for_modes(selected_modes: Iterable[str]) -> None:
     for mode in selected_modes:
         path = f"eval_steps_{mode}.json"

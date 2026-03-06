@@ -53,46 +53,43 @@ let populate_state () =
   add_exp
     (fun w_0 ->
       assert_env_length w_0 1;
-      push_env w_0 (Dynarray.get w_0.state.e 0);
       w_0.state.c <- pc_to_exp (int_to_pc 3))
     1;
   add_exp
     (fun w_2 ->
-      assert_env_length w_2 5;
-      let x0_0 = resolve w_2 (Source.E 3) in
-      let x1_0 = resolve w_2 (Source.E 4) in
+      assert_env_length w_2 3;
+      let x0_0 = resolve w_2 (Source.E 1) in
+      let x1_0 = resolve w_2 (Source.E 2) in
       ignore (pop_env w_2);
       ignore (pop_env w_2);
       push_env w_2 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
-      assert_env_length w_2 4;
-      push_env w_2 (Dynarray.get w_2.state.e 2);
-      assert_env_length w_2 5;
-      let keep_0 = env_call w_2 [ 3 ] 1 in
+      assert_env_length w_2 2;
+      push_env w_2 (Dynarray.get w_2.state.e 0);
+      assert_env_length w_2 3;
+      let keep_0 = env_call w_2 [ 1 ] 1 in
       w_2.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_0; w_2.state.k ];
       w_2.state.c <- pc_to_exp (int_to_pc 1))
     2;
   add_exp
     (fun w_1 ->
-      assert_env_length w_1 2;
-      let last_0 = Source.E 1 in
+      assert_env_length w_1 1;
+      let last_0 = Source.E 0 in
       let x_0 = resolve w_1 last_0 in
       match Word.get_value (fst x_0) with
       | 1 (* tag_Nil *) ->
           ignore (pop_env w_1);
-          assert_env_length w_1 1;
+          assert_env_length w_1 0;
           push_env w_1 (Memo.from_constructor tag_Nil);
-          assert_env_length w_1 2;
-          return_n w_1 2 (pc_to_exp (int_to_pc 0))
+          assert_env_length w_1 1;
+          return_n w_1 1 (pc_to_exp (int_to_pc 0))
       | 2 (* tag_Cons *) ->
           let splits_0 = Memo.splits (snd x_0) in
           let split0_0 = List.nth splits_0 0 in
           let split1_0 = List.nth splits_0 1 in
           ignore (pop_env w_1);
-          push_env w_1 split0_0;
           push_env w_1 split1_0;
-          assert_env_length w_1 3;
-          push_env w_1 (Dynarray.get w_1.state.e 1);
-          assert_env_length w_1 4;
+          push_env w_1 split0_0;
+          assert_env_length w_1 2;
           push_env w_1 (Memo.from_int 1);
           w_1.state.c <- pc_to_exp (int_to_pc 2)
       | _ -> failwith "unreachable (3)")
