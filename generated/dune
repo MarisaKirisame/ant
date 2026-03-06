@@ -3,6 +3,7 @@
  (modules
   FromHazel
   HazelAppend
+  HazelAsymptotics
   HazelFilter
   HazelMap
   HazelQS
