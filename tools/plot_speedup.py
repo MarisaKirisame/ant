@@ -43,6 +43,8 @@ from stats import (
 REPORT_WALL_CLOCK_TIME = True
 # Toggle whether plots that show absolute time values use log scale.
 REPORT_ABSOLUTE_TIME_LOG_SCALE = True
+# Toggle drawing interpolation (linear fit) on scatter plots.
+REPORT_DRAW_INTERPOLATION_LINE = False
 
 if REPORT_WALL_CLOCK_TIME:
     MEMO_KEY = "memo_profile"
@@ -117,11 +119,13 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
     memos = [memo for _, memo in pairs_list]
     min_time = min(min(baselines), min(memos))
     max_time = max(max(baselines), max(memos))
-    log_memos = np.log10(memos)
-    log_baselines = np.log10(baselines)
-    slope, intercept = np.polyfit(log_memos, log_baselines, 1)
     reg_x = np.array([min_time, max_time])
-    reg_y = 10 ** (slope * np.log10(reg_x) + intercept)
+    reg_y = None
+    if REPORT_DRAW_INTERPOLATION_LINE:
+        log_memos = np.log10(memos)
+        log_baselines = np.log10(baselines)
+        slope, intercept = np.polyfit(log_memos, log_baselines, 1)
+        reg_y = 10 ** (slope * np.log10(reg_x) + intercept)
     scale_label = (
         "linear"
         if REPORT_WALL_CLOCK_TIME and not REPORT_ABSOLUTE_TIME_LOG_SCALE
@@ -133,6 +137,19 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
         else None
     )
     yscale = xscale
+
+    def _plot(ax: plt.Axes) -> None:
+        ax.scatter(memos, baselines, alpha=0.75)
+        if reg_y is not None:
+            ax.plot(reg_x, reg_y, color="tab:blue", linewidth=1.5, label="Linear fit")
+        ax.plot(
+            [min_time, max_time],
+            [min_time, max_time],
+            color="black",
+            linestyle="--",
+            linewidth=1,
+        )
+
     return _save_plot(
         output_dir,
         title=f"Our vs Their ({METRIC_LABEL}, {scale_label})",
@@ -140,18 +157,8 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
         ylabel=f"Their ({METRIC_LABEL})",
         xscale=xscale,
         yscale=yscale,
-        legend=True,
-        plotter=lambda ax: (
-            ax.scatter(memos, baselines, alpha=0.75),
-            ax.plot(reg_x, reg_y, color="tab:blue", linewidth=1.5, label="Linear fit"),
-            ax.plot(
-                [min_time, max_time],
-                [min_time, max_time],
-                color="black",
-                linestyle="--",
-                linewidth=1,
-            ),
-        ),
+        legend=REPORT_DRAW_INTERPOLATION_LINE,
+        plotter=_plot,
     )
 
 
@@ -164,6 +171,23 @@ def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
         ylabel=f"Speedup ({METRIC_LABEL}, baseline / memoized, log scale)",
         yscale="log",
         plotter=lambda ax: ax.plot(xs, ratios, marker="o", linewidth=1.5),
+    )
+
+
+def plot_speedup_cdf(ratios: Sequence[float], output_dir: Path) -> str:
+    if not ratios:
+        raise ValueError("ratios is empty")
+    if any(r <= 0 for r in ratios):
+        raise ValueError("ratios must be positive")
+    xs = sorted(ratios)
+    ys = [100.0 * (i + 1) / len(xs) for i in range(len(xs))]
+    return _save_plot(
+        output_dir,
+        title=f"Speedup CDF ({METRIC_LABEL})",
+        xlabel=f"Speedup ({METRIC_LABEL}, baseline / memoized)",
+        ylabel="Executions <= speedup (%)",
+        xscale="log",
+        plotter=lambda ax: ax.plot(xs, ys, marker="o", linewidth=1.5),
     )
 
 

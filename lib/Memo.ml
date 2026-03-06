@@ -386,10 +386,10 @@ let insert_step (m : memo) (step : step) : unit =
   let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
   step.insert_time <- elapsed_time
 
-let step_sc (step : (step * Value.value) option) : int = match step with None -> 0 | Some (step, _) -> step.sc
+let step_sc (step : (step * Value.value Rev.t) option) : int = match step with None -> 0 | Some (step, _) -> step.sc
 
-let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.value) (step : (step * Value.value) option)
-    : (step * Value.value) option =
+let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.value Rev.t)
+    (step : (step * Value.value Rev.t) option) : (step * Value.value Rev.t) option =
   (match x with None -> () | Some x -> assert (trie_degree x = (Value.value_measure value).degree));
   match x with
   | None -> step
@@ -403,9 +403,7 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.val
             assert (pm.degree = m.degree);
             assert (pm.max_degree = m.max_degree);
             match Dependency.value_match_pattern_aux value prefix with
-            | Some vls ->
-                let leaf_matched = List.fold_left vls ~init:Generic.empty ~f:(fun acc v -> Value.append acc v) in
-                choose_step_option step (Some (step_, Value.append acc leaf_matched))
+            | Some vls -> choose_step_option step (Some (step_, Rev.append acc (Rev.from_list vls)))
             | None -> step)
         | Branch br -> (
             match Value.unwords value br.prefix with
@@ -416,7 +414,7 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.val
                   | None -> None
                   | Some var ->
                       let vh, vt = Value.pop_n value 1 in
-                      Some (var, (vt, Value.append acc vh))
+                      Some (var, (vt, Rev.snoc acc vh))
                 in
                 let const_child =
                   let Words vh, vt = Value.front_exn value in
@@ -447,9 +445,9 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.val
 let rec list_to_value (x : Value.value list) : Value.value =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Value.append h (list_to_value t)
 
-let lookup_step (value : state) (m : memo) : (step * Value.value) option =
+let lookup_step (value : state) (m : memo) : (step * Value.value Rev.t) option =
   let pc = value.c.pc in
-  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) Generic.empty None
+  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) (Rev.from_list []) None
 
 type 'a bin = 'a digit list
 and 'a digit = Zero | One of 'a

@@ -257,13 +257,15 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         env=env,
     )
 
+modes = ("append", "filter", "map", "qs")
 
 def run_project() -> None:
+    _remove_eval_steps_files()
     ensure_switch()
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
     opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
-    for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
+    for mode in modes:
         opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
 
 
@@ -274,7 +276,6 @@ def profile_project() -> None:
     generate_ml_files(env=env)
     opam_exec(["dune", "build", "generated/GeneratedMain.exe"], env=env)
     binary = os.path.join("_build", "default", "generated", "GeneratedMain.exe")
-    modes = ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel", "tailrec")
     for mode in modes:
         if sys.platform == "darwin":
             # On macOS, use xctrace (modern replacement for instruments CLI)
@@ -317,6 +318,14 @@ def _remove_perf_data_files() -> None:
                 shutil.rmtree(path)
             else:
                 os.remove(path)
+        except FileNotFoundError:
+            continue
+
+
+def _remove_eval_steps_files() -> None:
+    for path in glob.glob("eval_steps*.json"):
+        try:
+            os.remove(path)
         except FileNotFoundError:
             continue
 
