@@ -100,6 +100,8 @@ let seqs_ (xs : (unit -> unit code) list) : unit code = Stdlib.List.fold_left se
 let zro_ (x : ('a * 'b) code) : 'a code = app_ (from_ir $ Function "fst") x
 let pair_value_ (x : (Word.t * Value.seq) code) : Value.seq code = app_ (from_ir $ Function "snd") x
 let add_ (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " + " ^^ uncode y)
+let mul_ (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " * " ^^ uncode y)
+let div_ (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " / " ^^ uncode y)
 let sub_ (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " - " ^^ uncode y)
 
 let land_ (x : int code) (y : int code) : int code =

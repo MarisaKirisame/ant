@@ -210,6 +210,34 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             "exec",
             "ant",
             "--",
+            "examples/Arith.ant",
+            "generated/ArithCEK.ml",
+            "--compile",
+            "--backend",
+            "memo",
+        ],
+        env=env,
+    )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Arith.ant",
+            "generated/ArithPlain.ml",
+            "--compile",
+            "--backend",
+            "plain",
+        ],
+        env=env,
+    )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
             "examples/Lisp.ant",
             "generated/LispCEK.ml",
             "--compile",
@@ -239,9 +267,10 @@ def run_project() -> None:
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
     opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
-    for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
-        opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
-    opam_exec(["dune", "exec", "GeneratedMain", "lisp"], env=env)
+    # for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
+    #     opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
+    # opam_exec(["dune", "exec", "GeneratedMain", "lisp"], env=env)
+    opam_exec(["dune", "exec", "GeneratedMain", "arith"], env=env)
 
 
 def profile_project() -> None:
@@ -251,13 +280,17 @@ def profile_project() -> None:
     generate_ml_files(env=env)
     opam_exec(["dune", "build", "generated/GeneratedMain.exe"], env=env)
     binary = os.path.join("_build", "default", "generated", "GeneratedMain.exe")
-    for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
-        opam_exec(
-            ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
-            env=env,
-        )
+    # for mode in ("live-simple", "live-list-extend", "live-left-to-right", "live-demand-driven", "hazel"):
+    #     opam_exec(
+    #         ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
+    #         env=env,
+    #     )
+    # opam_exec(
+    #     ["perf", "record", "-o", f"perf-tailrec.data", "--", binary, "tailrec"],
+    #     env=env,
+    # )
     opam_exec(
-        ["perf", "record", "-o", f"perf-tailrec.data", "--", binary, "tailrec"],
+        ["perf", "record", "-o", f"perf-arith.data", "--", binary, "arith"],
         env=env,
     )
 

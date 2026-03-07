@@ -14,6 +14,10 @@
   RunLiveDemandDriven
   TailRecCEK
   RunTailRec
+  ArithCEK
+  ArithPlain
+  ArithFrontend
+  RunArith
   LispCEK
   LispPlain
   LispFrontend

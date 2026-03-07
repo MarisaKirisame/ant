@@ -1,5 +1,6 @@
 let usage =
-  "Usage: GeneratedMain <live-simple|live-left-to-right|live-list-extend|live-demand-driven|test|tailrec|hazel|lisp>"
+  "Usage: GeneratedMain \
+   <live-simple|live-left-to-right|live-list-extend|live-demand-driven|test|tailrec|hazel|lisp|arith>"
 
 let () =
   match Array.to_list Sys.argv with
@@ -11,6 +12,7 @@ let () =
       | "live-demand-driven" -> RunLiveDemandDriven.run ()
       | "test" -> RunTest.run ()
       | "tailrec" -> RunTailRec.run ()
+      | "arith" -> RunArith.run ()
       | "lisp" -> RunLisp.run ()
       | "hazel" -> FromHazel.run ()
       | _ ->

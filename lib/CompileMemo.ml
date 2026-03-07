@@ -514,6 +514,8 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
       let op_code =
         match op with
         | "+" -> add_
+        | "*" -> mul_
+        | "/" -> div_
         | "-" -> sub_
         | "=" -> eq_
         | "<" -> lt_

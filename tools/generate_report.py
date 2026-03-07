@@ -175,6 +175,11 @@ def generate_reports() -> None:
         output_dir=Path("output/lisp"),
         css_source=css_source,
     )
+    speedup_module.generate_speedup_report(
+        input_path=Path("eval_steps_arith.json"),
+        output_dir=Path("output/arith"),
+        css_source=css_source,
+    )
     generate_html(
         title="Live Benchmark Index",
         output=Path("output/index.html"),
@@ -185,6 +190,7 @@ def generate_reports() -> None:
             ("Demand-driven Benchmark", Path("output/live-demand-driven/index.html")),
             ("Hazel Benchmark", Path("output/hazel/index.html")),
             ("Lisp Benchmark", Path("output/lisp/index.html")),
+            ("Arith Benchmark", Path("output/arith/index.html")),
         ],
         css_source=css_source,
     )
