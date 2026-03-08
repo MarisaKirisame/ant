@@ -114,6 +114,23 @@ let rec pattern_to_value_aux (p : pattern) src (hole_idx : int ref) : value =
 
 let pattern_to_value (p : pattern cek) : value cek = maps_ek (fun p s -> pattern_to_value_aux p s (ref 0)) p
 
+let collect_from_reference (r : reference) (p : pattern) : value list =
+  let rec loop p offset acc =
+    if pattern_is_empty p then List.rev acc
+    else
+      let ph, pt = pattern_front_exn p in
+      match ph with
+      | PVar n ->
+          if n = 0 then loop pt offset acc
+          else
+            let seg = Generic.singleton (Reference { r with offset = r.offset + offset; values_count = n }) in
+            loop pt (offset + n) (seg :: acc)
+      | PCon c ->
+          let d = max 0 (Words.max_degree c) in
+          loop pt (offset + d) acc
+  in
+  loop p 0 []
+
 (*todo: this code look a lot like value_match_pattern, is there ways to unify them?*)
 (*unify pattern and value, building a substituion map for pattern*)
 let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
@@ -242,8 +259,37 @@ let string_of_step (step : step) : string =
   let dst = step.dst in
   "(" ^ string_of_cek src ^ " -> " ^ string_of_cek dst ^ ")"
 
-let compose_step_step_through_slot = Profile.register_slot Profile.memo_profile "compose_step.step_through"
 let unify_vp_slot = Profile.register_slot Profile.memo_profile "unify_vp"
+
+let rec collect_subst_aux (v : value) (p : pattern) : value list =
+  if pattern_is_empty p then (
+    assert (Generic.is_empty v);
+    [])
+  else
+    let ph, pt = pattern_front_exn p in
+    match ph with
+    | PVar ph ->
+        let vh, vt = Value.pop_n v ph in
+        vh :: collect_subst_aux vt pt
+    | PCon ph -> (
+        match Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v with
+        | rest, Words w -> (
+            let pl = Words.length ph in
+            let m = Words.summary w in
+            if m.length < pl then
+              let _, pht = Words.slice_length ph m.length in
+              collect_subst_aux rest (pattern_cons_unsafe (PCon pht) pt)
+            else
+              match Words.unwords w ph with
+              | None -> failwith "collect_subst_aux: cannot unify"
+              | Some wt ->
+                  let rest = if Words.is_empty wt then rest else Value.value_cons (Words wt) rest in
+                  collect_subst_aux rest pt)
+        | rest, Reference r ->
+            let ph_slice, pt = pattern_slice p r.values_count in
+            let vs_here = collect_from_reference r ph_slice in
+            let vs_rest = collect_subst_aux rest pt in
+            vs_here @ vs_rest)
 
 let compose_step (x : step) (y : step) : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x.dst in*)
@@ -283,15 +329,9 @@ let compose_step (x : step) (y : step) : step =
         Array.map (fun p -> pattern_to_value_aux p s hole_idx) p)
       s
   in
-  let dst = map_ek (subst_value subst) x.dst in
-  (*if not (can_step_through y dst) then (
-    print_endline "cannot compose steps:";
-    print_endline ("generalized pattern: " ^ string_of_cek (pattern_to_value src));
-    print_endline ("x step: " ^ string_of_step x);
-    print_endline ("intermediate: " ^ string_of_cek dst);
-    print_endline ("y step: " ^ string_of_step y));
-  assert (can_step_through y dst);*)
-  let dst = Profile.with_slot compose_step_step_through_slot (fun _ -> step_through y dst) in
+  let dst_mid = map_ek (subst_value subst) x.dst in
+  let y_subst = zipwith_ek (fun v p -> Array.of_list (collect_subst_aux v p)) dst_mid y.src in
+  let dst = map_ek (subst_value y_subst) y.dst in
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
   { src; dst; sc = x.sc + y.sc; hit = 0; insert_time = 0 }
 
