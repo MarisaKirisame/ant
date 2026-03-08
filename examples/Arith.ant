@@ -70,7 +70,7 @@ let rec int_log = fun n ->
   if n <= 1 then 0
   else 1 + int_log (n / 2);;
 
-let rec expr_eq_struct = fun a b ->
+let rec expr_equal = fun a b ->
   match a with
   | Const x ->
     (match b with
@@ -82,19 +82,19 @@ let rec expr_eq_struct = fun a b ->
     | _ -> false)
   | Add a1 a2 ->
     (match b with
-    | Add b1 b2 -> expr_eq_struct a1 b1 && expr_eq_struct a2 b2
+    | Add b1 b2 -> expr_equal a1 b1 && expr_equal a2 b2
     | _ -> false)
   | Mul a1 a2 ->
     (match b with
-    | Mul b1 b2 -> expr_eq_struct a1 b1 && expr_eq_struct a2 b2
+    | Mul b1 b2 -> expr_equal a1 b1 && expr_equal a2 b2
     | _ -> false)
   | Exp ax ->
     (match b with
-    | Exp bx -> expr_eq_struct ax bx
+    | Exp bx -> expr_equal ax bx
     | _ -> false)
   | Log ax ->
     (match b with
-    | Log bx -> expr_eq_struct ax bx
+    | Log bx -> expr_equal ax bx
     | _ -> false);;
 
 let rec normalize = fun e ->
@@ -114,7 +114,7 @@ let rec normalize = fun e ->
           let ordered = if compare_expr na nb <= 0 then Add na nb else Add nb na in
           (match ordered with
           | Add l r ->
-            if expr_eq_struct l r then Mul (Const 2) l else ordered))
+            if expr_equal l r then Mul (Const 2) l else ordered))
     | _ ->
       (match nb with
       | Const y ->
@@ -124,7 +124,7 @@ let rec normalize = fun e ->
         let ordered = if compare_expr na nb <= 0 then Add na nb else Add nb na in
         (match ordered with
         | Add l r ->
-          if expr_eq_struct l r then Mul (Const 2) l else ordered)))
+          if expr_equal l r then Mul (Const 2) l else ordered)))
   | Mul a b ->
     let na = normalize a in
     let nb = normalize b in
@@ -157,14 +157,9 @@ let rec normalize = fun e ->
     | Const n -> if n = 1 then Const 0 else Const (int_log n)
     | _ -> Log nx);;
 
-let expr_eq = fun a b ->
-  let na = normalize a in
-  let nb = normalize b in
-  expr_eq_struct na nb;;
-
 let rec simplify_aux = fun e ->
   let next = normalize e in
-  if expr_eq e next then next else simplify_aux next;;
+  if expr_equal e next then next else simplify_aux next;;
 
 let rec diffx = fun e ->
   match e with
@@ -189,3 +184,8 @@ let rec eval = fun e x y ->
   | Mul a b -> eval a x y * eval b x y
   | Exp a -> int_exp (eval a x y)
   | Log a -> int_log (eval a x y);;
+
+let main = fun e x y ->
+  let d = diffx e in
+  let s = simplify_aux d in
+  eval s x y;;

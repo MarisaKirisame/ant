@@ -37,15 +37,15 @@ let rec compare_expr =
 let rec int_exp = fun n -> if n < 0 then 0 else if n = 0 then 1 else 2 * int_exp (n - 1)
 let rec int_log = fun n -> if n <= 1 then 0 else 1 + int_log (n / 2)
 
-let rec expr_eq_struct =
+let rec expr_equal =
  fun a b ->
   match a with
   | Const x -> ( match b with Const y -> x = y | _ -> false)
   | Var va -> ( match b with Var vb -> var_rank va = var_rank vb | _ -> false)
-  | Add (a1, a2) -> ( match b with Add (b1, b2) -> expr_eq_struct a1 b1 && expr_eq_struct a2 b2 | _ -> false)
-  | Mul (a1, a2) -> ( match b with Mul (b1, b2) -> expr_eq_struct a1 b1 && expr_eq_struct a2 b2 | _ -> false)
-  | Exp ax -> ( match b with Exp bx -> expr_eq_struct ax bx | _ -> false)
-  | Log ax -> ( match b with Log bx -> expr_eq_struct ax bx | _ -> false)
+  | Add (a1, a2) -> ( match b with Add (b1, b2) -> expr_equal a1 b1 && expr_equal a2 b2 | _ -> false)
+  | Mul (a1, a2) -> ( match b with Mul (b1, b2) -> expr_equal a1 b1 && expr_equal a2 b2 | _ -> false)
+  | Exp ax -> ( match b with Exp bx -> expr_equal ax bx | _ -> false)
+  | Log ax -> ( match b with Log bx -> expr_equal ax bx | _ -> false)
 
 let rec normalize =
  fun e ->
@@ -63,13 +63,13 @@ let rec normalize =
             | Const y -> Const (x + y)
             | _ -> (
                 let ordered = if compare_expr na nb <= 0 then Add (na, nb) else Add (nb, na) in
-                match ordered with Add (l, r) -> if expr_eq_struct l r then Mul (Const 2, l) else ordered))
+                match ordered with Add (l, r) -> if expr_equal l r then Mul (Const 2, l) else ordered))
       | _ -> (
           match nb with
           | Const y -> if y = 0 then na else if compare_expr na nb <= 0 then Add (na, nb) else Add (nb, na)
           | _ -> (
               let ordered = if compare_expr na nb <= 0 then Add (na, nb) else Add (nb, na) in
-              match ordered with Add (l, r) -> if expr_eq_struct l r then Mul (Const 2, l) else ordered)))
+              match ordered with Add (l, r) -> if expr_equal l r then Mul (Const 2, l) else ordered)))
   | Mul (a, b) -> (
       let na = normalize a in
       let nb = normalize b in
@@ -96,16 +96,10 @@ let rec normalize =
       let nx = normalize x in
       match nx with Const n -> if n = 1 then Const 0 else Const (int_log n) | _ -> Log nx)
 
-let rec expr_eq =
- fun a b ->
-  let na = normalize a in
-  let nb = normalize b in
-  expr_eq_struct na nb
-
 let rec simplify_aux =
  fun e ->
   let next = normalize e in
-  if expr_eq e next then next else simplify_aux next
+  if expr_equal e next then next else simplify_aux next
 
 let rec diffx =
  fun e ->
@@ -126,3 +120,9 @@ let rec eval =
   | Mul (a, b) -> eval a x y * eval b x y
   | Exp a -> int_exp (eval a x y)
   | Log a -> int_log (eval a x y)
+
+let rec main =
+ fun e x y ->
+  let d = diffx e in
+  let s = simplify_aux d in
+  eval s x y

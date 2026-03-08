@@ -5,7 +5,6 @@ module Word = Ant.Word.Word
 module Frontend = ArithFrontend
 module Json = Yojson.Safe
 module State = Ant.State
-module Common = Ant.Common
 
 let steps_file = "eval_steps_arith.json"
 
@@ -121,6 +120,8 @@ let write_steps_json oc (r : Memo.exec_result) : unit =
 
 let eval_plain_slot = Ant.Profile.register_slot Ant.Profile.plain_profile "arith_eval_plain"
 let eval_cek_slot = Ant.Profile.register_slot Ant.Profile.cek_profile "arith_eval_cek"
+let main_plain_slot = Ant.Profile.register_slot Ant.Profile.plain_profile "arith_main_plain"
+let main_cek_slot = Ant.Profile.register_slot Ant.Profile.cek_profile "arith_main_cek"
 
 let eval_plain expr x y =
   let plain_expr = plain_expr_of_lc expr in
@@ -128,21 +129,29 @@ let eval_plain expr x y =
   let _ = Ant.Profile.with_slot eval_plain_slot (fun () -> Plain.eval plain_expr x y) in
   ()
 
-let eval_cek_profile expr x y =
+type eval_details = { value : int; runtime_seconds : float; steps_with_memo : int; steps_without_memo : int }
+
+let eval_main_expr_with_details expr x y =
   let seq_expr = LC.from_ocaml_expr expr in
   let seq_x = Memo.from_int x in
   let seq_y = Memo.from_int y in
-  Gc.full_major ();
-  let _ =
-    Ant.Profile.with_slot eval_cek_slot (fun () ->
-        Memo.exec_cek_raw
-          (Memo.pc_to_exp (Common.int_to_pc 32))
-          (Dynarray.of_list [ seq_expr; seq_x; seq_y ])
-          (Memo.from_constructor LC.tag_cont_done))
+  let start = Unix.gettimeofday () in
+  let res =
+    match !current_memo with
+    | Some memo -> Ant.Profile.with_slot main_cek_slot (fun () -> LC.main memo seq_expr seq_x seq_y)
+    | None -> with_memo (fun memo -> Ant.Profile.with_slot main_cek_slot (fun () -> LC.main memo seq_expr seq_x seq_y))
   in
-  ()
-
-type eval_details = { value : int; runtime_seconds : float; steps_with_memo : int; steps_without_memo : int }
+  let stop = Unix.gettimeofday () in
+  let plain_expr = plain_expr_of_lc expr in
+  let _ = Ant.Profile.with_slot main_plain_slot (fun () -> Plain.main plain_expr x y) in
+  Option.iter (fun write_steps -> write_steps res) !current_write_steps;
+  let result = Word.get_value (Memo.to_word res.words) in
+  {
+    value = result;
+    runtime_seconds = stop -. start;
+    steps_with_memo = res.step;
+    steps_without_memo = res.without_memo_step;
+  }
 
 let eval_expr_with_details expr x y =
   let seq_expr = LC.from_ocaml_expr expr in
@@ -150,12 +159,12 @@ let eval_expr_with_details expr x y =
   let seq_y = Memo.from_int y in
   let start = Unix.gettimeofday () in
   let res =
-    match !current_memo with
-    | Some memo -> LC.eval memo seq_expr seq_x seq_y
-    | None -> with_memo (fun memo -> LC.eval memo seq_expr seq_x seq_y)
+    Ant.Profile.with_slot eval_cek_slot (fun () ->
+        match !current_memo with
+        | Some memo -> LC.eval memo seq_expr seq_x seq_y
+        | None -> with_memo (fun memo -> LC.eval memo seq_expr seq_x seq_y))
   in
   let stop = Unix.gettimeofday () in
-  let _ = eval_cek_profile expr x y in
   eval_plain expr x y;
   Option.iter (fun write_steps -> write_steps res) !current_write_steps;
   let result = Word.get_value (Memo.to_word res.words) in
@@ -193,37 +202,37 @@ let test_parser_parentheses () =
   let result = eval_string ~print_compiled:false code 3 4 in
   expect_int "parser respects parentheses" 20 result
 
-let test_expr_eq_commutative () =
+let test_expr_equal_structural_true () =
   let left = Plain.Add (Plain.Const 1, Plain.Var Plain.X) in
-  let right = Plain.Add (Plain.Var Plain.X, Plain.Const 1) in
-  expect_true "expr_eq ignores add ordering" (Plain.expr_eq left right)
+  let right = Plain.Add (Plain.Const 1, Plain.Var Plain.X) in
+  expect_true "expr_equal accepts identical structure" (Plain.expr_equal left right)
 
-let test_expr_eq_mul_commutative () =
+let test_expr_equal_structural_false () =
   let left = Plain.Mul (Plain.Const 2, Plain.Var Plain.Y) in
   let right = Plain.Mul (Plain.Var Plain.Y, Plain.Const 2) in
-  expect_true "expr_eq ignores mul ordering" (Plain.expr_eq left right)
+  expect_true "expr_equal rejects reordered structure" (not (Plain.expr_equal left right))
 
 let test_diffx_simplify () =
   let expr = Frontend.compile_string "X * X + 3" |> plain_expr_of_lc in
   let derived = Plain.diffx expr |> Plain.simplify_aux in
-  let expected = Plain.Add (Plain.Var Plain.X, Plain.Var Plain.X) in
-  expect_true "simplify_aux reduces derivative" (Plain.expr_eq derived expected)
+  let expected = Plain.Mul (Plain.Const 2, Plain.Var Plain.X) in
+  expect_true "simplify_aux reduces derivative" (Plain.expr_equal derived expected)
 
 let test_diffx_exp_log () =
   let exp_expr = Frontend.compile_string "exp X" |> plain_expr_of_lc in
   let exp_diff = Plain.diffx exp_expr |> Plain.simplify_aux in
   let exp_expected = Plain.Exp (Plain.Var Plain.X) in
-  expect_true "diffx handles exp" (Plain.expr_eq exp_diff exp_expected);
+  expect_true "diffx handles exp" (Plain.expr_equal exp_diff exp_expected);
   let log_expr = Frontend.compile_string "log X" |> plain_expr_of_lc in
   let log_diff = Plain.diffx log_expr |> Plain.simplify_aux in
-  let log_expected = Plain.Exp (Plain.Mul (Plain.Log (Plain.Var Plain.X), Plain.Const (-1))) in
-  expect_true "diffx handles log" (Plain.expr_eq log_diff log_expected)
+  let log_expected = Plain.Exp (Plain.Mul (Plain.Const (-1), Plain.Log (Plain.Var Plain.X))) in
+  expect_true "diffx handles log" (Plain.expr_equal log_diff log_expected)
 
 let test_simplify_fixpoint () =
   let expr = Frontend.compile_string "X + 0 + 0" |> plain_expr_of_lc in
   let simplified = Plain.simplify_aux expr in
   let expected = Plain.Var Plain.X in
-  expect_true "simplify_aux reaches fixpoint" (Plain.expr_eq simplified expected)
+  expect_true "simplify_aux reaches fixpoint" (Plain.expr_equal simplified expected)
 
 let test_eval_exp_log () =
   let code = "exp 3 + log 8" in
@@ -235,36 +244,38 @@ let test_eval () =
   let result = eval_string ~print_compiled:false code 3 4 in
   expect_int "eval returns integer result" 14 result
 
-let run_bench_cases () =
-  let repeat_add n term =
-    if n <= 1 then term
+let make_term n =
+  match n mod 8 with
+  | 0 -> LC.Var LC.X
+  | 1 -> LC.Var LC.Y
+  | 2 -> LC.Const ((n mod 11) + 1)
+  | 3 -> LC.Add (LC.Var LC.X, LC.Const ((n mod 7) + 1))
+  | 4 -> LC.Mul (LC.Var LC.X, LC.Var LC.Y)
+  | 5 -> LC.Exp (LC.Add (LC.Var LC.X, LC.Const ((n mod 5) + 1)))
+  | 6 -> LC.Log (LC.Add (LC.Var LC.Y, LC.Const ((n mod 9) + 2)))
+  | _ -> LC.Mul (LC.Add (LC.Var LC.X, LC.Const ((n mod 3) + 1)), LC.Add (LC.Var LC.Y, LC.Const ((n mod 4) + 1)))
+
+let lcg seed = ((seed * 1103515245) + 12345) land 0x7fffffff
+
+let make_random_expr terms seed =
+  let rec build i cur_seed acc =
+    if i <= 0 then acc
     else
-      let rec aux i acc = if i <= 0 then acc else aux (i - 1) (acc ^ " + " ^ term) in
-      aux (n - 1) term
+      let next_seed = lcg cur_seed in
+      let term = make_term next_seed in
+      let next_acc = match acc with None -> Some term | Some e -> Some (LC.Add (e, term)) in
+      build (i - 1) next_seed next_acc
   in
-  let shared = "(exp (X + Y) + log (X + 3) + X * Y + 1)" in
-  let poly =
-    "(" ^ shared ^ " * " ^ shared ^ " + " ^ shared ^ " * " ^ shared ^ " + " ^ shared ^ " * " ^ shared ^ " + " ^ shared
-    ^ " * " ^ shared ^ ")"
-  in
-  let huge = repeat_add 24 poly in
-  let giant = repeat_add 40 poly in
-  let mega = repeat_add 120 poly in
-  let cases =
-    [
-      ("small", "X + 2 * Y", 7, 9);
-      ("medium", "exp (X + 1) * log (Y + 4) + X * X * Y", 3, 10);
-      ("large", "exp (X + Y) * exp (X + 2) + (X * Y + 1) * (X + Y + 3)", 4, 6);
-      ("huge", huge, 5, 8);
-      ("giant", giant, 5, 8);
-      ("mega", mega, 5, 8);
-    ]
-  in
+  match build terms seed None with Some expr -> expr | None -> LC.Const 0
+
+let run_bench_cases () =
+  let cases = [ ("rand-100", 100, 17, 5, 8); ("rand-250", 250, 29, 5, 8); ("rand-500", 500, 43, 5, 8) ] in
   List.iter
-    (fun (label, code, x, y) ->
+    (fun (label, terms, seed, x, y) ->
       Printf.printf "Running arith case %s...\n" label;
       Out_channel.flush Stdio.stdout;
-      ignore (eval_string_with_details ~print_compiled:false code x y))
+      let expr = make_random_expr terms seed in
+      ignore (eval_main_expr_with_details expr x y))
     cases
 
 let run () =
@@ -281,8 +292,8 @@ let run () =
         (fun () ->
           test_parser_precedence ();
           test_parser_parentheses ();
-          test_expr_eq_commutative ();
-          test_expr_eq_mul_commutative ();
+          test_expr_equal_structural_true ();
+          test_expr_equal_structural_false ();
           test_diffx_simplify ();
           test_diffx_exp_log ();
           test_simplify_fixpoint ();
