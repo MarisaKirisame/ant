@@ -4,6 +4,7 @@ open Syntax
 open Memo
 open State
 open Code
+module Hashtbl = AntHashtbl
 
 (* Backend overview moved to docs/internal.md#compilememo-backend. *)
 
@@ -220,13 +221,13 @@ let ctor_tag_name (ctx : ctx) (cname : string) : int code = raw (Hashtbl.find_ex
 let new_ctx () : ctx =
   let ctx =
     {
-      arity = Hashtbl.create (module Core.String);
-      ctag = Hashtbl.create (module Core.String);
-      ctag_name = Hashtbl.create (module Core.String);
+      arity = Hashtbl.create ();
+      ctag = Hashtbl.create ();
+      ctag_name = Hashtbl.create ();
       constructor_degree = Dynarray.create ();
       conts = Dynarray.create ();
       conts_count = 0;
-      func_pc = Hashtbl.create (module Core.String);
+      func_pc = Hashtbl.create ();
     }
   in
   add_cont ctx "cont_done" 0 (fun w _ -> exec_done_ w);

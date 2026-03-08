@@ -1,6 +1,6 @@
 open PPrint
 open Syntax
-module Hashtbl = Core.Hashtbl
+module Hashtbl = AntHashtbl
 
 type 'a ops = {
   type_name_of : string -> string;
