@@ -9,22 +9,31 @@
   Syntax
   Pat
   Pattern
+  PatternTree
   Reference
+  ReferenceTree
   Type
   Typing
   Transform
   Fresh
   Memo
+  MemoTree
   Dependency
+  DependencyTree
   Word
   Words
+  WordsTree
   Value
+  ValueTree
   State
+  StateTree
   Hash
   Intmap
   Common
   Profile
   batFingerTree
+  PlainTree
+  Tree
   Ir
   SynInfo
   Code
