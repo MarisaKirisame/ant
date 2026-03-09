@@ -1,4 +1,4 @@
-let usage = "Usage: GeneratedMain <append|filter|map|qs|asymptotics>"
+let usage = "Usage: GeneratedMain <append|filter|map|qs>"
 
 let () =
   match Array.to_list Sys.argv with
@@ -8,7 +8,6 @@ let () =
       | "filter" -> HazelFilter.run ()
       | "map" -> HazelMap.run ()
       | "qs" -> HazelQS.run ()
-      | "asymptotics" -> HazelAsymptotics.run ()
       | _ ->
           prerr_endline usage;
           exit 1)

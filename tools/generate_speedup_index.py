@@ -179,6 +179,29 @@ def _render_large_rule_stats(records: Result, *, min_size: int, limit: int) -> N
                         tag.td(tag.code(rule.rule))
     return None
 
+def generate_table(
+    *,
+    to_compares: list[tuple[str, Path]],
+    output_dir: Path,
+) -> None:
+    times = []
+    for name, path in to_compares:
+        record = load_records(path)
+        total_ns = 0 
+        for exec_time in record.exec_times:
+            total_ns += sum(entry.time_ns for entry in exec_time.memo_profile)
+        times.append((name, total_ns))
+    ratios = []
+    for i in range(1, len(times)):
+        ratios.append(times[0][1] / times[i][1])
+    with open(output_dir / "table.text", "w") as fout:
+        fout.writelines([
+            f"\\begin{{tabular}}{{c|c|c|c|c}}",
+            f"& {" & ".join(name for name, _ in times)} \\\\",
+            f"\\hline Memo ns & {" & ".join(str(int(time)) for _, time in times)} \\\\"
+            f"\\hline Ratio & & {" & ".join(f"{ratio:.3f}x" for ratio in ratios)}"
+            f"\\end{{tabular}}"
+        ])
 
 def generate_speedup_report(
     *,

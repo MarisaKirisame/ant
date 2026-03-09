@@ -3,7 +3,6 @@
  (modules
   FromHazel
   HazelAppend
-  HazelAsymptotics
   HazelFilter
   HazelMap
   HazelQS
@@ -13,6 +12,7 @@
   LiveLexer
   LiveParser
   NamedExpr
+  RunLiveAsymptotics
   RunLiveCommon
   RunLiveSimple
   RunLiveLeftToRight

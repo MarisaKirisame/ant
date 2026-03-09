@@ -165,6 +165,16 @@ def generate_html(
     shutil.copyfile(css_source, css_path)
     return summary
 
+def generate_table() -> None:
+    speedup_module.generate_table(
+        to_compares=[
+            ("Random", Path("eval_steps_asymptotic_random.json")),
+            ("Low entropy", Path("eval_steps_asymptotic_low_entropy.json")),
+            ("Modification", Path("eval_steps_asymptotic_warmed_up.json")),
+            ("Repeated", Path("eval_steps_asymptotic_repeated.json")),
+        ],
+        output_dir=Path("")
+    )
 
 def generate_reports() -> None:
     css_source = Path(__file__).with_name("style.css")
@@ -180,6 +190,15 @@ def generate_reports() -> None:
             output_dir=output_dir,
             css_source=css_source,
         )
+    speedup_module.generate_table(
+        to_compares=[
+            ("Random", Path("eval_steps_live_asymptotic_random.json")),
+            ("Repeated", Path("eval_steps_live_asymptotic_repeated.json")),
+            ("Low entropy", Path("eval_steps_live_asymptotic_low_entropy.json")),
+            ("Modification", Path("eval_steps_live_asymptotic_warmed_up.json")),
+        ],
+        output_dir=Path("")
+    )
     generate_html(
         title="Benchmark Index",
         output=Path("output/index.html"),
