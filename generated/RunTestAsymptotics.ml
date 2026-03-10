@@ -3,6 +3,16 @@ module TestCEK = TestCEK
 module TestPlain = TestPlain
 module Word = Ant.Word.Word
 
+let time_run (f : unit -> 'a) =
+  let start_time = Timer.create () in
+  let end_time = Timer.create () in
+  Timer.record start_time;
+  let result = f () in
+  Timer.record end_time;
+  let elapsed_time = Int64.to_int @@ Timer.diff_nanoseconds_positive start_time end_time in
+  result, elapsed_time
+
+
 let rec list_to_string_cek l = match l with TestCEK.Nil -> "[]" | TestCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_cek tl
 let rec list_to_string_plain l = match l with TestPlain.Nil -> "[]" | TestPlain.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_plain tl
 
@@ -49,29 +59,26 @@ let low_entropy_input =
 
 let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries)
 
-let run_case ~memo label xs =
+let run_case ~memo:_ label xs =
   let cek_list = TestCEK.from_ocaml_int_list (int_list_cek_of_list xs) in
   let plain_list = int_list_plain_of_list xs in
   Gc.full_major ();
-  let result_cek = Profile.with_slot RunLiveCommon.eval_cek_slot (fun () ->
+  let (result_cek, elapsed_cek) = time_run (fun () ->
     (Memo.exec_cek_raw
       (Memo.pc_to_exp (Common.int_to_pc 1))
       (Dynarray.of_list [ cek_list ])
       (Memo.from_constructor TestCEK.tag_cont_done)))
   in
   Gc.full_major ();
-  let _ = Profile.with_slot RunLiveCommon.eval_plain_slot (fun () -> TestPlain.list_incr plain_list) in
-
+  let (_, elapsed_plain) = time_run (fun () -> TestPlain.list_incr plain_list) in
   let result_ocaml = TestCEK.to_ocaml_int_list result_cek in
-  let profile_cek_json_dump = Profile.cek_profile |> Profile.dump_profile |> json_of_profile in
-  let profile_plain_json_dump = Profile.plain_profile |> Profile.dump_profile |> json_of_profile in
   Printf.printf
-    "%s -> result=%s, cek_profile=%s, plain_profile=%s\n"
+    "%s -> result=%s, cek_profile=%d, plain_profile=%d\n"
     label
     (list_to_string_cek result_ocaml)
-    (Yojson.Safe.to_string profile_cek_json_dump)
-    (Yojson.Safe.to_string profile_plain_json_dump);
-  profile_cek_json_dump, profile_plain_json_dump
+    elapsed_cek
+    elapsed_plain;
+  elapsed_cek, elapsed_plain
 
 let ns_of_result res =
   begin match res with
@@ -102,10 +109,10 @@ let run () =
   let memo = Ant.Memo.init_memo () in
   let _ = run_case ~memo "Random before remove" random_input in
   let (mod_res_cek, mod_res_plain) = run_case ~memo "Random after remove" random_input_removed in
-  let (random_ns_cek, random_ns_plain) = (ns_of_result random_res_cek, ns_of_result random_res_plain) in
-  let (low_entropy_ns_cek, low_entropy_ns_plain) = (ns_of_result low_entropy_res_cek, ns_of_result low_entropy_res_plain) in
-  let (repeated_ns_cek, repeated_ns_plain) = (ns_of_result repeated_res_cek, ns_of_result repeated_res_plain) in
-  let (mod_ns_cek, mod_ns_plain) = (ns_of_result mod_res_cek, ns_of_result mod_res_plain) in
+  let (random_ns_cek, random_ns_plain) = (random_res_cek, random_res_plain) in
+  let (low_entropy_ns_cek, low_entropy_ns_plain) = (low_entropy_res_cek, low_entropy_res_plain) in
+  let (repeated_ns_cek, repeated_ns_plain) = (repeated_res_cek, repeated_res_plain) in
+  let (mod_ns_cek, mod_ns_plain) = (mod_res_cek, mod_res_plain) in
   Printf.printf
 {|\begin{tabular}{c|c|c|c|c}
             & Random & Low entropy & Modification & Repeated \\ \hline
