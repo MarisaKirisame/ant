@@ -53,19 +53,22 @@ let run_case ~memo label xs =
   let cek_list = TestCEK.from_ocaml_int_list (int_list_cek_of_list xs) in
   let plain_list = int_list_plain_of_list xs in
   Gc.full_major ();
-  let result_cek = Profile.with_slot RunLiveCommon.eval_cek_slot (fun () -> TestCEK.list_incr memo cek_list) in
+  let result_cek = Profile.with_slot RunLiveCommon.eval_cek_slot (fun () ->
+    (Memo.exec_cek_raw
+      (Memo.pc_to_exp (Common.int_to_pc 1))
+      (Dynarray.of_list [ cek_list ])
+      (Memo.from_constructor TestCEK.tag_cont_done)))
+  in
   Gc.full_major ();
   let _ = Profile.with_slot RunLiveCommon.eval_plain_slot (fun () -> TestPlain.list_incr plain_list) in
 
-  let result_ocaml = TestCEK.to_ocaml_int_list result_cek.words in
+  let result_ocaml = TestCEK.to_ocaml_int_list result_cek in
   let profile_cek_json_dump = Profile.cek_profile |> Profile.dump_profile |> json_of_profile in
   let profile_plain_json_dump = Profile.plain_profile |> Profile.dump_profile |> json_of_profile in
   Printf.printf
-    "%s -> result=%s (took %d steps, %d without memo), cek_profile=%s, plain_profile=%s\n"
+    "%s -> result=%s, cek_profile=%s, plain_profile=%s\n"
     label
     (list_to_string_cek result_ocaml)
-    result_cek.step
-    result_cek.without_memo_step
     (Yojson.Safe.to_string profile_cek_json_dump)
     (Yojson.Safe.to_string profile_plain_json_dump);
   profile_cek_json_dump, profile_plain_json_dump

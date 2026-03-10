@@ -21,6 +21,7 @@
   RunTestAsymptotics
   TailRecCEK
   TestCEK
+  TestPlain
   RunTailRec
   RunTest)
  (libraries ant yojson sexplib)
