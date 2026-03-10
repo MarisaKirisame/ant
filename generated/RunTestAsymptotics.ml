@@ -1,12 +1,15 @@
 open Ant
-module Test = TestCEK
+module TestCEK = TestCEK
+module TestPlain = TestPlain
 module Word = Ant.Word.Word
 
-let rec list_to_string l = match l with Test.Nil -> "[]" | Test.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string tl
+let rec list_to_string_cek l = match l with TestCEK.Nil -> "[]" | TestCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_cek tl
+let rec list_to_string_plain l = match l with TestPlain.Nil -> "[]" | TestPlain.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_plain tl
 
-let rec int_list_of_list = function [] -> Test.Nil | x :: xs -> Test.Cons (x, int_list_of_list xs)
+let rec int_list_cek_of_list = function [] -> TestCEK.Nil | x :: xs -> TestCEK.Cons (x, int_list_cek_of_list xs)
+let rec int_list_plain_of_list = function [] -> TestPlain.Nil | x :: xs -> TestPlain.Cons (x, int_list_plain_of_list xs)
 
-let length = 512
+let length = 65536
 
 (* Random, without structure *)
 let random_input =
@@ -47,19 +50,25 @@ let low_entropy_input =
 let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries)
 
 let run_case ~memo label xs =
-  let seq_list = Test.from_ocaml_int_list (int_list_of_list xs) in
-  let result = Profile.with_slot RunLiveCommon.eval_cek_slot (fun () -> Test.list_incr memo seq_list) in
+  let cek_list = TestCEK.from_ocaml_int_list (int_list_cek_of_list xs) in
+  let plain_list = int_list_plain_of_list xs in
   Gc.full_major ();
-  let result_ocaml = Test.to_ocaml_int_list result.words in
-  let profile_json_dump = Profile.cek_profile |> Profile.dump_profile |> json_of_profile in
+  let result_cek = Profile.with_slot RunLiveCommon.eval_cek_slot (fun () -> TestCEK.list_incr memo cek_list) in
+  Gc.full_major ();
+  let _ = Profile.with_slot RunLiveCommon.eval_plain_slot (fun () -> TestPlain.list_incr plain_list) in
+
+  let result_ocaml = TestCEK.to_ocaml_int_list result_cek.words in
+  let profile_cek_json_dump = Profile.cek_profile |> Profile.dump_profile |> json_of_profile in
+  let profile_plain_json_dump = Profile.plain_profile |> Profile.dump_profile |> json_of_profile in
   Printf.printf
-    "%s -> result=%s (took %d steps, %d without memo), profile=%s\n"
+    "%s -> result=%s (took %d steps, %d without memo), cek_profile=%s, plain_profile=%s\n"
     label
-    (list_to_string result_ocaml)
-    result.step
-    result.without_memo_step
-    (Yojson.Safe.to_string profile_json_dump);
-  profile_json_dump
+    (list_to_string_cek result_ocaml)
+    result_cek.step
+    result_cek.without_memo_step
+    (Yojson.Safe.to_string profile_cek_json_dump)
+    (Yojson.Safe.to_string profile_plain_json_dump);
+  profile_cek_json_dump, profile_plain_json_dump
 
 let ns_of_result res =
   begin match res with
@@ -74,37 +83,42 @@ let ns_of_result res =
   end
 
 let run () =
-  Test.populate_state ();
+  TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let random_res = run_case ~memo "Random" random_input in
+  let (random_res_cek, random_res_plain) = run_case ~memo "Random" random_input in
 
-  Test.populate_state ();
+  TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let low_entropy_res = run_case ~memo "Low entropy" low_entropy_input in
+  let (low_entropy_res_cek, low_entropy_res_plain) = run_case ~memo "Low entropy" low_entropy_input in
 
-  Test.populate_state ();
+  TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let repeated_res = run_case ~memo "Repeated" repeated_input in
+  let (repeated_res_cek, repeated_res_plain) = run_case ~memo "Repeated" repeated_input in
 
-  Test.populate_state ();
+  TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
   let _ = run_case ~memo "Random before remove" random_input in
-  let mod_res = run_case ~memo "Random after remove" random_input_removed in
-  let random_ns = ns_of_result random_res in
-  let low_entropy_ns = ns_of_result low_entropy_res in
-  let repeated_ns = ns_of_result repeated_res in
-  let mod_ns = ns_of_result mod_res in
+  let (mod_res_cek, mod_res_plain) = run_case ~memo "Random after remove" random_input_removed in
+  let (random_ns_cek, random_ns_plain) = (ns_of_result random_res_cek, ns_of_result random_res_plain) in
+  let (low_entropy_ns_cek, low_entropy_ns_plain) = (ns_of_result low_entropy_res_cek, ns_of_result low_entropy_res_plain) in
+  let (repeated_ns_cek, repeated_ns_plain) = (ns_of_result repeated_res_cek, ns_of_result repeated_res_plain) in
+  let (mod_ns_cek, mod_ns_plain) = (ns_of_result mod_res_cek, ns_of_result mod_res_plain) in
   Printf.printf
 {|\begin{tabular}{c|c|c|c|c}
-        & Random & Low entropy & Modification & Repeated \\ \hline
-Memo ns & %i     & %i          & %i     & %i \\ \hline
-Ratios  &        & %.3fx        & %.3fx   & %.3fx
+            & Random & Low entropy & Modification & Repeated \\ \hline
+Baseline ns & %i     & %i          & %i      & %i \\ \hline
+Memo ns     & %i     & %i          & %i      & %i \\ \hline
+Ratios      &        & %.3fx       & %.3fx   & %.3fx
 \end{tabular}|}
-    random_ns
-    low_entropy_ns
-    mod_ns
-    repeated_ns
-    (float_of_int random_ns /. float_of_int low_entropy_ns)
-    (float_of_int random_ns /. float_of_int mod_ns)
-    (float_of_int random_ns /. float_of_int repeated_ns);
+    random_ns_plain
+    low_entropy_ns_plain
+    mod_ns_plain
+    repeated_ns_plain
+    random_ns_cek
+    low_entropy_ns_cek
+    mod_ns_cek
+    repeated_ns_cek
+    (float_of_int random_ns_cek /. float_of_int low_entropy_ns_cek)
+    (float_of_int random_ns_cek /. float_of_int mod_ns_cek)
+    (float_of_int random_ns_cek /. float_of_int repeated_ns_cek);
   ()
