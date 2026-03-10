@@ -60,26 +60,25 @@ let low_entropy_input =
 
 let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries)
 
-let run_case ~memo:_ label xs =
+let run_case ~memo label xs =
   let cek_list = TestCEK.from_ocaml_int_list (int_list_cek_of_list xs) in
-  let plain_list = int_list_plain_of_list xs in
   Gc.full_major ();
-  let (result_cek, elapsed_cek) = time_run (fun () ->
-    (Memo.exec_cek_raw
+  let (result_memo, elapsed_memo) = time_run (fun () -> TestCEK.list_incr memo cek_list) in
+  Gc.full_major ();
+  let (_, elapsed_cek) = time_run (fun () ->
+    Memo.exec_cek_raw
       (Memo.pc_to_exp (Common.int_to_pc 1))
       (Dynarray.of_list [ cek_list ])
-      (Memo.from_constructor TestCEK.tag_cont_done)))
+      (Memo.from_constructor TestCEK.tag_cont_done))
   in
-  Gc.full_major ();
-  let (_, elapsed_plain) = time_run (fun () -> TestPlain.list_incr plain_list) in
-  let result_ocaml = TestCEK.to_ocaml_int_list result_cek in
+  let result_ocaml = TestCEK.to_ocaml_int_list result_memo.words in
   Printf.printf
     "%s -> result=%s, cek_profile=%d, plain_profile=%d\n"
     label
     (list_to_string_cek result_ocaml)
-    elapsed_cek
-    elapsed_plain;
-  elapsed_cek, elapsed_plain
+    elapsed_memo
+    elapsed_cek;
+  elapsed_memo, elapsed_cek
 
 let ns_of_result res =
   begin match res with
@@ -96,24 +95,24 @@ let ns_of_result res =
 let run () =
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let (random_res_cek, random_res_plain) = run_case ~memo "Random" random_input in
+  let (random_res_memo, random_res_cek) = run_case ~memo "Random" random_input in
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let (low_entropy_res_cek, low_entropy_res_plain) = run_case ~memo "Low entropy" low_entropy_input in
+  let (low_entropy_res_memo, low_entropy_res_cek) = run_case ~memo "Low entropy" low_entropy_input in
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let (repeated_res_cek, repeated_res_plain) = run_case ~memo "Repeated" repeated_input in
+  let (repeated_res_memo, repeated_res_cek) = run_case ~memo "Repeated" repeated_input in
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
   let _ = run_case ~memo "Random before remove" random_input in
-  let (mod_res_cek, mod_res_plain) = run_case ~memo "Random after remove" random_input_removed in
-  let (random_ns_cek, random_ns_plain) = (random_res_cek, random_res_plain) in
-  let (low_entropy_ns_cek, low_entropy_ns_plain) = (low_entropy_res_cek, low_entropy_res_plain) in
-  let (repeated_ns_cek, repeated_ns_plain) = (repeated_res_cek, repeated_res_plain) in
-  let (mod_ns_cek, mod_ns_plain) = (mod_res_cek, mod_res_plain) in
+  let (mod_res_memo, mod_res_cek) = run_case ~memo "Random after remove" random_input_removed in
+  let (random_ns_memo, random_ns_cek) = (random_res_memo, random_res_cek) in
+  let (low_entropy_ns_memo, low_entropy_ns_cek) = (low_entropy_res_memo, low_entropy_res_cek) in
+  let (repeated_ns_memo, repeated_ns_cek) = (repeated_res_memo, repeated_res_cek) in
+  let (mod_ns_memo, mod_ns_cek) = (mod_res_memo, mod_res_cek) in
   Printf.printf
 {|\begin{tabular}{c|c|c|c|c}
             & Random & Low entropy & Modification & Repeated \\ \hline
@@ -121,15 +120,15 @@ Baseline ns & %i     & %i          & %i      & %i \\ \hline
 Memo ns     & %i     & %i          & %i      & %i \\ \hline
 Ratios      &        & %.3fx       & %.3fx   & %.3fx
 \end{tabular}|}
-    random_ns_plain
-    low_entropy_ns_plain
-    mod_ns_plain
-    repeated_ns_plain
     random_ns_cek
     low_entropy_ns_cek
     mod_ns_cek
     repeated_ns_cek
-    (float_of_int random_ns_cek /. float_of_int low_entropy_ns_cek)
-    (float_of_int random_ns_cek /. float_of_int mod_ns_cek)
-    (float_of_int random_ns_cek /. float_of_int repeated_ns_cek);
+    random_ns_memo
+    low_entropy_ns_memo
+    mod_ns_memo
+    repeated_ns_memo
+    (float_of_int random_ns_memo /. float_of_int low_entropy_ns_memo)
+    (float_of_int random_ns_memo /. float_of_int mod_ns_memo)
+    (float_of_int random_ns_memo /. float_of_int repeated_ns_memo);
   ()
