@@ -18,7 +18,9 @@
   RunLiveLeftToRight
   RunLiveListExtend
   RunLiveDemandDriven
+  RunTestAsymptotics
   TailRecCEK
+  TestCEK
   RunTailRec
   RunTest)
  (libraries ant yojson sexplib)
