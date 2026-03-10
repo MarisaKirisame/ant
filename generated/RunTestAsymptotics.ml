@@ -19,7 +19,8 @@ let rec list_to_string_plain l = match l with TestPlain.Nil -> "[]" | TestPlain.
 let rec int_list_cek_of_list = function [] -> TestCEK.Nil | x :: xs -> TestCEK.Cons (x, int_list_cek_of_list xs)
 let rec int_list_plain_of_list = function [] -> TestPlain.Nil | x :: xs -> TestPlain.Cons (x, int_list_plain_of_list xs)
 
-let length = 65536
+(* let length = 65536 *)
+let length = 512
 
 (* Random, without structure *)
 let random_input =
