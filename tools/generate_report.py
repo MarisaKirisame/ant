@@ -190,6 +190,11 @@ def generate_reports() -> None:
             output_dir=output_dir,
             css_source=css_source,
         )
+    speedup_module.generate_memo_stats_report(
+        input_path=Path("memo_stats_asymptotic_random.json"),
+        output_dir=Path("output/memo_stats_random"),
+        css_source=css_source,
+    )
     # speedup_module.generate_table(
     #     to_compares=[
     #         ("Random", Path("eval_steps_live_asymptotic_random.json")),

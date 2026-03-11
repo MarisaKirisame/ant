@@ -92,23 +92,31 @@ let ns_of_result res =
     end
   end
 
+let write_memo_stats_json filename memo =
+  RunLiveCommon.with_outchannel filename (fun oc -> RunLiveCommon.write_memo_stats_json oc memo)
+
 let run () =
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
   let (random_res_memo, random_res_cek) = run_case ~memo "Random" random_input in
+  write_memo_stats_json "memo_stats_asymptotic_random.json" memo;
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
   let (low_entropy_res_memo, low_entropy_res_cek) = run_case ~memo "Low entropy" low_entropy_input in
+  write_memo_stats_json "memo_stats_asymptotic_low_entropy.json" memo;
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
   let (repeated_res_memo, repeated_res_cek) = run_case ~memo "Repeated" repeated_input in
+  write_memo_stats_json "memo_stats_asymptotic_repeated.json" memo;
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
   let _ = run_case ~memo "Random before remove" random_input in
   let (mod_res_memo, mod_res_cek) = run_case ~memo "Random after remove" random_input_removed in
+  write_memo_stats_json "memo_stats_asymptotic_mod.json" memo;
+
   let (random_ns_memo, random_ns_cek) = (random_res_memo, random_res_cek) in
   let (low_entropy_ns_memo, low_entropy_ns_cek) = (low_entropy_res_memo, low_entropy_res_cek) in
   let (repeated_ns_memo, repeated_ns_cek) = (repeated_res_memo, repeated_res_cek) in

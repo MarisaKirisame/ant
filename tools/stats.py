@@ -85,6 +85,15 @@ class Result:
     hashtable_stat: list[MemoHashtableStat]
 
 
+@dataclass(frozen=True)
+class MemoStatsResult:
+    depth_breakdown: list[MemoStatsNode]
+    node_stat: list[MemoNodeStat]
+    rule_stat: list[MemoRuleStat]
+    node_counts: MemoNodeCounts | None
+    hashtable_stat: list[MemoHashtableStat]
+
+
 def _require_dict(value: object, *, ctx: str) -> dict:
     if not isinstance(value, dict):
         raise ValueError(f"{ctx} must be an object")
@@ -120,6 +129,113 @@ def _parse_profile(entries: object, *, key_name: str) -> list[ProfileEntry]:
             raise ValueError(f"{key_name}[{idx}].time must be numeric")
         parsed.append(ProfileEntry(name=name, time_ns=float(value)))
     return parsed
+
+
+def _parse_memo_stats_record(
+    rec: dict,
+) -> tuple[
+    list[MemoStatsNode],
+    list[MemoNodeStat],
+    list[MemoRuleStat],
+    MemoNodeCounts | None,
+    list[MemoHashtableStat],
+]:
+    stats = _require_list(rec.get("depth_breakdown"), ctx="depth_breakdown")
+    nodes: list[MemoStatsNode] = []
+    for idx, entry in enumerate(stats):
+        entry = _require_dict(entry, ctx=f"depth_breakdown[{idx}]")
+        depth = _require_int(
+            entry.get("depth"),
+            ctx=f"depth_breakdown[{idx}].depth",
+        )
+        node_count = _require_int(
+            entry.get("node_count"),
+            ctx=f"depth_breakdown[{idx}].node_count",
+        )
+        nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
+    stem_nodes = _require_int(rec.get("stem_nodes"), ctx="stem_nodes")
+    branch_nodes = _require_int(rec.get("branch_nodes"), ctx="branch_nodes")
+    total_nodes = _require_int(rec.get("total_nodes"), ctx="total_nodes")
+    node_counts = MemoNodeCounts(
+        stem_nodes=stem_nodes,
+        branch_nodes=branch_nodes,
+        total_nodes=total_nodes,
+    )
+    raw_hashtable_stat = _require_list(
+        rec.get("hashtable_stat"), ctx="hashtable_stat"
+    )
+    hashtable_entries: list[MemoHashtableStat] = []
+    for idx, entry in enumerate(raw_hashtable_stat):
+        entry = _require_dict(entry, ctx=f"hashtable_stat[{idx}]")
+        depth = _require_int(
+            entry.get("depth"),
+            ctx=f"hashtable_stat[{idx}].depth",
+        )
+        size = _require_int(
+            entry.get("size"),
+            ctx=f"hashtable_stat[{idx}].size",
+        )
+        hashtable_entries.append(MemoHashtableStat(depth=depth, size=size))
+    raw_node_stat = _require_list(rec.get("node_stat"), ctx="node_stat")
+    node_stat_entries: list[MemoNodeStat] = []
+    for idx, entry in enumerate(raw_node_stat):
+        entry = _require_dict(entry, ctx=f"node_stat[{idx}]")
+        depth = _require_int(
+            entry.get("depth"),
+            ctx=f"node_stat[{idx}].depth",
+        )
+        insert_time = _require_int(
+            entry.get("insert_time"),
+            ctx=f"node_stat[{idx}].insert_time",
+        )
+        node_state = _require_str(
+            entry.get("node_state"),
+            ctx=f"node_stat[{idx}].node_state",
+        )
+        if node_state not in ("stem", "branch"):
+            raise ValueError(f"node_stat[{idx}].node_state must be stem or branch")
+        node_stat_entries.append(
+            MemoNodeStat(
+                depth=depth,
+                insert_time=insert_time,
+                node_state=node_state,
+            )
+        )
+    raw_rule_stat = _require_list(rec.get("rule_stat", []), ctx="rule_stat")
+    rule_stat_entries: list[MemoRuleStat] = []
+    for idx, entry in enumerate(raw_rule_stat):
+        entry = _require_dict(entry, ctx=f"rule_stat[{idx}]")
+        size = _require_int(entry.get("size"), ctx=f"rule_stat[{idx}].size")
+        pvar_length = _require_int(
+            entry.get("pvar_length"), ctx=f"rule_stat[{idx}].pvar_length"
+        )
+        sc = _require_int(entry.get("sc"), ctx=f"rule_stat[{idx}].sc")
+        hit_count = _require_int(
+            entry.get("hit_count"), ctx=f"rule_stat[{idx}].hit_count"
+        )
+        insert_time = _require_int(
+            entry.get("insert_time"), ctx=f"rule_stat[{idx}].insert_time"
+        )
+        depth = _require_int(entry.get("depth"), ctx=f"rule_stat[{idx}].depth")
+        rule = _require_str(entry.get("rule"), ctx=f"rule_stat[{idx}].rule")
+        rule_stat_entries.append(
+            MemoRuleStat(
+                size=size,
+                pvar_length=pvar_length,
+                sc=sc,
+                hit_count=hit_count,
+                insert_time=insert_time,
+                depth=depth,
+                rule=rule,
+            )
+        )
+    return (
+        nodes,
+        node_stat_entries,
+        rule_stat_entries,
+        node_counts,
+        hashtable_entries,
+    )
 
 
 def load_records(
@@ -167,128 +283,13 @@ def load_records(
                     if seen_memo_stats:
                         raise ValueError("memo_stats record appears more than once")
                     seen_memo_stats = True
-                    stats = _require_list(
-                        rec.get("depth_breakdown"), ctx="depth_breakdown"
-                    )
-                    nodes: list[MemoStatsNode] = []
-                    for idx, entry in enumerate(stats):
-                        entry = _require_dict(
-                            entry, ctx=f"depth_breakdown[{idx}]"
-                        )
-                        depth = _require_int(
-                            entry.get("depth"),
-                            ctx=f"depth_breakdown[{idx}].depth",
-                        )
-                        node_count = _require_int(
-                            entry.get("node_count"),
-                            ctx=f"depth_breakdown[{idx}].node_count",
-                        )
-                        nodes.append(MemoStatsNode(depth=depth, node_count=node_count))
-                    depth_breakdown = nodes
-                    stem_nodes = _require_int(
-                        rec.get("stem_nodes"), ctx="stem_nodes"
-                    )
-                    branch_nodes = _require_int(
-                        rec.get("branch_nodes"), ctx="branch_nodes"
-                    )
-                    total_nodes = _require_int(
-                        rec.get("total_nodes"), ctx="total_nodes"
-                    )
-                    node_counts = MemoNodeCounts(
-                            stem_nodes=stem_nodes,
-                            branch_nodes=branch_nodes,
-                            total_nodes=total_nodes)
-                    raw_hashtable_stat = _require_list(
-                        rec.get("hashtable_stat"), ctx="hashtable_stat"
-                    )
-                    hashtable_entries: list[MemoHashtableStat] = []
-                    for idx, entry in enumerate(raw_hashtable_stat):
-                        entry = _require_dict(
-                            entry, ctx=f"hashtable_stat[{idx}]"
-                        )
-                        depth = _require_int(
-                            entry.get("depth"),
-                            ctx=f"hashtable_stat[{idx}].depth",
-                        )
-                        size = _require_int(
-                            entry.get("size"),
-                            ctx=f"hashtable_stat[{idx}].size",
-                        )
-                        hashtable_entries.append(MemoHashtableStat(depth=depth, size=size))
-                    hashtable_stat = hashtable_entries
-                    raw_node_stat = _require_list(
-                        rec.get("node_stat"), ctx="node_stat"
-                    )
-                    node_stat_entries: list[MemoNodeStat] = []
-                    for idx, entry in enumerate(raw_node_stat):
-                        entry = _require_dict(
-                            entry, ctx=f"node_stat[{idx}]"
-                        )
-                        depth = _require_int(
-                            entry.get("depth"),
-                            ctx=f"node_stat[{idx}].depth",
-                        )
-                        insert_time = _require_int(
-                            entry.get("insert_time"),
-                            ctx=f"node_stat[{idx}].insert_time",
-                        )
-                        node_state = _require_str(
-                            entry.get("node_state"),
-                            ctx=f"node_stat[{idx}].node_state",
-                        )
-                        if node_state not in ("stem", "branch"):
-                            raise ValueError(f"node_stat[{idx}].node_state must be stem or branch")
-                        node_stat_entries.append(
-                            MemoNodeStat(
-                                depth=depth,
-                                insert_time=insert_time,
-                                node_state=node_state,
-                            )
-                        )
-                    node_stat = node_stat_entries
-                    raw_rule_stat = _require_list(
-                        rec.get("rule_stat", []), ctx="rule_stat"
-                    )
-                    rule_stat_entries: list[MemoRuleStat] = []
-                    for idx, entry in enumerate(raw_rule_stat):
-                        entry = _require_dict(
-                            entry, ctx=f"rule_stat[{idx}]"
-                        )
-                        size = _require_int(
-                            entry.get("size"), ctx=f"rule_stat[{idx}].size"
-                        )
-                        pvar_length = _require_int(
-                            entry.get("pvar_length"), ctx=f"rule_stat[{idx}].pvar_length"
-                        )
-                        sc = _require_int(
-                            entry.get("sc"), ctx=f"rule_stat[{idx}].sc"
-                        )
-                        hit_count = _require_int(
-                            entry.get("hit_count"),
-                            ctx=f"rule_stat[{idx}].hit_count",
-                        )
-                        insert_time = _require_int(
-                            entry.get("insert_time"),
-                            ctx=f"rule_stat[{idx}].insert_time",
-                        )
-                        depth = _require_int(
-                            entry.get("depth"), ctx=f"rule_stat[{idx}].depth"
-                        )
-                        rule = _require_str(
-                            entry.get("rule"), ctx=f"rule_stat[{idx}].rule"
-                        )
-                        rule_stat_entries.append(
-                            MemoRuleStat(
-                                size=size,
-                                pvar_length=pvar_length,
-                                sc=sc,
-                                hit_count=hit_count,
-                                insert_time=insert_time,
-                                depth=depth,
-                                rule=rule,
-                            )
-                        )
-                    rule_stat = rule_stat_entries
+                    (
+                        depth_breakdown,
+                        node_stat,
+                        rule_stat,
+                        node_counts,
+                        hashtable_stat,
+                    ) = _parse_memo_stats_record(rec)
                 else:
                     raise ValueError(f"unexpected record name: {name}")
             except Exception as exc:  # pylint: disable=broad-except
@@ -297,6 +298,47 @@ def load_records(
         raise RuntimeError("no exec_time records found in file")
     return Result(
         exec_times=exec_times,
+        depth_breakdown=depth_breakdown,
+        node_stat=node_stat,
+        rule_stat=rule_stat,
+        node_counts=node_counts,
+        hashtable_stat=hashtable_stat,
+    )
+
+
+def load_memo_stats(path: Path) -> MemoStatsResult:
+    """Return parsed memo_stats records from a JSONL file."""
+    depth_breakdown: list[MemoStatsNode] = []
+    node_stat: list[MemoNodeStat] = []
+    rule_stat: list[MemoRuleStat] = []
+    node_counts: MemoNodeCounts | None = None
+    hashtable_stat: list[MemoHashtableStat] = []
+    seen_memo_stats = False
+    with path.open() as f:
+        for line_no, line in enumerate(f, 1):
+            if not line.strip():
+                continue
+            try:
+                rec = _require_dict(json.loads(line), ctx="record")
+                name = rec.get("name")
+                if name == "memo_stats":
+                    if seen_memo_stats:
+                        raise ValueError("memo_stats record appears more than once")
+                    seen_memo_stats = True
+                    (
+                        depth_breakdown,
+                        node_stat,
+                        rule_stat,
+                        node_counts,
+                        hashtable_stat,
+                    ) = _parse_memo_stats_record(rec)
+                else:
+                    raise ValueError(f"unexpected record name: {name}")
+            except Exception as exc:  # pylint: disable=broad-except
+                raise RuntimeError(f"failed to parse line {line_no}") from exc
+    if not seen_memo_stats:
+        raise RuntimeError("no memo_stats record found in file")
+    return MemoStatsResult(
         depth_breakdown=depth_breakdown,
         node_stat=node_stat,
         rule_stat=rule_stat,
