@@ -19,6 +19,10 @@
   RunLiveDemandDriven
   TailRecCEK
   RunTailRec
+  ArithCEK
+  ArithPlain
+  ArithFrontend
+  RunArith
   RunTest)
  (libraries ant yojson sexplib)
  (wrapped false)

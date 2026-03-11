@@ -256,8 +256,36 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         ],
         env=env,
     )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Arith.ant",
+            "generated/ArithCEK.ml",
+            "--compile",
+            "--backend",
+            "memo",
+        ],
+        env=env,
+    )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Arith.ant",
+            "generated/ArithPlain.ml",
+            "--compile",
+            "--backend",
+            "plain",
+        ],
+        env=env,
+    )
 
-modes = ("append", "filter", "map", "qs")
+modes = ("append", "filter", "map", "qs", "arith")
 
 def run_project() -> None:
     _remove_eval_steps_files()
