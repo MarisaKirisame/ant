@@ -88,9 +88,8 @@ let compile_adt (e : env) (tb : 'a ty_binding) =
   in
   let type_defs = CompileFfi.compile_type_defs ops tb in
   let constructors =
-    match tb with
-    | TBOne (adt_name, Enum { ctors; _ }) -> compile_adt_constructors e adt_name ctors
-    | TBRec _ -> failwith "Not implemented (TODO)"
+    let decls = match tb with TBOne (adt_name, kind) -> [ (adt_name, kind) ] | TBRec decls -> decls in
+    separate_map (break 1) (fun (adt_name, Enum { ctors; _ }) -> compile_adt_constructors e adt_name ctors) decls
   in
   let conversions = CompileFfi.compile_conversions ops e.ctag tb in
   type_defs ^^ break 1 ^^ constructors ^^ break 1 ^^ conversions
@@ -117,8 +116,7 @@ let rec compile_pp_expr (e : 'a expr) : document =
 
 let compile_pp_stmt (e : env) (s : 'a stmt) : document =
   match s with
-  | Type (TBOne _ as tb) -> compile_adt e tb
-  | Type (TBRec _) -> failwith "Not implemented (TODO)"
+  | Type tb -> compile_adt e tb
   | Term (BSeq (tm, _)) -> compile_pp_expr tm
   | Term (BOne (x, tm, _)) ->
       string "let rec" ^^ space ^^ pp_pattern x ^^ space ^^ string "=" ^^ space ^^ group @@ compile_pp_expr tm

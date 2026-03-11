@@ -131,9 +131,14 @@ let compile_stmt (x : 'a stmt) : document =
       | None -> compile_type_binding tb
       | Some module_name -> compile_type_alias module_name tb)
   | Term (BSeq (e, _)) -> compile_expr e
-  | Term (BOne (pat, e, _) | BRec [ (pat, e, _) ]) ->
-      string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
-  | _ -> failwith "Not implemented (TODO)"
+  | Term (BOne (pat, e, _)) -> string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
+  | Term (BRec [] | BRecC []) -> failwith "Empty recursive group"
+  | Term (BRec bindings | BRecC bindings) ->
+      string "let rec "
+      ^^ separate_map (string " and ")
+           (fun (pat, e, _) -> parens_compile_pat pat ^^ string " = " ^^ compile_expr e)
+           bindings
+  | Term (BCont (pat, e, _)) -> string "let " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
 
 let compile_plain (xs : 'a stmt list) : document =
   let alias_module = !type_alias_module in
