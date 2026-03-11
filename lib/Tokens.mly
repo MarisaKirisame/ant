@@ -36,6 +36,8 @@
 %token TK_GE            ">="
 %token TK_LT            "<"
 %token TK_GT            ">"
+%token TK_LAND          "&&"
+%token TK_LOR           "||"
 %token TK_R_ARROW       "->"
 %token TK_ADD           "+"
 %token TK_SUB           "-"

@@ -129,19 +129,23 @@ case : pattern "->" expr { ($1, $3) }
   sep_or_terminated_rlist1(";", expr) { $1 }
 
 %inline infix_op0:
-  | "=" { "=" }
+  | "&&" { "&&" }
+  | "||" { "||" }
 
 %inline infix_op1:
+  | "=" { "=" }
+
+%inline infix_op2:
   | "<" { "<" }
   | "<=" { "<=" }
   | ">" { ">" }
   | ">=" { ">=" }
 
-%inline infix_op2:
+%inline infix_op3:
   | "+" { "+" }
   | "-" { "-" }
 
-%inline infix_op3:
+%inline infix_op4:
   | "*" { "*" }
   | "/" { "/" }
 
@@ -178,6 +182,7 @@ expr:
   | expr infix_op1 expr { Op ($2, $1, $3, empty_info) }
   | expr infix_op2 expr { Op ($2, $1, $3, empty_info) }
   | expr infix_op3 expr { Op ($2, $1, $3, empty_info) }
+  | expr infix_op4 expr { Op ($2, $1, $3, empty_info) }
   | "let" binding "in" expr { let (p, e) = $2 in Let (BOne (p, e, empty_info), $4, empty_info) }
   | "let" "rec" binding and_binding* "in" expr { Let (BRec (List.map (fun (p, e) -> (p, e, empty_info)) ($3 :: $4)), $6, empty_info) }
   | "match" expr "with" cases { Match ($2, (MatchPattern $4), empty_info) }

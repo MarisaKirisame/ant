@@ -153,8 +153,8 @@ let populate_state () =
           assert_env_length w_34 3;
           push_env w_34 (Dynarray.get w_34.state.e 1);
           assert_env_length w_34 4;
-          let keep_vals_20 = env_call w_34 [ 0; 1; 2 ] 1 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; keep_vals_20; w_34.state.k ];
+          let keep_20 = env_call w_34 [ 0; 1; 2 ] 1 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; keep_20; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 3)
       | 10 (* tag_cont_2 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -170,8 +170,8 @@ let populate_state () =
           assert_env_length w_34 2;
           push_env w_34 (Dynarray.get w_34.state.e 0);
           assert_env_length w_34 3;
-          let keep_vals_21 = env_call w_34 [ 1 ] 1 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_vals_21; w_34.state.k ];
+          let keep_21 = env_call w_34 [ 1 ] 1 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_21; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 1)
       | 13 (* tag_cont_5 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -181,8 +181,8 @@ let populate_state () =
           assert_env_length w_34 4;
           push_env w_34 (Dynarray.get w_34.state.e 1);
           assert_env_length w_34 5;
-          let keep_vals_22 = env_call w_34 [ 2 ] 2 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; keep_vals_22; w_34.state.k ];
+          let keep_22 = env_call w_34 [ 2 ] 2 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; keep_22; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 16)
       | 14 (* tag_cont_6 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -192,8 +192,8 @@ let populate_state () =
           assert_env_length w_34 4;
           push_env w_34 (Dynarray.get w_34.state.e 1);
           assert_env_length w_34 5;
-          let keep_vals_23 = env_call w_34 [ 2 ] 2 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_24; keep_vals_23; w_34.state.k ];
+          let keep_23 = env_call w_34 [ 2 ] 2 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_24; keep_23; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 16)
       | 15 (* tag_cont_7 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -201,8 +201,8 @@ let populate_state () =
           assert_env_length w_34 2;
           push_env w_34 (Dynarray.get w_34.state.e 0);
           assert_env_length w_34 3;
-          let keep_vals_24 = env_call w_34 [ 1 ] 1 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_25; keep_vals_24; w_34.state.k ];
+          let keep_24 = env_call w_34 [ 1 ] 1 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_25; keep_24; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 25)
       | 16 (* tag_cont_8 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -210,8 +210,8 @@ let populate_state () =
           assert_env_length w_34 2;
           push_env w_34 (Dynarray.get w_34.state.e 0);
           assert_env_length w_34 3;
-          let keep_vals_25 = env_call w_34 [ 1 ] 1 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_26; keep_vals_25; w_34.state.k ];
+          let keep_25 = env_call w_34 [ 1 ] 1 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_26; keep_25; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 25)
       | 17 (* tag_cont_9 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -233,8 +233,8 @@ let populate_state () =
           assert_env_length w_34 3;
           push_env w_34 (Dynarray.get w_34.state.e 1);
           assert_env_length w_34 4;
-          let keep_vals_28 = env_call w_34 [ 1 ] 2 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_29; keep_vals_28; w_34.state.k ];
+          let keep_28 = env_call w_34 [ 1 ] 2 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_29; keep_28; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 16)
       | 20 (* tag_cont_12 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -242,8 +242,8 @@ let populate_state () =
           assert_env_length w_34 2;
           push_env w_34 (Dynarray.get w_34.state.e 0);
           assert_env_length w_34 3;
-          let keep_vals_29 = env_call w_34 [ 1 ] 1 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_30; keep_vals_29; w_34.state.k ];
+          let keep_29 = env_call w_34 [ 1 ] 1 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_30; keep_29; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 28)
       | 21 (* tag_cont_13 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -259,8 +259,8 @@ let populate_state () =
           assert_env_length w_34 4;
           push_env w_34 (Dynarray.get w_34.state.e 1);
           assert_env_length w_34 5;
-          let keep_vals_30 = env_call w_34 [ 2; 3 ] 1 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_31; keep_vals_30; w_34.state.k ];
+          let keep_30 = env_call w_34 [ 2; 3 ] 1 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_31; keep_30; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 28)
       | 22 (* tag_cont_14 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -296,8 +296,8 @@ let populate_state () =
           assert_env_length w_34 6;
           push_env w_34 (Dynarray.get w_34.state.e 1);
           assert_env_length w_34 7;
-          let keep_vals_31 = env_call w_34 [ 3 ] 3 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_32; keep_vals_31; w_34.state.k ];
+          let keep_31 = env_call w_34 [ 3 ] 3 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_32; keep_31; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 31)
       | 25 (* tag_cont_17 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -309,8 +309,8 @@ let populate_state () =
           assert_env_length w_34 6;
           push_env w_34 (Dynarray.get w_34.state.e 1);
           assert_env_length w_34 7;
-          let keep_vals_32 = env_call w_34 [ 3 ] 3 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_33; keep_vals_32; w_34.state.k ];
+          let keep_32 = env_call w_34 [ 3 ] 3 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_33; keep_32; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 31)
       | 26 (* tag_cont_18 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -330,8 +330,8 @@ let populate_state () =
           assert_env_length w_34 3;
           push_env w_34 (Dynarray.get w_34.state.e 2);
           assert_env_length w_34 4;
-          let keep_vals_33 = env_call w_34 [ 0; 1 ] 1 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_34; keep_vals_33; w_34.state.k ];
+          let keep_33 = env_call w_34 [ 0; 1 ] 1 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_34; keep_33; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 27)
       | 29 (* tag_cont_21 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -449,8 +449,8 @@ let populate_state () =
           assert_env_length w_34 2;
           push_env w_34 (Dynarray.get w_34.state.e 0);
           assert_env_length w_34 3;
-          let keep_vals_43 = env_call w_34 [ 1 ] 1 in
-          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_44; keep_vals_43; w_34.state.k ];
+          let keep_43 = env_call w_34 [ 1 ] 1 in
+          w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_44; keep_43; w_34.state.k ];
           w_34.state.c <- pc_to_exp (int_to_pc 1)
       | 44 (* tag_cont_36 *) ->
           w_34.state.k <- get_next_cont tl_0;
@@ -645,8 +645,8 @@ let populate_state () =
       assert_env_length w_4 2;
       push_env w_4 (Dynarray.get w_4.state.e 0);
       assert_env_length w_4 3;
-      let keep_vals_0 = env_call w_4 [ 0; 1 ] 1 in
-      w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_vals_0; w_4.state.k ];
+      let keep_0 = env_call w_4 [ 0; 1 ] 1 in
+      w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_0; w_4.state.k ];
       w_4.state.c <- pc_to_exp (int_to_pc 3))
     5;
   add_exp
@@ -666,8 +666,8 @@ let populate_state () =
       ignore (pop_env w_10);
       push_env w_10 (Memo.from_int (Word.get_value (fst x0_2) - Word.get_value (fst x1_2)));
       assert_env_length w_10 3;
-      let keep_vals_1 = env_call w_10 [ 1 ] 1 in
-      w_10.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; keep_vals_1; w_10.state.k ];
+      let keep_1 = env_call w_10 [ 1 ] 1 in
+      w_10.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; keep_1; w_10.state.k ];
       w_10.state.c <- pc_to_exp (int_to_pc 6))
     7;
   add_exp
@@ -743,8 +743,8 @@ let populate_state () =
       ignore (pop_env w_14);
       push_env w_14 (Memo.from_int (Word.get_value (fst x0_4) / Word.get_value (fst x1_4)));
       assert_env_length w_14 3;
-      let keep_vals_2 = env_call w_14 [ 1 ] 1 in
-      w_14.state.k <- Memo.appends [ Memo.from_constructor tag_cont_3; keep_vals_2; w_14.state.k ];
+      let keep_2 = env_call w_14 [ 1 ] 1 in
+      w_14.state.k <- Memo.appends [ Memo.from_constructor tag_cont_3; keep_2; w_14.state.k ];
       w_14.state.c <- pc_to_exp (int_to_pc 12))
     13;
   add_exp
@@ -837,8 +837,8 @@ let populate_state () =
           assert_env_length w_19 4;
           push_env w_19 (Dynarray.get w_19.state.e 2);
           assert_env_length w_19 5;
-          let keep_vals_3 = env_call w_19 [ 3 ] 1 in
-          w_19.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_vals_3; w_19.state.k ];
+          let keep_3 = env_call w_19 [ 3 ] 1 in
+          w_19.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_3; w_19.state.k ];
           w_19.state.c <- pc_to_exp (int_to_pc 1)
       | _ ->
           ignore (pop_env w_19);
@@ -868,8 +868,8 @@ let populate_state () =
           assert_env_length w_20 7;
           push_env w_20 (Dynarray.get w_20.state.e 4);
           assert_env_length w_20 8;
-          let keep_vals_4 = env_call w_20 [ 3; 5 ] 2 in
-          w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_vals_4; w_20.state.k ];
+          let keep_4 = env_call w_20 [ 3; 5 ] 2 in
+          w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_4; w_20.state.k ];
           w_20.state.c <- pc_to_exp (int_to_pc 16)
       | _ ->
           ignore (pop_env w_20);
@@ -899,8 +899,8 @@ let populate_state () =
           assert_env_length w_21 7;
           push_env w_21 (Dynarray.get w_21.state.e 4);
           assert_env_length w_21 8;
-          let keep_vals_5 = env_call w_21 [ 3; 5 ] 2 in
-          w_21.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_vals_5; w_21.state.k ];
+          let keep_5 = env_call w_21 [ 3; 5 ] 2 in
+          w_21.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_5; w_21.state.k ];
           w_21.state.c <- pc_to_exp (int_to_pc 16)
       | _ ->
           ignore (pop_env w_21);
@@ -1072,8 +1072,8 @@ let populate_state () =
           assert_env_length w_25 3;
           push_env w_25 (Dynarray.get w_25.state.e 1);
           assert_env_length w_25 4;
-          let keep_vals_6 = env_call w_25 [ 2 ] 1 in
-          w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_vals_6; w_25.state.k ];
+          let keep_6 = env_call w_25 [ 2 ] 1 in
+          w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_6; w_25.state.k ];
           w_25.state.c <- pc_to_exp (int_to_pc 25)
       | 6 (* tag_Mul *) ->
           let splits_21 = Memo.splits (snd x_9) in
@@ -1085,8 +1085,8 @@ let populate_state () =
           assert_env_length w_25 3;
           push_env w_25 (Dynarray.get w_25.state.e 1);
           assert_env_length w_25 4;
-          let keep_vals_7 = env_call w_25 [ 2 ] 1 in
-          w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_vals_7; w_25.state.k ];
+          let keep_7 = env_call w_25 [ 2 ] 1 in
+          w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_7; w_25.state.k ];
           w_25.state.c <- pc_to_exp (int_to_pc 25)
       | 7 (* tag_Exp *) ->
           let splits_22 = Memo.splits (snd x_9) in
@@ -1096,8 +1096,8 @@ let populate_state () =
           assert_env_length w_25 2;
           push_env w_25 (Dynarray.get w_25.state.e 1);
           assert_env_length w_25 3;
-          let keep_vals_8 = env_call w_25 [] 1 in
-          w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_vals_8; w_25.state.k ];
+          let keep_8 = env_call w_25 [] 1 in
+          w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_8; w_25.state.k ];
           w_25.state.c <- pc_to_exp (int_to_pc 25)
       | 8 (* tag_Log *) ->
           let splits_23 = Memo.splits (snd x_9) in
@@ -1107,8 +1107,8 @@ let populate_state () =
           assert_env_length w_25 2;
           push_env w_25 (Dynarray.get w_25.state.e 1);
           assert_env_length w_25 3;
-          let keep_vals_9 = env_call w_25 [] 1 in
-          w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_vals_9; w_25.state.k ];
+          let keep_9 = env_call w_25 [] 1 in
+          w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_9; w_25.state.k ];
           w_25.state.c <- pc_to_exp (int_to_pc 25)
       | _ -> failwith "unreachable (26)")
     26;
@@ -1117,8 +1117,8 @@ let populate_state () =
       assert_env_length w_26 1;
       push_env w_26 (Dynarray.get w_26.state.e 0);
       assert_env_length w_26 2;
-      let keep_vals_10 = env_call w_26 [ 0 ] 1 in
-      w_26.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_vals_10; w_26.state.k ];
+      let keep_10 = env_call w_26 [ 0 ] 1 in
+      w_26.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_10; w_26.state.k ];
       w_26.state.c <- pc_to_exp (int_to_pc 25))
     27;
   add_exp
@@ -1195,8 +1195,8 @@ let populate_state () =
           assert_env_length w_28 3;
           push_env w_28 (Dynarray.get w_28.state.e 1);
           assert_env_length w_28 4;
-          let keep_vals_11 = env_call w_28 [ 2 ] 1 in
-          w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_12; keep_vals_11; w_28.state.k ];
+          let keep_11 = env_call w_28 [ 2 ] 1 in
+          w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_12; keep_11; w_28.state.k ];
           w_28.state.c <- pc_to_exp (int_to_pc 28)
       | 6 (* tag_Mul *) ->
           let splits_27 = Memo.splits (snd x_10) in
@@ -1208,8 +1208,8 @@ let populate_state () =
           assert_env_length w_28 3;
           push_env w_28 (Dynarray.get w_28.state.e 1);
           assert_env_length w_28 4;
-          let keep_vals_12 = env_call w_28 [ 1; 2 ] 1 in
-          w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; keep_vals_12; w_28.state.k ];
+          let keep_12 = env_call w_28 [ 1; 2 ] 1 in
+          w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; keep_12; w_28.state.k ];
           w_28.state.c <- pc_to_exp (int_to_pc 28)
       | 7 (* tag_Exp *) ->
           let splits_28 = Memo.splits (snd x_10) in
@@ -1224,8 +1224,8 @@ let populate_state () =
           assert_env_length w_28 3;
           push_env w_28 (Dynarray.get w_28.state.e 1);
           assert_env_length w_28 4;
-          let keep_vals_13 = env_call w_28 [ 2 ] 1 in
-          w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_vals_13; w_28.state.k ];
+          let keep_13 = env_call w_28 [ 2 ] 1 in
+          w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_13; w_28.state.k ];
           w_28.state.c <- pc_to_exp (int_to_pc 28)
       | 8 (* tag_Log *) ->
           let splits_29 = Memo.splits (snd x_10) in
@@ -1235,8 +1235,8 @@ let populate_state () =
           assert_env_length w_28 2;
           push_env w_28 (Dynarray.get w_28.state.e 1);
           assert_env_length w_28 3;
-          let keep_vals_14 = env_call w_28 [ 1 ] 1 in
-          w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; keep_vals_14; w_28.state.k ];
+          let keep_14 = env_call w_28 [ 1 ] 1 in
+          w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; keep_14; w_28.state.k ];
           w_28.state.c <- pc_to_exp (int_to_pc 28)
       | _ -> failwith "unreachable (30)")
     30;
@@ -1309,8 +1309,8 @@ let populate_state () =
           assert_env_length w_31 7;
           push_env w_31 (Dynarray.get w_31.state.e 2);
           assert_env_length w_31 8;
-          let keep_vals_15 = env_call w_31 [ 1; 2; 4 ] 3 in
-          w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; keep_vals_15; w_31.state.k ];
+          let keep_15 = env_call w_31 [ 1; 2; 4 ] 3 in
+          w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; keep_15; w_31.state.k ];
           w_31.state.c <- pc_to_exp (int_to_pc 31)
       | 6 (* tag_Mul *) ->
           let splits_33 = Memo.splits (snd x_12) in
@@ -1326,8 +1326,8 @@ let populate_state () =
           assert_env_length w_31 7;
           push_env w_31 (Dynarray.get w_31.state.e 2);
           assert_env_length w_31 8;
-          let keep_vals_16 = env_call w_31 [ 1; 2; 4 ] 3 in
-          w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; keep_vals_16; w_31.state.k ];
+          let keep_16 = env_call w_31 [ 1; 2; 4 ] 3 in
+          w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; keep_16; w_31.state.k ];
           w_31.state.c <- pc_to_exp (int_to_pc 31)
       | 7 (* tag_Exp *) ->
           let splits_34 = Memo.splits (snd x_12) in
@@ -1341,8 +1341,8 @@ let populate_state () =
           assert_env_length w_31 6;
           push_env w_31 (Dynarray.get w_31.state.e 2);
           assert_env_length w_31 7;
-          let keep_vals_17 = env_call w_31 [] 3 in
-          w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_18; keep_vals_17; w_31.state.k ];
+          let keep_17 = env_call w_31 [] 3 in
+          w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_18; keep_17; w_31.state.k ];
           w_31.state.c <- pc_to_exp (int_to_pc 31)
       | 8 (* tag_Log *) ->
           let splits_35 = Memo.splits (snd x_12) in
@@ -1356,8 +1356,8 @@ let populate_state () =
           assert_env_length w_31 6;
           push_env w_31 (Dynarray.get w_31.state.e 2);
           assert_env_length w_31 7;
-          let keep_vals_18 = env_call w_31 [] 3 in
-          w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_19; keep_vals_18; w_31.state.k ];
+          let keep_18 = env_call w_31 [] 3 in
+          w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_19; keep_18; w_31.state.k ];
           w_31.state.c <- pc_to_exp (int_to_pc 31)
       | _ -> failwith "unreachable (33)")
     33;
@@ -1366,8 +1366,8 @@ let populate_state () =
       assert_env_length w_33 3;
       push_env w_33 (Dynarray.get w_33.state.e 0);
       assert_env_length w_33 4;
-      let keep_vals_19 = env_call w_33 [ 1; 2 ] 1 in
-      w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; keep_vals_19; w_33.state.k ];
+      let keep_19 = env_call w_33 [ 1; 2 ] 1 in
+      w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; keep_19; w_33.state.k ];
       w_33.state.c <- pc_to_exp (int_to_pc 28))
     34;
   add_exp
@@ -1415,8 +1415,8 @@ let populate_state () =
         assert_env_length w_39 2;
         push_env w_39 (Dynarray.get w_39.state.e 1);
         assert_env_length w_39 3;
-        let keep_vals_26 = env_call w_39 [] 1 in
-        w_39.state.k <- Memo.appends [ Memo.from_constructor tag_cont_27; keep_vals_26; w_39.state.k ];
+        let keep_26 = env_call w_39 [] 1 in
+        w_39.state.k <- Memo.appends [ Memo.from_constructor tag_cont_27; keep_26; w_39.state.k ];
         w_39.state.c <- pc_to_exp (int_to_pc 6)))
     37;
   add_exp
@@ -1483,8 +1483,8 @@ let populate_state () =
         assert_env_length w_42 2;
         push_env w_42 (Dynarray.get w_42.state.e 1);
         assert_env_length w_42 3;
-        let keep_vals_27 = env_call w_42 [] 1 in
-        w_42.state.k <- Memo.appends [ Memo.from_constructor tag_cont_28; keep_vals_27; w_42.state.k ];
+        let keep_27 = env_call w_42 [] 1 in
+        w_42.state.k <- Memo.appends [ Memo.from_constructor tag_cont_28; keep_27; w_42.state.k ];
         w_42.state.c <- pc_to_exp (int_to_pc 12)))
     40;
   add_exp
@@ -1676,8 +1676,8 @@ let populate_state () =
           assert_env_length w_55 6;
           push_env w_55 (Dynarray.get w_55.state.e 4);
           assert_env_length w_55 7;
-          let keep_vals_34 = env_call w_55 [ 5 ] 1 in
-          w_55.state.k <- Memo.appends [ Memo.from_constructor tag_cont_35; keep_vals_34; w_55.state.k ];
+          let keep_34 = env_call w_55 [ 5 ] 1 in
+          w_55.state.k <- Memo.appends [ Memo.from_constructor tag_cont_35; keep_34; w_55.state.k ];
           w_55.state.c <- pc_to_exp (int_to_pc 1)
       | _ -> failwith "unreachable (50)")
     50;
@@ -1699,8 +1699,8 @@ let populate_state () =
           assert_env_length w_56 9;
           push_env w_56 (Dynarray.get w_56.state.e 6);
           assert_env_length w_56 10;
-          let keep_vals_35 = env_call w_56 [ 5; 7 ] 2 in
-          w_56.state.k <- Memo.appends [ Memo.from_constructor tag_cont_36; keep_vals_35; w_56.state.k ];
+          let keep_35 = env_call w_56 [ 5; 7 ] 2 in
+          w_56.state.k <- Memo.appends [ Memo.from_constructor tag_cont_36; keep_35; w_56.state.k ];
           w_56.state.c <- pc_to_exp (int_to_pc 5)
       | _ -> failwith "unreachable (51)")
     51;
@@ -1722,8 +1722,8 @@ let populate_state () =
           assert_env_length w_57 9;
           push_env w_57 (Dynarray.get w_57.state.e 6);
           assert_env_length w_57 10;
-          let keep_vals_36 = env_call w_57 [ 5; 7 ] 2 in
-          w_57.state.k <- Memo.appends [ Memo.from_constructor tag_cont_37; keep_vals_36; w_57.state.k ];
+          let keep_36 = env_call w_57 [ 5; 7 ] 2 in
+          w_57.state.k <- Memo.appends [ Memo.from_constructor tag_cont_37; keep_36; w_57.state.k ];
           w_57.state.c <- pc_to_exp (int_to_pc 5)
       | _ -> failwith "unreachable (52)")
     52;
@@ -1993,8 +1993,8 @@ let populate_state () =
           assert_env_length w_67 4;
           push_env w_67 (Dynarray.get w_67.state.e 1);
           assert_env_length w_67 5;
-          let keep_vals_37 = env_call w_67 [ 0; 1 ] 2 in
-          w_67.state.k <- Memo.appends [ Memo.from_constructor tag_cont_38; keep_vals_37; w_67.state.k ];
+          let keep_37 = env_call w_67 [ 0; 1 ] 2 in
+          w_67.state.k <- Memo.appends [ Memo.from_constructor tag_cont_38; keep_37; w_67.state.k ];
           w_67.state.c <- pc_to_exp (int_to_pc 5)
       | _ -> failwith "unreachable (65)")
     65;
@@ -2055,8 +2055,8 @@ let populate_state () =
         assert_env_length w_71 4;
         push_env w_71 (Dynarray.get w_71.state.e 1);
         assert_env_length w_71 5;
-        let keep_vals_38 = env_call w_71 [ 0; 1 ] 2 in
-        w_71.state.k <- Memo.appends [ Memo.from_constructor tag_cont_39; keep_vals_38; w_71.state.k ];
+        let keep_38 = env_call w_71 [ 0; 1 ] 2 in
+        w_71.state.k <- Memo.appends [ Memo.from_constructor tag_cont_39; keep_38; w_71.state.k ];
         w_71.state.c <- pc_to_exp (int_to_pc 5)))
     68;
   add_exp
@@ -2092,8 +2092,8 @@ let populate_state () =
           assert_env_length w_69 3;
           push_env w_69 (Dynarray.get w_69.state.e 1);
           assert_env_length w_69 4;
-          let keep_vals_39 = env_call w_69 [ 0; 1 ] 2 in
-          w_69.state.k <- Memo.appends [ Memo.from_constructor tag_cont_40; keep_vals_39; w_69.state.k ];
+          let keep_39 = env_call w_69 [ 0; 1 ] 2 in
+          w_69.state.k <- Memo.appends [ Memo.from_constructor tag_cont_40; keep_39; w_69.state.k ];
           w_69.state.c <- pc_to_exp (int_to_pc 5)
       | _ -> failwith "unreachable (70)")
     70;
@@ -2244,8 +2244,8 @@ let populate_state () =
           assert_env_length w_77 4;
           push_env w_77 (Dynarray.get w_77.state.e 1);
           assert_env_length w_77 5;
-          let keep_vals_40 = env_call w_77 [ 0; 1 ] 2 in
-          w_77.state.k <- Memo.appends [ Memo.from_constructor tag_cont_41; keep_vals_40; w_77.state.k ];
+          let keep_40 = env_call w_77 [ 0; 1 ] 2 in
+          w_77.state.k <- Memo.appends [ Memo.from_constructor tag_cont_41; keep_40; w_77.state.k ];
           w_77.state.c <- pc_to_exp (int_to_pc 5)
       | _ -> failwith "unreachable (77)")
     77;
@@ -2344,8 +2344,8 @@ let populate_state () =
         assert_env_length w_87 4;
         push_env w_87 (Dynarray.get w_87.state.e 1);
         assert_env_length w_87 5;
-        let keep_vals_41 = env_call w_87 [ 0; 1 ] 2 in
-        w_87.state.k <- Memo.appends [ Memo.from_constructor tag_cont_42; keep_vals_41; w_87.state.k ];
+        let keep_41 = env_call w_87 [ 0; 1 ] 2 in
+        w_87.state.k <- Memo.appends [ Memo.from_constructor tag_cont_42; keep_41; w_87.state.k ];
         w_87.state.c <- pc_to_exp (int_to_pc 5)))
     82;
   add_exp
@@ -2419,8 +2419,8 @@ let populate_state () =
           assert_env_length w_83 3;
           push_env w_83 (Dynarray.get w_83.state.e 1);
           assert_env_length w_83 4;
-          let keep_vals_42 = env_call w_83 [ 0; 1 ] 2 in
-          w_83.state.k <- Memo.appends [ Memo.from_constructor tag_cont_43; keep_vals_42; w_83.state.k ];
+          let keep_42 = env_call w_83 [ 0; 1 ] 2 in
+          w_83.state.k <- Memo.appends [ Memo.from_constructor tag_cont_43; keep_42; w_83.state.k ];
           w_83.state.c <- pc_to_exp (int_to_pc 5)
       | _ -> failwith "unreachable (86)")
     86;
@@ -2588,8 +2588,8 @@ let populate_state () =
           assert_env_length w_97 6;
           push_env w_97 (Dynarray.get w_97.state.e 4);
           assert_env_length w_97 7;
-          let keep_vals_44 = env_call w_97 [ 2; 3 ] 2 in
-          w_97.state.k <- Memo.appends [ Memo.from_constructor tag_cont_45; keep_vals_44; w_97.state.k ];
+          let keep_44 = env_call w_97 [ 2; 3 ] 2 in
+          w_97.state.k <- Memo.appends [ Memo.from_constructor tag_cont_45; keep_44; w_97.state.k ];
           w_97.state.c <- pc_to_exp (int_to_pc 16)
       | _ -> failwith "unreachable (95)")
     95;
@@ -2611,8 +2611,8 @@ let populate_state () =
           assert_env_length w_98 6;
           push_env w_98 (Dynarray.get w_98.state.e 4);
           assert_env_length w_98 7;
-          let keep_vals_45 = env_call w_98 [ 2; 3 ] 2 in
-          w_98.state.k <- Memo.appends [ Memo.from_constructor tag_cont_46; keep_vals_45; w_98.state.k ];
+          let keep_45 = env_call w_98 [ 2; 3 ] 2 in
+          w_98.state.k <- Memo.appends [ Memo.from_constructor tag_cont_46; keep_45; w_98.state.k ];
           w_98.state.c <- pc_to_exp (int_to_pc 16)
       | _ -> failwith "unreachable (96)")
     96;
@@ -2728,8 +2728,8 @@ let populate_state () =
           assert_env_length w_103 6;
           push_env w_103 (Dynarray.get w_103.state.e 4);
           assert_env_length w_103 7;
-          let keep_vals_46 = env_call w_103 [ 2; 3 ] 2 in
-          w_103.state.k <- Memo.appends [ Memo.from_constructor tag_cont_47; keep_vals_46; w_103.state.k ];
+          let keep_46 = env_call w_103 [ 2; 3 ] 2 in
+          w_103.state.k <- Memo.appends [ Memo.from_constructor tag_cont_47; keep_46; w_103.state.k ];
           w_103.state.c <- pc_to_exp (int_to_pc 16)
       | _ -> failwith "unreachable (101)")
     101;
@@ -2751,8 +2751,8 @@ let populate_state () =
           assert_env_length w_104 6;
           push_env w_104 (Dynarray.get w_104.state.e 4);
           assert_env_length w_104 7;
-          let keep_vals_47 = env_call w_104 [ 2; 3 ] 2 in
-          w_104.state.k <- Memo.appends [ Memo.from_constructor tag_cont_48; keep_vals_47; w_104.state.k ];
+          let keep_47 = env_call w_104 [ 2; 3 ] 2 in
+          w_104.state.k <- Memo.appends [ Memo.from_constructor tag_cont_48; keep_47; w_104.state.k ];
           w_104.state.c <- pc_to_exp (int_to_pc 16)
       | _ -> failwith "unreachable (102)")
     102;

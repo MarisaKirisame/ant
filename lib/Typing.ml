@@ -286,6 +286,8 @@ let type_of_op op =
   | "<" | "<=" | ">" | ">=" | "==" | "!=" ->
       let t = new_tvar () in
       new_arrow [ t; t ] (TPrim Bool)
+  | "&&" | "||" -> new_arrow [ TPrim Bool; TPrim Bool ] (TPrim Bool)
+  | "=" -> new_arrow [ TPrim Int; TPrim Int ] (TPrim Bool)
   | _ -> elab_error [%string "type_of_op: unknown op: %{op}"]
 
 let rec type_of_pattern (ctx : Type.ty StrMap.t) (p : 'a pattern) : 'a pattern * Type.ty =
