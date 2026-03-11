@@ -257,7 +257,7 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         env=env,
     )
 
-modes = ("append", "filter", "map", "qs")
+modes = ("append", "filter", "map", "qs", "asymptotics")
 
 def run_project() -> None:
     _remove_eval_steps_files()
