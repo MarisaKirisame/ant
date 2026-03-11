@@ -45,8 +45,11 @@ let compile_ctor (name, tys, _) =
   else string name ^^ string " of " ^^ separate_map (string " * ") (fun x -> parens (compile_ty x)) tys
 
 let comple_type_decl name (Enum { params; ctors }) =
-  separate_map space string (List.map (fun s -> "'" ^ s) params)
-  ^^ space ^^ string name ^^ space ^^ string " = "
+  (match params with
+    | [] -> empty
+    | [ x ] -> string ("'" ^ x) ^^ space
+    | _ -> parens (separate_map (string ", ") (fun p -> string ("'" ^ p)) params) ^^ space)
+  ^^ string name ^^ space ^^ string " = "
   ^^ separate_map (string "| ") compile_ctor ctors
 
 let compile_type_binding x =
@@ -92,7 +95,7 @@ let rec compile_expr (e : 'a expr) : document =
   | Int v -> string (string_of_int v)
   | Float v -> string (string_of_float v)
   | Bool v -> string (string_of_bool v)
-  | Str v -> string v
+  | Str v -> dquotes (string (String.escaped v))
   | Builtin (Builtin b, _) -> string b
   | Var (name, _) -> string name
   | GVar (name, _) -> string name
@@ -102,7 +105,7 @@ let rec compile_expr (e : 'a expr) : document =
   | App (fn, args, _) -> parens_compile_expr fn ^^ space ^^ separate_map space parens_compile_expr args
   | Op (op, lhs, rhs, _) -> parens (parens_compile_expr lhs ^^ string op ^^ parens_compile_expr rhs)
   | Tup (xs, _) -> string "(" ^^ separate_map (string ", ") compile_expr xs ^^ string ")"
-  | Arr (xs, _) -> string "[]" ^^ separate_map (string "; ") compile_expr xs ^^ string "]"
+  | Arr (xs, _) -> brackets (separate_map (string "; ") compile_expr xs)
   | Lam (ps, value, _) ->
       string "fun " ^^ separate_map space parens_compile_pat ps ^^ string " -> " ^^ parens_compile_expr value
   | Let (binding, value, _) -> compile_binding binding (parens_compile_expr value)
@@ -130,8 +133,8 @@ let compile_stmt (x : 'a stmt) : document =
       match !type_alias_module with
       | None -> compile_type_binding tb
       | Some module_name -> compile_type_alias module_name tb)
-  | Term (BSeq (e, _)) -> compile_expr e
-  | Term (BOne (pat, e, _)) -> string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
+  | Term (BSeq (e, _)) -> string "let _ = " ^^ compile_expr e
+  | Term (BOne (pat, e, _)) -> string "let " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
   | Term (BRec [] | BRecC []) -> failwith "Empty recursive group"
   | Term (BRec bindings | BRecC bindings) ->
       string "let rec "
