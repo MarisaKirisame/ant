@@ -3,16 +3,6 @@ module TestCEK = TestCEK
 module TestPlain = TestPlain
 module Word = Ant.Word.Word
 
-let time_run (f : unit -> 'a) =
-  let start_time = Timer.create () in
-  let end_time = Timer.create () in
-  Timer.record start_time;
-  let result = f () in
-  Timer.record end_time;
-  let elapsed_time = Int64.to_int @@ Timer.diff_nanoseconds_positive start_time end_time in
-  result, elapsed_time
-
-
 let rec list_to_string_cek l = match l with TestCEK.Nil -> "[]" | TestCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_cek tl
 let rec list_to_string_plain l = match l with TestPlain.Nil -> "[]" | TestPlain.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_plain tl
 
@@ -61,23 +51,34 @@ let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `Stri
 
 let run_case ~memo label xs =
   let cek_list = TestCEK.from_ocaml_int_list (int_list_cek_of_list xs) in
+  let plain_list = int_list_plain_of_list xs in
+  (* Memo *)
   Gc.full_major ();
-  let (result_memo, elapsed_memo) = time_run (fun () -> TestCEK.list_incr memo cek_list) in
+  let _ = TestCEK.list_incr memo cek_list in
+  (* CEK *)
   Gc.full_major ();
-  let (_, elapsed_cek) = time_run (fun () ->
+  let result_cek = Profile.with_slot RunLiveCommon.eval_cek_slot (fun () ->
     Memo.exec_cek_raw
       (Memo.pc_to_exp (Common.int_to_pc 1))
       (Dynarray.of_list [ cek_list ])
       (Memo.from_constructor TestCEK.tag_cont_done))
   in
-  let result_ocaml = TestCEK.to_ocaml_int_list result_memo.words in
+  (* Plain *)
+  Gc.full_major ();
+  let _ = Profile.with_slot RunLiveCommon.eval_plain_slot (fun () -> TestPlain.list_incr plain_list) in
+  (* JSONs *)
+  let result_ocaml = TestCEK.to_ocaml_int_list result_cek in
+  let memo_json = Profile.memo_profile |> Profile.dump_profile |> json_of_profile in
+  let cek_json = Profile.cek_profile |> Profile.dump_profile |> json_of_profile in
+  let plain_json = Profile.plain_profile |> Profile.dump_profile |> json_of_profile in
   Printf.printf
-    "%s -> result=%s, cek_profile=%d, plain_profile=%d\n"
+    "%s -> result=%s, memo_profile=%s, cek_profile=%s, plain_profile=%s\n"
     label
     (list_to_string_cek result_ocaml)
-    elapsed_memo
-    elapsed_cek;
-  elapsed_memo, elapsed_cek
+    (Yojson.Safe.to_string memo_json)
+    (Yojson.Safe.to_string cek_json)
+    (Yojson.Safe.to_string plain_json);
+  memo_json, cek_json, plain_json
 
 let ns_of_result res =
   begin match res with
@@ -93,6 +94,26 @@ let ns_of_result res =
 
 let write_memo_stats_json filename memo =
   RunLiveCommon.with_outchannel filename (fun oc -> RunLiveCommon.write_memo_stats_json oc memo)
+
+let write_steps_json oc (r : Memo.exec_result) : unit =
+  let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
+  let json =
+    `Assoc
+      [
+        ("name", `String "exec_time");
+        ("step", `Int r.step);
+        ("without_memo_step", `Int r.without_memo_step);
+        ("memo_profile", Profile.dump_profile Profile.memo_profile |> json_of_profile);
+        ("plain_profile", Profile.dump_profile Profile.plain_profile |> json_of_profile);
+        ("cek_profile", Profile.dump_profile Profile.cek_profile |> json_of_profile);
+      ]
+  in
+  Yojson.Safe.to_string json |> output_string oc;
+  output_char oc '\n';
+  flush oc
+
+let write_steps_json filename exec_result =
+  RunLiveCommon.with_outchannel filename (fun oc -> RunLiveCommon.write_steps_json oc exec_result)
 
 let run () =
   TestCEK.populate_state ();
