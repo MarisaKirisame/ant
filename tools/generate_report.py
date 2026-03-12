@@ -183,6 +183,10 @@ def generate_reports() -> None:
         ("Filter Benchmark", Path("eval_steps_filter.json"), Path("output/filter")),
         ("Map Benchmark", Path("eval_steps_map.json"), Path("output/map")),
         ("Quicksort Benchmark", Path("eval_steps_qs.json"), Path("output/qs")),
+        ("Map Asymptotics: Randomly Generated List", Path("eval_steps_asymptotic_random.json"), Path("output/map_asymptotics_random")),
+        ("Map Asymptotics: Low Entropy List", Path("eval_steps_asymptotic_random.json"), Path("output/map_asymptotics_low_entropy")),
+        ("Map Asymptotics: Modification List", Path("eval_steps_asymptotic_random.json"), Path("output/map_asymptotics_mod")),
+        ("Map Asymptotics: Repeated List", Path("eval_steps_asymptotic_random.json"), Path("output/map_asymptotics_repeat")),
     ]
     for _, input_path, output_dir in experiments:
         speedup_module.generate_speedup_report(
@@ -190,20 +194,6 @@ def generate_reports() -> None:
             output_dir=output_dir,
             css_source=css_source,
         )
-    speedup_module.generate_memo_stats_report(
-        input_path=Path("memo_stats_asymptotic_random.json"),
-        output_dir=Path("output/memo_stats_random"),
-        css_source=css_source,
-    )
-    # speedup_module.generate_table(
-    #     to_compares=[
-    #         ("Random", Path("eval_steps_live_asymptotic_random.json")),
-    #         ("Repeated", Path("eval_steps_live_asymptotic_repeated.json")),
-    #         ("Low entropy", Path("eval_steps_live_asymptotic_low_entropy.json")),
-    #         ("Modification", Path("eval_steps_live_asymptotic_warmed_up.json")),
-    #     ],
-    #     output_dir=Path("")
-    # )
     generate_html(
         title="Benchmark Index",
         output=Path("output/index.html"),

@@ -54,7 +54,7 @@ let run_case ~memo label xs =
   let plain_list = int_list_plain_of_list xs in
   (* Memo *)
   Gc.full_major ();
-  let _ = TestCEK.list_incr memo cek_list in
+  let result_memo = TestCEK.list_incr memo cek_list in
   (* CEK *)
   Gc.full_major ();
   let result_cek = Profile.with_slot RunLiveCommon.eval_cek_slot (fun () ->
@@ -68,6 +68,8 @@ let run_case ~memo label xs =
   let _ = Profile.with_slot RunLiveCommon.eval_plain_slot (fun () -> TestPlain.list_incr plain_list) in
   (* JSONs *)
   let result_ocaml = TestCEK.to_ocaml_int_list result_cek in
+  let memo_step = result_memo.step in
+  let without_memo_step = result_memo.without_memo_step in
   let memo_json = Profile.memo_profile |> Profile.dump_profile |> json_of_profile in
   let cek_json = Profile.cek_profile |> Profile.dump_profile |> json_of_profile in
   let plain_json = Profile.plain_profile |> Profile.dump_profile |> json_of_profile in
@@ -78,69 +80,65 @@ let run_case ~memo label xs =
     (Yojson.Safe.to_string memo_json)
     (Yojson.Safe.to_string cek_json)
     (Yojson.Safe.to_string plain_json);
-  memo_json, cek_json, plain_json
+  memo_step, without_memo_step, memo_json, cek_json, plain_json
 
-let ns_of_result res =
-  begin match res with
+let total_ns_of_json json =
+  begin match json with
   | `List inner ->
-    begin match (List.hd inner) with
-    | `List innerinner ->
-      begin match (List.nth innerinner 1) with
-      | `Int i -> i
-      | `String _ -> failwith "Read profile name when trying to read ns"
-      end
-    end
+    List.fold_left
+      (fun sum elt ->
+        match elt with
+        | `List elt ->
+          match List.nth elt 1 with
+          | `Int i -> sum + i
+          | `String _ -> failwith "Read profile name in index 1 of json list"
+      )
+      0
+      inner
   end
 
-let write_memo_stats_json filename memo =
-  RunLiveCommon.with_outchannel filename (fun oc -> RunLiveCommon.write_memo_stats_json oc memo)
-
-let write_steps_json oc (r : Memo.exec_result) : unit =
-  let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
+let write_steps_json oc memo_step without_memo_step memo_json cek_json plain_json =
   let json =
     `Assoc
       [
         ("name", `String "exec_time");
-        ("step", `Int r.step);
-        ("without_memo_step", `Int r.without_memo_step);
-        ("memo_profile", Profile.dump_profile Profile.memo_profile |> json_of_profile);
-        ("plain_profile", Profile.dump_profile Profile.plain_profile |> json_of_profile);
-        ("cek_profile", Profile.dump_profile Profile.cek_profile |> json_of_profile);
+        ("step", `Int memo_step);
+        ("without_memo_step", `Int without_memo_step);
+        ("memo_profile", memo_json);
+        ("plain_profile", plain_json);
+        ("cek_profile", cek_json);
       ]
   in
   Yojson.Safe.to_string json |> output_string oc;
   output_char oc '\n';
   flush oc
 
-let write_steps_json filename exec_result =
-  RunLiveCommon.with_outchannel filename (fun oc -> RunLiveCommon.write_steps_json oc exec_result)
+let run_case_then_write memo name xs filename =
+  let (memo_steps, without_memo_steps, memo_json, cek_json, plain_json) = run_case ~memo name xs in
+  RunLiveCommon.with_outchannel filename (fun oc ->
+    write_steps_json oc memo_steps without_memo_steps memo_json cek_json plain_json;
+    RunLiveCommon.write_memo_stats_json oc memo
+  );
+  total_ns_of_json memo_json, total_ns_of_json cek_json
 
 let run () =
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let (random_res_memo, random_res_cek) = run_case ~memo "Random" random_input in
-  write_memo_stats_json "memo_stats_asymptotic_random.json" memo;
+  let (random_ns_memo, random_ns_cek) = run_case_then_write memo "Random" random_input "eval_steps_asymptotic_random.json" in
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let (low_entropy_res_memo, low_entropy_res_cek) = run_case ~memo "Low entropy" low_entropy_input in
-  write_memo_stats_json "memo_stats_asymptotic_low_entropy.json" memo;
+  let (low_entropy_ns_memo, low_entropy_ns_cek) = run_case_then_write memo "Low entropy" low_entropy_input "eval_steps_asymptotic_low_entropy.json" in
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let (repeated_res_memo, repeated_res_cek) = run_case ~memo "Repeated" repeated_input in
-  write_memo_stats_json "memo_stats_asymptotic_repeated.json" memo;
+  let (repeated_ns_memo, repeated_ns_cek) = run_case_then_write memo "Repeated" repeated_input "eval_steps_asymptotic_repeated.json" in
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
   let _ = run_case ~memo "Random before remove" random_input in
-  let (mod_res_memo, mod_res_cek) = run_case ~memo "Random after remove" random_input_removed in
-  write_memo_stats_json "memo_stats_asymptotic_mod.json" memo;
+  let (mod_ns_memo, mod_ns_cek) = run_case_then_write memo "Random after remove" random_input_removed "eval_steps_asymptotic_mod.json" in
 
-  let (random_ns_memo, random_ns_cek) = (random_res_memo, random_res_cek) in
-  let (low_entropy_ns_memo, low_entropy_ns_cek) = (low_entropy_res_memo, low_entropy_res_cek) in
-  let (repeated_ns_memo, repeated_ns_cek) = (repeated_res_memo, repeated_res_cek) in
-  let (mod_ns_memo, mod_ns_cek) = (mod_res_memo, mod_res_cek) in
   Printf.printf
 {|\begin{tabular}{c|c|c|c|c}
             & Random & Low entropy & Modification & Repeated \\ \hline
