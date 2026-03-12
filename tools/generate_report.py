@@ -184,9 +184,9 @@ def generate_reports() -> None:
         ("Map Benchmark", Path("eval_steps_map.json"), Path("output/map")),
         ("Quicksort Benchmark", Path("eval_steps_qs.json"), Path("output/qs")),
         ("Map Asymptotics: Randomly Generated List", Path("eval_steps_asymptotic_random.json"), Path("output/map_asymptotics_random")),
-        ("Map Asymptotics: Low Entropy List", Path("eval_steps_asymptotic_random.json"), Path("output/map_asymptotics_low_entropy")),
-        ("Map Asymptotics: Modification List", Path("eval_steps_asymptotic_random.json"), Path("output/map_asymptotics_mod")),
-        ("Map Asymptotics: Repeated List", Path("eval_steps_asymptotic_random.json"), Path("output/map_asymptotics_repeat")),
+        ("Map Asymptotics: Low Entropy List", Path("eval_steps_asymptotic_low_entropy.json"), Path("output/map_asymptotics_low_entropy")),
+        ("Map Asymptotics: Modification List", Path("eval_steps_asymptotic_mod.json"), Path("output/map_asymptotics_mod")),
+        ("Map Asymptotics: Repeated List", Path("eval_steps_asymptotic_repeated.json"), Path("output/map_asymptotics_repeat")),
     ]
     for _, input_path, output_dir in experiments:
         speedup_module.generate_speedup_report(
