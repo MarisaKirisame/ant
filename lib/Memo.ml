@@ -7,11 +7,11 @@ module Dynarray = Stdlib.Dynarray
 (*module Hasher = Hash.MCRC32*)
 (*module Hasher = Hash.SL2*)
 (*module Hasher = Hash.DebugHash*)
-module Hashtbl = Core.Hashtbl
 open Value
 open State
 open Common
 open Core
+module Hashtbl = AntHashtbl
 
 let log x = print_endline x
 let log x = ignore x
