@@ -493,6 +493,7 @@ let instantiate (step : step) (state : state) : step =
   let src = zipwith_ek join step.src state in
   let dst : state = Dependency.step_through step (Dependency.pattern_to_value src) in
   { step with src; dst }
+(*let instantiate (step : step) (state : state) : step = step*)
 
 let instantiate_slot = Profile.register_slot Profile.memo_profile "instantiate"
 
