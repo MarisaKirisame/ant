@@ -173,6 +173,7 @@ def generate_reports() -> None:
         ("Filter Benchmark", Path("eval_steps_filter.json"), Path("output/filter")),
         ("Map Benchmark", Path("eval_steps_map.json"), Path("output/map")),
         ("Quicksort Benchmark", Path("eval_steps_qs.json"), Path("output/qs")),
+        ("Arith Benchmark", Path("eval_steps_arith.json"), Path("output/arith")),
     ]
     for _, input_path, output_dir in experiments:
         speedup_module.generate_speedup_report(

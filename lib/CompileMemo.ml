@@ -467,28 +467,34 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
             goto_ w (Hashtbl.find_exn ctx.func_pc f)]
   | If (cond, thn, els, _) ->
       let* s = compile_pp_expr ctx s cond in
-      fun w ->
-        let cond_name = gensym "cond" in
-        [%seqs
-          assert_env_length_ w (int_ s.env_length);
-          let_pat_in_ (var_pat_ cond_name)
-            (resolve_ w (src_E_ (s.env_length - 1)))
-            [%seqs
-              to_unit_ $ pop_env_ w;
-              let$ if_kont = paren (lam_unit_ (fun _ -> k s w)) in
-              let k = fun _ _ -> app_ if_kont unit_ in
-              let cond_bool = code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0") in
-              let then_branch = compile_pp_expr ctx (pop_s s) thn k in
-              let else_branch = compile_pp_expr ctx (pop_s s) els k in
-              if_ cond_bool (then_branch w) (else_branch w)]]
+      reading s $ fun s w ->
+      let cond_name = gensym "cond" in
+      [%seqs
+        assert_env_length_ w (int_ s.env_length);
+        let_pat_in_ (var_pat_ cond_name)
+          (resolve_ w (src_E_ (s.env_length - 1)))
+          [%seqs
+            to_unit_ $ pop_env_ w;
+            (* let$ if_kont = paren (lam_unit_ (fun _ -> k s w)) in
+            let k = fun _ _ -> app_ if_kont unit_ in *)
+            let cond_bool = code $ parens (uncode (int_from_word_ (zro_ (var_ cond_name))) ^^ string " <> 0") in
+            let then_branch = compile_pp_expr ctx (pop_s s) thn k in
+            let else_branch = compile_pp_expr ctx (pop_s s) els k in
+            if_ cond_bool (then_branch w) (else_branch w)]]
   | Op (op, x0, x1, _) ->
       let op_code =
         match op with
         | "+" -> add_
+        | "*" -> mul_
+        | "/" -> div_
+        | "-" -> sub_
+        | "=" -> eq_
         | "<" -> lt_
         | "<=" -> le_
         | ">" -> gt_
         | ">=" -> ge_
+        | "&&" -> land_
+        | "||" -> lor_
         | _ -> failwith ("compile_pp_expr: unsupported op " ^ op)
       in
       let* s = compile_pp_expr ctx s x0 in
@@ -514,6 +520,18 @@ let rec compile_pp_expr (ctx : ctx) (s : scope) (c : 'a expr) (k : kont) : world
       check_scope s;
       let* s = compile_pp_expr ctx (extend_s (pop_s s) l) r in
       fun w -> drop s [ l ] w k
+  | Bool true ->
+      fun w ->
+        [%seqs
+          assert_env_length_ w (int_ s.env_length);
+          push_env_ w (memo_from_int_ (int_ 1));
+          k (push_s s) w]
+  | Bool false ->
+      fun w ->
+        [%seqs
+          assert_env_length_ w (int_ s.env_length);
+          push_env_ w (memo_from_int_ (int_ 0));
+          k (push_s s) w]
   | _ -> failwith ("compile_pp_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr c)
 
 and compile_pp_exprs (ctx : ctx) (s : scope) (cs : 'a expr list) (k : kont) : world code -> unit code =
@@ -553,8 +571,11 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
                           push_env_ w x0_v;
                           compile_pp_expr ctx (extend_s s x0) expr (fun s w -> drop s [ x0 ] w k) w]
                     | _ -> failwith "with_splits: unexpected arity") )
-          | PCtorApp (cname, Some (PTup (xs, _)), _) when List.for_all (function PVar _ -> true | _ -> false) xs ->
-              let xs = List.map (function PVar (name, _) -> name | _ -> failwith "impossible") xs in
+          | PCtorApp (cname, Some (PTup (xs, _)), _)
+            when List.for_all (function PVar _ | PAny -> true | _ -> false) xs ->
+              let xs =
+                List.map (function PVar (name, _) -> name | PAny -> gensym "_" | _ -> failwith "impossible") xs
+              in
               let n = List.length xs in
               ( case cname,
                 with_splits n
