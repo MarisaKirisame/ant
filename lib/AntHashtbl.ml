@@ -18,7 +18,7 @@ module type S = sig
   val of_seq : ('k * 'v) Seq.t -> ('k, 'v) t
 end
 
-module Small : S = struct
+module Small_list : S = struct
   type ('k, 'v) t = { mutable data : ('k * 'v) list }
 
   let name = "small"
@@ -50,6 +50,81 @@ module Small : S = struct
   let of_seq seq =
     let t = create () in
     Seq.iter (fun (k, v) -> set t ~key:k ~data:v) seq;
+    t
+end
+
+module Small (Fallback : S) : S = struct
+  type ('k, 'v) repr = Small of ('k * 'v) list | Fallback of ('k, 'v) Fallback.t
+  type ('k, 'v) t = { mutable repr : ('k, 'v) repr }
+
+  (* Keep tiny tables in a flat list, then promote once they stop being tiny. *)
+  let small_limit = 16
+  let name = "small+" ^ Fallback.name
+  let length t = match t.repr with Small data -> List.length data | Fallback tbl -> Fallback.length tbl
+  let is_empty t = match t.repr with Small data -> data = [] | Fallback tbl -> Fallback.is_empty tbl
+
+  let to_fallback data =
+    let tbl = Fallback.create ~size:(List.length data) () in
+    List.iter (fun (key, value) -> Fallback.set tbl ~key ~data:value) data;
+    tbl
+
+  let promote_if_needed t =
+    match t.repr with
+    | Small data when List.length data > small_limit -> t.repr <- Fallback (to_fallback data)
+    | _ -> ()
+
+  let demote_if_needed t =
+    match t.repr with
+    | Fallback tbl when Fallback.length tbl <= small_limit -> t.repr <- Small (Fallback.to_alist tbl)
+    | _ -> ()
+
+  let create ?size () =
+    match size with
+    | Some size when size > small_limit -> { repr = Fallback (Fallback.create ~size ()) }
+    | _ -> { repr = Small [] }
+
+  let find t key = match t.repr with Small data -> List.assoc_opt key data | Fallback tbl -> Fallback.find tbl key
+  let find_opt = find
+  let find_exn t key = match t.repr with Small data -> List.assoc key data | Fallback tbl -> Fallback.find_exn tbl key
+  let mem t key = match t.repr with Small data -> List.mem_assoc key data | Fallback tbl -> Fallback.mem tbl key
+
+  let set t ~key ~data =
+    match t.repr with
+    | Small items ->
+        t.repr <- Small ((key, data) :: List.filter (fun (k, _) -> k <> key) items);
+        promote_if_needed t
+    | Fallback tbl -> Fallback.set tbl ~key ~data
+
+  let add t ~key ~data =
+    match t.repr with
+    | Small items ->
+        if List.mem_assoc key items then `Duplicate
+        else (
+          t.repr <- Small ((key, data) :: items);
+          promote_if_needed t;
+          `Ok)
+    | Fallback tbl -> Fallback.add tbl ~key ~data
+
+  let add_exn t ~key ~data =
+    match add t ~key ~data with `Ok -> () | `Duplicate -> failwith "Hashtbl.add_exn: duplicate key"
+
+  let remove t key =
+    match t.repr with
+    | Small items -> t.repr <- Small (List.filter (fun (k, _) -> k <> key) items)
+    | Fallback tbl ->
+        Fallback.remove tbl key;
+        demote_if_needed t
+
+  let iter t ~f =
+    match t.repr with
+    | Small items -> List.iter (fun (_, value) -> f value) items
+    | Fallback tbl -> Fallback.iter tbl ~f
+
+  let to_alist t = match t.repr with Small items -> items | Fallback tbl -> Fallback.to_alist tbl
+
+  let of_seq seq =
+    let t = create () in
+    Seq.iter (fun (key, data) -> set t ~key ~data) seq;
     t
 end
 
@@ -113,6 +188,9 @@ module Core : S = struct
     t
 end
 
+module Small_stdlib = Small (Stdlib)
+module Small_core = Small (Core)
+
 (* One-line switch between implementations. *)
-module Impl = Stdlib
+module Impl = Small_stdlib
 include Impl
