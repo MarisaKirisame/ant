@@ -3,9 +3,14 @@
  (modules
   FromHazel
   HazelAppend
+  HazelExperiment
   HazelFilter
+  HazelIS
   HazelMap
+  HazelMS
+  HazelPair
   HazelQS
+  HazelRev
   HazelIsSorted
   LiveCEK
   LivePlain

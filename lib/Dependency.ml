@@ -242,8 +242,12 @@ let string_of_step (step : step) : string =
   let dst = step.dst in
   "(" ^ string_of_cek src ^ " -> " ^ string_of_cek dst ^ ")"
 
-let compose_step_step_through_slot = Profile.register_slot Profile.memo_profile "compose_step.step_through"
-let unify_vp_slot = Profile.register_slot Profile.memo_profile "unify_vp"
+let compose_step_slot = Profile.register_slot Profile.memo_profile "compose_step"
+
+let compose_step_step_through_slot =
+  compose_step_slot (*Profile.register_slot Profile.memo_profile "compose_step.step_through"*)
+
+let unify_vp_slot = None (*Profile.register_slot Profile.memo_profile "unify_vp"*)
 
 let compose_step (x : step) (y : step) : step =
   (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x.dst in*)

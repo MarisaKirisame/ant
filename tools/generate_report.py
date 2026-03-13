@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
@@ -19,12 +20,45 @@ from plot_speedup import (
     SpeedupStats,
     compare_stats,
     load_records,
+    profile_totals_from_result,
     plot_speedup_cdf,
     plot_scatter,
     pairs_from_profiles,
     pairs_from_steps,
 )
 import generate_speedup_index as speedup_module
+
+BASE_EXPERIMENTS: list[tuple[str, str]] = [
+    ("append", "Append"),
+    ("filter", "Filter"),
+    ("map", "Map"),
+    ("qs", "Quicksort"),
+    ("is", "Insertion Sort"),
+    ("ms", "Merge Sort"),
+    ("pair", "Pair"),
+    ("rev", "Reverse"),
+]
+
+VARIANTS: list[tuple[str, str, str]] = [
+    ("eval_steps_{key}.json", "output/{key}", ""),
+    ("eval_steps_th_{key}.json", "output/th_{key}", " (th)"),
+    ("eval_steps_at_{key}.json", "output/at_{key}", " (at)"),
+]
+
+TABLE_VARIANTS: list[tuple[str, str]] = [
+    ("Alice", "eval_steps_{key}.json"),
+    ("Bob", "eval_steps_at_{key}.json"),
+    ("Charlie", "eval_steps_th_{key}.json"),
+]
+
+SPEED_BREAKDOWN_ORDER = [
+    "rules lookup",
+    "rule composition",
+    "rule instantiation",
+    "rule insertion",
+    "rule application",
+    "misc",
+]
 
 
 def _render_html(
@@ -168,25 +202,208 @@ def generate_html(
 
 def generate_reports() -> None:
     css_source = Path(__file__).with_name("style.css")
-    experiments = [
-        ("Append Benchmark", Path("eval_steps_append.json"), Path("output/append")),
-        ("Filter Benchmark", Path("eval_steps_filter.json"), Path("output/filter")),
-        ("Map Benchmark", Path("eval_steps_map.json"), Path("output/map")),
-        ("Quicksort Benchmark", Path("eval_steps_qs.json"), Path("output/qs")),
-        ("Arith Benchmark", Path("eval_steps_arith.json"), Path("output/arith")),
-    ]
-    for _, input_path, output_dir in experiments:
+    experiments = _hazel_experiments() + _arith_experiments()
+    _generate_reports_for_experiments(
+        title="Benchmark Index",
+        output=Path("output/index.html"),
+        experiments=experiments,
+        css_source=css_source,
+    )
+
+
+def generate_hazel_reports() -> None:
+    css_source = Path(__file__).with_name("style.css")
+    _generate_reports_for_experiments(
+        title="Hazel Benchmark Index",
+        output=Path("output/index.html"),
+        experiments=_hazel_experiments(),
+        css_source=css_source,
+    )
+
+
+def generate_arith_reports() -> None:
+    css_source = Path(__file__).with_name("style.css")
+    _generate_reports_for_experiments(
+        title="Arith Benchmark Index",
+        output=Path("output/arith_index.html"),
+        experiments=_arith_experiments(),
+        css_source=css_source,
+    )
+
+
+def _hazel_experiments() -> list[tuple[str, Path, Path]]:
+    experiments: list[tuple[str, Path, Path]] = []
+    for steps_pattern, output_pattern, label_suffix in VARIANTS:
+        for key, label in BASE_EXPERIMENTS:
+            experiments.append(
+                (
+                    f"{label} Benchmark{label_suffix}",
+                    Path(steps_pattern.format(key=key)),
+                    Path(output_pattern.format(key=key)),
+                )
+            )
+    return experiments
+
+
+def _arith_experiments() -> list[tuple[str, Path, Path]]:
+    return [("Arith Benchmark", Path("eval_steps_arith.json"), Path("output/arith"))]
+
+
+def _generate_reports_for_experiments(
+    *,
+    title: str,
+    output: Path,
+    experiments: Sequence[tuple[str, Path, Path]],
+    css_source: Path,
+) -> None:
+    generated_entries: list[tuple[str, Path]] = []
+    for label, input_path, output_dir in experiments:
+        if not input_path.exists():
+            print(f"[generate_report] skipping missing input: {input_path}", file=sys.stderr)
+            continue
         speedup_module.generate_speedup_report(
             input_path=input_path,
             output_dir=output_dir,
             css_source=css_source,
         )
+        generated_entries.append((label, output_dir / "index.html"))
     generate_html(
-        title="Benchmark Index",
-        output=Path("output/index.html"),
-        entries=[(label, output_dir / "index.html") for label, _, output_dir in experiments],
+        title=title,
+        output=output,
+        entries=generated_entries,
         css_source=css_source,
     )
+
+
+def _geomean_memo_vs_cek_speedup(input_path: Path) -> str:
+    result = load_records(input_path)
+    pairs = pairs_from_profiles(result, baseline_key="cek_profile", memo_key="memo_profile")
+    _, stats = compare_stats(pairs)
+    return f"${fmt_speedup(stats.geo_mean)}\\times$"
+
+
+def _escape_latex(value: str) -> str:
+    escaped = value.replace("\\", r"\textbackslash{}")
+    escaped = escaped.replace("&", r"\&")
+    escaped = escaped.replace("%", r"\%")
+    escaped = escaped.replace("$", r"\$")
+    escaped = escaped.replace("#", r"\#")
+    escaped = escaped.replace("_", r"\_")
+    escaped = escaped.replace("{", r"\{")
+    escaped = escaped.replace("}", r"\}")
+    return escaped
+
+
+def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
+    if not data_paths:
+        return ["timeout%"]
+
+    aggregate_slot_ns: dict[str, float] = {}
+    total_ns = 0.0
+    for path in data_paths:
+        result = load_records(path)
+        slot_totals, slot_total_ns = profile_totals_from_result(result)
+        total_ns += slot_total_ns
+        for slot_name, slot_ns in slot_totals.items():
+            aggregate_slot_ns[slot_name] = aggregate_slot_ns.get(slot_name, 0.0) + slot_ns
+
+    if total_ns <= 0 or not aggregate_slot_ns:
+        return ["timeout%"]
+
+    def bucket_name(slot_name: str) -> str:
+        if slot_name == "lookup_step":
+            return "rules lookup"
+        if slot_name == "compose_step":
+            return "rule composition"
+        if slot_name == "instantiate":
+            return "rule instantiation"
+        if slot_name == "insert_step":
+            return "rule insertion"
+        if slot_name == "step_through":
+            return "rule application"
+        if slot_name == "exec_cek":
+            return "misc"
+        return slot_name
+
+    bucket_totals: dict[str, float] = {}
+    for slot_name, slot_ns in aggregate_slot_ns.items():
+        name = bucket_name(slot_name)
+        bucket_totals[name] = bucket_totals.get(name, 0.0) + slot_ns
+
+    ordered_names = [name for name in SPEED_BREAKDOWN_ORDER if name in bucket_totals]
+    ordered_names.extend(sorted(name for name in bucket_totals if name not in SPEED_BREAKDOWN_ORDER))
+
+    lines = [
+        "\\begin{tabular}{lr}",
+        "\\hline",
+        "Name & Percent \\\\",
+        "\\hline",
+    ]
+    for name in ordered_names:
+        percent = 100.0 * bucket_totals[name] / total_ns
+        lines.append(f"{_escape_latex(name)} & {percent:.2f}\\% \\\\")
+    lines.extend(
+        [
+            "\\hline",
+            "\\end{tabular}%",
+        ]
+    )
+    return lines
+
+
+def generate_tex_table(*, output_path: Path = Path("output/hazel.tex")) -> None:
+    available_input_paths: list[Path] = []
+    rows: list[tuple[str, list[str]]] = []
+    for variant_label, steps_pattern in TABLE_VARIANTS:
+        values: list[str] = []
+        for key, _ in BASE_EXPERIMENTS:
+            input_path = Path(steps_pattern.format(key=key))
+            if not input_path.exists():
+                values.append("timeout")
+                continue
+            available_input_paths.append(input_path)
+            values.append(_geomean_memo_vs_cek_speedup(input_path))
+        rows.append((variant_label, values))
+
+    point_count = 0
+    total_speedup = "timeout"
+    if available_input_paths:
+        pairs = _collect_pairs(available_input_paths)
+        point_count = len(pairs)
+        if pairs:
+            _, stats = compare_stats(pairs)
+            total_speedup = f"${fmt_speedup(stats.geo_mean)}\\times$"
+    breakdown_lines = _memo_speed_breakdown_lines(available_input_paths)
+
+    variant_labels = [variant_label for variant_label, _ in rows]
+    header_cells = " & ".join(["Benchmark", *variant_labels])
+    col_spec = "l" + ("r" * len(variant_labels))
+    lines = [
+        "% Auto-generated by tools/generate_report.py",
+        "\\newcommand{\\hazelPointCount}{" + str(point_count) + "}",
+        "\\newcommand{\\hazelTotalSpeedup}{" + total_speedup + "}",
+        "\\newcommand{\\hazelSpeedBreakdown}{%",
+        *breakdown_lines,
+        "}",
+        "\\newcommand{\\hazelSpeedupTable}{%",
+        "\\begin{tabular}{" + col_spec + "}",
+        "\\hline",
+        header_cells + " \\\\",
+        "\\hline",
+    ]
+    for benchmark_idx, (_, benchmark_label) in enumerate(BASE_EXPERIMENTS):
+        benchmark_values = [values[benchmark_idx] for _, values in rows]
+        lines.append(" & ".join([benchmark_label, *benchmark_values]) + " \\\\")
+    lines.extend(
+        [
+            "\\hline",
+            "\\end{tabular}%",
+            "}",
+            "",
+        ]
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def _relativize(entries: Iterable[Tuple[str, Path]], output: Path) -> List[Tuple[str, str]]:

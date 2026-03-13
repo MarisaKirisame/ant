@@ -36,6 +36,9 @@ type expr =
   | PEmptyHole
   | Ap of expr * expr
   | Cons of expr * expr
+  | Zro of expr
+  | Fst of expr
+  | Seq of expr * expr
 
 let rec expr_of_sexp_helper = function
   | Sexp.List [ Sexp.Atom "Let"; lhs; rhs; body ] ->
@@ -54,6 +57,7 @@ let rec expr_of_sexp_helper = function
   | Sexp.List [ Sexp.Atom "Int"; Sexp.Atom i ] -> Int (int_of_string i)
   | Sexp.List [ Sexp.Atom "BinOp"; Sexp.Atom op; lhs; rhs ] ->
       BinOp (op, expr_of_sexp_helper lhs, expr_of_sexp_helper rhs)
+  | Sexp.List [ Sexp.Atom "UnOp"; Sexp.Atom "Minus"; x ] -> BinOp ("Minus", Int 0, expr_of_sexp_helper x)
   | Sexp.List [ Sexp.Atom "Match"; scrut; Sexp.List cases ] ->
       Match
         ( expr_of_sexp_helper scrut,
@@ -69,12 +73,14 @@ let rec expr_of_sexp_helper = function
   | Sexp.Atom "PEmptyHole" -> PEmptyHole
   | Sexp.List [ Sexp.Atom "Ap"; Sexp.Atom "Forward"; func; arg ] ->
       Ap (expr_of_sexp_helper func, expr_of_sexp_helper arg)
+  | Sexp.List [ Sexp.Atom "ApPat"; func; arg ] -> PEmptyHole
   | Sexp.List [ Sexp.Atom "Tuple"; Sexp.List elems ] -> Tuple (List.map expr_of_sexp_helper elems)
   | Sexp.List [ Sexp.Atom "TupLabel"; x; y ] -> expr_of_sexp_helper y
   | Sexp.List [ Sexp.Atom "Cons"; head; tail ] -> Cons (expr_of_sexp_helper head, expr_of_sexp_helper tail)
   | Sexp.List [ Sexp.Atom "ListLit"; Sexp.List elems ] -> ListLit (List.map expr_of_sexp_helper elems)
   | Sexp.List [ Sexp.Atom "LabelPat"; Sexp.Atom str ] -> LabelPat str
   | Sexp.List [ Sexp.Atom "Constructor"; _ ] -> EmptyHole
+  | Sexp.List [ Sexp.Atom "Seq"; x; y ] -> Seq (expr_of_sexp_helper x, expr_of_sexp_helper y)
   | sexp -> failwith (Printf.sprintf "Unrecognized expression s-expression: %s" (Sexp.to_string_hum sexp))
 
 let expr_of_sexp sexp =
@@ -105,6 +111,8 @@ let rec pp_expr fmt = function
   | Atom e -> Format.fprintf fmt "(Atom %a)" pp_expr e
   | Bool b -> Format.fprintf fmt "(Bool %b)" b
   | Int i -> Format.fprintf fmt "(Int %d)" i
+  | Zro x -> Format.fprintf fmt "(Zro %a)" pp_expr x
+  | Fst x -> Format.fprintf fmt "(Fst %a)" pp_expr x
   | TupLabelPat (x, y) -> Format.fprintf fmt "(TupLablePat %a %a)" pp_expr x pp_expr y
   | LabelPat str -> Format.fprintf fmt "(LabelPat %s)" str
   | BinOp (op, l, r) -> Format.fprintf fmt "(BinOp %s %a %a)" op pp_expr l pp_expr r
@@ -151,12 +159,13 @@ let rec pp_expr fmt = function
   | PEmptyHole -> Format.pp_print_string fmt "PEmptyHole"
   | Ap (f, a) -> Format.fprintf fmt "(Ap %a %a)" pp_expr f pp_expr a
   | Cons (h, t) -> Format.fprintf fmt "(Cons %a %a)" pp_expr h pp_expr t
+  | Seq (x, y) -> Format.fprintf fmt "(Seq %a %a)" pp_expr x pp_expr y
 
 type case = { patterns : expr list; body : nexpr; letlist : (string * nexpr) list }
 
 let rec subst (lhs : string) (rhs : nexpr) (expr : nexpr) =
   match expr with
-  | NEInt _ | NETrue | NEFalse | NEUnit | NEHole -> expr
+  | NEInt _ | NETrue | NEFalse | NEUnit | NEHole | NENil -> expr
   | NEVar v -> if v = lhs then rhs else expr
   | NEApp (f, a) -> NEApp (subst lhs rhs f, subst lhs rhs a)
   | NEAnd (l, r) -> NEAnd (subst lhs rhs l, subst lhs rhs r)
@@ -166,10 +175,21 @@ let rec subst (lhs : string) (rhs : nexpr) (expr : nexpr) =
       NELet (name, subst lhs rhs binding, subst lhs rhs body)
   | NEFix (name, arg, body) -> NEFix (name, arg, subst lhs rhs body)
   | NEAbs (arg, body) -> NEAbs (arg, subst lhs rhs body)
+  | NEPlus (x, y) -> NEPlus (subst lhs rhs x, subst lhs rhs y)
+  | NEMinus (x, y) -> NEMinus (subst lhs rhs x, subst lhs rhs y)
   | NELt (x, y) -> NELt (subst lhs rhs x, subst lhs rhs y)
-  | NEGe (x, y) -> NEGe (subst lhs rhs x, subst lhs rhs y)
   | NELe (x, y) -> NELe (subst lhs rhs x, subst lhs rhs y)
+  | NEGt (x, y) -> NEGt (subst lhs rhs x, subst lhs rhs y)
+  | NEGe (x, y) -> NEGe (subst lhs rhs x, subst lhs rhs y)
+  | NESeq (x, y) -> NESeq (subst lhs rhs x, subst lhs rhs y)
+  | NEPair (x, y) -> NEPair (subst lhs rhs x, subst lhs rhs y)
   | NEIf (i, t, e) -> NEIf (subst lhs rhs i, subst lhs rhs t, subst lhs rhs e)
+  | NEMatchList (l, nil_case, x, xs, cons_case) ->
+      assert (lhs != x);
+      assert (lhs != xs);
+      NEMatchList (subst lhs rhs l, subst lhs rhs nil_case, x, xs, subst lhs rhs cons_case)
+  | NEZro x -> NEZro (subst lhs rhs x)
+  | NEFst x -> NEFst (subst lhs rhs x)
   | _ -> failwith ("subst not implemented for: " ^ Format.asprintf "%a" pp_nexpr expr)
 
 let rec substs (bindings : (string * nexpr) list) (expr : nexpr) : nexpr =
@@ -295,6 +315,7 @@ let rec free_vars_aux (x : expr) bound acc =
   | Ap (func, arg) -> free_vars_aux func bound (free_vars_aux arg bound acc)
   | Tuple ps -> List.fold_left (fun a p -> free_vars_aux p bound a) acc ps
   | Cons (hd, tl) -> free_vars_aux hd bound (free_vars_aux tl bound acc)
+  | Seq (x, y) -> free_vars_aux x bound (free_vars_aux y bound acc)
   | Fun (args, body) -> free_vars_aux body (bound_vars args bound) acc
   | Let (lhs, rhs, body) -> free_vars_aux body (bound_vars lhs bound) (free_vars_aux rhs bound acc)
   | If (i, t, e) -> free_vars_aux i bound (free_vars_aux t bound (free_vars_aux e bound acc))
@@ -310,7 +331,7 @@ let rec nexpr_of_expr_aux e names : nexpr =
         List.map
           (function
             | VarPat p -> p
-            | PEmptyHole -> "WILD"
+            | PEmptyHole -> fresh_name names
             | p ->
                 failwith
                   ("Only VarPat supported in recursive function parameters. but got: " ^ Format.asprintf "%a" pp_expr p))
@@ -325,14 +346,20 @@ let rec nexpr_of_expr_aux e names : nexpr =
   | Let (VarPat name, Fun (VarPat param, fun_body), let_body) when List.mem name (free_vars fun_body) ->
       NELet (name, NEFix (name, param, nexpr_of_expr_aux fun_body names), nexpr_of_expr_aux let_body names)
   | Let (VarPat name, bound, body) -> NELet (name, nexpr_of_expr_aux bound names, nexpr_of_expr_aux body names)
-  | Let (PEmptyHole, _, _) -> NEHole
+  | Let (PEmptyHole, _, x) -> nexpr_of_expr_aux x names
+  | Let (PMultiHole, _, x) -> nexpr_of_expr_aux x names
+  | Let (TuplePat [ x; y ], rhs, body) ->
+      let p = fresh_name names in
+      let l = fresh_name names in
+      let r = fresh_name names in
+      nexpr_of_expr_aux (Let (VarPat p, rhs, Let (VarPat l, Zro (Var p), Let (VarPat r, Fst (Var p), body)))) names
   (*todo: use the new tuple mechanism*)
   | Fun (TuplePat params, body) ->
       let rec build_nested_fun params body =
         match params with
         | [] -> nexpr_of_expr_aux body names
         | VarPat name :: rest -> NEAbs (name, build_nested_fun rest body)
-        | PEmptyHole :: rest -> NEAbs ("WILD", build_nested_fun rest body)
+        | PEmptyHole :: rest -> NEAbs (fresh_name names, build_nested_fun rest body)
         | TupLabelPat _ :: rest -> NEHole
         | p :: rest ->
             failwith ("Only VarPat supported in function parameters, but got: " ^ Format.asprintf "%a" pp_expr p)
@@ -341,7 +368,7 @@ let rec nexpr_of_expr_aux e names : nexpr =
   | Fun (VarPat name, body) -> NEAbs (name, nexpr_of_expr_aux body names)
   | Fun (PEmptyHole, body) -> NEHole
   | Fun (PMultiHole, body) -> NEHole
-  | Fun (Wild, body) -> NEAbs ("WILD", nexpr_of_expr_aux body names)
+  | Fun (Wild, body) -> NEAbs (fresh_name names, nexpr_of_expr_aux body names)
   | Ap (func, Tuple [ x; y ]) ->
       NEApp (NEApp (nexpr_of_expr_aux func names, nexpr_of_expr_aux x names), nexpr_of_expr_aux y names)
   | Ap (func, arg) -> NEApp (nexpr_of_expr_aux func names, nexpr_of_expr_aux arg names)
@@ -360,8 +387,10 @@ let rec nexpr_of_expr_aux e names : nexpr =
       | "Gt" -> NEGt (nl, nr)
       | "Ge" -> NEGe (nl, nr)
       | "And" -> NEAnd (nl, nr)
+      | "Minus" -> NEMinus (nl, nr)
       | _ -> failwith ("nexpr_of_expr not implemented for binop: " ^ op))
   | EmptyHole | MultiHole -> NEHole
+  | Int i -> NEInt i
   | Match (list, cases) ->
       let matched = nexpr_of_expr_aux list names in
       let m = fresh_name names in
@@ -378,6 +407,10 @@ let rec nexpr_of_expr_aux e names : nexpr =
   | Cons (hd, tl) -> NECons (nexpr_of_expr_aux hd names, nexpr_of_expr_aux tl names)
   | ListLit [] -> NENil
   | ListLit (x :: xs) -> NECons (nexpr_of_expr_aux x names, nexpr_of_expr_aux (ListLit xs) names)
+  | Tuple [ x; y ] -> NEPair (nexpr_of_expr_aux x names, nexpr_of_expr_aux y names)
+  | Zro x -> NEZro (nexpr_of_expr_aux x names)
+  | Fst x -> NEFst (nexpr_of_expr_aux x names)
+  | Seq (x, y) -> NESeq (nexpr_of_expr_aux x names, nexpr_of_expr_aux y names)
   | _ -> failwith ("nexpr_of_expr not implemented for expr: " ^ Format.asprintf "%a" pp_expr e)
 
 let nexpr_of_expr e =
@@ -412,6 +445,8 @@ let rec clean_aux x (seen : string list) =
   | NELe (l, r) -> NELe (clean_aux l seen, clean_aux r seen)
   | NEAnd (l, r) -> NEAnd (clean_aux l seen, clean_aux r seen)
   | NEPlus (l, r) -> NEPlus (clean_aux l seen, clean_aux r seen)
+  | NEMinus (l, r) -> NEMinus (clean_aux l seen, clean_aux r seen)
+  | NESeq (l, r) -> NESeq (clean_aux l seen, clean_aux r seen)
   | NEMatchList (target, nil_case, head_name, tail_name, cons_case) ->
       NEMatchList
         ( clean_aux target seen,
@@ -421,7 +456,10 @@ let rec clean_aux x (seen : string list) =
           clean_aux cons_case (tail_name :: head_name :: seen) )
   | NEApp (f, a) -> NEApp (clean_aux f seen, clean_aux a seen)
   | NECons (h, t) -> NECons (clean_aux h seen, clean_aux t seen)
+  | NEPair (x, y) -> NEPair (clean_aux x seen, clean_aux y seen)
   | NEFix (name, param, body) -> NEFix (name, param, clean_aux body (param :: name :: seen))
+  | NEZro x -> NEZro (clean_aux x seen)
+  | NEFst x -> NEFst (clean_aux x seen)
   | _ -> failwith ("clean not implemented for expr: " ^ Format.asprintf "%a" pp_nexpr x)
 
 let clean x = clean_aux x []
@@ -430,6 +468,7 @@ let rec subst_deepest_hole y x =
   match x with
   | NEHole -> y
   | NELet (name, bound, body) -> NELet (name, bound, subst_deepest_hole y body)
+  | NEVar _ | NECons _ | NEAbs _ | NEMinus _ -> x
   | _ -> failwith ("subst_deepest_hole not implemented for expr: " ^ Format.asprintf "%a" pp_nexpr x)
 
 let parse_program_with_test ~program_path test =

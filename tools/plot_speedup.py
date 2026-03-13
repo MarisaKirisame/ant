@@ -45,6 +45,8 @@ REPORT_WALL_CLOCK_TIME = True
 REPORT_ABSOLUTE_TIME_LOG_SCALE = True
 # Toggle drawing interpolation (linear fit) on scatter plots.
 REPORT_DRAW_INTERPOLATION_LINE = False
+# Toggle drawing grid lines on plots.
+REPORT_DRAW_GRID_LINES = False
 
 if REPORT_WALL_CLOCK_TIME:
     MEMO_KEY = "memo_profile"
@@ -104,7 +106,8 @@ def _save_plot(
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
-    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    if REPORT_DRAW_GRID_LINES:
+        ax.grid(True, which="both", linestyle="--", alpha=0.5)
     if legend:
         ax.legend()
     fig.tight_layout()
@@ -122,9 +125,9 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
     reg_x = np.array([min_time, max_time])
     reg_y = None
     if REPORT_DRAW_INTERPOLATION_LINE:
-        log_memos = np.log10(memos)
         log_baselines = np.log10(baselines)
-        slope, intercept = np.polyfit(log_memos, log_baselines, 1)
+        log_memos = np.log10(memos)
+        slope, intercept = np.polyfit(log_baselines, log_memos, 1)
         reg_y = 10 ** (slope * np.log10(reg_x) + intercept)
     scale_label = (
         "linear"
@@ -139,7 +142,32 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
     yscale = xscale
 
     def _plot(ax: plt.Axes) -> None:
-        ax.scatter(memos, baselines, alpha=0.75)
+        def draw_ratio_line(factor: float, *, linewidth: float, label: str, offset: tuple[float, float]) -> None:
+            x_start = factor * min_time
+            if x_start > max_time:
+                return
+            ax.plot(
+                [x_start, max_time],
+                [min_time, max_time / factor],
+                color="black",
+                linestyle="--",
+                linewidth=linewidth,
+            )
+            x_anchor = x_start + 0.7 * (max_time - x_start)
+            y_anchor = x_anchor / factor
+            ax.annotate(
+                label,
+                xy=(x_anchor, y_anchor),
+                xytext=offset,
+                textcoords="offset points",
+                bbox={"boxstyle": "round,pad=0.25", "fc": "white", "ec": "black", "alpha": 0.9},
+                arrowprops={"arrowstyle": "->", "color": "black", "lw": 1},
+                fontsize=9,
+                ha="left",
+                va="center",
+            )
+
+        ax.scatter(baselines, memos, alpha=0.2)
         if reg_y is not None:
             ax.plot(reg_x, reg_y, color="tab:blue", linewidth=1.5, label="Linear fit")
         ax.plot(
@@ -149,12 +177,14 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
             linestyle="--",
             linewidth=1,
         )
+        draw_ratio_line(10.0, linewidth=0.5, label="10x faster", offset=(12, 10))
+        draw_ratio_line(100.0, linewidth=0.2, label="100x faster", offset=(12, -12))
 
     return _save_plot(
         output_dir,
         title=f"Our vs Their ({METRIC_LABEL}, {scale_label})",
-        xlabel=f"Our ({METRIC_LABEL})",
-        ylabel=f"Their ({METRIC_LABEL})",
+        xlabel=f"Their ({METRIC_LABEL})",
+        ylabel=f"Our ({METRIC_LABEL})",
         xscale=xscale,
         yscale=yscale,
         legend=REPORT_DRAW_INTERPOLATION_LINE,
@@ -181,13 +211,36 @@ def plot_speedup_cdf(ratios: Sequence[float], output_dir: Path) -> str:
         raise ValueError("ratios must be positive")
     xs = sorted(ratios)
     ys = [100.0 * (i + 1) / len(xs) for i in range(len(xs))]
+
+    def _plot(ax: plt.Axes) -> None:
+        break_even_count = sum(1 for ratio in xs if ratio <= 1.0)
+        break_even_pct = 100.0 * break_even_count / len(xs)
+        label_y = min(95.0, max(5.0, break_even_pct + (10.0 if break_even_pct < 85.0 else -10.0)))
+
+        ax.plot(xs, ys, marker="o", linewidth=1.5)
+        ax.axvline(1.0, color="black", linestyle="--", linewidth=1)
+        ax.axvline(10.0, color="gray", linestyle="--", linewidth=0.5)
+        ax.axvline(100.0, color="gray", linestyle="--", linewidth=0.2)
+        ax.scatter([1.0], [break_even_pct], color="black", s=20, zorder=3)
+        ax.annotate(
+            f"{break_even_pct:.1f}%",
+            xy=(1.0, break_even_pct),
+            xytext=(2.0, label_y),
+            textcoords="data",
+            bbox={"boxstyle": "round,pad=0.25", "fc": "white", "ec": "black", "alpha": 0.9},
+            arrowprops={"arrowstyle": "->", "color": "black", "lw": 1},
+            fontsize=9,
+            ha="left",
+            va="center",
+        )
+
     return _save_plot(
         output_dir,
         title=f"Speedup CDF ({METRIC_LABEL})",
         xlabel=f"Speedup ({METRIC_LABEL}, baseline / memoized)",
         ylabel="Executions <= speedup (%)",
         xscale="log",
-        plotter=lambda ax: ax.plot(xs, ys, marker="o", linewidth=1.5),
+        plotter=_plot,
     )
 
 
