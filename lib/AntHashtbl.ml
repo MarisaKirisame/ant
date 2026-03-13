@@ -114,5 +114,5 @@ module Core : S = struct
 end
 
 (* One-line switch between implementations. *)
-module Impl = Core
+module Impl = Stdlib
 include Impl
