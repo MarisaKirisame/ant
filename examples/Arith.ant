@@ -77,7 +77,7 @@ let rec normalize = fun e ->
   | Add a b ->
     let na = normalize a in
     let nb = normalize b in
-    if expr_equal na nb then Mul (Const 2) (na nb) else 
+    if expr_equal na nb then Mul (Const 2) na else 
     (match na with
     | Const x ->
       if x = 0 then nb

@@ -22,7 +22,7 @@ For deeper dives, see `internal.md` (architecture) and `motivation.md` (why this
 use `uv sync` to install deps.
 
 ```bash
-make dependency   # install opam switch + packages (idempotent)
+make dependency   # install toolchain/dev tools and refresh dune.lock
 make build        # dune build
 make run          # regenerate generated/*.ml, format, and execute GeneratedMain
 ```
@@ -53,7 +53,7 @@ Run `dune exec ant -- INPUT OUTPUT [flags]` to compile or inspect a program. The
 All CLI wiring lives in `bin/main.ml`.
 
 ## Development Workflow
-- `make dependency` – create/update the local `ant` opam switch and install packages listed in `nightly.py`.
+- `make dependency` – create/update the local `ant` opam switch, install the Dune toolchain/dev tools, and refresh the lockdir with `dune pkg lock`.
 - `make build` – build through the managed switch (`dune build`).
 - `make run` – regenerate `generated/*.ml`, format, and execute `GeneratedMain`.
 - `dune runtest` – run unit tests in `test/test_ant.ml` (hash monoid and intmap checks).

@@ -1,0 +1,18 @@
+(version 3.10.0)
+
+(build
+ (all_platforms
+  ((action
+    (progn
+     (when %{pkg-self:dev} (run dune subst))
+     (run dune build -p %{pkg-self:name} -j %{jobs} @install))))))
+
+(depends
+ (all_platforms
+  (dune ocaml camlp-streams ocamlfind num)))
+
+(source
+ (fetch
+  (url
+   https://github.com/ocaml-batteries-team/batteries-included/releases/download/v3.10.0/batteries-3.10.0.tar.gz)
+  (checksum md5=b7f3b99f12f21b1da6b6aa13d993206d)))

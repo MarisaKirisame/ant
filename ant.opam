@@ -12,10 +12,17 @@ bug-reports: "https://github.com/username/reponame/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.16"}
+  "menhir"
   "pprint"
   "cmdliner"
   "batteries"
   "core"
+  "core_unix"
+  "core_bench"
+  "sexplib"
+  "yojson"
+  "ppx_deriving"
+  "ppxlib"
   "odoc" {with-doc}
 ]
 build: [
