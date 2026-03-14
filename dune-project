@@ -21,7 +21,20 @@
  (name ant)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml dune pprint cmdliner batteries core)
+ (depends
+  ocaml
+  dune
+  menhir
+  pprint
+  cmdliner
+  batteries
+  core
+  core_unix
+  core_bench
+  sexplib
+  yojson
+  ppx_deriving
+  ppxlib)
  (tags
   (topics "to describe" your project)))
 

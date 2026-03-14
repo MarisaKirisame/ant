@@ -1,0 +1,13 @@
+(version 20230830)
+
+(build
+ (all_platforms ((action (run dune build -p %{pkg-self:name} -j %{jobs})))))
+
+(depends
+ (all_platforms
+  (ocaml dune)))
+
+(source
+ (fetch
+  (url https://github.com/fpottier/pprint/archive/20230830.tar.gz)
+  (checksum md5=449216484e93e5691c76f14c87c5a711)))
