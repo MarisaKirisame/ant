@@ -270,7 +270,6 @@ let compose_step_step_through_slot =
   compose_step_slot (*Profile.register_slot Profile.memo_profile "compose_step.step_through"*)
 
 let unify_vp_slot = None (*Profile.register_slot Profile.memo_profile "unify_vp"*)
-
 let debug_compose = match Sys.getenv_opt "ANT_DEBUG_COMPOSE" with Some ("1" | "true" | "TRUE") -> true | _ -> false
 let fast_compose = match Sys.getenv_opt "ANT_FAST_COMPOSE" with Some ("0" | "false" | "FALSE") -> false | _ -> true
 let pattern_has_pcon (p : pattern) : bool = Generic.to_list p |> List.exists (function PCon _ -> true | _ -> false)

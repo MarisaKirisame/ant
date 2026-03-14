@@ -497,7 +497,7 @@ let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
   with ElaborationError (msg, l) ->
     let s = Syntax.string_of_document @@ Syntax.pp_expr e in
     print_endline [%string "!!!!!! Type error %{msg} in expression:\n%{s}\n"];
-    if l < 4 then raise (ElaborationError (msg, l + 1)) else failwith "Maximum reporting depth reached"
+    if l < 4 then raise (ElaborationError (msg, l + 1)) else raise (ElaborationError (msg, l))
 
 let top_type_of_prog (p : info prog) : info prog =
   let rec convert_ty (ctx : Type.ty StrMap.t) (arity : int StrMap.t) (ty : 'a Syntax.ty) : Type.ty =
