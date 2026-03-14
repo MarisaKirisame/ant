@@ -8,7 +8,7 @@ These notes document how the Codex agent currently works in this repository so y
 - May create and modify files directly (prefers `apply_patch` for small edits).
 
 ## Limits
-- `make build|run|dependency` trigger `nightly.py`, which still touches the opam switch named `ant`; expect the harmless “already installed switch” warning.
+- `make build|run|dependency` trigger `nightly.py`, which still touches the opam switch named `ant` for the compiler/Dune toolchain and dev tools; project dependencies are resolved through Dune package management.
 - Long `make` runs can timeout at 30 s unless explicitly requested with a longer timeout.
 - OCaml warnings (pattern-match exhaustiveness, unused rec) currently surface during builds; they are known noise unless you ask otherwise.
 - Files under `generated/` are rebuild artifacts; `make run` will overwrite them—avoid manual edits there.

@@ -39,18 +39,12 @@ def _resolve_switch() -> str:
 
 
 SWITCH = _resolve_switch()
-PACKAGES = [
-    "core",
+TOOLCHAIN_PACKAGES = [
     "dune",
-    "menhir",
-    "ppx_deriving",
-    "ppx_sexp_conv",
-    "yojson",
-    "core_unix",
-    "batteries",
-    "pprint",
-    "cmdliner",
-    "core_bench",
+]
+DEV_PACKAGES = [
+    "ocaml-lsp-server",
+    "ocamlformat",
 ]
 
 TOOLS_DIR = Path(__file__).resolve().parent / "tools"
@@ -145,7 +139,9 @@ def install_dependencies() -> None:
     ensure_switch()
     run(["opam", "update"])
     run(["opam", "upgrade", "--switch", SWITCH, "--fixup", "-y"])
-    run(["opam", "install", "--switch", SWITCH, "-y", *PACKAGES])
+    run(["opam", "install", "--switch", SWITCH, "-y", *TOOLCHAIN_PACKAGES])
+    run(["opam", "install", "--switch", SWITCH, "-y", *DEV_PACKAGES])
+    opam_exec(["dune", "pkg", "lock"])
 
 
 def build_project() -> None:
