@@ -121,10 +121,9 @@ let collect_from_reference (r : reference) (p : pattern) : value list =
       let ph, pt = pattern_front_exn p in
       match ph with
       | PVar n ->
-          if n = 0 then loop pt offset acc
-          else
-            let seg = Generic.singleton (Reference { r with offset = r.offset + offset; values_count = n }) in
-            loop pt (offset + n) (seg :: acc)
+          assert (n > 0);
+          let seg = Generic.singleton (Reference { r with offset = r.offset + offset; values_count = n }) in
+          loop pt (offset + n) (seg :: acc)
       | PCon c ->
           let d = max 0 (Words.max_degree c) in
           loop pt (offset + d) acc
