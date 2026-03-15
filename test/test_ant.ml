@@ -122,6 +122,68 @@ let () =
   let seq_match = compile_with CompileSeq.Backend.compile (frontend_example "AnfJoinMatch.ant") in
   assert (Core.String.is_substring seq_match ~substring:"match")
 
+let () =
+  let regmemo_if = compile_with CompileRegMemo.Backend.compile (frontend_prog "let f = fun x -> (if x then 1 else 2) + 3;;")
+  in
+  assert (Core.String.is_substring regmemo_if ~substring:"function f#");
+  assert (Core.String.is_substring regmemo_if ~substring:"branch");
+  assert (Core.String.is_substring regmemo_if ~substring:"jump");
+  let regmemo_global =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "type t = | A of int | B of int;; let x = (match A 1 with | A n -> n | B m -> m) + 1;;")
+  in
+  assert (Core.String.is_substring regmemo_global ~substring:"global x#");
+  assert (Core.String.is_substring regmemo_global ~substring:"match");
+  let regmemo_call =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "let g = fun y -> y;; let f = fun x -> g x;;")
+  in
+  assert (Core.String.is_substring regmemo_call ~substring:"call @g")
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info) ],
+                   Syntax.Let
+                     ( Syntax.BRecC
+                         [
+                           ( Syntax.PVar ("loop", info),
+                             Syntax.Lam
+                               ( [ Syntax.PVar ("y", info) ],
+                                 Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("y", info) ], info),
+                                 info ),
+                             info );
+                         ],
+                       Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("x", info) ], info),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let rendered = compile_with CompileRegMemo.Backend.compile prog in
+  assert (Core.String.is_substring rendered ~substring:"function f#");
+  assert (Core.String.is_substring rendered ~substring:"loop");
+  assert (Core.String.is_substring rendered ~substring:"jump")
+
+let () =
+  let info = SynInfo.empty_info in
+  let bad_prog =
+    ( [
+        Syntax.Term
+          (Syntax.BCont
+             (Syntax.PVar ("k", info), Syntax.Lam ([ Syntax.PVar ("x", info) ], Syntax.Var ("x", info), info), info));
+      ],
+      info )
+  in
+  expect_failure ~needle:"CompileRegMemo Phase 1 unsupported: top-level BCont" (fun () ->
+      ignore (compile_with CompileRegMemo.Backend.compile bad_prog))
+
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =
     let open M in
