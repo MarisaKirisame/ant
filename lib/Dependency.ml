@@ -77,6 +77,7 @@ let rec subst_value (s : value_subst_cek) (v : value) : value =
 let rec value_match_pattern_aux (v : value) (p : pattern) : value list option =
   (*assert (value_valid v);*)
   let return x = x in
+  assert ((Value.summary v).degree = (pattern_measure p).degree);
   (*assert ((Value.summary v).degree = (pattern_measure p).degree);
   assert ((Value.summary v).degree = (Value.summary v).max_degree);
   assert ((pattern_measure p).degree = (pattern_measure p).max_degree);*)
@@ -114,26 +115,11 @@ let rec pattern_to_value_aux (p : pattern) src (hole_idx : int ref) : value =
 
 let pattern_to_value (p : pattern cek) : value cek = maps_ek (fun p s -> pattern_to_value_aux p s (ref 0)) p
 
+type unification_rhs = Immediate of value | Defer of reference * pattern
 
-let collect_from_reference (r : reference) (p : pattern) : value list =
-  let rec loop p offset acc =
-    if pattern_is_empty p then []
-    else
-      let ph, pt = pattern_front_exn p in
-      match ph with
-      | PVar n ->
-          assert (n > 0);
-          let seg = Generic.singleton (Reference { r with offset = r.offset + offset; values_count = n }) in
-          seg :: (loop pt (offset + n))
-      | PCon c ->
-          let d = max 0 (Words.max_degree c) in
-          loop pt (offset + d)
-  in
-  loop p 0 []
-  
 (*todo: this code look a lot like value_match_pattern, is there ways to unify them?*)
 (*unify pattern and value, building a substituion map for pattern*)
-let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : value list =
+let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unification_rhs list =
   (*assert ((Value.summary v).degree = (pattern_measure p).degree);
   assert ((Value.summary v).degree = (Value.summary v).max_degree);
   assert ((pattern_measure p).degree = (pattern_measure p).max_degree);*)
@@ -146,11 +132,10 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : value l
     let ph, pt = pattern_front_exn p in
     match ph with
     | PVar ph ->
-        assert (ph = 1);
         let vh, vt = Value.pop_n v ph in
         (*assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
         assert ((Value.summary vh).degree = ph);*)
-        return (vh :: unify_vp_aux vt pt s)
+        return (Immediate vh :: unify_vp_aux vt pt s)
     | PCon ph -> (
         match Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v with
         | rest, Words w ->
@@ -172,6 +157,8 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : value l
                   return (unify_vp_aux rest pt s))
         | rest, Reference r ->
             let ph, pt = pattern_slice p r.values_count in
+            let old_ph = ph in
+            assert (r.values_count = (pattern_measure ph).degree);
             let sm = cek_get s r.src in
             let unify_with = Array.get sm r.hole_idx in
             (*assert ((pattern_measure ph).degree = (pattern_measure ph).max_degree);*)
@@ -184,9 +171,9 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : value l
               assert (Pattern.pattern_valid ph);
               assert (Pattern.pattern_valid hole_value);*)
             Array.set sm r.hole_idx hole_value;
-            return (unify_vp_aux rest pt s))
+            return (Defer (r, old_ph) :: unify_vp_aux rest pt s))
 
-let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek * value list cek =
+let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek * unification_rhs list cek =
   let x = zipwith_ek (fun v p -> unify_vp_aux v p s) v p in
   (s, x)
 
@@ -289,13 +276,6 @@ let compose_step (x : step) (y : step) : step =
       x.src sl
   in
   (* unify subst turn variables in y into variables in x, but we have to also apply the unification applied on x *)
-  let unify_subst : value_subst_cek =
-    maps_ek
-      (fun p s ->
-        print_endline (string_of_int (List.length p));
-        Array.of_list p)
-      sr
-  in
   let reshift_subst : value_subst_cek =
     maps_ek
       (fun p s ->
@@ -303,7 +283,35 @@ let compose_step (x : step) (y : step) : step =
         Array.map (fun p -> pattern_to_value_aux p s hole_idx) p)
       sl
   in
-  let dst = map_ek (subst_value reshift_subst) (map_ek (subst_value unify_subst) y.dst) in
+  let unify_subst : value_subst_cek =
+    zipwith_ek
+      (fun p ps ->
+        let p =
+          List.concat_map
+            (function
+              | Immediate imm -> [ subst_value reshift_subst imm ]
+              | Defer (x, y) ->
+                  assert (x.values_count == (pattern_measure y).degree);
+                  Option.get (value_match_pattern_aux (subst_value reshift_subst (Generic.singleton (Reference x))) y))
+            p
+        in
+        let ps = Generic.to_list ps in
+        let rec loop p ps =
+          match (p, ps) with
+          | [], [] -> []
+          | _, PCon _ :: ps -> loop p ps
+          | ph :: pt, PVar n :: ps ->
+              let pd = (Value.summary ph).degree in
+              if n > pd then
+                let (rh :: rt) = loop pt (PVar (n - pd) :: ps) in
+                Value.append ph rh :: rt
+              else if n < pd then failwith "todo1"
+              else ph :: loop pt ps
+        in
+        Array.of_list (loop p ps))
+      sr y.src
+  in
+  let dst = map_ek (subst_value unify_subst) y.dst in
   { src; dst; sc = x.sc + y.sc; hit = 0; insert_time = 0 }
 
 let make_step (value : state) (resolved : bool cek) m : step =
