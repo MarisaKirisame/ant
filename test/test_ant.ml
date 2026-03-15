@@ -1,5 +1,54 @@
 open Ant
 
+let parse content =
+  let lexbuf = Lexing.from_string content in
+  try Parser.prog Lexer.tokenize lexbuf with
+  | Parser.Error _ -> failwith "parse error in test fixture"
+  | Lexer.Error _ -> failwith "lex error in test fixture"
+
+let anf_string source =
+  source
+  |> parse
+  |> Typing.top_type_of_prog
+  |> Transform.anf_prog
+  |> Syntax.pp_prog
+  |> Syntax.string_of_document
+
+let () =
+  let anf = anf_string "let _ = (if true then 1 else 2) + 3;;" in
+  assert (Core.String.is_substring anf ~substring:"letcont");
+  assert (Core.String.is_substring anf ~substring:"jump")
+
+let () =
+  let anf =
+    anf_string
+      "type t = | A of int | B of int;;\nlet _ = (match A 1 with | A x -> x | B y -> y) + 1;;"
+  in
+  assert (Core.String.is_substring anf ~substring:"letcont");
+  assert (Core.String.is_substring anf ~substring:"jump")
+
+let () =
+  let anf = anf_string "let rec loop = fun x -> loop x;;" in
+  assert (Core.String.is_substring anf ~substring:"let rec loop")
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [ Syntax.Term
+          (Syntax.BRecC
+             [
+               ( Syntax.PVar ("j", info),
+                 Syntax.Lam
+                   ( [ Syntax.PVar ("x", info) ],
+                     Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info) ], info),
+                     info ),
+                 info );
+             ]) ],
+      info )
+  in
+  let rendered = Syntax.string_of_document (Syntax.pp_prog prog) in
+  assert (Core.String.is_substring rendered ~substring:"letcont rec")
+
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =
     let open M in

@@ -13,8 +13,8 @@ their responsibilities, and the data structures that make reuse possible.
    `GVar` before Hindley–Milner inference in `Typing.ml`/`Type.ml` annotates the
    program. Printers exposed through the CLI show either plain or level-aware
    types (`-t`, `-L`).
-3. **Normalisation** – `Transform.ml` performs CPS and defunctionalisation;
-   `Pat.ml` lowers pattern matches into decision trees.
+3. **Normalisation** – `Transform.ml` lowers typed programs into ANF and
+   introduces join points; `Pat.ml` lowers pattern matches into decision trees.
 4. **Backends** –
    - `CompileMemo.ml` emits the memoising CEK VM.
    - `CompileSeq.ml` emits a pure interpreter for comparison runs.
@@ -146,8 +146,7 @@ generalise reuse across different concrete inputs.
 
 ## Further Work
 
-- Document the CPS/defunctionalisation pipeline in more depth (closure capture,
-  free-variable handling) within `Transform.ml`.
+- Document the ANF/join-point pipeline in more depth within `Transform.ml`.
 - Add regression tests that exercise step composition (`Dependency.compose_step`)
   and the memo fast-forward path in `Memo.exec_cek`.
 - Explore pruning or indexing strategies for the step list to keep lookup costs

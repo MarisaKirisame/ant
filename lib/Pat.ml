@@ -341,6 +341,10 @@ let lower_pat_mat expr =
         let f = aux f in
         let args = List.map aux args in
         App (f, args, info)
+    | Jump (f, args, info) ->
+        let f = aux f in
+        let args = List.map aux args in
+        Jump (f, args, info)
     | Op (op, e1, e2, info) ->
         let e1 = aux e1 in
         let e2 = aux e2 in
@@ -358,10 +362,17 @@ let lower_pat_mat expr =
         let e1 = aux e1 in
         let e2 = aux e2 in
         Let (BOne (pat, e1, info), e2, info')
+    | Let (BCont (pat, e1, info), e2, info') ->
+        let _mat = make_single_mat pat in
+        let e1 = aux e1 in
+        let e2 = aux e2 in
+        Let (BCont (pat, e1, info), e2, info')
     | Let (BRec bindings, e2, info) ->
         (* TODO *)
         Let (BRec (List.map (fun (pat, e1, info) -> (pat, aux e1, info)) bindings), aux e2, info)
-    | Let _ -> assert false
+    | Let (BRecC bindings, e2, info) ->
+        (* TODO *)
+        Let (BRecC (List.map (fun (pat, e1, info) -> (pat, aux e1, info)) bindings), aux e2, info)
     | Sel (e, fld, info) -> Sel (e, fld, info)
     | If (c, e1, e2, info) -> If (aux c, aux e1, aux e2, info)
     | Match (e, MatchPattern cases, info) ->
@@ -376,7 +387,7 @@ let lower_pat_mat expr =
 let collect_pat_mat expr =
   let rec aux acc = function
     | Unit | Bool _ | Int _ | Float _ | Str _ | Builtin _ | Var _ | GVar _ | Ctor _ -> List.rev acc
-    | App (f, args, _) ->
+    | App (f, args, _) | Jump (f, args, _) ->
         let acc = aux acc f in
         List.fold_left aux acc args
     | Op (_, e1, e2, _) ->
@@ -388,12 +399,12 @@ let collect_pat_mat expr =
     | Let (BSeq (e1, _), e2, _) ->
         let acc = aux acc e1 in
         aux acc e2
-    | Let (BOne (pat, e1, _), e2, _) ->
+    | Let ((BOne (pat, e1, _) | BCont (pat, e1, _)), e2, _) ->
         let acc = aux acc e1 in
         let mat = make_mat [ pat ] [ 0 ] in
         let acc = mat :: acc in
         aux acc e2
-    | Let (BRec bindings, e2, _) ->
+    | Let ((BRec bindings | BRecC bindings), e2, _) ->
         let acc =
           List.fold_left
             (fun acc (pat, e1, _) ->
@@ -403,7 +414,6 @@ let collect_pat_mat expr =
             acc bindings
         in
         aux acc e2
-    | Let (_, e2, _) -> aux acc e2
     | Sel (e, _, _) -> aux acc e
     | If (c, e1, e2, _) ->
         let acc = aux acc c in
