@@ -114,9 +114,26 @@ let rec pattern_to_value_aux (p : pattern) src (hole_idx : int ref) : value =
 
 let pattern_to_value (p : pattern cek) : value cek = maps_ek (fun p s -> pattern_to_value_aux p s (ref 0)) p
 
+
+let collect_from_reference (r : reference) (p : pattern) : value list =
+  let rec loop p offset acc =
+    if pattern_is_empty p then []
+    else
+      let ph, pt = pattern_front_exn p in
+      match ph with
+      | PVar n ->
+          assert (n > 0);
+          let seg = Generic.singleton (Reference { r with offset = r.offset + offset; values_count = n }) in
+          seg :: (loop pt (offset + n))
+      | PCon c ->
+          let d = max 0 (Words.max_degree c) in
+          loop pt (offset + d)
+  in
+  loop p 0 []
+  
 (*todo: this code look a lot like value_match_pattern, is there ways to unify them?*)
 (*unify pattern and value, building a substituion map for pattern*)
-let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
+let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : value list =
   (*assert ((Value.summary v).degree = (pattern_measure p).degree);
   assert ((Value.summary v).degree = (Value.summary v).max_degree);
   assert ((pattern_measure p).degree = (pattern_measure p).max_degree);*)
@@ -124,15 +141,16 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
   let return x = x in
   if pattern_is_empty p then (
     assert (Generic.is_empty v);
-    return ())
+    return [])
   else
     let ph, pt = pattern_front_exn p in
     match ph with
     | PVar ph ->
+        assert (ph = 1);
         let vh, vt = Value.pop_n v ph in
         (*assert ((Value.summary vh).degree = (Value.summary vh).max_degree);
         assert ((Value.summary vh).degree = ph);*)
-        return (unify_vp_aux vt pt s)
+        return (vh :: unify_vp_aux vt pt s)
     | PCon ph -> (
         match Generic.front_exn ~monoid:Value.monoid ~measure:Value.measure v with
         | rest, Words w ->
@@ -168,9 +186,9 @@ let rec unify_vp_aux (v : value) (p : pattern) (s : pattern_subst_cek) : unit =
             Array.set sm r.hole_idx hole_value;
             return (unify_vp_aux rest pt s))
 
-let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek =
-  let _ = zipwith_ek (fun v p -> unify_vp_aux v p s) v p in
-  s
+let unify_vp (v : value cek) (p : pattern cek) (s : pattern_subst_cek) : pattern_subst_cek * value list cek =
+  let x = zipwith_ek (fun v p -> unify_vp_aux v p s) v p in
+  (s, x)
 
 let value_match_pattern_ek_with (v : value cek) (p : pattern cek) (f : value * pattern -> value_subst_map option) =
   Option.bind (zip_ek v p) (fun vp -> option_ek_to_ek_option (map_ek f vp))
@@ -182,15 +200,9 @@ let can_step_through (step : step) (state : state) : bool =
   step.src.c.pc = state.c.pc && Option.is_some (value_match_pattern_ek state step.src)
 
 let step_through (step : step) (state : state) : state =
-  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
-  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) state in*)
-  let return x =
-    (*let _ = map_ek (fun v -> assert (Value.value_valid v)) x in*)
-    x
-  in
+  let return x = x in
   assert (step.src.c.pc = state.c.pc);
   let subst = Option.get (value_match_pattern_ek state step.src) in
-  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) step.dst in*)
   return (map_ek (subst_value subst) step.dst)
 
 let step_through_with_subst (step : step) (state : state) (subst_val : value Rev.t) : state =
@@ -243,10 +255,6 @@ let string_of_step (step : step) : string =
   "(" ^ string_of_cek src ^ " -> " ^ string_of_cek dst ^ ")"
 
 let compose_step_slot = Profile.register_slot Profile.memo_profile "compose_step"
-
-let compose_step_step_through_slot =
-  compose_step_slot (*Profile.register_slot Profile.memo_profile "compose_step.step_through"*)
-
 let unify_vp_slot = None (*Profile.register_slot Profile.memo_profile "unify_vp"*)
 
 let compose_step (x : step) (y : step) : step =
@@ -269,7 +277,7 @@ let compose_step (x : step) (y : step) : step =
     in
     Array.of_list (loop p)
   in
-  let s = Profile.with_slot unify_vp_slot (fun _ -> unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src)) in
+  let sl, sr = Profile.with_slot unify_vp_slot (fun _ -> unify_vp x.dst y.src (map_ek pattern_to_subst_map x.src)) in
   let src =
     zipwith_ek
       (fun p s ->
@@ -278,25 +286,24 @@ let compose_step (x : step) (y : step) : step =
         let ret = compose_pattern p (Array.to_list s) in
         (*assert (Pattern.pattern_valid ret);*)
         ret)
-      x.src s
+      x.src sl
   in
-  let subst : value_subst_cek =
+  (* unify subst turn variables in y into variables in x, but we have to also apply the unification applied on x *)
+  let unify_subst : value_subst_cek =
+    maps_ek
+      (fun p s ->
+        print_endline (string_of_int (List.length p));
+        Array.of_list p)
+      sr
+  in
+  let reshift_subst : value_subst_cek =
     maps_ek
       (fun p s ->
         let hole_idx = ref 0 in
         Array.map (fun p -> pattern_to_value_aux p s hole_idx) p)
-      s
+      sl
   in
-  let dst = map_ek (subst_value subst) x.dst in
-  (*if not (can_step_through y dst) then (
-    print_endline "cannot compose steps:";
-    print_endline ("generalized pattern: " ^ string_of_cek (pattern_to_value src));
-    print_endline ("x step: " ^ string_of_step x);
-    print_endline ("intermediate: " ^ string_of_cek dst);
-    print_endline ("y step: " ^ string_of_step y));
-  assert (can_step_through y dst);*)
-  let dst = Profile.with_slot compose_step_step_through_slot (fun _ -> step_through y dst) in
-  (*let _ = map_ek (fun v -> assert (Value.value_valid v)) dst in*)
+  let dst = map_ek (subst_value reshift_subst) (map_ek (subst_value unify_subst) y.dst) in
   { src; dst; sc = x.sc + y.sc; hit = 0; insert_time = 0 }
 
 let make_step (value : state) (resolved : bool cek) m : step =

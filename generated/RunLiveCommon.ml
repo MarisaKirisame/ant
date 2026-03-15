@@ -337,7 +337,7 @@ let quicksort_nexpr =
      greater = quicksort (filter (fun x -> x >= pivot) rest) in append smaller (pivot :: greater)"
 
 let quicksort_expr = expr_of_nexpr quicksort_nexpr
-let experiment_list_length = 400
+let experiment_list_length = 40
 let experiment_random_seed = 42
 let experiment_random_bound = 100
 
