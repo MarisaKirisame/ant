@@ -259,7 +259,7 @@ let compiled_unit_exn (ctx : cg_ctx) name =
   | Some unit_cg -> unit_cg
   | None -> failf "CompileRegMemo: unknown direct call target `%s`" name
 
-let dummy_value_ (ctx : cg_ctx) = from_constructor_ (ctor_tag_name ctx "cont_done")
+let dummy_value_ = memo_from_int_ (int_ 0)
 
 let operand_value_code (ctx : cg_ctx) (unit_cg : unit_codegen) (w : world code) = function
   | OLocal value_id -> get_env_slot_ w (int_ (slot_of_value unit_cg.allocation value_id))
@@ -501,13 +501,13 @@ let compile_jump_copy (ctx : cg_ctx) (unit_cg : unit_codegen) (block : block) su
   let moves = schedule_parallel_moves unit_cg.allocation.scratch_slot moves in
   seqs_of_writers (List.map (fun move -> fun () -> emit_move ctx unit_cg w move) moves)
 
-let compile_call_setup ctx callee w arg_values =
+let compile_call_setup _ctx callee w arg_values =
   let entry_layout = block_layout_exn callee.allocation callee.unit_ir.entry in
   if List.length entry_layout.param_slots <> List.length arg_values then
     failf "CompileRegMemo: direct call to `%s` expects %d args, got %d" callee.unit_ir.name
       (List.length entry_layout.param_slots) (List.length arg_values);
   [%seqs
-    init_frame_ w (int_ callee.allocation.frame_size) (dummy_value_ ctx);
+    init_frame_ w (int_ callee.allocation.frame_size) dummy_value_;
     seqs_ (List.map2 (fun slot value -> fun _ -> set_env_slot_ w (int_ slot) value) entry_layout.param_slots arg_values)]
 
 let rec compile_stmt_chain ctx unit_cg block current_pc w stmts stmt_afters term =
@@ -567,7 +567,7 @@ and compile_non_tail_call ctx unit_cg _block w dst callee arg_values live_after 
           [%seqs
             assert_env_length_ w (int_ 1);
             set_k_ w (get_next_cont_ tl);
-            init_frame_ w (int_ unit_cg.allocation.frame_size) (dummy_value_ ctx);
+            init_frame_ w (int_ unit_cg.allocation.frame_size) dummy_value_;
             restore_env_slots_ w (list_literal_of_ int_ keep_slots) tl;
             set_env_slot_ w (int_ dst_slot) ret;
             goto_ w resume_pc]));
@@ -651,17 +651,31 @@ let ctor_tag_decls ctx =
 let compile_unit_wrapper (ctx : cg_ctx) (unit_cg : unit_codegen) =
   let arg_count = List.length unit_cg.unit_ir.params in
   let args = List.init arg_count (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")) in
-  let arg_values = List.init arg_count (fun i -> string ("x" ^ string_of_int i)) in
+  let entry_layout = block_layout_exn unit_cg.allocation unit_cg.unit_ir.entry in
+  if List.length entry_layout.param_slots <> arg_count then
+    failf "CompileRegMemo: wrapper for `%s` expects %d args, got %d slots" unit_cg.unit_ir.name arg_count
+      (List.length entry_layout.param_slots);
+  let arg_inits =
+    List.map2
+      (fun slot i ->
+        string "Dynarray.set initial_env "
+        ^^ string (string_of_int slot)
+        ^^ space
+        ^^ string ("x" ^ string_of_int i)
+        ^^ semi)
+      entry_layout.param_slots (List.init arg_count Fun.id)
+  in
   let name = unit_cg.unit_ir.name in
   string "let " ^^ string name ^^ space ^^ string "memo"
   ^^ (if args = [] then empty else space ^^ separate space args)
-  ^^ string " : exec_result = " ^^ string "(exec_cek "
+  ^^ string " : exec_result =" ^^ hardline
+  ^^ string "  let initial_env = Dynarray.init "
+  ^^ string (string_of_int unit_cg.allocation.frame_size)
+  ^^ string " (fun _ -> " ^^ uncode dummy_value_ ^^ string ") in"
+  ^^ (if arg_inits = [] then empty else hardline ^^ separate_map hardline (fun doc -> string "  " ^^ doc) arg_inits)
+  ^^ hardline ^^ string "  exec_cek "
   ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int unit_cg.entry_pc) ^ "))")
-  ^^ string " (Dynarray.of_list ["
-  ^^ separate (string "; ") arg_values
-  ^^ string "]) " ^^ string "("
-  ^^ uncode (from_constructor_ (ctor_tag_name ctx "cont_done"))
-  ^^ string ") memo)"
+  ^^ string " initial_env (" ^^ uncode dummy_value_ ^^ string ") memo"
 
 let compile_type_stmt (ctx : cg_ctx) = function
   | Type (TBOne (_, Enum { ctors; _ }) as binding) ->

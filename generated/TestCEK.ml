@@ -26,7 +26,9 @@ let rec to_ocaml_int_list x =
   | _ -> failwith "unreachable"
 
 let list_incr memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 3)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 0 x0;
+  exec_cek (pc_to_exp (int_to_pc 3)) initial_env (Memo.from_int 0) memo
 
 let populate_state () =
   Memo.reset ();
@@ -40,7 +42,7 @@ let populate_state () =
           let ret_0 = get_env_slot w_4 0 in
           assert_env_length w_4 1;
           w_4.state.k <- get_next_cont tl_0;
-          init_frame w_4 2 (Memo.from_constructor tag_cont_done);
+          init_frame w_4 2 (Memo.from_int 0);
           restore_env_slots w_4 [ 1 ] tl_0;
           set_env_slot w_4 0 ret_0;
           w_4.state.c <- pc_to_exp (int_to_pc 4)
@@ -61,7 +63,7 @@ let populate_state () =
       let arg0_0 = get_env_slot w_1 0 in
       assert_env_length w_1 2;
       w_1.state.k <- Memo.appends [ Memo.from_constructor tag_cont_0; collect_env_slots w_1 [ 1 ]; w_1.state.k ];
-      init_frame w_1 2 (Memo.from_constructor tag_cont_done);
+      init_frame w_1 2 (Memo.from_int 0);
       set_env_slot w_1 0 arg0_0;
       w_1.state.c <- pc_to_exp (int_to_pc 3))
     2;

@@ -77,31 +77,53 @@ let rec to_ocaml_expr x =
   | _ -> failwith "unreachable"
 
 let var_rank memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 3)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 0 x0;
+  exec_cek (pc_to_exp (int_to_pc 3)) initial_env (Memo.from_int 0) memo
 
 let expr_rank memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 8)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 0 x0;
+  exec_cek (pc_to_exp (int_to_pc 8)) initial_env (Memo.from_int 0) memo
 
 let compare_expr memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 9)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 5 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 1 x0;
+  Dynarray.set initial_env 0 x1;
+  exec_cek (pc_to_exp (int_to_pc 9)) initial_env (Memo.from_int 0) memo
 
 let expr_equal memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 46)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 4 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 1 x0;
+  Dynarray.set initial_env 0 x1;
+  exec_cek (pc_to_exp (int_to_pc 46)) initial_env (Memo.from_int 0) memo
 
 let normalize memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 92)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 5 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 0 x0;
+  exec_cek (pc_to_exp (int_to_pc 92)) initial_env (Memo.from_int 0) memo
 
 let simplify_aux memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 93)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 1 x0;
+  exec_cek (pc_to_exp (int_to_pc 93)) initial_env (Memo.from_int 0) memo
 
 let diffx memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 102)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 3 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 0 x0;
+  exec_cek (pc_to_exp (int_to_pc 102)) initial_env (Memo.from_int 0) memo
 
 let eval memo (x0 : Value.seq) (x1 : Value.seq) (x2 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 109)) (Dynarray.of_list [ x0; x1; x2 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 4 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 2 x0;
+  Dynarray.set initial_env 0 x1;
+  Dynarray.set initial_env 1 x2;
+  exec_cek (pc_to_exp (int_to_pc 109)) initial_env (Memo.from_int 0) memo
 
 let main memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 110)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 0 x0;
+  exec_cek (pc_to_exp (int_to_pc 110)) initial_env (Memo.from_int 0) memo
 
 let populate_state () =
   Memo.reset ();
@@ -115,7 +137,7 @@ let populate_state () =
           let ret_0 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 1 ] tl_0;
           set_env_slot w_139 0 ret_0;
           w_139.state.c <- pc_to_exp (int_to_pc 112)
@@ -123,7 +145,7 @@ let populate_state () =
           let ret_1 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 0 ] tl_0;
           set_env_slot w_139 1 ret_1;
           w_139.state.c <- pc_to_exp (int_to_pc 111)
@@ -131,7 +153,7 @@ let populate_state () =
           let ret_2 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 2 ] tl_0;
           set_env_slot w_139 0 ret_2;
           w_139.state.c <- pc_to_exp (int_to_pc 114)
@@ -139,7 +161,7 @@ let populate_state () =
           let ret_3 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 1 ] tl_0;
           set_env_slot w_139 2 ret_3;
           w_139.state.c <- pc_to_exp (int_to_pc 113)
@@ -147,7 +169,7 @@ let populate_state () =
           let ret_4 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 2 ] tl_0;
           set_env_slot w_139 0 ret_4;
           w_139.state.c <- pc_to_exp (int_to_pc 116)
@@ -155,7 +177,7 @@ let populate_state () =
           let ret_5 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 1 ] tl_0;
           set_env_slot w_139 2 ret_5;
           w_139.state.c <- pc_to_exp (int_to_pc 115)
@@ -163,7 +185,7 @@ let populate_state () =
           let ret_6 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 2 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 2 (Memo.from_int 0);
           restore_env_slots w_139 [ 0 ] tl_0;
           set_env_slot w_139 1 ret_6;
           w_139.state.c <- pc_to_exp (int_to_pc 118)
@@ -171,7 +193,7 @@ let populate_state () =
           let ret_7 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 2 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 2 (Memo.from_int 0);
           restore_env_slots w_139 [ 1 ] tl_0;
           set_env_slot w_139 0 ret_7;
           w_139.state.c <- pc_to_exp (int_to_pc 117)
@@ -179,7 +201,7 @@ let populate_state () =
           let ret_8 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 1 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 1 (Memo.from_int 0);
           restore_env_slots w_139 [] tl_0;
           set_env_slot w_139 0 ret_8;
           w_139.state.c <- pc_to_exp (int_to_pc 120)
@@ -187,7 +209,7 @@ let populate_state () =
           let ret_9 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 1 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 1 (Memo.from_int 0);
           restore_env_slots w_139 [] tl_0;
           set_env_slot w_139 0 ret_9;
           w_139.state.c <- pc_to_exp (int_to_pc 119)
@@ -195,7 +217,7 @@ let populate_state () =
           let ret_10 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 3 ] tl_0;
           set_env_slot w_139 0 ret_10;
           w_139.state.c <- pc_to_exp (int_to_pc 122)
@@ -203,7 +225,7 @@ let populate_state () =
           let ret_11 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 1; 2 ] tl_0;
           set_env_slot w_139 3 ret_11;
           w_139.state.c <- pc_to_exp (int_to_pc 121)
@@ -211,7 +233,7 @@ let populate_state () =
           let ret_12 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 3 ] tl_0;
           set_env_slot w_139 0 ret_12;
           w_139.state.c <- pc_to_exp (int_to_pc 124)
@@ -219,7 +241,7 @@ let populate_state () =
           let ret_13 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 4 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 4 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 1; 2 ] tl_0;
           set_env_slot w_139 3 ret_13;
           w_139.state.c <- pc_to_exp (int_to_pc 123)
@@ -227,7 +249,7 @@ let populate_state () =
           let ret_14 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 2 ] tl_0;
           set_env_slot w_139 1 ret_14;
           w_139.state.c <- pc_to_exp (int_to_pc 127)
@@ -235,7 +257,7 @@ let populate_state () =
           let ret_15 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 0 ] tl_0;
           set_env_slot w_139 2 ret_15;
           w_139.state.c <- pc_to_exp (int_to_pc 126)
@@ -243,7 +265,7 @@ let populate_state () =
           let ret_16 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 1 ] tl_0;
           set_env_slot w_139 0 ret_16;
           w_139.state.c <- pc_to_exp (int_to_pc 125)
@@ -251,7 +273,7 @@ let populate_state () =
           let ret_17 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 2 ] tl_0;
           set_env_slot w_139 1 ret_17;
           w_139.state.c <- pc_to_exp (int_to_pc 129)
@@ -259,7 +281,7 @@ let populate_state () =
           let ret_18 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 2 ] tl_0;
           set_env_slot w_139 0 ret_18;
           w_139.state.c <- pc_to_exp (int_to_pc 128)
@@ -267,7 +289,7 @@ let populate_state () =
           let ret_19 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 1; 2 ] tl_0;
           set_env_slot w_139 3 ret_19;
           w_139.state.c <- pc_to_exp (int_to_pc 131)
@@ -275,7 +297,7 @@ let populate_state () =
           let ret_20 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 1 ] tl_0;
           set_env_slot w_139 2 ret_20;
           w_139.state.c <- pc_to_exp (int_to_pc 130)
@@ -283,7 +305,7 @@ let populate_state () =
           let ret_21 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 0 ] tl_0;
           set_env_slot w_139 1 ret_21;
           w_139.state.c <- pc_to_exp (int_to_pc 133)
@@ -291,7 +313,7 @@ let populate_state () =
           let ret_22 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 2 ] tl_0;
           set_env_slot w_139 0 ret_22;
           w_139.state.c <- pc_to_exp (int_to_pc 132)
@@ -299,7 +321,7 @@ let populate_state () =
           let ret_23 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 1 ] tl_0;
           set_env_slot w_139 2 ret_23;
           w_139.state.c <- pc_to_exp (int_to_pc 134)
@@ -307,7 +329,7 @@ let populate_state () =
           let ret_24 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 5 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 5 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 1 ] tl_0;
           set_env_slot w_139 2 ret_24;
           w_139.state.c <- pc_to_exp (int_to_pc 135)
@@ -315,7 +337,7 @@ let populate_state () =
           let ret_25 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 3 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 3 (Memo.from_int 0);
           restore_env_slots w_139 [ 1 ] tl_0;
           set_env_slot w_139 0 ret_25;
           w_139.state.c <- pc_to_exp (int_to_pc 137)
@@ -323,7 +345,7 @@ let populate_state () =
           let ret_26 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 3 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 3 (Memo.from_int 0);
           restore_env_slots w_139 [ 0 ] tl_0;
           set_env_slot w_139 1 ret_26;
           w_139.state.c <- pc_to_exp (int_to_pc 136)
@@ -331,7 +353,7 @@ let populate_state () =
           let ret_27 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 3 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 3 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 1 ] tl_0;
           set_env_slot w_139 2 ret_27;
           w_139.state.c <- pc_to_exp (int_to_pc 139)
@@ -339,7 +361,7 @@ let populate_state () =
           let ret_28 = get_env_slot w_139 0 in
           assert_env_length w_139 1;
           w_139.state.k <- get_next_cont tl_0;
-          init_frame w_139 3 (Memo.from_constructor tag_cont_done);
+          init_frame w_139 3 (Memo.from_int 0);
           restore_env_slots w_139 [ 0; 2 ] tl_0;
           set_env_slot w_139 1 ret_28;
           w_139.state.c <- pc_to_exp (int_to_pc 138)
@@ -431,7 +453,7 @@ let populate_state () =
       let arg0_21 = get_env_slot w_97 1 in
       assert_env_length w_97 5;
       w_97.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; collect_env_slots w_97 [ 0; 1 ]; w_97.state.k ];
-      init_frame w_97 1 (Memo.from_constructor tag_cont_done);
+      init_frame w_97 1 (Memo.from_int 0);
       set_env_slot w_97 0 arg0_21;
       w_97.state.c <- pc_to_exp (int_to_pc 8))
     9;
@@ -522,7 +544,7 @@ let populate_state () =
       let arg0_23 = get_env_slot w_109 1 in
       assert_env_length w_109 5;
       w_109.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; collect_env_slots w_109 [ 2 ]; w_109.state.k ];
-      init_frame w_109 1 (Memo.from_constructor tag_cont_done);
+      init_frame w_109 1 (Memo.from_int 0);
       set_env_slot w_109 0 arg0_23;
       w_109.state.c <- pc_to_exp (int_to_pc 3))
     19;
@@ -581,7 +603,7 @@ let populate_state () =
       assert_env_length w_117 5;
       w_117.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_23; collect_env_slots w_117 [ 0; 1 ]; w_117.state.k ];
-      init_frame w_117 5 (Memo.from_constructor tag_cont_done);
+      init_frame w_117 5 (Memo.from_int 0);
       set_env_slot w_117 1 arg0_25;
       set_env_slot w_117 0 arg1_10;
       w_117.state.c <- pc_to_exp (int_to_pc 9))
@@ -592,7 +614,7 @@ let populate_state () =
       let arg0_26 = get_env_slot w_119 1 in
       let arg1_11 = get_env_slot w_119 0 in
       assert_env_length w_119 5;
-      init_frame w_119 5 (Memo.from_constructor tag_cont_done);
+      init_frame w_119 5 (Memo.from_int 0);
       set_env_slot w_119 1 arg0_26;
       set_env_slot w_119 0 arg1_11;
       w_119.state.c <- pc_to_exp (int_to_pc 9))
@@ -630,7 +652,7 @@ let populate_state () =
       assert_env_length w_122 5;
       w_122.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_24; collect_env_slots w_122 [ 0; 1 ]; w_122.state.k ];
-      init_frame w_122 5 (Memo.from_constructor tag_cont_done);
+      init_frame w_122 5 (Memo.from_int 0);
       set_env_slot w_122 1 arg0_27;
       set_env_slot w_122 0 arg1_12;
       w_122.state.c <- pc_to_exp (int_to_pc 9))
@@ -641,7 +663,7 @@ let populate_state () =
       let arg0_28 = get_env_slot w_124 1 in
       let arg1_13 = get_env_slot w_124 0 in
       assert_env_length w_124 5;
-      init_frame w_124 5 (Memo.from_constructor tag_cont_done);
+      init_frame w_124 5 (Memo.from_int 0);
       set_env_slot w_124 1 arg0_28;
       set_env_slot w_124 0 arg1_13;
       w_124.state.c <- pc_to_exp (int_to_pc 9))
@@ -752,7 +774,7 @@ let populate_state () =
       let arg0_0 = get_env_slot w_3 1 in
       assert_env_length w_3 4;
       w_3.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; collect_env_slots w_3 [ 0 ]; w_3.state.k ];
-      init_frame w_3 1 (Memo.from_constructor tag_cont_done);
+      init_frame w_3 1 (Memo.from_int 0);
       set_env_slot w_3 0 arg0_0;
       w_3.state.c <- pc_to_exp (int_to_pc 3))
     37;
@@ -786,7 +808,7 @@ let populate_state () =
       let arg1_0 = get_env_slot w_8 3 in
       assert_env_length w_8 4;
       w_8.state.k <- Memo.appends [ Memo.from_constructor tag_cont_3; collect_env_slots w_8 [ 0; 1 ]; w_8.state.k ];
-      init_frame w_8 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_8 4 (Memo.from_int 0);
       set_env_slot w_8 1 arg0_2;
       set_env_slot w_8 0 arg1_0;
       w_8.state.c <- pc_to_exp (int_to_pc 46))
@@ -823,7 +845,7 @@ let populate_state () =
       let arg1_2 = get_env_slot w_13 3 in
       assert_env_length w_13 4;
       w_13.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; collect_env_slots w_13 [ 0; 1 ]; w_13.state.k ];
-      init_frame w_13 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_13 4 (Memo.from_int 0);
       set_env_slot w_13 1 arg0_4;
       set_env_slot w_13 0 arg1_2;
       w_13.state.c <- pc_to_exp (int_to_pc 46))
@@ -912,7 +934,7 @@ let populate_state () =
       let arg0_16 = get_env_slot w_45 0 in
       assert_env_length w_45 5;
       w_45.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; collect_env_slots w_45 [ 1 ]; w_45.state.k ];
-      init_frame w_45 5 (Memo.from_constructor tag_cont_done);
+      init_frame w_45 5 (Memo.from_int 0);
       set_env_slot w_45 0 arg0_16;
       w_45.state.c <- pc_to_exp (int_to_pc 92))
     49;
@@ -1387,7 +1409,7 @@ let populate_state () =
       let arg0_19 = get_env_slot w_90 0 in
       assert_env_length w_90 5;
       w_90.state.k <- Memo.appends [ Memo.from_constructor tag_cont_18; collect_env_slots w_90 [ 2 ]; w_90.state.k ];
-      init_frame w_90 5 (Memo.from_constructor tag_cont_done);
+      init_frame w_90 5 (Memo.from_int 0);
       set_env_slot w_90 0 arg0_19;
       w_90.state.c <- pc_to_exp (int_to_pc 92))
     91;
@@ -1438,7 +1460,7 @@ let populate_state () =
       let arg0_6 = get_env_slot w_19 1 in
       assert_env_length w_19 2;
       w_19.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; collect_env_slots w_19 [ 1 ]; w_19.state.k ];
-      init_frame w_19 5 (Memo.from_constructor tag_cont_done);
+      init_frame w_19 5 (Memo.from_int 0);
       set_env_slot w_19 0 arg0_6;
       w_19.state.c <- pc_to_exp (int_to_pc 92))
     93;
@@ -1452,7 +1474,7 @@ let populate_state () =
       assert_env_length w_23 2;
       let arg0_8 = get_env_slot w_23 0 in
       assert_env_length w_23 2;
-      init_frame w_23 2 (Memo.from_constructor tag_cont_done);
+      init_frame w_23 2 (Memo.from_int 0);
       set_env_slot w_23 1 arg0_8;
       w_23.state.c <- pc_to_exp (int_to_pc 93))
     95;
@@ -1496,7 +1518,7 @@ let populate_state () =
       let arg0_29 = get_env_slot w_132 1 in
       assert_env_length w_132 3;
       w_132.state.k <- Memo.appends [ Memo.from_constructor tag_cont_26; collect_env_slots w_132 [ 0 ]; w_132.state.k ];
-      init_frame w_132 3 (Memo.from_constructor tag_cont_done);
+      init_frame w_132 3 (Memo.from_int 0);
       set_env_slot w_132 0 arg0_29;
       w_132.state.c <- pc_to_exp (int_to_pc 102))
     100;
@@ -1507,7 +1529,7 @@ let populate_state () =
       assert_env_length w_135 3;
       w_135.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_28; collect_env_slots w_135 [ 0; 2 ]; w_135.state.k ];
-      init_frame w_135 3 (Memo.from_constructor tag_cont_done);
+      init_frame w_135 3 (Memo.from_int 0);
       set_env_slot w_135 0 arg0_31;
       w_135.state.c <- pc_to_exp (int_to_pc 102))
     101;
@@ -1590,7 +1612,7 @@ let populate_state () =
       assert_env_length w_31 4;
       w_31.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_11; collect_env_slots w_31 [ 0; 1; 2 ]; w_31.state.k ];
-      init_frame w_31 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_31 4 (Memo.from_int 0);
       set_env_slot w_31 2 arg0_12;
       set_env_slot w_31 0 arg1_5;
       set_env_slot w_31 1 arg2_0;
@@ -1605,7 +1627,7 @@ let populate_state () =
       assert_env_length w_34 4;
       w_34.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_13; collect_env_slots w_34 [ 0; 1; 2 ]; w_34.state.k ];
-      init_frame w_34 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_34 4 (Memo.from_int 0);
       set_env_slot w_34 2 arg0_14;
       set_env_slot w_34 0 arg1_7;
       set_env_slot w_34 1 arg2_2;
@@ -1660,7 +1682,7 @@ let populate_state () =
       let arg0_9 = get_env_slot w_24 0 in
       assert_env_length w_24 1;
       w_24.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; collect_env_slots w_24 []; w_24.state.k ];
-      init_frame w_24 3 (Memo.from_constructor tag_cont_done);
+      init_frame w_24 3 (Memo.from_int 0);
       set_env_slot w_24 0 arg0_9;
       w_24.state.c <- pc_to_exp (int_to_pc 102))
     110;
@@ -1670,7 +1692,7 @@ let populate_state () =
       let arg0_1 = get_env_slot w_4 0 in
       assert_env_length w_4 4;
       w_4.state.k <- Memo.appends [ Memo.from_constructor tag_cont_0; collect_env_slots w_4 [ 1 ]; w_4.state.k ];
-      init_frame w_4 1 (Memo.from_constructor tag_cont_done);
+      init_frame w_4 1 (Memo.from_int 0);
       set_env_slot w_4 0 arg0_1;
       w_4.state.c <- pc_to_exp (int_to_pc 3))
     111;
@@ -1690,7 +1712,7 @@ let populate_state () =
       let arg1_1 = get_env_slot w_9 0 in
       assert_env_length w_9 4;
       w_9.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; collect_env_slots w_9 [ 2 ]; w_9.state.k ];
-      init_frame w_9 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_9 4 (Memo.from_int 0);
       set_env_slot w_9 1 arg0_3;
       set_env_slot w_9 0 arg1_1;
       w_9.state.c <- pc_to_exp (int_to_pc 46))
@@ -1711,7 +1733,7 @@ let populate_state () =
       let arg1_3 = get_env_slot w_14 0 in
       assert_env_length w_14 4;
       w_14.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; collect_env_slots w_14 [ 2 ]; w_14.state.k ];
-      init_frame w_14 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_14 4 (Memo.from_int 0);
       set_env_slot w_14 1 arg0_5;
       set_env_slot w_14 0 arg1_3;
       w_14.state.c <- pc_to_exp (int_to_pc 46))
@@ -1732,7 +1754,7 @@ let populate_state () =
       let arg1_4 = get_env_slot w_20 0 in
       assert_env_length w_20 2;
       w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; collect_env_slots w_20 [ 0 ]; w_20.state.k ];
-      init_frame w_20 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_20 4 (Memo.from_int 0);
       set_env_slot w_20 1 arg0_7;
       set_env_slot w_20 0 arg1_4;
       w_20.state.c <- pc_to_exp (int_to_pc 46))
@@ -1749,7 +1771,7 @@ let populate_state () =
       let arg0_10 = get_env_slot w_25 0 in
       assert_env_length w_25 1;
       w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; collect_env_slots w_25 []; w_25.state.k ];
-      init_frame w_25 3 (Memo.from_constructor tag_cont_done);
+      init_frame w_25 3 (Memo.from_int 0);
       set_env_slot w_25 0 arg0_10;
       w_25.state.c <- pc_to_exp (int_to_pc 102))
     119;
@@ -1758,7 +1780,7 @@ let populate_state () =
       assert_env_length w_26 1;
       let arg0_11 = get_env_slot w_26 0 in
       assert_env_length w_26 1;
-      init_frame w_26 2 (Memo.from_constructor tag_cont_done);
+      init_frame w_26 2 (Memo.from_int 0);
       set_env_slot w_26 1 arg0_11;
       w_26.state.c <- pc_to_exp (int_to_pc 93))
     120;
@@ -1770,7 +1792,7 @@ let populate_state () =
       let arg2_1 = get_env_slot w_32 1 in
       assert_env_length w_32 4;
       w_32.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; collect_env_slots w_32 [ 3 ]; w_32.state.k ];
-      init_frame w_32 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_32 4 (Memo.from_int 0);
       set_env_slot w_32 2 arg0_13;
       set_env_slot w_32 0 arg1_6;
       set_env_slot w_32 1 arg2_1;
@@ -1793,7 +1815,7 @@ let populate_state () =
       let arg2_3 = get_env_slot w_35 1 in
       assert_env_length w_35 4;
       w_35.state.k <- Memo.appends [ Memo.from_constructor tag_cont_12; collect_env_slots w_35 [ 3 ]; w_35.state.k ];
-      init_frame w_35 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_35 4 (Memo.from_int 0);
       set_env_slot w_35 2 arg0_15;
       set_env_slot w_35 0 arg1_8;
       set_env_slot w_35 1 arg2_3;
@@ -1814,7 +1836,7 @@ let populate_state () =
       let arg0_17 = get_env_slot w_46 1 in
       assert_env_length w_46 5;
       w_46.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; collect_env_slots w_46 [ 0 ]; w_46.state.k ];
-      init_frame w_46 5 (Memo.from_constructor tag_cont_done);
+      init_frame w_46 5 (Memo.from_int 0);
       set_env_slot w_46 0 arg0_17;
       w_46.state.c <- pc_to_exp (int_to_pc 92))
     125;
@@ -1825,7 +1847,7 @@ let populate_state () =
       let arg1_9 = get_env_slot w_47 2 in
       assert_env_length w_47 5;
       w_47.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; collect_env_slots w_47 [ 0; 2 ]; w_47.state.k ];
-      init_frame w_47 4 (Memo.from_constructor tag_cont_done);
+      init_frame w_47 4 (Memo.from_int 0);
       set_env_slot w_47 1 arg0_18;
       set_env_slot w_47 0 arg1_9;
       w_47.state.c <- pc_to_exp (int_to_pc 46))
@@ -1842,7 +1864,7 @@ let populate_state () =
       let arg0_20 = get_env_slot w_91 2 in
       assert_env_length w_91 5;
       w_91.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; collect_env_slots w_91 [ 0; 2 ]; w_91.state.k ];
-      init_frame w_91 5 (Memo.from_constructor tag_cont_done);
+      init_frame w_91 5 (Memo.from_int 0);
       set_env_slot w_91 0 arg0_20;
       w_91.state.c <- pc_to_exp (int_to_pc 92))
     128;
@@ -1880,7 +1902,7 @@ let populate_state () =
       assert_env_length w_98 5;
       w_98.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_19; collect_env_slots w_98 [ 0; 1; 2 ]; w_98.state.k ];
-      init_frame w_98 1 (Memo.from_constructor tag_cont_done);
+      init_frame w_98 1 (Memo.from_int 0);
       set_env_slot w_98 0 arg0_22;
       w_98.state.c <- pc_to_exp (int_to_pc 8))
     130;
@@ -1900,7 +1922,7 @@ let populate_state () =
       let arg0_24 = get_env_slot w_110 2 in
       assert_env_length w_110 5;
       w_110.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; collect_env_slots w_110 [ 0 ]; w_110.state.k ];
-      init_frame w_110 1 (Memo.from_constructor tag_cont_done);
+      init_frame w_110 1 (Memo.from_int 0);
       set_env_slot w_110 0 arg0_24;
       w_110.state.c <- pc_to_exp (int_to_pc 3))
     132;
@@ -1940,7 +1962,7 @@ let populate_state () =
       let arg0_30 = get_env_slot w_133 0 in
       assert_env_length w_133 3;
       w_133.state.k <- Memo.appends [ Memo.from_constructor tag_cont_25; collect_env_slots w_133 [ 1 ]; w_133.state.k ];
-      init_frame w_133 3 (Memo.from_constructor tag_cont_done);
+      init_frame w_133 3 (Memo.from_int 0);
       set_env_slot w_133 0 arg0_30;
       w_133.state.c <- pc_to_exp (int_to_pc 102))
     136;
@@ -1960,7 +1982,7 @@ let populate_state () =
       assert_env_length w_136 3;
       w_136.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_27; collect_env_slots w_136 [ 0; 1 ]; w_136.state.k ];
-      init_frame w_136 3 (Memo.from_constructor tag_cont_done);
+      init_frame w_136 3 (Memo.from_int 0);
       set_env_slot w_136 0 arg0_32;
       w_136.state.c <- pc_to_exp (int_to_pc 102))
     138;

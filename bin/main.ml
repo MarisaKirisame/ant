@@ -59,7 +59,7 @@ let backend =
   let doc = "Backend used to compile the ant source, defaulting to memo" in
   let cdds =
     [
-      ("memo", (module CompileMemo.Backend : Compile.Backend));
+      ("memo", (module CompileRegMemo.Backend : Compile.Backend));
       ("regmemo", (module CompileRegMemo.Backend : Compile.Backend));
       ("seq", (module CompileSeq.Backend : Compile.Backend));
       ("plain", (module CompilePlain.Backend));

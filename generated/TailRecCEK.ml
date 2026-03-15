@@ -25,7 +25,10 @@ let rec to_ocaml_int_list x =
   | _ -> failwith "unreachable"
 
 let sum memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 3)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+  let initial_env = Dynarray.init 3 (fun _ -> Memo.from_int 0) in
+  Dynarray.set initial_env 1 x0;
+  Dynarray.set initial_env 0 x1;
+  exec_cek (pc_to_exp (int_to_pc 3)) initial_env (Memo.from_int 0) memo
 
 let populate_state () =
   Memo.reset ();
@@ -51,7 +54,7 @@ let populate_state () =
       let arg0_0 = get_env_slot w_1 1 in
       let arg1_0 = get_env_slot w_1 0 in
       assert_env_length w_1 3;
-      init_frame w_1 3 (Memo.from_constructor tag_cont_done);
+      init_frame w_1 3 (Memo.from_int 0);
       set_env_slot w_1 1 arg0_0;
       set_env_slot w_1 0 arg1_0;
       w_1.state.c <- pc_to_exp (int_to_pc 3))
