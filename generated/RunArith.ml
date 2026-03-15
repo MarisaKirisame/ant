@@ -126,7 +126,7 @@ let eval_main_expr_with_details expr =
     Ant.Profile.with_slot main_cek_slot (fun () ->
         LC.to_ocaml_expr
           (Memo.exec_cek_raw
-             (Memo.pc_to_exp (Ant.Common.int_to_pc 22))
+             (Memo.pc_to_exp (Ant.Common.int_to_pc 94))
              (Dynarray.of_list [ seq_expr ])
              (Memo.from_constructor LC.tag_cont_done)))
   in
@@ -160,16 +160,15 @@ let rec make_term size =
 let run_bench_cases () =
   let cases =
     [
-      ("rand-100", 1000);
-      ("rand-200", 2000);
-      ("rand-300", 3000);
-      ("rand-400", 4000);
-      ("rand-500", 5000);
-      ("rand-600", 6000);
-      ("rand-700", 7000);
-      ("rand-800", 8000);
-      ("rand-900", 9000);
-      ("rand-1000", 10000);
+      ("rand-100", 100);
+      ("rand-200", 200);
+      ("rand-300", 300);
+      ("rand-400", 400);
+      ("rand-500", 500);
+      ("rand-600", 600);
+      ("rand-700", 700);
+      ("rand-800", 800);
+      ("rand-900", 900);
     ]
   in
   List.iter
