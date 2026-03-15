@@ -269,7 +269,7 @@ def _arith_experiments() -> list[tuple[str, Path, Path]]:
 
 def _asymptotics_experiments() -> list[tuple[str, Path, Path]]:
     result = list()
-    for program in ["map", "append", "filter", "reverse", "pair", "insertion_sort", "merge_sort"]: # Reminder: Add quick_sort
+    for program in ["map", "append", "simple_filter", "reverse", "pair", "insertion_sort", "merge_sort"]: # Reminder: Add quick_sort
         for list_type in ["random", "low_entropy", "mod", "repeated"]:
             result.append((f"{program}-{list_type}", Path(f"eval_steps_asymptotic_{program}_{list_type}.json"), Path(f"output/asymptotics_{program}_{list_type}")))
     return result
