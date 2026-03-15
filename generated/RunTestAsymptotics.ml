@@ -13,6 +13,8 @@ module SimpleFilterCEK = SimpleFilterCEK
 module SimpleFilterPlain = SimpleFilterPlain
 module PairCEK = PairCEK
 module PairPlain = PairPlain
+module QuickSortCEK = QuickSortCEK
+module QuickSortPlain = QuickSortPlain
 module Word = Ant.Word.Word
 
 let rec list_to_string_test_cek l = match l with TestCEK.Nil -> "[]" | TestCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_test_cek tl
@@ -22,6 +24,7 @@ let rec list_to_string_merge_sort_cek l = match l with MergeSortCEK.Nil -> "[]" 
 let rec list_to_string_reverse_cek l = match l with ReverseCEK.Nil -> "[]" | ReverseCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_reverse_cek tl
 let rec list_to_string_simple_filter_cek l = match l with SimpleFilterCEK.Nil -> "[]" | SimpleFilterCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_simple_filter_cek tl
 let rec list_to_string_pair_cek l = match l with PairCEK.NilP -> "[]" | PairCEK.ConsP (a, b, tl) -> "(" ^ string_of_int a ^ ", " ^ string_of_int b ^ ") :: " ^ list_to_string_pair_cek tl
+let rec list_to_string_quick_sort_cek l = match l with QuickSortCEK.Nil -> "[]" | QuickSortCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_quick_sort_cek tl
 
 let rec int_list_test_cek_of_list = function [] -> TestCEK.Nil | x :: xs -> TestCEK.Cons (x, int_list_test_cek_of_list xs)
 let rec int_list_test_plain_of_list = function [] -> TestPlain.Nil | x :: xs -> TestPlain.Cons (x, int_list_test_plain_of_list xs)
@@ -38,7 +41,7 @@ let rec int_list_simple_filter_plain_of_list = function [] -> SimpleFilterPlain.
 let rec int_list_pair_cek_of_list = function [] -> PairCEK.Nil | x :: xs -> PairCEK.Cons (x, int_list_pair_cek_of_list xs)
 let rec int_list_pair_plain_of_list = function [] -> PairPlain.Nil | x :: xs -> PairPlain.Cons (x, int_list_pair_plain_of_list xs)
 
-let length = 65536
+let length = 256
 
 (* Random, without structure *)
 let random_input =
@@ -294,7 +297,7 @@ let run () =
         ~memo
         ~label
         ~filename
-        ~entry_pc:4
+        ~entry_pc:5
         ~tag_cont_done:InsertionSortCEK.tag_cont_done
         ~cek_args:[ cek_list ]
         ~run_memo:(fun memo -> InsertionSortCEK.insertion_sort memo cek_list)
@@ -308,7 +311,7 @@ let run () =
         run_case
           ~memo
           ~label:"Random before remove"
-          ~entry_pc:4
+          ~entry_pc:5
           ~tag_cont_done:InsertionSortCEK.tag_cont_done
           ~cek_args:[ cek_list ]
           ~run_memo:(fun memo -> InsertionSortCEK.insertion_sort memo cek_list)
@@ -328,7 +331,7 @@ let run () =
         ~memo
         ~label
         ~filename
-        ~entry_pc:10
+        ~entry_pc:11
         ~tag_cont_done:MergeSortCEK.tag_cont_done
         ~cek_args:[ cek_list ]
         ~run_memo:(fun memo -> MergeSortCEK.mergesort memo cek_list)
@@ -342,7 +345,7 @@ let run () =
         run_case
           ~memo
           ~label:"Random before remove"
-          ~entry_pc:10
+          ~entry_pc:11
           ~tag_cont_done:MergeSortCEK.tag_cont_done
           ~cek_args:[ cek_list ]
           ~run_memo:(fun memo -> MergeSortCEK.mergesort memo cek_list)
