@@ -1,17 +1,29 @@
 (library
  (name runmodes)
  (modules
+  AppendCEK
+  AppendPlain
   FromHazel
   HazelAppend
   HazelFilter
   HazelMap
   HazelQS
   HazelIsSorted
+  InsertionSortCEK
+  InsertionSortPlain
   LiveCEK
   LivePlain
   LiveLexer
   LiveParser
+  MergeSortCEK
+  MergeSortPlain
   NamedExpr
+  PairCEK
+  PairPlain
+  QuickSortCEK
+  QuickSortPlain
+  ReverseCEK
+  ReversePlain
   RunLiveAsymptotics
   RunLiveCommon
   RunLiveSimple
@@ -19,6 +31,8 @@
   RunLiveListExtend
   RunLiveDemandDriven
   RunTestAsymptotics
+  SimpleFilterCEK
+  SimpleFilterPlain
   TailRecCEK
   TestCEK
   TestPlain

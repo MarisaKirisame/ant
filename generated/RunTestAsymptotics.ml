@@ -49,7 +49,7 @@ let low_entropy_input =
 
 let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries)
 
-let run_case ~memo label xs =
+let run_case_test ~memo label xs =
   let cek_list = TestCEK.from_ocaml_int_list (int_list_cek_of_list xs) in
   let plain_list = int_list_plain_of_list xs in
   (* Memo *)
@@ -113,8 +113,8 @@ let write_steps_json oc memo_step without_memo_step memo_json cek_json plain_jso
   output_char oc '\n';
   flush oc
 
-let run_case_then_write memo name xs filename =
-  let (memo_steps, without_memo_steps, memo_json, cek_json, plain_json) = run_case ~memo name xs in
+let run_case_test_then_write memo name xs filename =
+  let (memo_steps, without_memo_steps, memo_json, cek_json, plain_json) = run_case_test ~memo name xs in
   RunLiveCommon.with_outchannel filename (fun oc ->
     write_steps_json oc memo_steps without_memo_steps memo_json cek_json plain_json;
     RunLiveCommon.write_memo_stats_json oc memo
@@ -124,20 +124,20 @@ let run_case_then_write memo name xs filename =
 let run () =
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let (random_ns_memo, random_ns_cek) = run_case_then_write memo "Random" random_input "eval_steps_asymptotic_random.json" in
+  let (random_ns_memo, random_ns_cek) = run_case_test_then_write memo "Random" random_input "eval_steps_asymptotic_random.json" in
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let (low_entropy_ns_memo, low_entropy_ns_cek) = run_case_then_write memo "Low entropy" low_entropy_input "eval_steps_asymptotic_low_entropy.json" in
+  let (low_entropy_ns_memo, low_entropy_ns_cek) = run_case_test_then_write memo "Low entropy" low_entropy_input "eval_steps_asymptotic_low_entropy.json" in
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let (repeated_ns_memo, repeated_ns_cek) = run_case_then_write memo "Repeated" repeated_input "eval_steps_asymptotic_repeated.json" in
+  let (repeated_ns_memo, repeated_ns_cek) = run_case_test_then_write memo "Repeated" repeated_input "eval_steps_asymptotic_repeated.json" in
 
   TestCEK.populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let _ = run_case ~memo "Random before remove" random_input in
-  let (mod_ns_memo, mod_ns_cek) = run_case_then_write memo "Random after remove" random_input_removed "eval_steps_asymptotic_mod.json" in
+  let _ = run_case_test ~memo "Random before remove" random_input in
+  let (mod_ns_memo, mod_ns_cek) = run_case_test_then_write memo "Random after remove" random_input_removed "eval_steps_asymptotic_mod.json" in
 
   Printf.printf
 {|\begin{tabular}{c|c|c|c|c}

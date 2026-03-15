@@ -1,0 +1,74 @@
+open Ant
+open Word
+open Memo
+open Value
+open Common
+let tag_cont_done = 0
+let tag_Nil = 1
+let tag_Cons = 2
+let tag_P = 3
+let tag_cont_1 = 4
+let tag_cont_2 = 5
+let tag_cont_3 = 6
+let tag_cont_4 = 7
+let tag_cont_5 = 8
+let tag_cont_6 = 9
+type int_list =
+| Nil
+| Cons of int * int_list
+let rec from_ocaml_int_list x =
+  match x with
+  | Nil ->
+    Memo.appends [Memo.from_constructor tag_Nil]
+  | Cons (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_Cons; (Memo.from_int x0); from_ocaml_int_list x1]
+let rec to_ocaml_int_list x =
+  let h, t = Option.get (Memo.list_match x) in
+  match Word.get_value h with| 1 (* tag_Nil *) ->
+    Nil| 2 (* tag_Cons *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    Cons ((Word.get_value (Memo.to_word x0)), to_ocaml_int_list x1)
+  | _ -> failwith "unreachable"
+type pair_int_lists =
+| P of int_list * int_list
+let rec from_ocaml_pair_int_lists x =
+  match x with
+  | P (x0, x1) ->
+    Memo.appends [Memo.from_constructor tag_P; from_ocaml_int_list x0; from_ocaml_int_list x1]
+let rec to_ocaml_pair_int_lists x =
+  let h, t = Option.get (Memo.list_match x) in
+  match Word.get_value h with| 3 (* tag_P *) ->
+    let (x0, x1) = Memo.splits_2 t in
+    P (to_ocaml_int_list x0, to_ocaml_int_list x1)
+  | _ -> failwith "unreachable"
+let rec my_split_aux memo (x0 : Value.seq) (x1 : Value.seq): exec_result = (exec_cek (pc_to_exp (int_to_pc 1))(Dynarray.of_list[(x0);(x1)])((Memo.from_constructor tag_cont_done)) memo)
+let rec my_split memo (x0 : Value.seq): exec_result = (exec_cek (pc_to_exp (int_to_pc 5))(Dynarray.of_list[(x0)])((Memo.from_constructor tag_cont_done)) memo)
+let rec my_merge memo (x0 : Value.seq) (x1 : Value.seq): exec_result = (exec_cek (pc_to_exp (int_to_pc 6))(Dynarray.of_list[(x0);(x1)])((Memo.from_constructor tag_cont_done)) memo)
+let rec mergesort memo (x0 : Value.seq): exec_result = (exec_cek (pc_to_exp (int_to_pc 10))(Dynarray.of_list[(x0)])((Memo.from_constructor tag_cont_done)) memo)
+let populate_state () =
+  Memo.reset ();
+  Words.reset ();add_exp (fun w_12 -> ((assert_env_length w_12 1);let (hd_0, tl_0) = (resolve w_12 K) in (match (Word.get_value hd_0) with | 0 (* tag_cont_done *) -> (exec_done w_12)| 4 (* tag_cont_1 *) -> (((w_12.state).k <- (get_next_cont tl_0));(restore_env w_12 1 tl_0);((w_12.state).c <- (pc_to_exp (int_to_pc 13))))| 5 (* tag_cont_2 *) -> (((w_12.state).k <- (get_next_cont tl_0));(restore_env w_12 1 tl_0);(assert_env_length w_12 2);let ctor_arg_10 = (pop_env w_12) in let ctor_arg_11 = (pop_env w_12) in ((push_env w_12 (Memo.appends [(Memo.from_constructor tag_Cons);ctor_arg_11;ctor_arg_10]));(if_kont_0 ())))| 6 (* tag_cont_3 *) -> (((w_12.state).k <- (get_next_cont tl_0));(restore_env w_12 1 tl_0);(assert_env_length w_12 2);let ctor_arg_12 = (pop_env w_12) in let ctor_arg_13 = (pop_env w_12) in ((push_env w_12 (Memo.appends [(Memo.from_constructor tag_Cons);ctor_arg_13;ctor_arg_12]));(if_kont_0 ())))| 7 (* tag_cont_4 *) -> (((w_12.state).k <- (get_next_cont tl_0));(restore_env w_12 0 tl_0);((w_12.state).c <- (pc_to_exp (int_to_pc 14))))| 8 (* tag_cont_5 *) -> (((w_12.state).k <- (get_next_cont tl_0));(restore_env w_12 1 tl_0);(assert_env_length w_12 2);(push_env w_12 (Dynarray.get ((w_12.state).e) 0));(assert_env_length w_12 3);let keep_5 = (env_call w_12 [1] 1) in ((w_12.state).k <- (Memo.appends [(Memo.from_constructor tag_cont_6);keep_5;((w_12.state).k)]));((w_12.state).c <- (pc_to_exp (int_to_pc 10))))| 9 (* tag_cont_6 *) -> (((w_12.state).k <- (get_next_cont tl_0));(restore_env w_12 1 tl_0);(assert_env_length w_12 2);(ignore (env_call w_12 [] 2));((w_12.state).c <- (pc_to_exp (int_to_pc 6))))| _ -> failwith "unreachable (0)"))) 0;
+add_exp (fun w_0 -> ((assert_env_length w_0 2);(push_env w_0 (Dynarray.get ((w_0.state).e) 1));((w_0.state).c <- (pc_to_exp (int_to_pc 4))))) 1;
+add_exp (fun w_3 -> ((assert_env_length w_3 7);let last_2 = (Source.E 6) in let x_2 = (resolve w_3 last_2) in (match (Word.get_value (fst x_2)) with | 1 (* tag_Nil *) -> ((ignore (pop_env w_3));(assert_env_length w_3 6);(push_env w_3 (Memo.from_constructor tag_Nil));(assert_env_length w_3 7);(push_env w_3 (Memo.from_constructor tag_Nil));(assert_env_length w_3 8);let ctor_arg_4 = (pop_env w_3) in let ctor_arg_5 = (pop_env w_3) in ((push_env w_3 (Memo.appends [(Memo.from_constructor tag_P);ctor_arg_5;ctor_arg_4]));(assert_env_length w_3 7);(drop_n w_3 7 2);(assert_env_length w_3 5);(drop_n w_3 5 2);(assert_env_length w_3 3);(return_n w_3 3 (pc_to_exp (int_to_pc 0)))))| 2 (* tag_Cons *) -> let splits_2 = (Memo.splits (snd x_2)) in let split0_2 = (List.nth splits_2 0) in let split1_2 = (List.nth splits_2 1) in ((ignore (pop_env w_3));(push_env w_3 split0_2);(push_env w_3 split1_2);(assert_env_length w_3 8);(push_env w_3 (Dynarray.get ((w_3.state).e) 7));(assert_env_length w_3 9);(push_env w_3 (Dynarray.get ((w_3.state).e) 5));(assert_env_length w_3 10);let keep_0 = (env_call w_3 [6] 2) in ((w_3.state).k <- (Memo.appends [(Memo.from_constructor tag_cont_1);keep_0;((w_3.state).k)]));((w_3.state).c <- (pc_to_exp (int_to_pc 1))))| _ -> failwith "unreachable (2)"))) 2;
+add_exp (fun w_2 -> ((assert_env_length w_2 5);let last_1 = (Source.E 4) in let x_1 = (resolve w_2 last_1) in (match (Word.get_value (fst x_1)) with | 1 (* tag_Nil *) -> ((ignore (pop_env w_2));(assert_env_length w_2 4);(push_env w_2 (Memo.from_constructor tag_Nil));(assert_env_length w_2 5);(push_env w_2 (Dynarray.get ((w_2.state).e) 0));(assert_env_length w_2 6);let ctor_arg_2 = (pop_env w_2) in let ctor_arg_3 = (pop_env w_2) in ((push_env w_2 (Memo.appends [(Memo.from_constructor tag_P);ctor_arg_3;ctor_arg_2]));(assert_env_length w_2 5);(drop_n w_2 5 2);(assert_env_length w_2 3);(return_n w_2 3 (pc_to_exp (int_to_pc 0)))))| 2 (* tag_Cons *) -> let splits_1 = (Memo.splits (snd x_1)) in let split0_1 = (List.nth splits_1 0) in let split1_1 = (List.nth splits_1 1) in ((ignore (pop_env w_2));(push_env w_2 split0_1);(push_env w_2 split1_1);(assert_env_length w_2 6);(push_env w_2 (Dynarray.get ((w_2.state).e) 0));((w_2.state).c <- (pc_to_exp (int_to_pc 2))))| _ -> failwith "unreachable (3)"))) 3;
+add_exp (fun w_1 -> ((assert_env_length w_1 3);let last_0 = (Source.E 2) in let x_0 = (resolve w_1 last_0) in (match (Word.get_value (fst x_0)) with | 1 (* tag_Nil *) -> ((ignore (pop_env w_1));(assert_env_length w_1 2);(push_env w_1 (Memo.from_constructor tag_Nil));(assert_env_length w_1 3);(push_env w_1 (Dynarray.get ((w_1.state).e) 0));(assert_env_length w_1 4);let ctor_arg_0 = (pop_env w_1) in let ctor_arg_1 = (pop_env w_1) in ((push_env w_1 (Memo.appends [(Memo.from_constructor tag_P);ctor_arg_1;ctor_arg_0]));(assert_env_length w_1 3);(return_n w_1 3 (pc_to_exp (int_to_pc 0)))))| 2 (* tag_Cons *) -> let splits_0 = (Memo.splits (snd x_0)) in let split0_0 = (List.nth splits_0 0) in let split1_0 = (List.nth splits_0 1) in ((ignore (pop_env w_1));(push_env w_1 split0_0);(push_env w_1 split1_0);(assert_env_length w_1 4);(push_env w_1 (Dynarray.get ((w_1.state).e) 3));((w_1.state).c <- (pc_to_exp (int_to_pc 3))))| _ -> failwith "unreachable (4)"))) 4;
+add_exp (fun w_4 -> ((assert_env_length w_4 1);(push_env w_4 (Dynarray.get ((w_4.state).e) 0));(assert_env_length w_4 2);(push_env w_4 (Dynarray.get ((w_4.state).e) 0));(assert_env_length w_4 3);(ignore (env_call w_4 [] 2));((w_4.state).c <- (pc_to_exp (int_to_pc 1))))) 5;
+add_exp (fun w_5 -> ((assert_env_length w_5 2);(push_env w_5 (Dynarray.get ((w_5.state).e) 0));((w_5.state).c <- (pc_to_exp (int_to_pc 9))))) 6;
+add_exp (fun w_8 -> ((assert_env_length w_8 8);let x0_0 = (resolve w_8 (Source.E 6)) in let x1_0 = (resolve w_8 (Source.E 7)) in ((ignore (pop_env w_8));(ignore (pop_env w_8));(push_env w_8 (Memo.from_int ((if (Word.get_value (fst x0_0)) < (Word.get_value (fst x1_0)) then 1 else 0))));(assert_env_length w_8 7);let cond_0 = (resolve w_8 (Source.E 6)) in ((ignore (pop_env w_8));let if_kont_0 = ((fun _ -> ((assert_env_length w_8 7);(drop_n w_8 7 2);(assert_env_length w_8 5);(drop_n w_8 5 2);(assert_env_length w_8 3);(return_n w_8 3 (pc_to_exp (int_to_pc 0)))))) in if ((Word.get_value (fst cond_0)) <> 0) then ((assert_env_length w_8 6);(push_env w_8 (Dynarray.get ((w_8.state).e) 2));(assert_env_length w_8 7);(push_env w_8 (Dynarray.get ((w_8.state).e) 3));(assert_env_length w_8 8);(push_env w_8 (Dynarray.get ((w_8.state).e) 1));(assert_env_length w_8 9);let keep_2 = (env_call w_8 [6] 2) in ((w_8.state).k <- (Memo.appends [(Memo.from_constructor tag_cont_3);keep_2;((w_8.state).k)]));((w_8.state).c <- (pc_to_exp (int_to_pc 6)))) else ((assert_env_length w_8 6);(push_env w_8 (Dynarray.get ((w_8.state).e) 4));(assert_env_length w_8 7);(push_env w_8 (Dynarray.get ((w_8.state).e) 0));(assert_env_length w_8 8);(push_env w_8 (Dynarray.get ((w_8.state).e) 5));(assert_env_length w_8 9);let keep_1 = (env_call w_8 [6] 2) in ((w_8.state).k <- (Memo.appends [(Memo.from_constructor tag_cont_2);keep_1;((w_8.state).k)]));((w_8.state).c <- (pc_to_exp (int_to_pc 6)))))))) 7;
+add_exp (fun w_7 -> ((assert_env_length w_7 5);let last_4 = (Source.E 4) in let x_4 = (resolve w_7 last_4) in (match (Word.get_value (fst x_4)) with | 1 (* tag_Nil *) -> ((ignore (pop_env w_7));(assert_env_length w_7 4);(push_env w_7 (Dynarray.get ((w_7.state).e) 0));(assert_env_length w_7 5);(drop_n w_7 5 2);(assert_env_length w_7 3);(return_n w_7 3 (pc_to_exp (int_to_pc 0))))| 2 (* tag_Cons *) -> let splits_4 = (Memo.splits (snd x_4)) in let split0_4 = (List.nth splits_4 0) in let split1_4 = (List.nth splits_4 1) in ((ignore (pop_env w_7));(push_env w_7 split0_4);(push_env w_7 split1_4);(assert_env_length w_7 6);(push_env w_7 (Dynarray.get ((w_7.state).e) 2));(assert_env_length w_7 7);(push_env w_7 (Dynarray.get ((w_7.state).e) 4));((w_7.state).c <- (pc_to_exp (int_to_pc 7))))| _ -> failwith "unreachable (8)"))) 8;
+add_exp (fun w_6 -> ((assert_env_length w_6 3);let last_3 = (Source.E 2) in let x_3 = (resolve w_6 last_3) in (match (Word.get_value (fst x_3)) with | 1 (* tag_Nil *) -> ((ignore (pop_env w_6));(assert_env_length w_6 2);(push_env w_6 (Dynarray.get ((w_6.state).e) 1));(assert_env_length w_6 3);(return_n w_6 3 (pc_to_exp (int_to_pc 0))))| 2 (* tag_Cons *) -> let splits_3 = (Memo.splits (snd x_3)) in let split0_3 = (List.nth splits_3 0) in let split1_3 = (List.nth splits_3 1) in ((ignore (pop_env w_6));(push_env w_6 split0_3);(push_env w_6 split1_3);(assert_env_length w_6 4);(push_env w_6 (Dynarray.get ((w_6.state).e) 1));((w_6.state).c <- (pc_to_exp (int_to_pc 8))))| _ -> failwith "unreachable (9)"))) 9;
+add_exp (fun w_9 -> ((assert_env_length w_9 1);(push_env w_9 (Dynarray.get ((w_9.state).e) 0));((w_9.state).c <- (pc_to_exp (int_to_pc 12))))) 10;
+add_exp (fun w_11 -> ((assert_env_length w_11 4);let last_6 = (Source.E 3) in let x_6 = (resolve w_11 last_6) in (match (Word.get_value (fst x_6)) with | 1 (* tag_Nil *) -> ((ignore (pop_env w_11));(assert_env_length w_11 3);(push_env w_11 (Dynarray.get ((w_11.state).e) 0));(assert_env_length w_11 4);(drop_n w_11 4 2);(assert_env_length w_11 2);(return_n w_11 2 (pc_to_exp (int_to_pc 0))))| 2 (* tag_Cons *) -> let splits_6 = (Memo.splits (snd x_6)) in let split0_6 = (List.nth splits_6 0) in let split1_6 = (List.nth splits_6 1) in ((ignore (pop_env w_11));(push_env w_11 split0_6);(push_env w_11 split1_6);(assert_env_length w_11 5);(push_env w_11 (Dynarray.get ((w_11.state).e) 0));(assert_env_length w_11 6);let keep_3 = (env_call w_11 [] 1) in ((w_11.state).k <- (Memo.appends [(Memo.from_constructor tag_cont_4);keep_3;((w_11.state).k)]));((w_11.state).c <- (pc_to_exp (int_to_pc 5))))| _ -> failwith "unreachable (11)"))) 11;
+add_exp (fun w_10 -> ((assert_env_length w_10 2);let last_5 = (Source.E 1) in let x_5 = (resolve w_10 last_5) in (match (Word.get_value (fst x_5)) with | 1 (* tag_Nil *) -> ((ignore (pop_env w_10));(assert_env_length w_10 1);(push_env w_10 (Memo.from_constructor tag_Nil));(assert_env_length w_10 2);(return_n w_10 2 (pc_to_exp (int_to_pc 0))))| 2 (* tag_Cons *) -> let splits_5 = (Memo.splits (snd x_5)) in let split0_5 = (List.nth splits_5 0) in let split1_5 = (List.nth splits_5 1) in ((ignore (pop_env w_10));(push_env w_10 split0_5);(push_env w_10 split1_5);(assert_env_length w_10 3);(push_env w_10 (Dynarray.get ((w_10.state).e) 2));((w_10.state).c <- (pc_to_exp (int_to_pc 11))))| _ -> failwith "unreachable (12)"))) 12;
+add_exp (fun w_13 -> ((assert_env_length w_13 2);let last_7 = (Source.E 1) in let x_7 = (resolve w_13 last_7) in (match (Word.get_value (fst x_7)) with | 3 (* tag_P *) -> let splits_7 = (Memo.splits (snd x_7)) in let split0_7 = (List.nth splits_7 0) in let split1_7 = (List.nth splits_7 1) in ((ignore (pop_env w_13));(push_env w_13 split0_7);(push_env w_13 split1_7);(assert_env_length w_13 3);(push_env w_13 (Dynarray.get ((w_13.state).e) 0));(assert_env_length w_13 4);(push_env w_13 (Dynarray.get ((w_13.state).e) 1));(assert_env_length w_13 5);let ctor_arg_6 = (pop_env w_13) in let ctor_arg_7 = (pop_env w_13) in ((push_env w_13 (Memo.appends [(Memo.from_constructor tag_Cons);ctor_arg_7;ctor_arg_6]));(assert_env_length w_13 4);(push_env w_13 (Dynarray.get ((w_13.state).e) 2));(assert_env_length w_13 5);let ctor_arg_8 = (pop_env w_13) in let ctor_arg_9 = (pop_env w_13) in ((push_env w_13 (Memo.appends [(Memo.from_constructor tag_P);ctor_arg_9;ctor_arg_8]));(assert_env_length w_13 4);(drop_n w_13 4 2);(assert_env_length w_13 2);(drop_n w_13 2 1);(assert_env_length w_13 1);(drop_n w_13 1 0);(assert_env_length w_13 1);(drop_n w_13 1 0);(assert_env_length w_13 1);(return_n w_13 1 (pc_to_exp (int_to_pc 0))))))| _ -> failwith "unreachable (13)"))) 13;
+add_exp (fun w_14 -> ((assert_env_length w_14 1);let last_8 = (Source.E 0) in let x_8 = (resolve w_14 last_8) in (match (Word.get_value (fst x_8)) with | 3 (* tag_P *) -> let splits_8 = (Memo.splits (snd x_8)) in let split0_8 = (List.nth splits_8 0) in let split1_8 = (List.nth splits_8 1) in ((ignore (pop_env w_14));(push_env w_14 split0_8);(push_env w_14 split1_8);(assert_env_length w_14 2);(push_env w_14 (Dynarray.get ((w_14.state).e) 0));(assert_env_length w_14 3);let keep_4 = (env_call w_14 [1] 1) in ((w_14.state).k <- (Memo.appends [(Memo.from_constructor tag_cont_5);keep_4;((w_14.state).k)]));((w_14.state).c <- (pc_to_exp (int_to_pc 10))))| _ -> failwith "unreachable (14)"))) 14;
+Words.set_constructor_degree 0 (1);
+Words.set_constructor_degree 1 (1);
+Words.set_constructor_degree 2 (-1);
+Words.set_constructor_degree 3 (-1);
+Words.set_constructor_degree 4 (-1);
+Words.set_constructor_degree 5 (-1);
+Words.set_constructor_degree 6 (-1);
+Words.set_constructor_degree 7 (0);
+Words.set_constructor_degree 8 (-1);
+Words.set_constructor_degree 9 (-1);;

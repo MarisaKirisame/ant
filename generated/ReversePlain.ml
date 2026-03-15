@@ -1,0 +1,5 @@
+type  int_list  = Nil| Cons of (int) * (int_list);;
+
+let rec (append) = fun (x) (e) -> (match x with (Nil) -> (Cons ((e), (Nil)))| (Cons (xh, xt)) -> (Cons ((xh), ((append) (xt) (e)))));;
+
+let rec (reverse) = fun (x) -> (match x with (Nil) -> (Nil)| (Cons (xh, xt)) -> ((append) ((reverse) (xt)) (xh)))
