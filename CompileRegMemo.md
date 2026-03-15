@@ -91,8 +91,6 @@
 
 ### Phase 4: Jump coalescing 和 parallel copy
 
-`Jump` 边上的参数传递不能退化成 push/pop。
-
 需要：
 
 - 优先让实参与 join 形参共槽

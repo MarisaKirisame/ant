@@ -29,6 +29,50 @@ let frontend_prog source = source |> parse |> Typing.top_type_of_prog |> Transfo
 let frontend_example name = name |> example_path |> read_all |> frontend_prog
 let compile_with backend prog = prog |> backend |> Syntax.string_of_document
 
+let regmemo_single_unit_liveness prog =
+  let ir = CompileRegMemo.lower_prog prog in
+  match ir.units with
+  | [ unit_ir ] -> (unit_ir, CompileRegMemo.analyze_unit_liveness unit_ir)
+  | _ -> failwith "expected a single regmemo unit"
+
+let regmemo_value_id (unit_ir : CompileRegMemo.unit_ir) name =
+  match List.find_opt (fun (info : CompileRegMemo.value_info) -> String.equal info.name name) unit_ir.values with
+  | Some info -> info.id
+  | None -> failwith ("missing regmemo value: " ^ name)
+
+let regmemo_block_id (unit_ir : CompileRegMemo.unit_ir) label =
+  match List.find_opt (fun (block : CompileRegMemo.block) -> String.equal block.label label) unit_ir.blocks with
+  | Some block -> block.id
+  | None -> failwith ("missing regmemo block: " ^ label)
+
+let regmemo_block_liveness (liveness : CfgLiveness.unit_liveness) block_id =
+  match CfgLiveness.IntMap.find_opt block_id liveness.blocks with
+  | Some info -> info
+  | None -> failwith ("missing regmemo block liveness: b" ^ string_of_int block_id)
+
+let regmemo_edge_liveness info succ_id =
+  match CfgLiveness.IntMap.find_opt succ_id info.CfgLiveness.live_on_edge with
+  | Some live -> live
+  | None -> failwith ("missing regmemo edge liveness to b" ^ string_of_int succ_id)
+
+let regmemo_edge_param_liveness info succ_id param_id =
+  match CfgLiveness.IntMap.find_opt param_id (regmemo_edge_liveness info succ_id).CfgLiveness.live_params with
+  | Some live -> live
+  | None ->
+      failwith
+        ("missing regmemo edge param liveness to b" ^ string_of_int succ_id ^ " param " ^ string_of_int param_id)
+
+let regmemo_names_of_live (unit_ir : CompileRegMemo.unit_ir) live =
+  unit_ir.values
+  |> List.filter_map (fun (info : CompileRegMemo.value_info) ->
+         if CfgLiveness.IntSet.mem info.id live then Some info.name else None)
+  |> List.sort String.compare
+
+let assert_regmemo_live_names unit_ir live expected =
+  let actual = regmemo_names_of_live unit_ir live in
+  let expected = List.sort String.compare expected in
+  assert (List.equal String.equal actual expected)
+
 let rec assert_no_admin_let_rhs_expr = function
   | Syntax.Unit | Syntax.Int _ | Syntax.Float _ | Syntax.Bool _ | Syntax.Str _ | Syntax.Builtin _ | Syntax.Var _
   | Syntax.GVar _ | Syntax.Ctor _ ->
@@ -307,6 +351,100 @@ let () =
   in
   expect_failure ~needle:"CompileRegMemo Phase 1 unsupported: top-level BCont" (fun () ->
       ignore (compile_with CompileRegMemo.Backend.compile bad_prog))
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("c", info); Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("z", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("z", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info); Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, liveness = regmemo_single_unit_liveness prog in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let then_id = regmemo_block_id unit_ir "f.entry.then" in
+  let else_id = regmemo_block_id unit_ir "f.entry.else" in
+  let join_live = regmemo_block_liveness liveness join_id in
+  let then_live = regmemo_block_liveness liveness then_id in
+  let else_live = regmemo_block_liveness liveness else_id in
+  let a_id = regmemo_value_id unit_ir "a" in
+  let b_id = regmemo_value_id unit_ir "b" in
+  assert_regmemo_live_names unit_ir join_live.live_in [ "z" ];
+  assert_regmemo_live_names unit_ir join_live.live_params [ "a" ];
+  assert (CfgLiveness.IntSet.mem a_id join_live.live_params);
+  assert (not (CfgLiveness.IntSet.mem b_id join_live.live_params));
+  assert_regmemo_live_names unit_ir
+    (CfgLiveness.edge_live_values (regmemo_edge_liveness then_live join_id))
+    [ "y"; "z" ];
+  assert_regmemo_live_names unit_ir
+    (CfgLiveness.edge_live_values (regmemo_edge_liveness else_live join_id))
+    [ "x"; "z" ];
+  assert_regmemo_live_names unit_ir (regmemo_edge_param_liveness then_live join_id a_id) [ "y" ];
+  assert_regmemo_live_names unit_ir (regmemo_edge_param_liveness else_live join_id a_id) [ "x" ];
+  assert (not (CfgLiveness.IntMap.mem b_id (regmemo_edge_liveness then_live join_id).CfgLiveness.live_params));
+  assert (not (CfgLiveness.IntMap.mem b_id (regmemo_edge_liveness else_live join_id).CfgLiveness.live_params))
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("p", info); Syntax.PVar ("z", info) ],
+                   Syntax.Match
+                     ( Syntax.Var ("p", info),
+                       Syntax.MatchPattern
+                         [
+                           ( Syntax.PTup ([ Syntax.PVar ("x", info); Syntax.PAny ], info),
+                             Syntax.Var ("z", info) );
+                           ( Syntax.PTup ([ Syntax.PAny; Syntax.PVar ("y", info) ], info),
+                             Syntax.Var ("z", info) );
+                         ],
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, liveness = regmemo_single_unit_liveness prog in
+  let entry_id = regmemo_block_id unit_ir "f.entry" in
+  let arm0_id = regmemo_block_id unit_ir "f.entry.match0" in
+  let arm1_id = regmemo_block_id unit_ir "f.entry.match1" in
+  let entry_live = regmemo_block_liveness liveness entry_id in
+  let arm0_live = regmemo_block_liveness liveness arm0_id in
+  let arm1_live = regmemo_block_liveness liveness arm1_id in
+  assert_regmemo_live_names unit_ir arm0_live.live_in [ "z" ];
+  assert_regmemo_live_names unit_ir arm1_live.live_in [ "z" ];
+  assert_regmemo_live_names unit_ir arm0_live.live_params [];
+  assert_regmemo_live_names unit_ir arm1_live.live_params [];
+  assert_regmemo_live_names unit_ir
+    (CfgLiveness.edge_live_values (regmemo_edge_liveness entry_live arm0_id))
+    [ "z" ];
+  assert_regmemo_live_names unit_ir
+    (CfgLiveness.edge_live_values (regmemo_edge_liveness entry_live arm1_id))
+    [ "z" ]
 
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =

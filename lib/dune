@@ -24,6 +24,9 @@
   Intmap
   Common
   Liveness
+  CfgLiveness
+  ControlFlowGraph
+  AnfToCfg
   AntHashtbl
   Profile
   batFingerTree
