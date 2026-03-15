@@ -1,5 +1,0 @@
-let f =
-  let rec f = fun g -> f (fun x -> g x) in
-  f;;
-
-let _ = f (fun x -> x);;
