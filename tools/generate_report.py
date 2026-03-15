@@ -272,12 +272,7 @@ def _asymptotics_experiments() -> list[tuple[str, Path, Path]]:
     for program in ["map", "append", "filter", "reverse", "pair", "insertion_sort", "merge_sort", "quick_sort"]:
         for list_type in ["random", "low_entropy", "mod", "repeated"]:
             result.append((f"{program}-{list_type}", Path("eval_steps_asymptotic_{program}_{list_type}.json"), Path("output/asymptotics_{program}_{list_type}")))
-    return [
-        ("Map Asymptotics: Randomly Generated List", Path("eval_steps_asymptotic_random.json"), Path("output/map_asymptotics_random")),
-        ("Map Asymptotics: Low Entropy List", Path("eval_steps_asymptotic_low_entropy.json"), Path("output/map_asymptotics_low_entropy")),
-        ("Map Asymptotics: Modification List", Path("eval_steps_asymptotic_mod.json"), Path("output/map_asymptotics_mod")),
-        ("Map Asymptotics: Repeated List", Path("eval_steps_asymptotic_repeated.json"), Path("output/map_asymptotics_repeat")),
-    ]
+    return result
 
 def _generate_reports_for_experiments(
     *,
