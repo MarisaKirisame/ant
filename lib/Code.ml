@@ -4,6 +4,7 @@ open Ir
 open State
 open Word
 open Common
+module Hashtbl = AntHashtbl
 
 type 'a code = Code of ir | Pat of pat
 
@@ -28,7 +29,7 @@ let ctor_pat'_ (name : string) : 'a code = Pat (Ctor (name, None))
 let uncode c : document =
   match c with Code ir -> ir_to_doc (optimize_ir ir) | Pat pat -> pat_to_doc (optimize_pat pat)
 
-let fresh_name : (string, int) Hashtbl.t = Hashtbl.create (module String)
+let fresh_name : (string, int) Hashtbl.t = Hashtbl.create ()
 
 let gensym (base : string) : string =
   let n = Option.value (Hashtbl.find fresh_name base) ~default:0 in
@@ -100,6 +101,18 @@ let seqs_ (xs : (unit -> unit code) list) : unit code = Stdlib.List.fold_left se
 let zro_ (x : ('a * 'b) code) : 'a code = app_ (from_ir $ Function "fst") x
 let pair_value_ (x : (Word.t * Value.seq) code) : Value.seq code = app_ (from_ir $ Function "snd") x
 let add_ (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " + " ^^ uncode y)
+let mul_ (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " * " ^^ uncode y)
+let div_ (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " / " ^^ uncode y)
+let sub_ (x : int code) (y : int code) : int code = code $ parens (uncode x ^^ string " - " ^^ uncode y)
+
+let land_ (x : int code) (y : int code) : int code =
+  code $ parens (string "(if " ^^ uncode x ^^ string " <> 0 && " ^^ uncode y ^^ string " <> 0 then 1 else 0)")
+
+let lor_ (x : int code) (y : int code) : int code =
+  code $ parens (string "(if " ^^ uncode x ^^ string " <> 0 || " ^^ uncode y ^^ string " <> 0 then 1 else 0)")
+
+let eq_ (x : int code) (y : int code) : int code =
+  code $ parens (string "(if " ^^ uncode x ^^ string " = " ^^ uncode y ^^ string " then 1 else 0)")
 
 let lt_ (x : int code) (y : int code) : int code =
   code $ parens (string "(if " ^^ uncode x ^^ string " < " ^^ uncode y ^^ string " then 1 else 0)")

@@ -1,7 +1,7 @@
 open Value
 open Pattern
 open BatFingerTree
-module Hashtbl = Core.Hashtbl
+module Hashtbl = AntHashtbl
 
 module Children = struct
   type 'a repr = Small of (int * 'a) list | Hash of (int, 'a) Hashtbl.t
@@ -15,7 +15,7 @@ module Children = struct
     match t.repr with Small lst -> List.assoc_opt key lst | Hash tbl -> Hashtbl.find tbl key
 
   let to_hash (lst : (int * 'a) list) : (int, 'a) Hashtbl.t =
-    let tbl = Hashtbl.create (module Core.Int) in
+    let tbl = Hashtbl.create ~size:(List.length lst) () in
     List.iter (fun (k, v) -> Hashtbl.set tbl ~key:k ~data:v) lst;
     tbl
 

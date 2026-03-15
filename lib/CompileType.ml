@@ -1,7 +1,8 @@
 open PPrint
 open Syntax
+module Hashtbl = AntHashtbl
 
-let compile_ty_binding (ctx : (string, int) Core.Hashtbl.t) (binding : 'a ty_binding) : document =
+let compile_ty_binding (ctx : (string, int) Hashtbl.t) (binding : 'a ty_binding) : document =
   let rec compile_conv is_to ty v =
     match ty with
     | TUnit ->

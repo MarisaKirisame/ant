@@ -2,6 +2,7 @@ type nexpr =
   | NEInt of int
   | NEPlus of nexpr * nexpr
   | NELt of nexpr * nexpr
+  | NEMinus of nexpr * nexpr
   | NELe of nexpr * nexpr
   | NEGt of nexpr * nexpr
   | NEGe of nexpr * nexpr
@@ -22,6 +23,7 @@ type nexpr =
   | NEFst of nexpr
   | NEUnit
   | NEHole
+  | NESeq of nexpr * nexpr
 [@@deriving eq]
 
 let pp_nexpr fmt nexpr =
@@ -29,6 +31,7 @@ let pp_nexpr fmt nexpr =
     match expr with
     | NEInt i -> Format.pp_print_int fmt i
     | NEPlus (lhs, rhs) -> Format.fprintf fmt "(%a + %a)" aux lhs aux rhs
+    | NEMinus (lhs, rhs) -> Format.fprintf fmt "(%a - %a)" aux lhs aux rhs
     | NELt (lhs, rhs) -> Format.fprintf fmt "(%a < %a)" aux lhs aux rhs
     | NELe (lhs, rhs) -> Format.fprintf fmt "(%a <= %a)" aux lhs aux rhs
     | NEGt (lhs, rhs) -> Format.fprintf fmt "(%a > %a)" aux lhs aux rhs
@@ -52,5 +55,6 @@ let pp_nexpr fmt nexpr =
     | NEHole -> Format.pp_print_string fmt "hole"
     | NEUnit -> Format.pp_print_string fmt "()"
     | NEAnd (lhs, rhs) -> Format.fprintf fmt "(%a && %a)" aux lhs aux rhs
+    | NESeq (lhs, rhs) -> Format.fprintf fmt "(%a; %a)" aux lhs aux rhs
   in
   aux fmt nexpr

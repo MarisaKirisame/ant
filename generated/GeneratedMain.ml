@@ -1,4 +1,4 @@
-let usage = "Usage: GeneratedMain <append|filter|map|qs|asymptotics-live|asymptotics>"
+let usage = Printf.sprintf "Usage: GeneratedMain <%s|arith>" (String.concat "|" HazelExperiment.all_modes)
 
 let () =
   match Array.to_list Sys.argv with
@@ -10,9 +10,11 @@ let () =
       | "qs" -> HazelQS.run ()
       | "asymptotics-live" -> RunLiveAsymptotics.run ()
       | "asymptotics" -> RunTestAsymptotics.run ()
+      | "arith" -> RunArith.run ()
       | _ ->
-          prerr_endline usage;
-          exit 1)
+          if not (HazelExperiment.run_mode mode) then (
+            prerr_endline usage;
+            exit 1))
   | _ ->
       prerr_endline usage;
       exit 1

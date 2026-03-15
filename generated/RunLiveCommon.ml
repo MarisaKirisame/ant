@@ -75,6 +75,7 @@ let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
   let rec aux ctx = function
     | NEInt i -> LC.EInt i
     | NEPlus (lhs, rhs) -> LC.EPlus (aux ctx lhs, aux ctx rhs)
+    | NEMinus (lhs, rhs) -> LC.EPlus (aux ctx lhs, aux ctx rhs) (*todo: this is wrong*)
     | NELt (lhs, rhs) -> LC.ELt (aux ctx lhs, aux ctx rhs)
     | NELe (lhs, rhs) -> LC.ELe (aux ctx lhs, aux ctx rhs)
     | NEGt (lhs, rhs) -> LC.EGt (aux ctx lhs, aux ctx rhs)
@@ -97,6 +98,10 @@ let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
     | NEHole -> LC.EHole None
     | NEAnd (lhs, rhs) -> LC.EIf (aux ctx lhs, aux ctx rhs, LC.EFalse)
     | NEUnit -> LC.EUnit
+    | NEPair (x, y) -> LC.EPair (aux ctx x, aux ctx y)
+    | NEZro x -> LC.EZro (aux ctx x)
+    | NEFst x -> LC.EFst (aux ctx x)
+    | NESeq (x, y) -> LC.EPair (aux ctx x, aux ctx y)
     | x -> failwith ("expr_of_nexpr not implemente for expr: " ^ Format.asprintf "%a" pp_nexpr x)
   in
   aux ctx nexpr
@@ -332,6 +337,18 @@ let quicksort_nexpr =
      greater = quicksort (filter (fun x -> x >= pivot) rest) in append smaller (pivot :: greater)"
 
 let quicksort_expr = expr_of_nexpr quicksort_nexpr
+let experiment_list_length = 400
+let experiment_random_seed = 42
+let experiment_random_bound = 100
+
+let make_random_input_list ?(seed = experiment_random_seed) len =
+  let rng = Random.State.make [| seed |] in
+  List.init len (fun _ -> Random.State.int rng experiment_random_bound)
+
+let make_random_input_list_pair ?(seed = experiment_random_seed) len =
+  let rng = Random.State.make [| seed |] in
+  ( List.init len (fun _ -> Random.State.int rng experiment_random_bound),
+    List.init len (fun _ -> Random.State.int rng experiment_random_bound) )
 
 let random_list =
   [

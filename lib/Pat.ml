@@ -276,15 +276,15 @@ let column_ctor_prefix_score { pats; _ } col =
     pats;
   !score
 
-module Hashtbl = Stdlib.Hashtbl
+module Hashtbl = AntHashtbl
 
 let column_small_branching_factor_score { pats; _ } col =
-  let ctors = Hashtbl.create 8 in
+  let ctors = Hashtbl.create ~size:8 () in
   List.iter
     (fun row ->
       let cell = List.nth row col in
       let pat_desc = pat_desc cell in
-      match pat_desc with PDCtor (c, _) -> Hashtbl.add ctors c () | _ -> ())
+      match pat_desc with PDCtor (c, _) -> Hashtbl.set ctors ~key:c ~data:() | _ -> ())
     pats;
   -Hashtbl.length ctors
 

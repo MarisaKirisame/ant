@@ -35,13 +35,37 @@ def render_html(
     data_label: str,
     css_href: str,
 ) -> str:
-    memo_plot = plot_depth_breakdown(records.depth_breakdown, output_dir)
-    memo_cdf_plot = plot_depth_breakdown_cdf(records.depth_breakdown, output_dir)
-    size_scatter_plot = plot_rule_stat(records.rule_stat, output_dir)
-    hit_scatter_plot = plot_rule_stat_hits(records.rule_stat, output_dir)
-    insert_time_scatter_plot = plot_rule_stat_insert_time(records.rule_stat, output_dir)
-    pvar_insert_time_scatter_plot = plot_rule_stat_pvar_length_insert_time(records.rule_stat, output_dir)
-    depth_insert_time_scatter_plot = plot_rule_stat_depth_insert_time(records.rule_stat, output_dir)
+    memo_plot = (
+        plot_depth_breakdown(records.depth_breakdown, output_dir)
+        if records.depth_breakdown
+        else None
+    )
+    memo_cdf_plot = (
+        plot_depth_breakdown_cdf(records.depth_breakdown, output_dir)
+        if records.depth_breakdown
+        else None
+    )
+    size_scatter_plot = (
+        plot_rule_stat(records.rule_stat, output_dir) if records.rule_stat else None
+    )
+    hit_scatter_plot = (
+        plot_rule_stat_hits(records.rule_stat, output_dir) if records.rule_stat else None
+    )
+    insert_time_scatter_plot = (
+        plot_rule_stat_insert_time(records.rule_stat, output_dir)
+        if records.rule_stat
+        else None
+    )
+    pvar_insert_time_scatter_plot = (
+        plot_rule_stat_pvar_length_insert_time(records.rule_stat, output_dir)
+        if records.rule_stat
+        else None
+    )
+    depth_insert_time_scatter_plot = (
+        plot_rule_stat_depth_insert_time(records.rule_stat, output_dir)
+        if records.rule_stat
+        else None
+    )
     hashtable_depth_size_scatter_plot = None
     if records.hashtable_stat:
         hashtable_depth_size_scatter_plot = plot_hashtable_stat_depth_size(
@@ -86,13 +110,20 @@ def render_html(
                 label="Memo vs Plain (steps)",
                 pairs=pairs_from_steps(records),
             )
-            _plot_image(memo_plot, "Memo stats depth vs node count plot")
-            _plot_image(memo_cdf_plot, "Memo stats CDF plot")
-            _plot_image(size_scatter_plot, "Memo rule size vs sc scatter plot")
-            _plot_image(hit_scatter_plot, "Memo rule size vs hit count scatter plot")
-            _plot_image(insert_time_scatter_plot, "Memo rule size vs insert time scatter plot")
-            _plot_image(pvar_insert_time_scatter_plot, "Memo rule pvar length vs insert time scatter plot")
-            _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
+            if memo_plot is not None:
+                _plot_image(memo_plot, "Memo stats depth vs node count plot")
+            if memo_cdf_plot is not None:
+                _plot_image(memo_cdf_plot, "Memo stats CDF plot")
+            if size_scatter_plot is not None:
+                _plot_image(size_scatter_plot, "Memo rule size vs sc scatter plot")
+            if hit_scatter_plot is not None:
+                _plot_image(hit_scatter_plot, "Memo rule size vs hit count scatter plot")
+            if insert_time_scatter_plot is not None:
+                _plot_image(insert_time_scatter_plot, "Memo rule size vs insert time scatter plot")
+            if pvar_insert_time_scatter_plot is not None:
+                _plot_image(pvar_insert_time_scatter_plot, "Memo rule pvar length vs insert time scatter plot")
+            if depth_insert_time_scatter_plot is not None:
+                _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
             if hashtable_depth_size_scatter_plot is not None:
                 _plot_image(
                     hashtable_depth_size_scatter_plot,

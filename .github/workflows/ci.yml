@@ -17,7 +17,8 @@ jobs:
           path: |
             ~/.opam
             ~/.cache/opam
-          key: ${{ runner.os }}-ocaml-5.2-${{ hashFiles('**/*.opam', 'opam.locked') }}
+            ~/.cache/dune
+          key: ${{ runner.os }}-ocaml-5.2-${{ hashFiles('dune-project', 'dune.lock/**', '**/*.opam', 'nightly.py') }}
           restore-keys: |
             ${{ runner.os }}-ocaml-5.2-
 
@@ -34,10 +35,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-
 
-      - name: Install dependencies
-        run: opam install . --deps-only --with-test
-        env:
-          OPAMYES: "true"
       - run: git submodule update --init
       - name: Run pipeline
         run: make all

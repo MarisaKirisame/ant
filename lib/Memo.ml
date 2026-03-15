@@ -7,11 +7,11 @@ module Dynarray = Stdlib.Dynarray
 (*module Hasher = Hash.MCRC32*)
 (*module Hasher = Hash.SL2*)
 (*module Hasher = Hash.DebugHash*)
-module Hashtbl = Core.Hashtbl
 open Value
 open State
 open Common
 open Core
+module Hashtbl = AntHashtbl
 
 let log x = print_endline x
 let log x = ignore x
@@ -468,7 +468,6 @@ and slice = { state : state; step : step }
 
 let exec_cek_slot = Profile.register_slot Profile.memo_profile "exec_cek"
 let step_through_slot = Profile.register_slot Profile.memo_profile "step_through"
-let compose_step_slot = Profile.register_slot Profile.memo_profile "compose_step"
 let insert_step_slot = Profile.register_slot Profile.memo_profile "insert_step"
 let lookup_step_slot = Profile.register_slot Profile.memo_profile "lookup_step"
 
@@ -494,6 +493,9 @@ let instantiate (step : step) (state : state) : step =
   let src = zipwith_ek join step.src state in
   let dst : state = Dependency.step_through step (Dependency.pattern_to_value src) in
   { step with src; dst }
+(*let instantiate (step : step) (state : state) : step = step*)
+
+let instantiate_slot = Profile.register_slot Profile.memo_profile "instantiate"
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
   let run () =
@@ -533,8 +535,8 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
     (* Binary counter that incrementally composes adjacent slices; arguments are
        reversed so the newest slice sits on the right-hand side during carry. *)
     let compose_slice (y : slice) (x : slice) =
-      let step = Profile.with_slot compose_step_slot (fun () -> Dependency.compose_step x.step y.step) in
-      let step = instantiate step x.state in
+      let step = Profile.with_slot Dependency.compose_step_slot (fun () -> Dependency.compose_step x.step y.step) in
+      let step = Profile.with_slot instantiate_slot (fun () -> instantiate step x.state) in
       Profile.with_slot insert_step_slot (fun () -> insert_step m step);
       (*let lookuped = lookup_step x.state m |> Option.value_exn in
       if lookuped != step then

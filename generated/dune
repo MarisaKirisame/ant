@@ -5,9 +5,14 @@
   AppendPlain
   FromHazel
   HazelAppend
+  HazelExperiment
   HazelFilter
+  HazelIS
   HazelMap
+  HazelMS
+  HazelPair
   HazelQS
+  HazelRev
   HazelIsSorted
   InsertionSortCEK
   InsertionSortPlain
@@ -37,6 +42,9 @@
   TestCEK
   TestPlain
   RunTailRec
+  ArithCEK
+  ArithPlain
+  RunArith
   RunTest)
  (libraries ant yojson sexplib)
  (wrapped false)

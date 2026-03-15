@@ -39,18 +39,12 @@ def _resolve_switch() -> str:
 
 
 SWITCH = _resolve_switch()
-PACKAGES = [
-    "core",
+TOOLCHAIN_PACKAGES = [
     "dune",
-    "menhir",
-    "ppx_deriving",
-    "ppx_sexp_conv",
-    "yojson",
-    "core_unix",
-    "batteries",
-    "pprint",
-    "cmdliner",
-    "core_bench",
+]
+DEV_PACKAGES = [
+    "ocaml-lsp-server",
+    "ocamlformat",
 ]
 
 TOOLS_DIR = Path(__file__).resolve().parent / "tools"
@@ -145,7 +139,9 @@ def install_dependencies() -> None:
     ensure_switch()
     run(["opam", "update"])
     run(["opam", "upgrade", "--switch", SWITCH, "--fixup", "-y"])
-    run(["opam", "install", "--switch", SWITCH, "-y", *PACKAGES])
+    run(["opam", "install", "--switch", SWITCH, "-y", *TOOLCHAIN_PACKAGES])
+    run(["opam", "install", "--switch", SWITCH, "-y", *DEV_PACKAGES])
+    opam_exec(["dune", "pkg", "lock"])
 
 
 def build_project() -> None:
@@ -256,17 +252,76 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
         ],
         env=env,
     )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Arith.ant",
+            "generated/ArithCEK.ml",
+            "--compile",
+            "--backend",
+            "memo",
+        ],
+        env=env,
+    )
+    opam_exec(
+        [
+            "dune",
+            "exec",
+            "ant",
+            "--",
+            "examples/Arith.ant",
+            "generated/ArithPlain.ml",
+            "--compile",
+            "--backend",
+            "plain",
+        ],
+        env=env,
+    )
 
-modes = ("append", "filter", "map", "qs", "asymptotics")
+base_modes = ("append", "filter", "map", "qs", "is", "ms", "pair", "rev")
+variant_prefixes = ("", "th_", "at_")
+hazel_modes = tuple(
+    f"{prefix}{mode}" if prefix else mode
+    for prefix in variant_prefixes
+    for mode in base_modes
+)
+bad = set(["th_ms", "th_pair"])
+hazel_modes = tuple(m for m in hazel_modes if m not in bad)
+arith_modes = ("arith",)
+modes = arith_modes + hazel_modes
 
-def run_project() -> None:
-    _remove_eval_steps_files()
+
+def _remove_eval_steps_files_for_modes(selected_modes: Iterable[str]) -> None:
+    for mode in selected_modes:
+        path = f"eval_steps_{mode}.json"
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            continue
+
+
+def run_modes(selected_modes: tuple[str, ...]) -> None:
+    _remove_eval_steps_files_for_modes(selected_modes)
     ensure_switch()
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
     opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
-    for mode in modes:
+    for mode in selected_modes:
         opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
+
+def run_project() -> None:
+    run_modes(modes)
+
+
+def hazel_project() -> None:
+    run_modes(hazel_modes)
+
+
+def arith_project() -> None:
+    run_modes(arith_modes)
 
 
 def profile_project() -> None:
@@ -291,8 +346,24 @@ def profile_project() -> None:
 
 
 def report_project() -> None:
+    report_module.generate_reports()
+
+
+def hazel_report_project() -> None:
+    report_module.generate_hazel_reports()
+
+
+def arith_report_project() -> None:
+    report_module.generate_arith_reports()
+
+
+def experiment_project() -> None:
     run_project()
     report_module.generate_reports()
+
+
+def tex_project() -> None:
+    report_module.generate_tex_table()
 
 
 
@@ -335,7 +406,7 @@ def main(argv: Iterable[str]) -> int:
     if len(args) > 1:
         print("Only a single stage argument is supported.", file=sys.stderr)
         print(
-            "Usage: nightly.py [dependency|build|run|profile|report|compile-generated|all]",
+            "Usage: nightly.py [dependency|build|run|profile|hazel|hazel-report|arith|arith-report|report|experiment|tex|compile-generated|all]",
             file=sys.stderr,
         )
         return 1
@@ -350,8 +421,20 @@ def main(argv: Iterable[str]) -> int:
         run_project()
     elif stage == "profile":
         profile_project()
+    elif stage == "hazel":
+        hazel_project()
+    elif stage == "hazel-report":
+        hazel_report_project()
+    elif stage == "arith":
+        arith_project()
+    elif stage == "arith-report":
+        arith_report_project()
     elif stage == "report":
         report_project()
+    elif stage == "experiment":
+        experiment_project()
+    elif stage == "tex":
+        tex_project()
     elif stage == "compile-generated":
         compile_generated()
     elif stage == "all":
@@ -362,7 +445,7 @@ def main(argv: Iterable[str]) -> int:
     else:
         print(f"Unknown stage: {stage}", file=sys.stderr)
         print(
-            "Usage: nightly.py [dependency|build|run|profile|report|compile-generated|all]",
+            "Usage: nightly.py [dependency|build|run|profile|hazel|hazel-report|arith|arith-report|report|experiment|tex|compile-generated|all]",
             file=sys.stderr,
         )
         return 1
