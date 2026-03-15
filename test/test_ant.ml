@@ -29,6 +29,108 @@ let frontend_prog source = source |> parse |> Typing.top_type_of_prog |> Transfo
 let frontend_example name = name |> example_path |> read_all |> frontend_prog
 let compile_with backend prog = prog |> backend |> Syntax.string_of_document
 
+let rec assert_no_admin_let_rhs_expr = function
+  | Syntax.Unit | Syntax.Int _ | Syntax.Float _ | Syntax.Bool _ | Syntax.Str _ | Syntax.Builtin _ | Syntax.Var _
+  | Syntax.GVar _ | Syntax.Ctor _ ->
+      ()
+  | Syntax.App (fn, args, _) | Syntax.Jump (fn, args, _) ->
+      assert_no_admin_let_rhs_expr fn;
+      List.iter assert_no_admin_let_rhs_expr args
+  | Syntax.Op (_, lhs, rhs, _) ->
+      assert_no_admin_let_rhs_expr lhs;
+      assert_no_admin_let_rhs_expr rhs
+  | Syntax.Tup (values, _) | Syntax.Arr (values, _) -> List.iter assert_no_admin_let_rhs_expr values
+  | Syntax.Lam (_, body, _) -> assert_no_admin_let_rhs_expr body
+  | Syntax.Let (binding, body, _) ->
+      assert_no_admin_let_rhs_binding binding;
+      assert_no_admin_let_rhs_expr body
+  | Syntax.Sel (target, _, _) -> assert_no_admin_let_rhs_expr target
+  | Syntax.If (cond, if_true, if_false, _) ->
+      assert_no_admin_let_rhs_expr cond;
+      assert_no_admin_let_rhs_expr if_true;
+      assert_no_admin_let_rhs_expr if_false
+  | Syntax.Match (scrutinee, Syntax.MatchPattern cases, _) ->
+      assert_no_admin_let_rhs_expr scrutinee;
+      List.iter (fun (_pat, expr) -> assert_no_admin_let_rhs_expr expr) cases
+
+and assert_no_admin_let_rhs_binding = function
+  | Syntax.BSeq (expr, _) -> assert_no_admin_let_rhs_expr expr
+  | Syntax.BOne (Syntax.PVar (name, _), expr, _) ->
+      if Core.String.is_prefix name ~prefix:"_'anf" then (
+        match expr with
+        | Syntax.Let _ -> failwith ("admin ANF binder has nested let rhs: " ^ name)
+        | _ -> ());
+      assert_no_admin_let_rhs_expr expr
+  | Syntax.BOne (_pat, expr, _) -> assert_no_admin_let_rhs_expr expr
+  | Syntax.BCont (_pat, expr, _) -> assert_no_admin_let_rhs_expr expr
+  | Syntax.BRec entries | Syntax.BRecC entries ->
+      List.iter (fun (_pat, expr, _) -> assert_no_admin_let_rhs_expr expr) entries
+
+let rec expr_contains_app_to name = function
+  | Syntax.App ((Syntax.Var (callee, _) | Syntax.GVar (callee, _)), _, _) when callee = name -> true
+  | Syntax.App (fn, args, _) | Syntax.Jump (fn, args, _) ->
+      expr_contains_app_to name fn || List.exists (expr_contains_app_to name) args
+  | Syntax.Op (_, lhs, rhs, _) -> expr_contains_app_to name lhs || expr_contains_app_to name rhs
+  | Syntax.Tup (values, _) | Syntax.Arr (values, _) -> List.exists (expr_contains_app_to name) values
+  | Syntax.Lam (_, body, _) -> expr_contains_app_to name body
+  | Syntax.Let (binding, body, _) -> binding_contains_app_to name binding || expr_contains_app_to name body
+  | Syntax.Sel (target, _, _) -> expr_contains_app_to name target
+  | Syntax.If (cond, if_true, if_false, _) ->
+      expr_contains_app_to name cond || expr_contains_app_to name if_true || expr_contains_app_to name if_false
+  | Syntax.Match (scrutinee, Syntax.MatchPattern cases, _) ->
+      expr_contains_app_to name scrutinee || List.exists (fun (_pat, body) -> expr_contains_app_to name body) cases
+  | Syntax.Unit | Syntax.Int _ | Syntax.Float _ | Syntax.Bool _ | Syntax.Str _ | Syntax.Builtin _ | Syntax.Var _
+  | Syntax.GVar _ | Syntax.Ctor _ ->
+      false
+
+and binding_contains_app_to name = function
+  | Syntax.BSeq (expr, _) -> expr_contains_app_to name expr
+  | Syntax.BOne (_pat, expr, _) | Syntax.BCont (_pat, expr, _) -> expr_contains_app_to name expr
+  | Syntax.BRec entries | Syntax.BRecC entries ->
+      List.exists (fun (_pat, expr, _) -> expr_contains_app_to name expr) entries
+
+let rec expr_eventually_jumps_to join_name = function
+  | Syntax.Jump (Syntax.Var (target, _), _, _) | Syntax.Jump (Syntax.GVar (target, _), _, _) -> target = join_name
+  | Syntax.Let (_binding, body, _) -> expr_eventually_jumps_to join_name body
+  | Syntax.If (_, if_true, if_false, _) ->
+      expr_eventually_jumps_to join_name if_true && expr_eventually_jumps_to join_name if_false
+  | Syntax.Match (_, Syntax.MatchPattern cases, _) ->
+      List.for_all (fun (_pat, body) -> expr_eventually_jumps_to join_name body) cases
+  | _ -> false
+
+let rec has_if_join_with_body_call name = function
+  | Syntax.Let
+      ( Syntax.BCont (Syntax.PVar (join_name, _), Syntax.Lam (_params, body, _), _),
+        Syntax.If (_, if_true, if_false, _),
+        _ ) ->
+      ((expr_eventually_jumps_to join_name if_true && expr_eventually_jumps_to join_name if_false)
+      && expr_contains_app_to name body)
+      || has_if_join_with_body_call name body
+  | Syntax.Let (binding, body, _) ->
+      binding_has_if_join_with_body_call name binding || has_if_join_with_body_call name body
+  | Syntax.App (fn, args, _) | Syntax.Jump (fn, args, _) ->
+      has_if_join_with_body_call name fn || List.exists (has_if_join_with_body_call name) args
+  | Syntax.Op (_, lhs, rhs, _) -> has_if_join_with_body_call name lhs || has_if_join_with_body_call name rhs
+  | Syntax.Tup (values, _) | Syntax.Arr (values, _) -> List.exists (has_if_join_with_body_call name) values
+  | Syntax.Lam (_, body, _) -> has_if_join_with_body_call name body
+  | Syntax.Sel (target, _, _) -> has_if_join_with_body_call name target
+  | Syntax.If (cond, if_true, if_false, _) ->
+      has_if_join_with_body_call name cond
+      || has_if_join_with_body_call name if_true
+      || has_if_join_with_body_call name if_false
+  | Syntax.Match (scrutinee, Syntax.MatchPattern cases, _) ->
+      has_if_join_with_body_call name scrutinee
+      || List.exists (fun (_pat, body) -> has_if_join_with_body_call name body) cases
+  | Syntax.Unit | Syntax.Int _ | Syntax.Float _ | Syntax.Bool _ | Syntax.Str _ | Syntax.Builtin _ | Syntax.Var _
+  | Syntax.GVar _ | Syntax.Ctor _ ->
+      false
+
+and binding_has_if_join_with_body_call name = function
+  | Syntax.BSeq (expr, _) -> has_if_join_with_body_call name expr
+  | Syntax.BOne (_pat, expr, _) | Syntax.BCont (_pat, expr, _) -> has_if_join_with_body_call name expr
+  | Syntax.BRec entries | Syntax.BRecC entries ->
+      List.exists (fun (_pat, expr, _) -> has_if_join_with_body_call name expr) entries
+
 let () =
   let anf = anf_string "let _ = (if true then 1 else 2) + 3;;" in
   assert (Core.String.is_substring anf ~substring:"letcont");
@@ -52,6 +154,28 @@ let () =
   let anf = anf_example_string "AnfJoinMatch.ant" in
   assert (Core.String.is_substring anf ~substring:"letcont");
   assert (Core.String.is_substring anf ~substring:"jump")
+
+let () =
+  let prog =
+    parse "let c = true;; let f = fun x -> x;; let _ = f ((if c then 1 else 2) + 3);;"
+    |> Typing.top_type_of_prog |> Transform.anf_prog
+  in
+  let stmts, _ = prog in
+  let expr =
+    match List.rev stmts with
+    | Syntax.Term (Syntax.BSeq (expr, _)) :: _ | Syntax.Term (Syntax.BOne (_, expr, _)) :: _ -> expr
+    | _ -> failwith "expected final term expression"
+  in
+  assert (has_if_join_with_body_call "f" expr)
+
+let () =
+  List.iter
+    (fun source ->
+      frontend_prog source |> fst |> List.iter (function Syntax.Type _ -> () | Syntax.Term binding -> assert_no_admin_let_rhs_binding binding))
+    [
+      "let _ = let x = (1 + ((2 * 3) / 4)) in x + ((5 + 6) * 7);;";
+      "let f = fun x y -> ((x + y), ((x * y), y));;";
+    ]
 
 let () =
   let info = SynInfo.empty_info in
