@@ -1,10 +1,7 @@
 module IntSet = Set.Make (Int)
 module IntMap = Map.Make (Int)
 
-type edge_liveness = {
-  live_in : IntSet.t;
-  live_params : IntSet.t IntMap.t;
-}
+type edge_liveness = { live_in : IntSet.t; live_params : IntSet.t IntMap.t }
 
 type block_liveness = {
   live_in : IntSet.t;
@@ -44,8 +41,7 @@ let partition_entry_live entry_live block_params =
   (IntSet.diff entry_live block_params, IntSet.inter entry_live block_params)
 
 let equal_edge_liveness (old_info : edge_liveness) (new_info : edge_liveness) =
-  IntSet.equal old_info.live_in new_info.live_in
-  && IntMap.equal IntSet.equal old_info.live_params new_info.live_params
+  IntSet.equal old_info.live_in new_info.live_in && IntMap.equal IntSet.equal old_info.live_params new_info.live_params
 
 let equal_block_liveness old_info new_info =
   IntSet.equal old_info.live_in new_info.live_in
@@ -62,15 +58,13 @@ let check_monotone_param_liveness block_id succ_id old_params new_params =
         | Some live -> live
         | None ->
             failwith
-              (Printf.sprintf
-                 "CfgLiveness: non-monotone update in block %d, edge to block %d lost param %d"
-                 block_id succ_id param_id)
+              (Printf.sprintf "CfgLiveness: non-monotone update in block %d, edge to block %d lost param %d" block_id
+                 succ_id param_id)
       in
       if not (IntSet.subset old_live new_live) then
         failwith
-          (Printf.sprintf
-             "CfgLiveness: non-monotone update in block %d, edge to block %d shrank param %d"
-             block_id succ_id param_id))
+          (Printf.sprintf "CfgLiveness: non-monotone update in block %d, edge to block %d shrank param %d" block_id
+             succ_id param_id))
     old_params
 
 let check_monotone_edge_liveness block_id old_edges new_edges =
@@ -81,15 +75,13 @@ let check_monotone_edge_liveness block_id old_edges new_edges =
         | Some info -> info
         | None ->
             failwith
-              (Printf.sprintf
-                 "CfgLiveness: non-monotone update in block %d, edge to block %d disappeared"
-                 block_id succ_id)
+              (Printf.sprintf "CfgLiveness: non-monotone update in block %d, edge to block %d disappeared" block_id
+                 succ_id)
       in
       if not (IntSet.subset old_info.live_in new_info.live_in) then
         failwith
-          (Printf.sprintf
-             "CfgLiveness: non-monotone update in block %d, edge to block %d shrank live_in"
-             block_id succ_id);
+          (Printf.sprintf "CfgLiveness: non-monotone update in block %d, edge to block %d shrank live_in" block_id
+             succ_id);
       check_monotone_param_liveness block_id succ_id old_info.live_params new_info.live_params)
     old_edges
 
@@ -134,15 +126,7 @@ let analyze_unit ~blocks ~entry_id ~successors ~block_id ~params ~body ~transfer
         let block_params = intset_of_list (params block) in
         let live_in, live_params = partition_entry_live entry_live block_params in
         let current_block_id = block_id block in
-        let info =
-          {
-            live_in;
-            live_out;
-            live_before_term;
-            live_params;
-            live_on_edge;
-          }
-        in
+        let info = { live_in; live_out; live_before_term; live_params; live_on_edge } in
         let old_info = find_live current_block_id in
         check_monotone_block_update current_block_id old_info info;
         if not (equal_block_liveness old_info info) then (

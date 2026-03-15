@@ -234,7 +234,9 @@ let pp_edge_liveness values (edge_live : CfgLiveness.edge_liveness IntMap.t) =
       hardline ^^ string "edge_live:" ^^ hardline
       ^^ separate_map hardline
            (fun (block_id, info) ->
-             string "  -> b" ^^ string (string_of_int block_id) ^^ space ^^ string "live="
+             string "  -> b"
+             ^^ string (string_of_int block_id)
+             ^^ space ^^ string "live="
              ^^ pp_liveness_set values (CfgLiveness.edge_live_values info)
              ^^ space ^^ string "params="
              ^^ pp_edge_param_liveness values info.live_params)

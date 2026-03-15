@@ -11,11 +11,7 @@ open ControlFlowGraph
 let failf fmt = Printf.ksprintf failwith fmt
 
 type slot = int
-
-type block_layout = {
-  param_slots : slot list;
-  frame_size : int;
-}
+type block_layout = { param_slots : slot list; frame_size : int }
 
 type unit_allocation = {
   slot_of_value : slot IntMap.t;
@@ -30,7 +26,6 @@ let add_operand_uses (live : IntSet.t) = function
   | OGlobal _ | OBuiltin _ | OInt _ | OFloat _ | OBool _ | OString _ | OUnit | OCtor _ -> live
 
 let operand_uses operand = add_operand_uses IntSet.empty operand
-
 let add_operands_uses (live : IntSet.t) operands = List.fold_left add_operand_uses live operands
 
 let add_rhs_uses (live : IntSet.t) = function
@@ -105,14 +100,12 @@ let allocate_slots (unit_ir : unit_ir) (interference : IntSet.t IntMap.t) =
   let value_infos =
     List.filter allocatable_value unit_ir.values
     |> List.sort (fun (a : value_info) (b : value_info) ->
-           let degree_a = match IntMap.find_opt a.id interference with Some live -> IntSet.cardinal live | None -> 0 in
-           let degree_b = match IntMap.find_opt b.id interference with Some live -> IntSet.cardinal live | None -> 0 in
-           match Int.compare degree_b degree_a with
-           | 0 -> (
-               match Int.compare (value_priority a) (value_priority b) with
-               | 0 -> Int.compare a.id b.id
-               | order -> order)
-           | order -> order)
+        let degree_a = match IntMap.find_opt a.id interference with Some live -> IntSet.cardinal live | None -> 0 in
+        let degree_b = match IntMap.find_opt b.id interference with Some live -> IntSet.cardinal live | None -> 0 in
+        match Int.compare degree_b degree_a with
+        | 0 -> (
+            match Int.compare (value_priority a) (value_priority b) with 0 -> Int.compare a.id b.id | order -> order)
+        | order -> order)
   in
   List.fold_left
     (fun slot_of_value (info : value_info) ->
@@ -165,11 +158,8 @@ let directed_graph_has_cycle graph =
   in
   IntMap.exists (fun slot _ -> visit slot) graph
 
-let jump_edge_needs_scratch
-    (block_map : block IntMap.t)
-    (liveness : CfgLiveness.unit_liveness)
-    (slot_of_value : slot IntMap.t)
-    (block : block) =
+let jump_edge_needs_scratch (block_map : block IntMap.t) (liveness : CfgLiveness.unit_liveness)
+    (slot_of_value : slot IntMap.t) (block : block) =
   match block.term with
   | Jump (succ_id, args) ->
       let succ =
@@ -206,21 +196,22 @@ let jump_edge_needs_scratch
               else graph)
             IntMap.empty succ.params args
         with Invalid_argument _ ->
-          failf "RegAlloc: jump to block b%d expects %d args, got %d" succ.id (List.length succ.params) (List.length args)
+          failf "RegAlloc: jump to block b%d expects %d args, got %d" succ.id (List.length succ.params)
+            (List.length args)
       in
       directed_graph_has_cycle move_graph
   | Return _ | Branch _ | Match _ -> false
 
 let needs_scratch_slot (unit_ir : unit_ir) (liveness : CfgLiveness.unit_liveness) (slot_of_value : slot IntMap.t) =
-  let block_map = List.fold_left (fun acc (block : block) -> IntMap.add block.id block acc) IntMap.empty unit_ir.blocks in
+  let block_map =
+    List.fold_left (fun acc (block : block) -> IntMap.add block.id block acc) IntMap.empty unit_ir.blocks
+  in
   List.exists (jump_edge_needs_scratch block_map liveness slot_of_value) unit_ir.blocks
 
 let allocate_unit_slots (unit_ir : unit_ir) (liveness : CfgLiveness.unit_liveness) : unit_allocation =
   let interference = build_unit_interference unit_ir liveness in
   let slot_of_value = allocate_slots unit_ir interference in
-  let base_frame_size =
-    IntMap.fold (fun _ slot frame_size -> Int.max frame_size (slot + 1)) slot_of_value 0
-  in
+  let base_frame_size = IntMap.fold (fun _ slot frame_size -> Int.max frame_size (slot + 1)) slot_of_value 0 in
   let scratch_slot = if needs_scratch_slot unit_ir liveness slot_of_value then Some base_frame_size else None in
   let frame_size = match scratch_slot with Some slot -> slot + 1 | None -> base_frame_size in
   let block_layouts = block_layouts_of_slots unit_ir slot_of_value ~frame_size in

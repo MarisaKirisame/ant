@@ -149,6 +149,23 @@ let pop_env_ (w : world code) : Value.value code = app_ (from_ir $ Function "pop
 let goto_ (w : world code) (pc_value : pc) : unit code = set_c_ w (pc_to_exp_ (pc_ pc_value))
 let push_env_ (w : world code) (v : Value.seq code) : unit code = app2_ (from_ir $ Function "push_env") w v
 let get_env_ (w : world code) (i : int code) : Value.seq code = dyn_array_get_ (state_env_ @@ world_state_ w) i
+let get_env_slot_ (w : world code) (i : int code) : Value.seq code = app2_ (from_ir $ Function "get_env_slot") w i
+
+let set_env_slot_ (w : world code) (i : int code) (v : Value.seq code) : unit code =
+  app3_ (from_ir $ Function "set_env_slot") w i v
+
+let init_frame_ (w : world code) (frame_size : int code) (fill : Value.seq code) : unit code =
+  app3_ (from_ir $ Function "init_frame") w frame_size fill
+
+let collect_env_slots_ (w : world code) (slots : int list code) : Value.seq code =
+  app2_ (from_ir $ Function "collect_env_slots") w slots
+
+let restore_env_slots_ (w : world code) (slots : int list code) (saved : Value.seq code) : unit code =
+  app3_ (from_ir $ Function "restore_env_slots") w slots saved
+
+let return_value_ (w : world code) (v : Value.seq code) (exp : exp code) : unit code =
+  app3_ (from_ir $ Function "return_value") w v exp
+
 let exec_done_ (w : world code) : unit code = app_ (from_ir $ Function "exec_done") w
 
 let env_call_ (w : world code) (keep : int list code) (nargs : int code) : Value.seq code =
@@ -167,6 +184,7 @@ let memo_appends_ (xs : Value.seq code list) : Value.seq code =
     (code (string "[" ^^ separate (string ";") (Stdlib.List.map uncode xs) ^^ string "]"))
 
 let memo_from_int_ (i : int code) : Value.seq code = app_ (from_ir $ Function "Memo.from_int") i
+let memo_to_word_ (seq : Value.seq code) : Word.t code = app_ (from_ir $ Function "Memo.to_word") seq
 let int_from_word_ (w : Word.t code) : int code = app_ (from_ir $ Function "Word.get_value") w
 let memo_splits_ (seq : Value.seq code) : Value.seq list code = app_ (from_ir $ Function "Memo.splits") seq
 

@@ -73,13 +73,12 @@ let regmemo_edge_param_liveness info succ_id param_id =
   match CfgLiveness.IntMap.find_opt param_id (regmemo_edge_liveness info succ_id).CfgLiveness.live_params with
   | Some live -> live
   | None ->
-      failwith
-        ("missing regmemo edge param liveness to b" ^ string_of_int succ_id ^ " param " ^ string_of_int param_id)
+      failwith ("missing regmemo edge param liveness to b" ^ string_of_int succ_id ^ " param " ^ string_of_int param_id)
 
 let regmemo_names_of_live (unit_ir : CompileRegMemo.unit_ir) live =
   unit_ir.values
   |> List.filter_map (fun (info : CompileRegMemo.value_info) ->
-         if CfgLiveness.IntSet.mem info.id live then Some info.name else None)
+      if CfgLiveness.IntSet.mem info.id live then Some info.name else None)
   |> List.sort String.compare
 
 let assert_regmemo_live_names unit_ir live expected =
@@ -114,10 +113,8 @@ let rec assert_no_admin_let_rhs_expr = function
 and assert_no_admin_let_rhs_binding = function
   | Syntax.BSeq (expr, _) -> assert_no_admin_let_rhs_expr expr
   | Syntax.BOne (Syntax.PVar (name, _), expr, _) ->
-      if Core.String.is_prefix name ~prefix:"_'anf" then (
-        match expr with
-        | Syntax.Let _ -> failwith ("admin ANF binder has nested let rhs: " ^ name)
-        | _ -> ());
+      (if Core.String.is_prefix name ~prefix:"_'anf" then
+         match expr with Syntax.Let _ -> failwith ("admin ANF binder has nested let rhs: " ^ name) | _ -> ());
       assert_no_admin_let_rhs_expr expr
   | Syntax.BOne (_pat, expr, _) -> assert_no_admin_let_rhs_expr expr
   | Syntax.BCont (_pat, expr, _) -> assert_no_admin_let_rhs_expr expr
@@ -161,8 +158,8 @@ let rec has_if_join_with_body_call name = function
       ( Syntax.BCont (Syntax.PVar (join_name, _), Syntax.Lam (_params, body, _), _),
         Syntax.If (_, if_true, if_false, _),
         _ ) ->
-      ((expr_eventually_jumps_to join_name if_true && expr_eventually_jumps_to join_name if_false)
-      && expr_contains_app_to name body)
+      (expr_eventually_jumps_to join_name if_true && expr_eventually_jumps_to join_name if_false)
+      && expr_contains_app_to name body
       || has_if_join_with_body_call name body
   | Syntax.Let (binding, body, _) ->
       binding_has_if_join_with_body_call name binding || has_if_join_with_body_call name body
@@ -173,8 +170,7 @@ let rec has_if_join_with_body_call name = function
   | Syntax.Lam (_, body, _) -> has_if_join_with_body_call name body
   | Syntax.Sel (target, _, _) -> has_if_join_with_body_call name target
   | Syntax.If (cond, if_true, if_false, _) ->
-      has_if_join_with_body_call name cond
-      || has_if_join_with_body_call name if_true
+      has_if_join_with_body_call name cond || has_if_join_with_body_call name if_true
       || has_if_join_with_body_call name if_false
   | Syntax.Match (scrutinee, Syntax.MatchPattern cases, _) ->
       has_if_join_with_body_call name scrutinee
@@ -229,11 +225,9 @@ let () =
 let () =
   List.iter
     (fun source ->
-      frontend_prog source |> fst |> List.iter (function Syntax.Type _ -> () | Syntax.Term binding -> assert_no_admin_let_rhs_binding binding))
-    [
-      "let _ = let x = (1 + ((2 * 3) / 4)) in x + ((5 + 6) * 7);;";
-      "let f = fun x y -> ((x + y), ((x * y), y));;";
-    ]
+      frontend_prog source |> fst
+      |> List.iter (function Syntax.Type _ -> () | Syntax.Term binding -> assert_no_admin_let_rhs_binding binding))
+    [ "let _ = let x = (1 + ((2 * 3) / 4)) in x + ((5 + 6) * 7);;"; "let f = fun x y -> ((x + y), ((x * y), y));;" ]
 
 let () =
   let info = SynInfo.empty_info in
@@ -305,12 +299,15 @@ let () =
   assert (Core.String.is_substring seq_match ~substring:"match")
 
 let () =
-  let regmemo_if = compile_with CompileRegMemo.Backend.compile (frontend_prog "let f = fun x -> (if x then 1 else 2) + 3;;")
+  let regmemo_if =
+    compile_with CompileRegMemo.Backend.compile (frontend_prog "let f = fun x -> (if x then 1 else 2) + 3;;")
   in
   assert (Core.String.is_substring regmemo_if ~substring:"function f#");
   assert (Core.String.is_substring regmemo_if ~substring:"branch");
   assert (Core.String.is_substring regmemo_if ~substring:"jump");
   assert (Core.String.is_substring regmemo_if ~substring:"allocation:");
+  assert (Core.String.is_substring regmemo_if ~substring:"let populate_state () =");
+  assert (Core.String.is_substring regmemo_if ~substring:"return_value");
   let regmemo_global =
     compile_with CompileRegMemo.Backend.compile
       (frontend_prog "type t = | A of int | B of int;; let x = (match A 1 with | A n -> n | B m -> m) + 1;;")
@@ -318,10 +315,53 @@ let () =
   assert (Core.String.is_substring regmemo_global ~substring:"global x#");
   assert (Core.String.is_substring regmemo_global ~substring:"match");
   let regmemo_call =
-    compile_with CompileRegMemo.Backend.compile
-      (frontend_prog "let g = fun y -> y;; let f = fun x -> g x;;")
+    compile_with CompileRegMemo.Backend.compile (frontend_prog "let g = fun y -> y;; let f = fun x -> g x;;")
   in
-  assert (Core.String.is_substring regmemo_call ~substring:"call @g")
+  assert (Core.String.is_substring regmemo_call ~substring:"call @g");
+  assert (Core.String.is_substring regmemo_call ~substring:"init_frame");
+  assert (Core.String.is_substring regmemo_call ~substring:"set_env_slot")
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("c", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("b", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info); Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let rendered = compile_with CompileRegMemo.Backend.compile prog in
+  assert (Core.String.is_substring rendered ~substring:"scratch=s3");
+  assert (Core.String.is_substring rendered ~substring:"get_env_slot");
+  assert (Core.String.is_substring rendered ~substring:"set_env_slot")
+
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "let g = fun y -> y + 1;; let f = fun x -> let z = g x in z + 2;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"restore_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"cont_0")
 
 let () =
   let info = SynInfo.empty_info in
@@ -432,10 +472,8 @@ let () =
                      ( Syntax.Var ("p", info),
                        Syntax.MatchPattern
                          [
-                           ( Syntax.PTup ([ Syntax.PVar ("x", info); Syntax.PAny ], info),
-                             Syntax.Var ("z", info) );
-                           ( Syntax.PTup ([ Syntax.PAny; Syntax.PVar ("y", info) ], info),
-                             Syntax.Var ("z", info) );
+                           (Syntax.PTup ([ Syntax.PVar ("x", info); Syntax.PAny ], info), Syntax.Var ("z", info));
+                           (Syntax.PTup ([ Syntax.PAny; Syntax.PVar ("y", info) ], info), Syntax.Var ("z", info));
                          ],
                        info ),
                    info ),
@@ -454,12 +492,8 @@ let () =
   assert_regmemo_live_names unit_ir arm1_live.live_in [ "z" ];
   assert_regmemo_live_names unit_ir arm0_live.live_params [];
   assert_regmemo_live_names unit_ir arm1_live.live_params [];
-  assert_regmemo_live_names unit_ir
-    (CfgLiveness.edge_live_values (regmemo_edge_liveness entry_live arm0_id))
-    [ "z" ];
-  assert_regmemo_live_names unit_ir
-    (CfgLiveness.edge_live_values (regmemo_edge_liveness entry_live arm1_id))
-    [ "z" ]
+  assert_regmemo_live_names unit_ir (CfgLiveness.edge_live_values (regmemo_edge_liveness entry_live arm0_id)) [ "z" ];
+  assert_regmemo_live_names unit_ir (CfgLiveness.edge_live_values (regmemo_edge_liveness entry_live arm1_id)) [ "z" ]
 
 let () =
   let info = SynInfo.empty_info in
