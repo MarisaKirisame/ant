@@ -43,10 +43,9 @@ let rec int_list_simple_filter_plain_of_list = function [] -> SimpleFilterPlain.
 let rec int_list_pair_cek_of_list = function [] -> PairCEK.Nil | x :: xs -> PairCEK.Cons (x, int_list_pair_cek_of_list xs)
 let rec int_list_pair_plain_of_list = function [] -> PairPlain.Nil | x :: xs -> PairPlain.Cons (x, int_list_pair_plain_of_list xs)
 
-let length = 256
 
 (* Random, without structure *)
-let random_input =
+let random_input length =
   let rng = Random.State.make [| 42 |] in
   List.init length (fun _ -> Random.State.int rng 100)
 
@@ -55,31 +54,37 @@ let rec remove_index l i =
   | [] -> []
   | hd::tl -> if i = 0 then tl else hd :: remove_index tl (i - 1)
 
-let random_input_removed =
+let random_input_removed input length =
   let rng = Random.State.make [| 42 |] in
-  remove_index random_input (Random.State.int rng length)
+  remove_index input (Random.State.int rng length)
 
 (* Repeating one number, very structured *)
 
-let repeated_input =
+let repeated_input length =
   List.init length (Fun.const 1)
 
 (* Low entropy, semi-structured input *)
 
-let low_entropy_input =
+(* let rec list_to_string l = match l with [] -> "[]" | hd :: tl -> string_of_int hd ^ " :: " ^ list_to_string tl *)
+let low_entropy_input length =
   let rng = Random.State.make [| 42 |] in
-  let chunks = [
-    List.init 7 (fun _ -> Random.State.int rng 100);
-    List.init 8 (fun _ -> Random.State.int rng 100);
-    List.init 8 (fun _ -> Random.State.int rng 100);
-    List.init 9 (fun _ -> Random.State.int rng 100);
-  ] in
-  let rec make_list chunks_to_concat =
-    match chunks_to_concat with
+
+  let max_chunk_length = length |> float_of_int |> Float.cbrt |> int_of_float in
+  let rec generate_chunks rng n =
+    match n with
     | 0 -> []
-    | n -> List.append (List.nth chunks (Random.State.int rng 4)) (make_list (n - 1))
+    | n -> (n, List.init n (fun _ -> Random.State.int rng 100)) :: generate_chunks rng (n - 1)
   in
-  make_list (length / 8)
+  let chunks = generate_chunks rng max_chunk_length in
+  let rec make_list current_size current_list =
+    match current_size > length with
+    | true -> List.take length current_list
+    | false ->
+      let random_index = Random.State.int rng max_chunk_length in
+      let (n, l) = List.nth chunks random_index in
+      make_list (current_size + n) (List.append current_list l)
+  in
+  make_list 0 []
 
 let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries)
 
@@ -176,7 +181,11 @@ let run_case_then_write
 
 let filename program suffix = Printf.sprintf "eval_steps_asymptotic_%s_%s.json" program suffix
 
-let run_all_cases ~program_name ~populate_state ~case_fn ~warmup_fn =
+let run_all_cases ~program_name ~populate_state ~case_fn ~warmup_fn ~length =
+  let random_input = random_input length in
+  let low_entropy_input = low_entropy_input length in
+  let repeated_input = repeated_input length in
+  let random_input_removed = random_input_removed random_input length in
   populate_state ();
   let memo = Ant.Memo.init_memo () in
   let (random_ns_memo, random_ns_cek) = case_fn memo "Random" random_input (filename program_name "random") in
@@ -218,6 +227,7 @@ Ratios      &        & %.3fx       & %.3fx   & %.3fx
 
 let run () =
   run_all_cases
+    ~length:65536
     ~program_name:"map"
     ~populate_state:TestCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
@@ -252,6 +262,7 @@ let run () =
       ());
 
   run_all_cases
+    ~length:65536
     ~program_name:"append"
     ~populate_state:AppendCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
@@ -290,6 +301,7 @@ let run () =
       ());
 
   run_all_cases
+    ~length:1024
     ~program_name:"insertion_sort"
     ~populate_state:InsertionSortCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
@@ -324,6 +336,7 @@ let run () =
       ());
 
   run_all_cases
+    ~length:1024
     ~program_name:"merge_sort"
     ~populate_state:MergeSortCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
@@ -392,6 +405,7 @@ let run () =
       ()); *)
 
   run_all_cases
+    ~length:65536
     ~program_name:"reverse"
     ~populate_state:ReverseCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
@@ -426,6 +440,7 @@ let run () =
       ());
 
   run_all_cases
+    ~length:65536
     ~program_name:"simple_filter"
     ~populate_state:SimpleFilterCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
@@ -460,6 +475,7 @@ let run () =
       ());
 
   run_all_cases
+    ~length:65536
     ~program_name:"pair"
     ~populate_state:PairCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
