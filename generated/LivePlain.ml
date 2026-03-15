@@ -126,28 +126,22 @@ let rec eval =
       match _'anf25 with Some v -> v | None -> VStuck SIndexError)
   | EAbs e -> VAbs (e, env)
   | ELet (lhs, rhs) ->
-      let _'anf26 =
-        let _'anf27 = eval lhs env in
-        Cons (_'anf27, env)
-      in
-      eval rhs _'anf26
+      let _'anf26 = eval lhs env in
+      let _'anf27 = Cons (_'anf26, env) in
+      eval rhs _'anf27
   | EFix e -> VFix (e, env)
   | EApp (f, x) -> (
       let fv = eval f env in
       match fv with
       | VAbs (e, env_) ->
-          let _'anf28 =
-            let _'anf29 = eval x env in
-            Cons (_'anf29, env_)
-          in
-          eval e _'anf28
+          let _'anf28 = eval x env in
+          let _'anf29 = Cons (_'anf28, env_) in
+          eval e _'anf29
       | VFix (e, env_) ->
-          let _'anf30 =
-            let _'anf31 = eval x env in
-            let _'anf32 = Cons (fv, env_) in
-            Cons (_'anf31, _'anf32)
-          in
-          eval e _'anf30
+          let _'anf30 = eval x env in
+          let _'anf31 = Cons (fv, env_) in
+          let _'anf32 = Cons (_'anf30, _'anf31) in
+          eval e _'anf32
       | VStuck fs ->
           let _'anf33 = SApp (fs, x) in
           VStuck _'anf33
@@ -204,11 +198,9 @@ let rec eval =
       match _'anf49 with
       | VNil -> eval n env
       | VCons (x, xs) ->
-          let _'anf50 =
-            let _'anf51 = Cons (x, env) in
-            Cons (xs, _'anf51)
-          in
-          eval c _'anf50
+          let _'anf50 = Cons (x, env) in
+          let _'anf51 = Cons (xs, _'anf50) in
+          eval c _'anf51
       | VStuck vs ->
           let _'anf52 = SMatchList (vs, n, c) in
           VStuck _'anf52

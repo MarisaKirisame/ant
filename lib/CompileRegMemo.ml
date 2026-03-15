@@ -236,7 +236,6 @@ let new_cg_ctx () =
   let apply_cont = add_code dummy None in
   { dummy with apply_cont }
 
-let bool_eq_code lhs rhs = code $ parens (uncode lhs ^^ string " = " ^^ uncode rhs)
 let bool_nonzero_code value = code $ parens (uncode value ^^ string " <> 0")
 let unsupported_codegen construct = failf "CompileRegMemo codegen unsupported: %s" construct
 
@@ -298,6 +297,18 @@ let bind_values prefix values k =
   in
   aux 0 [] values
 
+let string_of_ir_pattern (unit_cg : unit_codegen) pattern =
+  string_of_document (pp_pattern (value_table unit_cg.unit_ir) pattern)
+
+let unsupported_match_pattern (unit_cg : unit_codegen) pattern =
+  failf "CompileRegMemo: unsupported match pattern `%s`; only patterns accepted by CompileMemo are supported"
+    (string_of_ir_pattern unit_cg pattern)
+
+let block_pc_or_fail (unit_cg : unit_codegen) block_id =
+  match IntMap.find_opt block_id unit_cg.block_pcs with
+  | Some pc -> pc
+  | None -> failf "CompileRegMemo: missing pc for block b%d" block_id
+
 let write_slot w slot value = set_env_slot_ w (int_ slot) value
 let seqs_of_writers writers = seqs_ (List.map (fun writer -> fun _ -> writer ()) writers)
 
@@ -343,50 +354,90 @@ let schedule_parallel_moves scratch_slot moves =
   in
   loop local_moves []
 
-let rec compile_pattern_match ctx unit_cg subject pattern on_success on_failure =
+let compile_match_success unit_cg w block assigns =
+  [%seqs
+    seqs_
+      (List.map
+         (fun (value_id, value) ->
+           let slot = slot_of_value unit_cg.allocation value_id in
+           fun _ -> set_env_slot_ w (int_ slot) value)
+         assigns);
+    goto_ w (block_pc_or_fail unit_cg block)]
+
+let tuple_pattern_assigns unit_cg whole_pattern patterns parts =
+  List.rev
+    (List.fold_left2
+       (fun acc pattern part ->
+         match pattern with
+         | RPAny -> acc
+         | RPBind value_id -> (value_id, part) :: acc
+         | _ -> unsupported_match_pattern unit_cg whole_pattern)
+       [] patterns parts)
+
+let compile_tuple_bindings unit_cg whole_pattern parts patterns w block =
+  bind_values "part"
+    (List.mapi (fun index _ -> nth_seq parts index) patterns)
+    (fun bound_parts ->
+      compile_match_success unit_cg w block (tuple_pattern_assigns unit_cg whole_pattern patterns bound_parts))
+
+let compile_default_arm unit_cg subject arms w current_pc =
+  let rec loop = function
+    | [] -> unreachable_ (pc_to_int current_pc)
+    | ({ pattern = RPAny; block } : match_arm) :: _ -> compile_match_success unit_cg w block []
+    | ({ pattern = RPBind value_id; block } : match_arm) :: _ ->
+        compile_match_success unit_cg w block [ (value_id, subject) ]
+    | _ :: rest -> loop rest
+  in
+  loop arms
+
+let compile_ctor_arm ctx unit_cg pair w default ({ pattern; block } : match_arm) =
   match pattern with
-  | RPAny -> on_success []
-  | RPBind value_id -> on_success [ (value_id, subject) ]
-  | RPInt n ->
-      let_in_ "word" (memo_to_word_ subject) (fun word ->
-          if_ (bool_eq_code (word_get_value_ word) (int_ n)) (on_success []) on_failure)
-  | RPBool b ->
-      let_in_ "word" (memo_to_word_ subject) (fun word ->
-          if_ (bool_eq_code (word_get_value_ word) (int_ (if b then 1 else 0))) (on_success []) on_failure)
-  | RPUnit ->
-      let_in_ "word" (memo_to_word_ subject) (fun word ->
-          if_ (bool_eq_code (word_get_value_ word) (int_ 0)) (on_success []) on_failure)
-  | RPTuple patterns ->
-      let_in_ "parts" (memo_splits_ subject) (fun parts ->
-          let len_ok =
-            code
-            $ parens
-                (string "List.length " ^^ uncode parts ^^ string " = " ^^ string (string_of_int (List.length patterns)))
-          in
-          if_ len_ok (compile_pattern_list ctx unit_cg parts patterns 0 on_success on_failure) on_failure)
   | RPCtor (ctor, payload) ->
+      let body =
+        match payload with
+        | None | Some RPAny -> compile_match_success unit_cg w block []
+        | Some (RPBind value_id) -> compile_match_success unit_cg w block [ (value_id, pair_value_ pair) ]
+        | Some (RPTuple patterns) ->
+            let whole_pattern = RPCtor (ctor, Some (RPTuple patterns)) in
+            let_in_ "parts"
+              (memo_splits_ (pair_value_ pair))
+              (fun parts ->
+                let len_ok =
+                  code
+                  $ parens
+                      (string "List.length " ^^ uncode parts ^^ string " = "
+                      ^^ string (string_of_int (List.length patterns)))
+                in
+                if_ len_ok (compile_tuple_bindings unit_cg whole_pattern parts patterns w block) default)
+        | Some unsupported -> unsupported_match_pattern unit_cg (RPCtor (ctor, Some unsupported))
+      in
+      (Hashtbl.find_exn ctx.ctag ctor, Hashtbl.find_exn ctx.ctag_name ctor, body)
+  | _ -> failwith "CompileRegMemo: internal error while compiling ctor dispatch"
+
+let compile_ctor_dispatch ctx unit_cg subject arms w current_pc =
+  let default = compile_default_arm unit_cg subject arms w current_pc in
+  let ctor_arms =
+    List.filter_map
+      (fun ({ pattern; _ } as arm) ->
+        match pattern with
+        | RPCtor _ -> Some arm
+        | RPAny | RPBind _ -> None
+        | unsupported -> unsupported_match_pattern unit_cg unsupported)
+      arms
+  in
+  match ctor_arms with
+  | [] -> default
+  | _ ->
       match_option_ (memo_list_match_ subject)
-        (fun () -> on_failure)
+        (fun () -> default)
         "pair"
         (fun pair ->
-          let tag_ok = bool_eq_code (word_get_value_ (zro_ pair)) (ctor_tag_name ctx ctor) in
-          if_ tag_ok
-            (match payload with
-            | None -> on_success []
-            | Some payload_pat -> compile_pattern_match ctx unit_cg (pair_value_ pair) payload_pat on_success on_failure)
-            on_failure)
-
-and compile_pattern_list ctx unit_cg parts patterns index on_success on_failure =
-  match patterns with
-  | [] -> on_success []
-  | pattern :: rest ->
-      let_in_ (Printf.sprintf "part%d" index) (nth_seq parts index) (fun part ->
-          compile_pattern_match ctx unit_cg part pattern
-            (fun assigns ->
-              compile_pattern_list ctx unit_cg parts rest (index + 1)
-                (fun rest_assigns -> on_success (assigns @ rest_assigns))
-                on_failure)
-            on_failure)
+          let_in_ "tag"
+            (word_get_value_ (zro_ pair))
+            (fun tag ->
+              match_ctor_tag_literal_default_ tag
+                (List.map (compile_ctor_arm ctx unit_cg pair w default) ctor_arms)
+                default))
 
 let compile_non_call_rhs (ctx : cg_ctx) (unit_cg : unit_codegen) (w : world code) dst rhs =
   let dst_slot = slot_of_value unit_cg.allocation dst in
@@ -459,15 +510,14 @@ let compile_call_setup ctx callee w arg_values =
     init_frame_ w (int_ callee.allocation.frame_size) (dummy_value_ ctx);
     seqs_ (List.map2 (fun slot value -> fun _ -> set_env_slot_ w (int_ slot) value) entry_layout.param_slots arg_values)]
 
-let rec compile_stmt_chain ctx unit_cg block current_pc stmts stmt_afters term =
+let rec compile_stmt_chain ctx unit_cg block current_pc w stmts stmt_afters term =
   match (stmts, stmt_afters) with
-  | [], [] -> compile_terminator ctx unit_cg block current_pc term
+  | [], [] -> compile_terminator ctx unit_cg block current_pc w term
   | Bind (dst, Call (Direct callee_name, args)) :: rest, live_after :: rest_afters ->
       let callee = compiled_unit_exn ctx callee_name in
       bind_values "arg"
-        (List.map (operand_value_code ctx unit_cg (var_ "w")) args)
+        (List.map (operand_value_code ctx unit_cg w) args)
         (fun arg_values ->
-          let w = var_ "w" in
           if rest = [] then
             match term with
             | Return (OLocal return_id) when return_id = dst ->
@@ -481,7 +531,7 @@ let rec compile_stmt_chain ctx unit_cg block current_pc stmts stmt_afters term =
                       ( lam_ "w" (fun w ->
                             [%seqs
                               assert_env_length_ w (int_ unit_cg.allocation.frame_size);
-                              compile_terminator ctx unit_cg block resume_pc term]),
+                              compile_terminator ctx unit_cg block resume_pc w term]),
                         resume_pc ))
                 in
                 compile_non_tail_call ctx unit_cg block w dst callee arg_values live_after resume_pc
@@ -491,18 +541,17 @@ let rec compile_stmt_chain ctx unit_cg block current_pc stmts stmt_afters term =
                   ( lam_ "w" (fun w ->
                         [%seqs
                           assert_env_length_ w (int_ unit_cg.allocation.frame_size);
-                          compile_stmt_chain ctx unit_cg block resume_pc rest rest_afters term]),
+                          compile_stmt_chain ctx unit_cg block resume_pc w rest rest_afters term]),
                     resume_pc ))
             in
             compile_non_tail_call ctx unit_cg block w dst callee arg_values live_after resume_pc)
   | Bind (_, Call (Indirect _, _)) :: _, _ -> unsupported_codegen "indirect call"
   | Bind (_, Call (Direct _, _)) :: _, [] -> failwith "CompileRegMemo: missing live-after information for call"
   | Bind (dst, rhs) :: rest, _live_after :: rest_afters ->
-      let w = var_ "w" in
       [%seqs
         assert_env_length_ w (int_ unit_cg.allocation.frame_size);
         compile_non_call_rhs ctx unit_cg w dst rhs;
-        compile_stmt_chain ctx unit_cg block current_pc rest rest_afters term]
+        compile_stmt_chain ctx unit_cg block current_pc w rest rest_afters term]
   | _ -> failwith "CompileRegMemo: mismatched statement and liveness counts"
 
 and compile_non_tail_call ctx unit_cg _block w dst callee arg_values live_after resume_pc =
@@ -529,27 +578,7 @@ and compile_non_tail_call ctx unit_cg _block w dst callee arg_values live_after 
     compile_call_setup ctx callee w arg_values;
     goto_ w callee.entry_pc]
 
-and compile_match_arms ctx unit_cg subject arms w current_pc =
-  match arms with
-  | [] -> to_unit_ $ unreachable_ (pc_to_int current_pc)
-  | ({ pattern; block } : match_arm) :: rest ->
-      compile_pattern_match ctx unit_cg subject pattern
-        (fun assigns ->
-          [%seqs
-            seqs_
-              (List.map
-                 (fun (value_id, value) ->
-                   let slot = slot_of_value unit_cg.allocation value_id in
-                   fun _ -> set_env_slot_ w (int_ slot) value)
-                 assigns);
-            goto_ w
-              (match IntMap.find_opt block unit_cg.block_pcs with
-              | Some pc -> pc
-              | None -> failf "CompileRegMemo: missing pc for block b%d" block)])
-        (compile_match_arms ctx unit_cg subject rest w current_pc)
-
-and compile_terminator ctx unit_cg block current_pc term =
-  let w = var_ "w" in
+and compile_terminator ctx unit_cg block current_pc w term =
   match term with
   | Return operand -> return_value_ w (operand_value_code ctx unit_cg w operand) (pc_to_exp_ (pc_ ctx.apply_cont))
   | Jump (succ_id, args) ->
@@ -576,7 +605,7 @@ and compile_terminator ctx unit_cg block current_pc term =
   | Match (scrutinee, arms) ->
       [%seqs
         assert_env_length_ w (int_ unit_cg.allocation.frame_size);
-        compile_match_arms ctx unit_cg (operand_value_code ctx unit_cg w scrutinee) arms w current_pc]
+        compile_ctor_dispatch ctx unit_cg (operand_value_code ctx unit_cg w scrutinee) arms w current_pc]
 
 let compile_block ctx unit_cg (block : block) =
   let current_pc =
@@ -590,7 +619,7 @@ let compile_block ctx unit_cg (block : block) =
     (lam_ "w" (fun w ->
          [%seqs
            assert_env_length_ w (int_ unit_cg.allocation.frame_size);
-           compile_stmt_chain ctx unit_cg block current_pc block.body stmt_afters block.term]))
+           compile_stmt_chain ctx unit_cg block current_pc w block.body stmt_afters block.term]))
 
 let generate_apply_cont (ctx : cg_ctx) =
   set_code ctx ctx.apply_cont
@@ -643,9 +672,13 @@ let compile_type_stmt (ctx : cg_ctx) = function
       CompileType.compile_ty_binding ctx.ctag binding
   | Term _ -> empty
 
+(* NOTE: !!! set this to enable IR dump *)
+
+let dump_cfg = false
+
 let analysis_comment (analysis : prog_slot_analysis) =
   let rendered = Syntax.string_of_document (pp_prog_slot_analysis analysis) in
-  string "(*" ^^ hardline ^^ string rendered ^^ hardline ^^ string "*)"
+  if dump_cfg then string "(*" ^^ hardline ^^ string rendered ^^ hardline ^^ string "*)" else empty
 
 let compile_reg_memo (prog : 'a prog) : document =
   let analysis = analyze_prog_slots (lower_prog prog) in

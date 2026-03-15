@@ -472,8 +472,12 @@ let () =
                      ( Syntax.Var ("p", info),
                        Syntax.MatchPattern
                          [
-                           (Syntax.PTup ([ Syntax.PVar ("x", info); Syntax.PAny ], info), Syntax.Var ("z", info));
-                           (Syntax.PTup ([ Syntax.PAny; Syntax.PVar ("y", info) ], info), Syntax.Var ("z", info));
+                           ( Syntax.PCtorApp
+                               ("A", Some (Syntax.PTup ([ Syntax.PVar ("x", info); Syntax.PAny ], info)), info),
+                             Syntax.Var ("z", info) );
+                           ( Syntax.PCtorApp
+                               ("B", Some (Syntax.PTup ([ Syntax.PAny; Syntax.PVar ("y", info) ], info)), info),
+                             Syntax.Var ("z", info) );
                          ],
                        info ),
                    info ),

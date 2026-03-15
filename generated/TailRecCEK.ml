@@ -24,8 +24,8 @@ let rec to_ocaml_int_list x =
       Cons (Word.get_value (Memo.to_word x0), to_ocaml_int_list x1)
   | _ -> failwith "unreachable"
 
-let rec sum memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let sum memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek (pc_to_exp (int_to_pc 3)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let populate_state () =
   Memo.reset ();
@@ -34,55 +34,48 @@ let populate_state () =
     (fun w_3 ->
       assert_env_length w_3 1;
       let hd_0, tl_0 = resolve w_3 K in
-      match Word.get_value hd_0 with 0 (* tag_cont_done *) -> exec_done w_3 | _ -> failwith "unreachable (0)")
+      match Word.get_value hd_0 with _ -> failwith "unreachable (0)")
     0;
   add_exp
     (fun w_0 ->
-      assert_env_length w_0 2;
-      push_env w_0 (Dynarray.get w_0.state.e 0);
-      w_0.state.c <- pc_to_exp (int_to_pc 3))
+      assert_env_length w_0 3;
+      return_value w_0 (get_env_slot w_0 0) (pc_to_exp (int_to_pc 0)))
     1;
-  add_exp
-    (fun w_2 ->
-      assert_env_length w_2 6;
-      let x0_0 = resolve w_2 (Source.E 4) in
-      let x1_0 = resolve w_2 (Source.E 5) in
-      ignore (pop_env w_2);
-      ignore (pop_env w_2);
-      push_env w_2 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
-      assert_env_length w_2 5;
-      push_env w_2 (Dynarray.get w_2.state.e 3);
-      assert_env_length w_2 6;
-      push_env w_2 (Dynarray.get w_2.state.e 4);
-      assert_env_length w_2 7;
-      ignore (env_call w_2 [] 2);
-      w_2.state.c <- pc_to_exp (int_to_pc 1))
-    2;
   add_exp
     (fun w_1 ->
       assert_env_length w_1 3;
-      let last_0 = Source.E 2 in
-      let x_0 = resolve w_1 last_0 in
-      match Word.get_value (fst x_0) with
-      | 1 (* tag_Nil *) ->
-          ignore (pop_env w_1);
-          assert_env_length w_1 2;
-          push_env w_1 (Dynarray.get w_1.state.e 1);
-          assert_env_length w_1 3;
-          return_n w_1 3 (pc_to_exp (int_to_pc 0))
-      | 2 (* tag_Cons *) ->
-          let splits_0 = Memo.splits (snd x_0) in
-          let split0_0 = List.nth splits_0 0 in
-          let split1_0 = List.nth splits_0 1 in
-          ignore (pop_env w_1);
-          push_env w_1 split0_0;
-          push_env w_1 split1_0;
-          assert_env_length w_1 4;
-          push_env w_1 (Dynarray.get w_1.state.e 2);
-          assert_env_length w_1 5;
-          push_env w_1 (Dynarray.get w_1.state.e 1);
-          w_1.state.c <- pc_to_exp (int_to_pc 2)
-      | _ -> failwith "unreachable (3)")
+      assert_env_length w_1 3;
+      let lhs_0 = Memo.to_word (get_env_slot w_1 2) in
+      let rhs_0 = Memo.to_word (get_env_slot w_1 0) in
+      set_env_slot w_1 0 (Memo.from_int (Word.get_value lhs_0 + Word.get_value rhs_0));
+      let arg0_0 = get_env_slot w_1 1 in
+      let arg1_0 = get_env_slot w_1 0 in
+      assert_env_length w_1 3;
+      init_frame w_1 3 (Memo.from_constructor tag_cont_done);
+      set_env_slot w_1 1 arg0_0;
+      set_env_slot w_1 0 arg1_0;
+      w_1.state.c <- pc_to_exp (int_to_pc 3))
+    2;
+  add_exp
+    (fun w_2 ->
+      assert_env_length w_2 3;
+      assert_env_length w_2 3;
+      match Memo.list_match (get_env_slot w_2 1) with
+      | None -> failwith "unreachable (3)"
+      | Some pair_0 -> (
+          let tag_0 = Word.get_value (fst pair_0) in
+          match tag_0 with
+          | 1 (* tag_Nil *) -> w_2.state.c <- pc_to_exp (int_to_pc 1)
+          | 2 (* tag_Cons *) ->
+              let parts_0 = Memo.splits (snd pair_0) in
+              if List.length parts_0 = 2 then (
+                let part0_0 = List.nth parts_0 0 in
+                let part1_0 = List.nth parts_0 1 in
+                set_env_slot w_2 2 part0_0;
+                set_env_slot w_2 1 part1_0;
+                w_2.state.c <- pc_to_exp (int_to_pc 2))
+              else failwith "unreachable (3)"
+          | _ -> failwith "unreachable (3)"))
     3;
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;

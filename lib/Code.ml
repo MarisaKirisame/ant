@@ -144,7 +144,7 @@ let set_k_ (w : world code) (k : kont code) : unit code =
   code $ parens (uncode (world_state_ w) ^^ string ".k <- " ^^ uncode k)
 
 let from_constructor_ (ctag : int code) : Value.seq code = app_ (from_ir $ Function "Memo.from_constructor") ctag
-let to_unit_ (x : 'a code) : unit code = app_ (from_ir $ Function "ignore") x
+let to_unit_ (x : 'a code) : unit code = app_ (from_ir $ Function "ignore") (paren x)
 let pop_env_ (w : world code) : Value.value code = app_ (from_ir $ Function "pop_env") w
 let goto_ (w : world code) (pc_value : pc) : unit code = set_c_ w (pc_to_exp_ (pc_ pc_value))
 let push_env_ (w : world code) (v : Value.seq code) : unit code = app2_ (from_ir $ Function "push_env") w v

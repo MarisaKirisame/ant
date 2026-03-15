@@ -118,30 +118,41 @@ let lower_var_param (ctx : func_ctx) (kind : value_kind) (pat : 'a pattern) : st
 let lower_let_var (ctx : func_ctx) (pat : 'a pattern) : string * value_id =
   match pat with PVar (name, _) -> (name, add_value ctx name Local) | _ -> unsupported "non-variable let binder"
 
-let rec lower_match_pattern (ctx : func_ctx) (pat : 'a pattern) : ir_pattern * (string * value_id) list =
+let unsupported_match_pattern pat =
+  failf "AnfToCfg unsupported: complex match pattern `%s`; only patterns accepted by CompileMemo are supported"
+    (string_of_document @@ Syntax.pp_pattern pat)
+
+let lower_match_binder (ctx : func_ctx) (pat : 'a pattern) : ir_pattern * (string * value_id) list =
   match pat with
   | PAny -> (RPAny, [])
-  | PInt n -> (RPInt n, [])
-  | PBool b -> (RPBool b, [])
-  | PUnit -> (RPUnit, [])
   | PVar (name, _) ->
       let id = add_value ctx name MatchBinder in
       (RPBind id, [ (name, id) ])
-  | PTup (patterns, _) ->
-      let patterns_rev, bindings_rev =
-        List.fold_left
-          (fun (patterns_acc, bindings_acc) pat ->
-            let pat', bindings = lower_match_pattern ctx pat in
-            (pat' :: patterns_acc, List.rev_append bindings bindings_acc))
-          ([], []) patterns
-      in
-      (RPTuple (List.rev patterns_rev), List.rev bindings_rev)
-  | PCtorApp (ctor, payload, _) -> (
-      match payload with
-      | None -> (RPCtor (ctor, None), [])
-      | Some payload ->
-          let payload', bindings = lower_match_pattern ctx payload in
-          (RPCtor (ctor, Some payload'), bindings))
+  | _ -> unsupported_match_pattern pat
+
+let lower_match_tuple_payload (ctx : func_ctx) (patterns : 'a pattern list) : ir_pattern * (string * value_id) list =
+  let patterns_rev, bindings_rev =
+    List.fold_left
+      (fun (patterns_acc, bindings_acc) pat ->
+        let pat', bindings = lower_match_binder ctx pat in
+        (pat' :: patterns_acc, List.rev_append bindings bindings_acc))
+      ([], []) patterns
+  in
+  (RPTuple (List.rev patterns_rev), List.rev bindings_rev)
+
+let lower_match_pattern (ctx : func_ctx) (pat : 'a pattern) : ir_pattern * (string * value_id) list =
+  match pat with
+  | PAny | PVar _ -> lower_match_binder ctx pat
+  | PCtorApp (ctor, None, _) -> (RPCtor (ctor, None), [])
+  | PCtorApp (ctor, Some ((PVar _ | PAny) as payload), _) ->
+      let payload', bindings = lower_match_binder ctx payload in
+      (RPCtor (ctor, Some payload'), bindings)
+  | PCtorApp (ctor, Some (PTup (patterns, _)), _)
+    when List.for_all (function PAny | PVar _ -> true | _ -> false) patterns ->
+      let payload', bindings = lower_match_tuple_payload ctx patterns in
+      (RPCtor (ctor, Some payload'), bindings)
+  | PCtorApp (_, Some payload, _) -> unsupported_match_pattern payload
+  | _ -> unsupported_match_pattern pat
 
 let value_ids_of_bindings bindings = List.map snd bindings
 

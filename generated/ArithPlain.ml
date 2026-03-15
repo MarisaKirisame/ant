@@ -102,24 +102,18 @@ let rec normalize =
                 | Const x -> (
                     match y0 with
                     | Const y ->
-                        let _'anf17 =
-                          let _'anf19 = x + y in
-                          Const _'anf19
-                        in
-                        let _'anf18 = Add (x1, y1) in
-                        Add (_'anf17, _'anf18)
+                        let _'anf17 = x + y in
+                        let _'anf18 = Const _'anf17 in
+                        let _'anf19 = Add (x1, y1) in
+                        Add (_'anf18, _'anf19)
                     | _ ->
-                        let _'anf20 =
-                          let _'anf21 = Add (x0, x1) in
-                          Add (_'anf21, y0)
-                        in
-                        Add (_'anf20, y1))
+                        let _'anf20 = Add (x0, x1) in
+                        let _'anf21 = Add (_'anf20, y0) in
+                        Add (_'anf21, y1))
                 | _ ->
-                    let _'anf22 =
-                      let _'anf23 = Add (x0, x1) in
-                      Add (_'anf23, y0)
-                    in
-                    Add (_'anf22, y1))
+                    let _'anf22 = Add (x0, x1) in
+                    let _'anf23 = Add (_'anf22, y0) in
+                    Add (_'anf23, y1))
             | _ -> Add (na, nb))
         | _ -> (
             match nb with
@@ -189,15 +183,11 @@ let rec diffx =
       let _'anf41 = diffx b in
       Add (_'anf40, _'anf41)
   | Mul (a, b) ->
-      let _'anf42 =
-        let _'anf45 = diffx a in
-        Mul (_'anf45, b)
-      in
-      let _'anf43 =
-        let _'anf44 = diffx b in
-        Mul (a, _'anf44)
-      in
-      Add (_'anf42, _'anf43)
+      let _'anf42 = diffx a in
+      let _'anf43 = Mul (_'anf42, b) in
+      let _'anf44 = diffx b in
+      let _'anf45 = Mul (a, _'anf44) in
+      Add (_'anf43, _'anf45)
 
 let rec eval =
  fun e x y ->
