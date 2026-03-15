@@ -46,21 +46,23 @@ let rec normalize =
   | Add (a, b) -> (
       let na = normalize a in
       let nb = normalize b in
-      match na with
-      | Const x -> ( if x = 0 then nb else match nb with Const y -> Const (x + y) | _ -> Add (na, nb))
-      | Add (x0, x1) -> (
-          match nb with
-          | Add (y0, y1) -> (
-              match x0 with
-              | Const x -> (
-                  match y0 with Const y -> Add (Const (x + y), Add (x1, y1)) | _ -> Add (Add (Add (x0, x1), y0), y1))
-              | _ -> Add (Add (Add (x0, x1), y0), y1))
-          | _ -> Add (na, nb))
-      | _ -> (
-          match nb with
-          | Const y -> if y = 0 then na else if compare_expr na nb <= 0 then Add (na, nb) else Add (nb, na)
-          | Add (l, r) -> Add (Add (na, l), r)
-          | _ -> Add (na, nb)))
+      if expr_equal na nb then Mul (Const 2, na)
+      else
+        match na with
+        | Const x -> ( if x = 0 then nb else match nb with Const y -> Const (x + y) | _ -> Add (na, nb))
+        | Add (x0, x1) -> (
+            match nb with
+            | Add (y0, y1) -> (
+                match x0 with
+                | Const x -> (
+                    match y0 with Const y -> Add (Const (x + y), Add (x1, y1)) | _ -> Add (Add (Add (x0, x1), y0), y1))
+                | _ -> Add (Add (Add (x0, x1), y0), y1))
+            | _ -> Add (na, nb))
+        | _ -> (
+            match nb with
+            | Const y -> if y = 0 then na else Add (nb, na)
+            | Add (l, r) -> Add (Add (na, l), r)
+            | _ -> Add (na, nb)))
   | Mul (a, b) -> (
       let na = normalize a in
       let nb = normalize b in
