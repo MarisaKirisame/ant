@@ -7,24 +7,24 @@ module InsertionSortCEK = InsertionSortCEK
 module InsertionSortPlain = InsertionSortPlain
 module MergeSortCEK = MergeSortCEK
 module MergeSortPlain = MergeSortPlain
+module QuickSortCEK = QuickSortCEK
+module QuickSortPlain = QuickSortPlain
 module ReverseCEK = ReverseCEK
 module ReversePlain = ReversePlain
 module SimpleFilterCEK = SimpleFilterCEK
 module SimpleFilterPlain = SimpleFilterPlain
 module PairCEK = PairCEK
 module PairPlain = PairPlain
-module QuickSortCEK = QuickSortCEK
-module QuickSortPlain = QuickSortPlain
 module Word = Ant.Word.Word
 
 let rec list_to_string_test_cek l = match l with TestCEK.Nil -> "[]" | TestCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_test_cek tl
 let rec list_to_string_append_cek l = match l with AppendCEK.Nil -> "[]" | AppendCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_append_cek tl
 let rec list_to_string_insertion_sort_cek l = match l with InsertionSortCEK.Nil -> "[]" | InsertionSortCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_insertion_sort_cek tl
 let rec list_to_string_merge_sort_cek l = match l with MergeSortCEK.Nil -> "[]" | MergeSortCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_merge_sort_cek tl
+let rec list_to_string_quick_sort_cek l = match l with QuickSortCEK.Nil -> "[]" | QuickSortCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_quick_sort_cek tl
 let rec list_to_string_reverse_cek l = match l with ReverseCEK.Nil -> "[]" | ReverseCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_reverse_cek tl
 let rec list_to_string_simple_filter_cek l = match l with SimpleFilterCEK.Nil -> "[]" | SimpleFilterCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_simple_filter_cek tl
 let rec list_to_string_pair_cek l = match l with PairCEK.NilP -> "[]" | PairCEK.ConsP (a, b, tl) -> "(" ^ string_of_int a ^ ", " ^ string_of_int b ^ ") :: " ^ list_to_string_pair_cek tl
-let rec list_to_string_quick_sort_cek l = match l with QuickSortCEK.Nil -> "[]" | QuickSortCEK.Cons (hd, tl) -> string_of_int hd ^ " :: " ^ list_to_string_quick_sort_cek tl
 
 let rec int_list_test_cek_of_list = function [] -> TestCEK.Nil | x :: xs -> TestCEK.Cons (x, int_list_test_cek_of_list xs)
 let rec int_list_test_plain_of_list = function [] -> TestPlain.Nil | x :: xs -> TestPlain.Cons (x, int_list_test_plain_of_list xs)
@@ -34,6 +34,8 @@ let rec int_list_insertion_sort_cek_of_list = function [] -> InsertionSortCEK.Ni
 let rec int_list_insertion_sort_plain_of_list = function [] -> InsertionSortPlain.Nil | x :: xs -> InsertionSortPlain.Cons (x, int_list_insertion_sort_plain_of_list xs)
 let rec int_list_merge_sort_cek_of_list = function [] -> MergeSortCEK.Nil | x :: xs -> MergeSortCEK.Cons (x, int_list_merge_sort_cek_of_list xs)
 let rec int_list_merge_sort_plain_of_list = function [] -> MergeSortPlain.Nil | x :: xs -> MergeSortPlain.Cons (x, int_list_merge_sort_plain_of_list xs)
+let rec int_list_quick_sort_cek_of_list = function [] -> QuickSortCEK.Nil | x :: xs -> QuickSortCEK.Cons (x, int_list_quick_sort_cek_of_list xs)
+let rec int_list_quick_sort_plain_of_list = function [] -> QuickSortPlain.Nil | x :: xs -> QuickSortPlain.Cons (x, int_list_quick_sort_plain_of_list xs)
 let rec int_list_reverse_cek_of_list = function [] -> ReverseCEK.Nil | x :: xs -> ReverseCEK.Cons (x, int_list_reverse_cek_of_list xs)
 let rec int_list_reverse_plain_of_list = function [] -> ReversePlain.Nil | x :: xs -> ReversePlain.Cons (x, int_list_reverse_plain_of_list xs)
 let rec int_list_simple_filter_cek_of_list = function [] -> SimpleFilterCEK.Nil | x :: xs -> SimpleFilterCEK.Cons (x, int_list_simple_filter_cek_of_list xs)
@@ -354,6 +356,40 @@ let run () =
           ~result_to_string:list_to_string_merge_sort_cek
       in
       ());
+
+  (* run_all_cases
+    ~program_name:"quick_sort"
+    ~populate_state:QuickSortCEK.populate_state
+    ~case_fn:(fun memo label xs filename ->
+      let cek_list = QuickSortCEK.from_ocaml_int_list (int_list_quick_sort_cek_of_list xs) in
+      let plain_list = int_list_quick_sort_plain_of_list xs in
+      run_case_then_write
+        ~memo
+        ~label
+        ~filename
+        ~entry_pc:15
+        ~tag_cont_done:QuickSortCEK.tag_cont_done
+        ~cek_args:[ cek_list ]
+        ~run_memo:(fun memo -> QuickSortCEK.quicksort memo cek_list)
+        ~run_plain:(fun () -> ignore (QuickSortPlain.quicksort plain_list))
+        ~result_of_cek:QuickSortCEK.to_ocaml_int_list
+        ~result_to_string:list_to_string_quick_sort_cek)
+    ~warmup_fn:(fun memo xs ->
+      let cek_list = QuickSortCEK.from_ocaml_int_list (int_list_quick_sort_cek_of_list xs) in
+      let plain_list = int_list_quick_sort_plain_of_list xs in
+      let _ =
+        run_case
+          ~memo
+          ~label:"Random before remove"
+          ~entry_pc:15
+          ~tag_cont_done:QuickSortCEK.tag_cont_done
+          ~cek_args:[ cek_list ]
+          ~run_memo:(fun memo -> QuickSortCEK.quicksort memo cek_list)
+          ~run_plain:(fun () -> ignore (QuickSortPlain.quicksort plain_list))
+          ~result_of_cek:QuickSortCEK.to_ocaml_int_list
+          ~result_to_string:list_to_string_quick_sort_cek
+      in
+      ()); *)
 
   run_all_cases
     ~program_name:"reverse"
