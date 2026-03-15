@@ -95,8 +95,16 @@ let compile_adt (e : env) (tb : 'a ty_binding) =
   let conversions = CompileFfi.compile_conversions ops e.ctag tb in
   type_defs ^^ break 1 ^^ constructors ^^ break 1 ^^ conversions
 
+let unsupported_anf construct = failwith ("CompileSeq backend placeholder: " ^ construct ^ " not implemented")
+
 let rec compile_pp_expr (e : 'a expr) : document =
   match e with
+  | Unit -> string "()"
+  | Int i -> string "(" ^^ string (string_of_int i) ^^ string ")"
+  | Float f -> string (string_of_float f)
+  | Bool b -> string (string_of_bool b)
+  | Str s -> string (String.escaped s) |> dquotes
+  | Builtin (Builtin b, _) -> string b
   | Lam (xs, e, _) -> string "fun " ^^ separate_map space pp_pattern' xs ^^ string " -> " ^^ compile_pp_expr e
   | Match (value, MatchPattern cases, _) ->
       string "match (" ^^ string "to_ocaml_int_list" ^^ space ^^ compile_pp_expr value ^^ string ") with | "
@@ -111,9 +119,27 @@ let rec compile_pp_expr (e : 'a expr) : document =
   | App (Ctor (cname, _), es, _) ->
       string "int_list_" ^^ string cname ^^ string "(" ^^ separate_map (string ",") compile_pp_expr es ^^ string ")"
   | App (f, xs, _) -> string "(" ^^ separate_map space compile_pp_expr (f :: xs) ^^ string ")"
+  | Jump (f, xs, _) -> string "(" ^^ separate_map space compile_pp_expr (f :: xs) ^^ string ")"
   | Op (op, l, r, _) -> string "(" ^^ compile_pp_expr l ^^ string op ^^ compile_pp_expr r ^^ string ")"
-  | Int i -> string "(" ^^ string (string_of_int i) ^^ string ")"
-  | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_expr e)
+  | Tup (xs, _) -> string "(" ^^ separate_map (string ", ") compile_pp_expr xs ^^ string ")"
+  | Arr (xs, _) -> string "[" ^^ separate_map (string "; ") compile_pp_expr xs ^^ string "]"
+  | Let (binding, body, _) -> compile_pp_binding binding (compile_pp_expr body)
+  | Sel (expr, prop, _) -> compile_pp_expr expr ^^ string "." ^^ pp_field prop
+  | If (cond, if_true, if_false, _) ->
+      string "if " ^^ compile_pp_expr cond ^^ string " then " ^^ compile_pp_expr if_true ^^ string " else "
+      ^^ compile_pp_expr if_false
+
+and compile_pp_binding (binding : 'a binding) (body : document) : document =
+  match binding with
+  | BSeq (expr, _) -> compile_pp_expr expr ^^ string ";" ^^ body
+  | BOne (pat, expr, info) -> string "let " ^^ compile_pp_let (pat, expr, info) ^^ string " in " ^^ body
+  | BCont (pat, expr, info) -> string "let " ^^ compile_pp_let (pat, expr, info) ^^ string " in " ^^ body
+  | BRec bindings -> string "let rec " ^^ separate_map (string " and ") compile_pp_let bindings ^^ string " in " ^^ body
+  | BRecC bindings ->
+      string "let rec " ^^ separate_map (string " and ") compile_pp_let bindings ^^ string " in " ^^ body
+
+and compile_pp_let ((pat, expr, _) : 'a pattern * 'a expr * 'a) =
+  pp_pattern pat ^^ space ^^ string "=" ^^ space ^^ group (compile_pp_expr expr)
 
 let compile_pp_stmt (e : env) (s : 'a stmt) : document =
   match s with
@@ -123,6 +149,9 @@ let compile_pp_stmt (e : env) (s : 'a stmt) : document =
   | Term (BOne (x, tm, _)) ->
       string "let rec" ^^ space ^^ pp_pattern x ^^ space ^^ string "=" ^^ space ^^ group @@ compile_pp_expr tm
       ^^ string ";;"
+  | Term (BCont (x, tm, _)) ->
+      string "let" ^^ space ^^ pp_pattern x ^^ space ^^ string "=" ^^ space ^^ group @@ compile_pp_expr tm
+      ^^ string ";;"
   | Term (BRec bindings) ->
       string "let rec" ^^ space
       ^^ separate_map
@@ -130,7 +159,13 @@ let compile_pp_stmt (e : env) (s : 'a stmt) : document =
            (fun (x, tm, _) -> pp_pattern x ^^ space ^^ string "=" ^^ space ^^ group @@ compile_pp_expr tm)
            bindings
       ^^ string ";;"
-  | _ -> failwith "Not implemented (TODO)"
+  | Term (BRecC bindings) ->
+      string "let rec" ^^ space
+      ^^ separate_map
+           (space ^^ string "and" ^^ space)
+           (fun (x, tm, _) -> pp_pattern x ^^ space ^^ string "=" ^^ space ^^ group @@ compile_pp_expr tm)
+           bindings
+      ^^ string ";;"
 
 let compile_ant x =
   string "open Ant" ^^ break 1 ^^ string "module Word = Seq.Word" ^^ break 1

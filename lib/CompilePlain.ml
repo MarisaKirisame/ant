@@ -27,6 +27,8 @@ let set_type_alias_module value =
       if not (is_valid_module_path module_name) then invalid_arg ("Invalid module path for --type-alias: " ^ module_name));
   type_alias_module := value
 
+let unsupported_anf construct = failwith ("CompilePlain backend placeholder: " ^ construct ^ " not implemented")
+
 let rec compile_ty (x : 'a ty) : document =
   match x with
   | TUnit -> string "unit"
@@ -100,6 +102,8 @@ let rec compile_expr (e : 'a expr) : document =
   | App (Ctor (name, _), args, _) ->
       string name ^^ space ^^ parens (separate_map (string ", ") parens_compile_expr args)
   | App (fn, args, _) -> parens_compile_expr fn ^^ space ^^ separate_map space parens_compile_expr args
+  | Jump (fn, [], _) -> parens_compile_expr fn
+  | Jump (fn, args, _) -> parens_compile_expr fn ^^ space ^^ separate_map space parens_compile_expr args
   | Op (op, lhs, rhs, _) -> parens (parens_compile_expr lhs ^^ string op ^^ parens_compile_expr rhs)
   | Tup (xs, _) -> string "(" ^^ separate_map (string ", ") compile_expr xs ^^ string ")"
   | Arr (xs, _) -> string "[]" ^^ separate_map (string "; ") compile_expr xs ^^ string "]"
@@ -119,8 +123,10 @@ and parens_compile_expr e = parens (compile_expr e)
 and compile_binding (b : 'a binding) (cont : document) : document =
   match b with
   | BSeq (e, _) -> compile_expr e ^^ string ";" ^^ cont
-  | BOne (p, e, info) | BCont (p, e, info) -> string "let " ^^ compile_let (p, e, info) ^^ string " in " ^^ cont
-  | BRec xs | BRecC xs -> string "let rec " ^^ separate_map (string " and ") compile_let xs ^^ string " in " ^^ cont
+  | BOne (p, e, info) -> string "let " ^^ compile_let (p, e, info) ^^ string " in " ^^ cont
+  | BCont (p, e, info) -> string "let " ^^ compile_let (p, e, info) ^^ string " in " ^^ cont
+  | BRec xs -> string "let rec " ^^ separate_map (string " and ") compile_let xs ^^ string " in " ^^ cont
+  | BRecC xs -> string "let rec " ^^ separate_map (string " and ") compile_let xs ^^ string " in " ^^ cont
 
 and compile_let (p, e, _) = parens_compile_pat p ^^ string " = " ^^ parens (compile_expr e)
 
@@ -131,8 +137,10 @@ let compile_stmt (x : 'a stmt) : document =
       | None -> compile_type_binding tb
       | Some module_name -> compile_type_alias module_name tb)
   | Term (BSeq (e, _)) -> compile_expr e
-  | Term (BOne (pat, e, _) | BRec [ (pat, e, _) ]) ->
-      string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
+  | Term (BOne (pat, e, _)) -> string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
+  | Term (BCont (pat, e, _)) -> string "let " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
+  | Term (BRec [ (pat, e, _) ]) -> string "let rec " ^^ parens_compile_pat pat ^^ string " = " ^^ compile_expr e
+  | Term (BRecC xs) -> string "let rec " ^^ separate_map (string " and ") compile_let xs
   | _ -> failwith "Not implemented (TODO)"
 
 let compile_plain (xs : 'a stmt list) : document =

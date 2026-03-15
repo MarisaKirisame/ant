@@ -1,0 +1,5 @@
+type t =
+  | A of int
+  | B of int;;
+
+let _ = (match A 1 with | A x -> x | B y -> y) + 1;;

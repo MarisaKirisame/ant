@@ -6,13 +6,28 @@ let parse content =
   | Parser.Error _ -> failwith "parse error in test fixture"
   | Lexer.Error _ -> failwith "lex error in test fixture"
 
+let read_all file = In_channel.with_open_text file In_channel.input_all
+
+let example_path name =
+  let candidates = [ Filename.concat "examples" name; Filename.concat ".." (Filename.concat "examples" name) ] in
+  let rec pick = function [] -> None | path :: rest -> if Sys.file_exists path then Some path else pick rest in
+  match pick candidates with Some path -> path | None -> failwith ("missing example fixture: " ^ name)
+
+let expect_failure ~needle f =
+  try
+    let _ = f () in
+    failwith ("expected failure containing: " ^ needle)
+  with exn ->
+    let message = Printexc.to_string exn in
+    assert (Core.String.is_substring message ~substring:needle)
+
 let anf_string source =
-  source
-  |> parse
-  |> Typing.top_type_of_prog
-  |> Transform.anf_prog
-  |> Syntax.pp_prog
-  |> Syntax.string_of_document
+  source |> parse |> Typing.top_type_of_prog |> Transform.anf_prog |> Syntax.pp_prog |> Syntax.string_of_document
+
+let anf_example_string name = name |> example_path |> read_all |> anf_string
+let frontend_prog source = source |> parse |> Typing.top_type_of_prog |> Transform.anf_prog |> Pat.compile
+let frontend_example name = name |> example_path |> read_all |> frontend_prog
+let compile_with backend prog = prog |> backend |> Syntax.string_of_document
 
 let () =
   let anf = anf_string "let _ = (if true then 1 else 2) + 3;;" in
@@ -20,10 +35,7 @@ let () =
   assert (Core.String.is_substring anf ~substring:"jump")
 
 let () =
-  let anf =
-    anf_string
-      "type t = | A of int | B of int;;\nlet _ = (match A 1 with | A x -> x | B y -> y) + 1;;"
-  in
+  let anf = anf_string "type t = | A of int | B of int;;\nlet _ = (match A 1 with | A x -> x | B y -> y) + 1;;" in
   assert (Core.String.is_substring anf ~substring:"letcont");
   assert (Core.String.is_substring anf ~substring:"jump")
 
@@ -32,9 +44,20 @@ let () =
   assert (Core.String.is_substring anf ~substring:"let rec loop")
 
 let () =
+  let anf = anf_example_string "AnfJoinIf.ant" in
+  assert (Core.String.is_substring anf ~substring:"letcont");
+  assert (Core.String.is_substring anf ~substring:"jump")
+
+let () =
+  let anf = anf_example_string "AnfJoinMatch.ant" in
+  assert (Core.String.is_substring anf ~substring:"letcont");
+  assert (Core.String.is_substring anf ~substring:"jump")
+
+let () =
   let info = SynInfo.empty_info in
   let prog =
-    ( [ Syntax.Term
+    ( [
+        Syntax.Term
           (Syntax.BRecC
              [
                ( Syntax.PVar ("j", info),
@@ -43,11 +66,61 @@ let () =
                      Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info) ], info),
                      info ),
                  info );
-             ]) ],
+             ]);
+      ],
       info )
   in
   let rendered = Syntax.string_of_document (Syntax.pp_prog prog) in
   assert (Core.String.is_substring rendered ~substring:"letcont rec")
+
+let () =
+  let info = SynInfo.empty_info in
+  let jump_prog =
+    ([ Syntax.Term (Syntax.BSeq (Syntax.Jump (Syntax.Var ("k", info), [ Syntax.Int 1 ], info), info)) ], info)
+  in
+  let cont_prog =
+    ( [
+        Syntax.Term
+          (Syntax.BCont
+             (Syntax.PVar ("k", info), Syntax.Lam ([ Syntax.PVar ("x", info) ], Syntax.Var ("x", info), info), info));
+      ],
+      info )
+  in
+  let rec_cont_prog =
+    ( [
+        Syntax.Term
+          (Syntax.BRecC
+             [ (Syntax.PVar ("k", info), Syntax.Lam ([ Syntax.PVar ("x", info) ], Syntax.Var ("x", info), info), info) ]);
+      ],
+      info )
+  in
+  let plain_jump = compile_with CompilePlain.Backend.compile jump_prog in
+  assert (Core.String.is_substring plain_jump ~substring:"k");
+  let plain_cont = compile_with CompilePlain.Backend.compile cont_prog in
+  assert (Core.String.is_substring plain_cont ~substring:"let");
+  let plain_rec_cont = compile_with CompilePlain.Backend.compile rec_cont_prog in
+  assert (Core.String.is_substring plain_rec_cont ~substring:"let rec");
+  let seq_jump = compile_with CompileSeq.Backend.compile jump_prog in
+  assert (Core.String.is_substring seq_jump ~substring:"k");
+  let seq_cont = compile_with CompileSeq.Backend.compile cont_prog in
+  assert (Core.String.is_substring seq_cont ~substring:"let");
+  let seq_rec_cont = compile_with CompileSeq.Backend.compile rec_cont_prog in
+  assert (Core.String.is_substring seq_rec_cont ~substring:"let rec");
+  expect_failure ~needle:"jump" (fun () -> ignore (compile_with CompileMemo.Backend.compile jump_prog));
+  expect_failure ~needle:"CompileMemo backend placeholder: Term BCont not implemented" (fun () ->
+      ignore (compile_with CompileMemo.Backend.compile cont_prog));
+  expect_failure ~needle:"CompileMemo backend placeholder: Term BRecC not implemented" (fun () ->
+      ignore (compile_with CompileMemo.Backend.compile rec_cont_prog))
+
+let () =
+  let plain_if = compile_with CompilePlain.Backend.compile (frontend_example "AnfJoinIf.ant") in
+  assert (Core.String.is_substring plain_if ~substring:"let");
+  let plain_match = compile_with CompilePlain.Backend.compile (frontend_example "AnfJoinMatch.ant") in
+  assert (Core.String.is_substring plain_match ~substring:"match");
+  let seq_if = compile_with CompileSeq.Backend.compile (frontend_example "AnfJoinIf.ant") in
+  assert (Core.String.is_substring seq_if ~substring:"if");
+  let seq_match = compile_with CompileSeq.Backend.compile (frontend_example "AnfJoinMatch.ant") in
+  assert (Core.String.is_substring seq_match ~substring:"match")
 
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =

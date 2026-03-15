@@ -12,6 +12,7 @@ let rec mark_tail_expr_impl (is_tail : bool) (expr : 'a expr) : bool expr =
   | GVar (name, _) -> GVar (name, is_tail)
   | Ctor (ctor, _) -> Ctor (ctor, is_tail)
   | App (fn, args, _) -> App (mark_tail_expr_impl false fn, List.map (mark_tail_expr_impl false) args, is_tail)
+  | Jump (target, args, _) -> Jump (mark_tail_expr_impl false target, List.map (mark_tail_expr_impl false) args, is_tail)
   | Op (op, lhs, rhs, _) -> Op (op, mark_tail_expr_impl false lhs, mark_tail_expr_impl false rhs, is_tail)
   | Tup (values, _) -> Tup (List.map (mark_tail_expr_impl false) values, is_tail)
   | Arr (values, _) -> Arr (List.map (mark_tail_expr_impl false) values, is_tail)

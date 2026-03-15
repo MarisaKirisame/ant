@@ -41,9 +41,17 @@ let populate_state () =
           w_3.state.k <- get_next_cont tl_0;
           restore_env w_3 1 tl_0;
           assert_env_length w_3 2;
+          push_env w_3 (Dynarray.get w_3.state.e 0);
+          assert_env_length w_3 3;
+          push_env w_3 (Dynarray.get w_3.state.e 1);
+          assert_env_length w_3 4;
           let ctor_arg_0 = pop_env w_3 in
           let ctor_arg_1 = pop_env w_3 in
           push_env w_3 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_1; ctor_arg_0 ]);
+          assert_env_length w_3 3;
+          drop_n w_3 3 1;
+          assert_env_length w_3 2;
+          drop_n w_3 2 1;
           assert_env_length w_3 1;
           drop_n w_3 1 0;
           assert_env_length w_3 1;

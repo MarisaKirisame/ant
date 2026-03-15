@@ -90,9 +90,7 @@ let pp_expr =
   in
   let fm ef e inf = group @@ align @@ string "match" ^^ space ^^ ef false e ^^ space ^^ string "with" ^^ inf in
   let fsb pro lhs rhs = group @@ align @@ pro ^^ space ^^ lhs ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ rhs in
-  let fl kw lhs rhs tail =
-    align @@ group @@ group (fsb kw lhs rhs ^^ break 1 ^^ string "in") ^^ break 1 ^^ tail
-  in
+  let fl kw lhs rhs tail = align @@ group @@ group (fsb kw lhs rhs ^^ break 1 ^^ string "in") ^^ break 1 ^^ tail in
   let flr kw lhs rhs others tail =
     align @@ group
     @@ group
@@ -157,7 +155,7 @@ let pp_expr =
             tail_lhs_rhs
         in
         flr (string "letcont rec") lhs rhs others (f false e2)
-    | GVar (x, _) -> string ("global:" ^ x)
+    | GVar (x, _) -> string x
     | If (e, e1, e2, _) ->
         group @@ align
         @@ (group @@ string "if" ^^ nest 2 @@ break 1 ^^ f true e)

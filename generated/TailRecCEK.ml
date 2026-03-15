@@ -44,13 +44,17 @@ let populate_state () =
     1;
   add_exp
     (fun w_2 ->
-      assert_env_length w_2 7;
-      let x0_0 = resolve w_2 (Source.E 5) in
-      let x1_0 = resolve w_2 (Source.E 6) in
+      assert_env_length w_2 6;
+      let x0_0 = resolve w_2 (Source.E 4) in
+      let x1_0 = resolve w_2 (Source.E 5) in
       ignore (pop_env w_2);
       ignore (pop_env w_2);
       push_env w_2 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
+      assert_env_length w_2 5;
+      push_env w_2 (Dynarray.get w_2.state.e 3);
       assert_env_length w_2 6;
+      push_env w_2 (Dynarray.get w_2.state.e 4);
+      assert_env_length w_2 7;
       ignore (env_call w_2 [] 2);
       w_2.state.c <- pc_to_exp (int_to_pc 1))
     2;
@@ -74,10 +78,8 @@ let populate_state () =
           push_env w_1 split0_0;
           push_env w_1 split1_0;
           assert_env_length w_1 4;
-          push_env w_1 (Dynarray.get w_1.state.e 3);
-          assert_env_length w_1 5;
           push_env w_1 (Dynarray.get w_1.state.e 2);
-          assert_env_length w_1 6;
+          assert_env_length w_1 5;
           push_env w_1 (Dynarray.get w_1.state.e 1);
           w_1.state.c <- pc_to_exp (int_to_pc 2)
       | _ -> failwith "unreachable (3)")

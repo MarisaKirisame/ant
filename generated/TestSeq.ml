@@ -23,4 +23,10 @@ let rec to_ocaml_int_list x =
   | _ -> failwith "unreachable"
 
 let rec list_incr =
- fun x -> match to_ocaml_int_list x with Nil -> int_list_Nil | Cons (xh, xt) -> int_list_Cons (xh + 1, list_incr xt)
+ fun x ->
+  match to_ocaml_int_list x with
+  | Nil -> int_list_Nil
+  | Cons (xh, xt) ->
+      let _'anf0 = xh + 1 in
+      let _'anf1 = list_incr xt in
+      int_list_Cons (_'anf0, _'anf1)
