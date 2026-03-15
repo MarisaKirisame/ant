@@ -10,17 +10,17 @@ let rec concat = fun x1 x2 ->
 let rec filter_gt = fun x pivot ->
   match x with
   | Nil -> Nil
-  | Cons xh xt -> if xh > pivot then Cons xh (filter_gt xt) else filter_gt xt;;
+  | Cons xh xt -> if xh > pivot then Cons xh (filter_gt xt pivot) else filter_gt xt pivot;;
 
 let rec filter_eq = fun x pivot ->
   match x with
   | Nil -> Nil
-  | Cons xh xt -> if xh = pivot then Cons xh (filter_eq xt) else filter_eq xt;;
+  | Cons xh xt -> if xh = pivot then Cons xh (filter_eq xt pivot) else filter_eq xt pivot;;
 
 let rec filter_lt = fun x pivot ->
   match x with
   | Nil -> Nil
-  | Cons xh xt -> if xh < pivot then Cons xh (filter_lt xt) else filter_lt xt;;
+  | Cons xh xt -> if xh < pivot then Cons xh (filter_lt xt pivot) else filter_lt xt pivot;;
 
 let rec quicksort = fun x ->
   match x with

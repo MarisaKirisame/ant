@@ -4,7 +4,7 @@ let rec (concat) = fun (x1) (x2) -> (match x1 with (Nil) -> (x2)| (Cons (xh, xt)
 
 let rec (filter_gt) = fun (x) (pivot) -> (match x with (Nil) -> (Nil)| (Cons (xh, xt)) -> (if ((xh)>(pivot)) then (Cons ((xh), ((filter_gt) (xt) (pivot)))) else ((filter_gt) (xt) (pivot))));;
 
-let rec (filter_eq) = fun (x) (pivot) -> (match x with (Nil) -> (Nil)| (Cons (xh, xt)) -> (if ((xh)<(pivot)) then ((filter_eq) (xt) (pivot)) else (if ((xh)>(pivot)) then ((filter_eq) (xt) (pivot)) else (Cons ((xh), ((filter_eq) (xt) (pivot)))))));;
+let rec (filter_eq) = fun (x) (pivot) -> (match x with (Nil) -> (Nil)| (Cons (xh, xt)) -> (if ((xh)=(pivot)) then (Cons ((xh), ((filter_eq) (xt) (pivot)))) else ((filter_eq) (xt) (pivot))));;
 
 let rec (filter_lt) = fun (x) (pivot) -> (match x with (Nil) -> (Nil)| (Cons (xh, xt)) -> (if ((xh)<(pivot)) then (Cons ((xh), ((filter_lt) (xt) (pivot)))) else ((filter_lt) (xt) (pivot))));;
 
