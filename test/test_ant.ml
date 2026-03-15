@@ -35,6 +35,10 @@ let regmemo_single_unit_liveness prog =
   | [ unit_ir ] -> (unit_ir, CompileRegMemo.analyze_unit_liveness unit_ir)
   | _ -> failwith "expected a single regmemo unit"
 
+let regmemo_single_unit_allocation prog =
+  let unit_ir, liveness = regmemo_single_unit_liveness prog in
+  (unit_ir, liveness, CompileRegMemo.allocate_unit_slots unit_ir liveness)
+
 let regmemo_value_id (unit_ir : CompileRegMemo.unit_ir) name =
   match List.find_opt (fun (info : CompileRegMemo.value_info) -> String.equal info.name name) unit_ir.values with
   | Some info -> info.id
@@ -49,6 +53,16 @@ let regmemo_block_liveness (liveness : CfgLiveness.unit_liveness) block_id =
   match CfgLiveness.IntMap.find_opt block_id liveness.blocks with
   | Some info -> info
   | None -> failwith ("missing regmemo block liveness: b" ^ string_of_int block_id)
+
+let regmemo_block_layout (allocation : CompileRegMemo.unit_allocation) block_id =
+  match CfgLiveness.IntMap.find_opt block_id allocation.block_layouts with
+  | Some layout -> layout
+  | None -> failwith ("missing regmemo block layout: b" ^ string_of_int block_id)
+
+let regmemo_slot_of_value (allocation : CompileRegMemo.unit_allocation) value_id =
+  match CfgLiveness.IntMap.find_opt value_id allocation.slot_of_value with
+  | Some slot -> slot
+  | None -> failwith ("missing regmemo slot: v" ^ string_of_int value_id)
 
 let regmemo_edge_liveness info succ_id =
   match CfgLiveness.IntMap.find_opt succ_id info.CfgLiveness.live_on_edge with
@@ -296,6 +310,7 @@ let () =
   assert (Core.String.is_substring regmemo_if ~substring:"function f#");
   assert (Core.String.is_substring regmemo_if ~substring:"branch");
   assert (Core.String.is_substring regmemo_if ~substring:"jump");
+  assert (Core.String.is_substring regmemo_if ~substring:"allocation:");
   let regmemo_global =
     compile_with CompileRegMemo.Backend.compile
       (frontend_prog "type t = | A of int | B of int;; let x = (match A 1 with | A n -> n | B m -> m) + 1;;")
@@ -349,7 +364,7 @@ let () =
       ],
       info )
   in
-  expect_failure ~needle:"CompileRegMemo Phase 1 unsupported: top-level BCont" (fun () ->
+  expect_failure ~needle:"AnfToCfg unsupported: top-level BCont" (fun () ->
       ignore (compile_with CompileRegMemo.Backend.compile bad_prog))
 
 let () =
@@ -445,6 +460,86 @@ let () =
   assert_regmemo_live_names unit_ir
     (CfgLiveness.edge_live_values (regmemo_edge_liveness entry_live arm1_id))
     [ "z" ]
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("c", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("b", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info); Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let join_layout = regmemo_block_layout allocation join_id in
+  let x_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "x") in
+  let y_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "y") in
+  let a_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "a") in
+  let b_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "b") in
+  assert (x_slot <> y_slot);
+  assert (a_slot <> b_slot);
+  assert (join_layout.param_slots = [ a_slot; b_slot ]);
+  assert (a_slot = x_slot);
+  assert (b_slot = y_slot);
+  assert (allocation.scratch_slot = Some 3);
+  assert (allocation.frame_size = 4)
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("c", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("b", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let join_layout = regmemo_block_layout allocation join_id in
+  let a_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "a") in
+  let b_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "b") in
+  assert (join_layout.param_slots = [ a_slot; b_slot ]);
+  assert (allocation.scratch_slot = None);
+  assert (allocation.frame_size = 3)
 
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =

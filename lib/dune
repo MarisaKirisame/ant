@@ -27,6 +27,7 @@
   CfgLiveness
   ControlFlowGraph
   AnfToCfg
+  RegAlloc
   AntHashtbl
   Profile
   batFingerTree
