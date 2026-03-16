@@ -11,6 +11,11 @@ type step_writer = Memo.exec_result -> unit
 
 let current_write_steps : step_writer option ref = ref None
 
+let init_random () =
+  match Sys.getenv_opt "ARITH_SEED" with
+  | Some seed -> ( match int_of_string_opt seed with Some n -> Random.init n | None -> Random.init 0)
+  | None -> Random.init 0
+
 let with_memo f =
   let memo = Memo.init_memo () in
   f memo
@@ -126,7 +131,7 @@ let eval_main_expr_with_details expr =
     Ant.Profile.with_slot main_cek_slot (fun () ->
         LC.to_ocaml_expr
           (Memo.exec_cek_raw
-             (Memo.pc_to_exp (Ant.Common.int_to_pc 22))
+             (Memo.pc_to_exp (Ant.Common.int_to_pc 91))
              (Dynarray.of_list [ seq_expr ])
              (Memo.from_constructor LC.tag_cont_done)))
   in
@@ -138,40 +143,46 @@ let eval_main_expr_with_details expr =
   { value = 0; runtime_seconds = stop -. start; steps_with_memo = res.step; steps_without_memo = res.without_memo_step }
 
 let rec make_term size =
-  if size == 0 then LC.Const 0
-  else if size == 1 then
-    match Random.int 3 with
+  if size <= 1 then
+    match Random.int 5 with
     | 0 -> LC.Var LC.X
     | 1 -> LC.Var LC.Y
-    | 2 -> LC.Const (Random.int 8)
+    | 2 -> LC.Const 0
+    | 3 -> LC.Const 1
+    | 4 -> LC.Const (2 + Random.int 3)
     | _ -> failwith "impossible"
   else (
     assert (size > 0);
     let split f =
-      let lsize = Random.int size in
+      let mid = size / 2 in
+      let slack = (size + 3) / 4 in
+      let low = max 0 (mid - slack) in
+      let width = min size ((slack * 2) + 1) in
+      let lsize = low + Random.int width in
       let rsize = size - lsize - 1 in
       f (make_term lsize) (make_term rsize)
     in
-    match Random.int 4 with
+    match Random.int 10 with
     | 0 -> split (fun x y -> LC.Add (x, y))
     | 1 | 2 | 3 -> split (fun x y -> LC.Mul (x, y))
+    | 4 | 5 ->
+        let t = make_term ((size - 1) / 2) in
+        LC.Add (t, t)
+    | 6 | 7 ->
+        let t = make_term ((size - 1) / 2) in
+        LC.Mul (t, t)
+    | 8 ->
+        let a = make_term (size / 3) in
+        let b = make_term (size - (size / 3) - 2) in
+        LC.Add (LC.Mul (a, b), LC.Mul (b, a))
+    | 9 ->
+        let a = make_term (size / 3) in
+        let b = make_term (size - (size / 3) - 2) in
+        LC.Mul (LC.Add (a, b), LC.Add (a, b))
     | _ -> failwith "impossible")
 
 let run_bench_cases () =
-  let cases =
-    [
-      ("rand-100", 1000);
-      ("rand-200", 2000);
-      ("rand-300", 3000);
-      ("rand-400", 4000);
-      ("rand-500", 5000);
-      ("rand-600", 6000);
-      ("rand-700", 7000);
-      ("rand-800", 8000);
-      ("rand-900", 9000);
-      ("rand-1000", 10000);
-    ]
-  in
+  let cases = [ ("rand-48", 48); ("rand-84", 84); ("rand-96", 96) ] in
   List.iter
     (fun (label, size) ->
       Printf.printf "Running arith case %s...\n" label;
@@ -183,6 +194,7 @@ let run_bench_cases () =
 let run () =
   with_outchannel steps_file (fun oc ->
       let write_steps = write_steps_json oc in
+      init_random ();
       LC.populate_state ();
       let memo = Memo.init_memo () in
       current_write_steps := Some write_steps;
