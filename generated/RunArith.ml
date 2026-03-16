@@ -20,18 +20,15 @@ let with_outchannel steps_path f =
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 
 let plain_var_of_lc = function LC.X -> Plain.X | LC.Y -> Plain.Y
-let rec nat_of_int n = if n <= 0 then LC.Z else LC.S (nat_of_int (n - 1))
-let rec int_of_nat = function LC.Z -> 0 | LC.S n -> 1 + int_of_nat n
-let rec plain_nat_of_lc = function LC.Z -> Plain.Z | LC.S n -> Plain.S (plain_nat_of_lc n)
 
 let rec plain_expr_of_lc = function
-  | LC.Const n -> Plain.Const (plain_nat_of_lc n)
+  | LC.Const n -> Plain.Const n
   | LC.Var v -> Plain.Var (plain_var_of_lc v)
   | LC.Add (a, b) -> Plain.Add (plain_expr_of_lc a, plain_expr_of_lc b)
   | LC.Mul (a, b) -> Plain.Mul (plain_expr_of_lc a, plain_expr_of_lc b)
 
 let rec string_of_expr = function
-  | LC.Const n -> string_of_int (int_of_nat n)
+  | LC.Const n -> string_of_int n
   | LC.Var LC.X -> "X"
   | LC.Var LC.Y -> "Y"
   | LC.Add (a, b) -> Printf.sprintf "(%s + %s)" (string_of_expr a) (string_of_expr b)
@@ -129,7 +126,7 @@ let eval_main_expr_with_details expr =
     Ant.Profile.with_slot main_cek_slot (fun () ->
         LC.to_ocaml_expr
           (Memo.exec_cek_raw
-             (Memo.pc_to_exp (Ant.Common.int_to_pc 98))
+             (Memo.pc_to_exp (Ant.Common.int_to_pc 91))
              (Dynarray.of_list [ seq_expr ])
              (Memo.from_constructor LC.tag_cont_done)))
   in
@@ -145,9 +142,9 @@ let rec make_term size =
     match Random.int 5 with
     | 0 -> LC.Var LC.X
     | 1 -> LC.Var LC.Y
-    | 2 -> LC.Const (nat_of_int 0)
-    | 3 -> LC.Const (nat_of_int 1)
-    | 4 -> LC.Const (nat_of_int (2 + Random.int 3))
+    | 2 -> LC.Const 0
+    | 3 -> LC.Const 1
+    | 4 -> LC.Const (2 + Random.int 3)
     | _ -> failwith "impossible"
   else (
     assert (size > 0);

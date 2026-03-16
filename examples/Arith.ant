@@ -9,7 +9,7 @@ type var =
 ;;
 
 type expr =
-  | Const of nat
+  | Const of int
   | Var of var
   | Add of expr * expr
   | Mul of expr * expr
@@ -29,43 +29,6 @@ type pick_result =
   | NoPick
   | Pick of expr * expr_list
 ;;
-
-let rec nat_add = fun a b ->
-  match a with
-  | Z -> b
-  | S rest -> S (nat_add rest b);;
-
-let rec nat_mul = fun a b ->
-  match a with
-  | Z -> Z
-  | S rest -> nat_add b (nat_mul rest b);;
-
-let rec nat_compare = fun a b ->
-  match a with
-  | Z ->
-    (match b with
-    | Z -> 0
-    | S _ -> (0-1))
-  | S ar ->
-    (match b with
-    | Z -> 1
-    | S br -> nat_compare ar br);;
-
-let nat_equal = fun a b ->
-  nat_compare a b = 0;;
-
-let nat_is_zero = fun n ->
-  match n with
-  | Z -> true
-  | S _ -> false;;
-
-let nat_is_one = fun n ->
-  match n with
-  | S m ->
-    (match m with
-    | Z -> true
-    | S _ -> false)
-  | Z -> false;;
 
 let var_rank = fun v ->
   match v with
@@ -88,7 +51,7 @@ let rec compare_expr = fun a b ->
     match a with
     | Const x ->
       (match b with
-      | Const y -> nat_compare x y)
+      | Const y -> if x < y then (0-1) else if x > y then 1 else 0)
     | Var va ->
       (match b with
       | Var vb ->
@@ -112,7 +75,7 @@ let rec expr_equal = fun a b ->
   match a with
   | Const x ->
     (match b with
-    | Const y -> nat_equal x y
+    | Const y -> x = y
     | _ -> false)
   | Var va ->
     (match b with
@@ -143,12 +106,12 @@ let better_expr = fun a b ->
   else b;;
 
 let scale = fun c e ->
-  if nat_is_zero c then Const Z
+  if c = 0 then Const 0
   else
     match e with
-    | Const x -> Const (nat_mul c x)
+    | Const x -> Const (c * x)
     | _ ->
-      if nat_is_one c then e
+      if c = 1 then e
       else Mul (Const c) e;;
 
 let coeff_value = fun e ->
@@ -157,12 +120,12 @@ let coeff_value = fun e ->
   | Mul lhs rhs ->
     (match lhs with
     | Const c -> c
-    | _ -> S Z)
-  | _ -> S Z;;
+    | _ -> 1)
+  | _ -> 1;;
 
 let coeff_base = fun e ->
   match e with
-  | Const _ -> Const (S Z)
+  | Const _ -> Const 1
   | Mul lhs rhs ->
     (match lhs with
     | Const _ -> rhs
@@ -170,7 +133,7 @@ let coeff_base = fun e ->
   | _ -> e;;
 
 let rec extract_factor = fun needle e ->
-  if expr_equal needle e then Found (Const (S Z))
+  if expr_equal needle e then Found (Const 1)
   else
     match e with
     | Mul a b ->
@@ -225,7 +188,7 @@ let reverse_exprs = fun xs ->
 let rec flatten_add = fun e ->
   match e with
   | Add a b -> append_exprs (flatten_add a) (flatten_add b)
-  | Const x -> if nat_is_zero x then ENil else ECons e ENil
+  | Const x -> if x = 0 then ENil else ECons e ENil
   | _ -> ECons e ENil;;
 
 let rec flatten_mul = fun e ->
@@ -239,12 +202,12 @@ let mul_coeff = fun e ->
   | Mul lhs rhs ->
     (match lhs with
     | Const c -> c
-    | _ -> S Z)
-  | _ -> S Z;;
+    | _ -> 1)
+  | _ -> 1;;
 
 let mul_base = fun e ->
   match e with
-  | Const _ -> Const (S Z)
+  | Const _ -> Const 1
   | Mul lhs rhs ->
     (match lhs with
     | Const _ -> rhs
@@ -253,8 +216,8 @@ let mul_base = fun e ->
 
 let rec mul_total_coeff = fun xs ->
   match xs with
-  | ENil -> S Z
-  | ECons x rest -> nat_mul (mul_coeff x) (mul_total_coeff rest);;
+  | ENil -> 1
+  | ECons x rest -> mul_coeff x * mul_total_coeff rest;;
 
 let rec mul_bases = fun xs ->
   match xs with
@@ -263,13 +226,13 @@ let rec mul_bases = fun xs ->
     let base = mul_base x in
     (match base with
     | Const one ->
-      if nat_is_one one then mul_bases rest
+      if one = 1 then mul_bases rest
       else insert_expr base (mul_bases rest)
     | _ -> insert_expr base (mul_bases rest));;
 
 let rec build_mul = fun xs ->
   match xs with
-  | ENil -> Const (S Z)
+  | ENil -> Const 1
   | ECons x rest ->
     (match rest with
     | ENil -> x
@@ -278,23 +241,23 @@ let rec build_mul = fun xs ->
 let normalize_mul_flat = fun left right ->
   let factors = append_exprs (flatten_mul left) (flatten_mul right) in
   let coeff = mul_total_coeff factors in
-  if nat_is_zero coeff then Const Z
+  if coeff = 0 then Const 0
   else
     let bases = mul_bases factors in
     let base_expr = build_mul bases in
-    if nat_is_one coeff then base_expr else scale coeff base_expr;;
+    if coeff = 1 then base_expr else scale coeff base_expr;;
 
 let rec combine_like_terms_acc = fun base coeff xs ->
   match xs with
   | ENil ->
-    if nat_is_zero coeff then ENil else ECons (scale coeff base) ENil
+    if coeff = 0 then ENil else ECons (scale coeff base) ENil
   | ECons x rest ->
     let xbase = coeff_base x in
     let xcoeff = coeff_value x in
-    if expr_equal base xbase then combine_like_terms_acc base (nat_add coeff xcoeff) rest
+    if expr_equal base xbase then combine_like_terms_acc base (coeff + xcoeff) rest
     else
       let tail = combine_like_terms_acc xbase xcoeff rest in
-      if nat_is_zero coeff then tail else insert_expr (scale coeff base) tail;;
+      if coeff = 0 then tail else insert_expr (scale coeff base) tail;;
 
 let combine_like_terms = fun xs ->
   match xs with
@@ -336,7 +299,7 @@ let rec search_terms = fun xs ->
 
 let rec build_add = fun xs ->
   match xs with
-  | ENil -> Const Z
+  | ENil -> Const 0
   | ECons x rest ->
     (match rest with
     | ENil -> x
@@ -365,26 +328,27 @@ let normalize_add_flat = fun left right ->
   build_add rescanned;;
 
 let rec search_opt = fun fuel e ->
-  if fuel = 0 then e
-  else
-    match e with
+  match fuel with
+  | Z -> e
+  | S fuel1 ->
+    (match e with
     | Add a b ->
-      let sa = search_opt (fuel - 1) a in
-      let sb = search_opt (fuel - 1) b in
+      let sa = search_opt fuel1 a in
+      let sb = search_opt fuel1 b in
       let merged = normalize_add_flat sa sb in
       let flipped = normalize_add_flat sb sa in
       let next = normalize_add_flat merged flipped in
       let final = normalize_add_flat next merged in
-      if expr_equal final merged then merged else search_opt (fuel - 1) final
+      if expr_equal final merged then merged else search_opt fuel1 final
     | Mul a b ->
-      let sa = search_opt (fuel - 1) a in
-      let sb = search_opt (fuel - 1) b in
+      let sa = search_opt fuel1 a in
+      let sb = search_opt fuel1 b in
       let merged = normalize_mul_flat sa sb in
       let flipped = normalize_mul_flat sb sa in
       let next = normalize_mul_flat merged flipped in
       let final = normalize_mul_flat next merged in
-      if expr_equal final merged then merged else search_opt (fuel - 1) final
-    | _ -> e;;
+      if expr_equal final merged then merged else search_opt fuel1 final
+    | _ -> e);;
 
 let rec normalize = fun e ->
   match e with
@@ -401,17 +365,17 @@ let rec normalize = fun e ->
 
 let rec simplify_aux = fun e ->
   let next = normalize e in
-  let searched = search_opt 6 next in
+  let searched = search_opt (S (S (S (S (S (S Z)))))) next in
   let final = normalize searched in
   if expr_equal e final then final else simplify_aux final;;
 
 let rec diffx = fun e ->
   match e with
-  | Const _ -> Const Z
+  | Const _ -> Const 0
   | Var v ->
     (match v with
-    | X -> Const (S Z)
-    | Y -> Const Z)
+    | X -> Const 1
+    | Y -> Const 0)
   | Add a b -> Add (diffx a) (diffx b)
   | Mul a b -> Add (Mul (diffx a) b) (Mul a (diffx b));;
 
@@ -422,8 +386,8 @@ let rec eval = fun e x y ->
     (match v with
     | X -> x
     | Y -> y)
-  | Add a b -> nat_add (eval a x y) (eval b x y)
-  | Mul a b -> nat_mul (eval a x y) (eval b x y);;
+  | Add a b -> eval a x y + eval b x y
+  | Mul a b -> eval a x y * eval b x y;;
 
 let main = fun e ->
   let d = diffx e in
