@@ -157,23 +157,27 @@ let rec make_term size =
       let rsize = size - lsize - 1 in
       f (make_term lsize) (make_term rsize)
     in
-    match Random.int 8 with
+    match Random.int 10 with
     | 0 -> split (fun x y -> LC.Add (x, y))
-    | 1 | 2 | 3 | 4 -> split (fun x y -> LC.Mul (x, y))
-    | 5 ->
+    | 1 | 2 | 3 -> split (fun x y -> LC.Mul (x, y))
+    | 4 | 5 ->
         let t = make_term ((size - 1) / 2) in
         LC.Add (t, t)
-    | 6 ->
+    | 6 | 7 ->
         let t = make_term ((size - 1) / 2) in
         LC.Mul (t, t)
-    | 7 ->
+    | 8 ->
         let a = make_term (size / 3) in
         let b = make_term (size - (size / 3) - 2) in
         LC.Add (LC.Mul (a, b), LC.Mul (b, a))
+    | 9 ->
+        let a = make_term (size / 3) in
+        let b = make_term (size - (size / 3) - 2) in
+        LC.Mul (LC.Add (a, b), LC.Add (a, b))
     | _ -> failwith "impossible")
 
 let run_bench_cases () =
-  let cases = [ ("rand-60", 60); ("rand-72", 72); ("rand-84", 84) ] in
+  let cases = [ ("rand-60", 60); ("rand-84", 84); ("rand-96", 96) ] in
   List.iter
     (fun (label, size) ->
       Printf.printf "Running arith case %s...\n" label;
