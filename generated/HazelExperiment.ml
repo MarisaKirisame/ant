@@ -43,70 +43,14 @@ let large_input = Common.make_random_input_list Common.experiment_list_length
 let large_left, large_right = Common.make_random_input_list_pair Common.experiment_list_length
 
 let benchmark_test_string = function
-  | Append ->
-      Printf.sprintf
-        {| (my_append ([]) ([])) ::
-       (my_append (1 :: 2 :: 3 :: []) ([])) ::
-       (my_append ([]) (4 :: 5 :: 6 :: [])) ::
-       (my_append (%s) (%s)) ::
-       [] |}
-        (list_to_cons_str large_left) (list_to_cons_str large_right)
-  | Filter ->
-      Printf.sprintf
-        {| (my_filter (fun x -> true) ([])) ::
-       (my_filter (fun x -> false) (1 :: 2 :: 3 :: [])) ::
-       (my_filter (fun x -> x > 2) (1 :: 2 :: 3 :: 4 :: [])) ::
-       (my_filter (fun x -> x > 50) (%s)) ::
-       [] |}
-        (list_to_cons_str large_input)
-  | Map ->
-      Printf.sprintf
-        {| (my_map (fun x -> x + 1) ([])) ::
-       (my_map (fun x -> x + 1) (1 :: 2 :: 3 :: [])) ::
-       (my_map (fun x -> x + x) (1 :: 2 :: 3 :: [])) ::
-       (my_map (fun x -> x + 1) (%s)) ::
-       [] |}
-        (list_to_cons_str large_input)
-  | QS ->
-      Printf.sprintf
-        {| (my_quicksort ([])) ::
-       (my_quicksort (3 :: 6 :: 1 :: 4 :: [])) ::
-       (my_quicksort (5 :: 5 :: 1 :: 5 :: 2 :: [])) ::
-       (my_quicksort (%s)) ::
-       [] |}
-        (list_to_cons_str large_input)
-  | IS ->
-      Printf.sprintf
-        {| (my_insertsort ([])) ::
-       (my_insertsort (3 :: 6 :: 1 :: 4 :: [])) ::
-       (my_insertsort (5 :: 5 :: 1 :: 5 :: 2 :: [])) ::
-       (my_insertsort (%s)) ::
-       [] |}
-        (list_to_cons_str large_input)
-  | MS ->
-      Printf.sprintf
-        {| (my_mergesort ([])) ::
-       (my_mergesort (3 :: 6 :: 1 :: 4 :: [])) ::
-       (my_mergesort (5 :: 5 :: 1 :: 5 :: 2 :: [])) ::
-       (my_mergesort (%s)) ::
-       [] |}
-        (list_to_cons_str large_input)
-  | Pair ->
-      Printf.sprintf
-        {| (my_pair ([])) ::
-       (my_pair (1 :: [])) ::
-       (my_pair (3 :: 6 :: 1 :: 4 :: [])) ::
-       (my_pair (%s)) ::
-       [] |}
-        (list_to_cons_str large_input)
-  | Rev ->
-      Printf.sprintf
-        {| (my_reverse ([])) ::
-       (my_reverse (3 :: 6 :: 1 :: 4 :: [])) ::
-       (my_reverse (5 :: 5 :: 1 :: 5 :: 2 :: [])) ::
-       (my_reverse (%s)) ::
-       [] |}
-        (list_to_cons_str large_input)
+  | Append -> Printf.sprintf {| my_append (%s) (%s) |} (list_to_cons_str large_left) (list_to_cons_str large_right)
+  | Filter -> Printf.sprintf {| my_filter (fun x -> x > 50) (%s) |} (list_to_cons_str large_input)
+  | Map -> Printf.sprintf {| my_map (fun x -> x + 1) (%s) |} (list_to_cons_str large_input)
+  | QS -> Printf.sprintf {| my_quicksort (%s) |} (list_to_cons_str large_input)
+  | IS -> Printf.sprintf {| my_insertsort (%s) |} (list_to_cons_str large_input)
+  | MS -> Printf.sprintf {| my_mergesort (%s) |} (list_to_cons_str large_input)
+  | Pair -> Printf.sprintf {| my_pair (%s) |} (list_to_cons_str large_input)
+  | Rev -> Printf.sprintf {| my_reverse (%s) |} (list_to_cons_str large_input)
 
 let run ~dataset ~benchmark =
   let test = Common.parse_nexpr (benchmark_test_string benchmark) in

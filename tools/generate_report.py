@@ -7,8 +7,10 @@ speedup summaries (geometric + arithmetic means) for key comparisons.
 
 from __future__ import annotations
 
+import math
 import os
 import shutil
+import statistics
 import sys
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
@@ -22,7 +24,7 @@ from plot_speedup import (
     load_records,
     profile_totals_from_result,
     plot_speedup_cdf,
-    plot_scatter,
+    plot_scatter_for_kind,
     pairs_from_profiles,
     pairs_from_steps,
 )
@@ -40,9 +42,9 @@ BASE_EXPERIMENTS: list[tuple[str, str]] = [
 ]
 
 VARIANTS: list[tuple[str, str, str]] = [
-    ("eval_steps_{key}.json", "output/{key}", ""),
-    ("eval_steps_th_{key}.json", "output/th_{key}", " (th)"),
-    ("eval_steps_at_{key}.json", "output/at_{key}", " (at)"),
+    ("eval_steps_{key}.json", "{key}", ""),
+    ("eval_steps_th_{key}.json", "th_{key}", " (th)"),
+    ("eval_steps_at_{key}.json", "at_{key}", " (at)"),
 ]
 
 TABLE_VARIANTS: list[tuple[str, str]] = [
@@ -64,6 +66,7 @@ SPEED_BREAKDOWN_ORDER = [
 def _render_html(
     title: str,
     entries: Sequence[Tuple[str, str]],
+    downloads: Sequence[Tuple[str, str]] | None,
     summary: SpeedupStats | None,
     comparison_summaries: Sequence[Tuple[str, SpeedupStats]] | None,
     combined_scatter_rel: str | None,
@@ -79,6 +82,11 @@ def _render_html(
         with tag.main():
             tag.h1(title)
             tag.p("Select a benchmark run to explore the detailed results.")
+            if downloads:
+                with tag.section(cls="grid"):
+                    for label, rel in downloads:
+                        with tag.a(href=rel, cls="card", download=""):
+                            tag.span(label)
             if comparison_summaries:
                 with tag.section(cls="stats"):
                     for label, stats in comparison_summaries:
@@ -112,11 +120,14 @@ def generate_html(
     title: str,
     output: Path,
     entries: Sequence[Tuple[str, Path]],
+    downloads: Sequence[Tuple[str, Path]] | None = None,
     data_paths: Sequence[Path] | None = None,
     css_source: Path,
+    report_kind: str = "hazel",
 ) -> SpeedupStats | None:
     output.parent.mkdir(parents=True, exist_ok=True)
     entries_with_rel = _relativize(entries, output)
+    downloads_with_rel = _relativize(downloads, output) if downloads else None
     if not css_source.exists():
         raise FileNotFoundError(f"missing stylesheet source: {css_source}")
     css_path = output.parent / css_source.name
@@ -143,7 +154,11 @@ def generate_html(
     combined_scatter_rel: str | None = None
     combined_cdf_rel: str | None = None
     if all_pairs:
-        scatter_name = plot_scatter(all_pairs, output.parent)
+        scatter_name = plot_scatter_for_kind(
+            all_pairs,
+            output.parent,
+            report_kind=report_kind,
+        )
         combined_scatter_rel = os.path.relpath(output.parent / scatter_name, output.parent)
     if ratios:
         cdf_name = plot_speedup_cdf(ratios, output.parent)
@@ -188,6 +203,7 @@ def generate_html(
         _render_html(
             title,
             entries_with_rel,
+            downloads_with_rel,
             summary,
             comparison_summaries,
             combined_scatter_rel,
@@ -201,37 +217,49 @@ def generate_html(
 
 
 def generate_reports() -> None:
+    generate_hazel_reports()
+    generate_arith_reports()
     css_source = Path(__file__).with_name("style.css")
-    experiments = _hazel_experiments() + _arith_experiments()
-    _generate_reports_for_experiments(
-        title="Benchmark Index",
+    generate_html(
+        title="Benchmark Reports",
         output=Path("output/index.html"),
-        experiments=experiments,
+        entries=[
+            ("Hazel Report", Path("output/hazel/index.html")),
+            ("Arith Report", Path("output/arith/index.html")),
+        ],
         css_source=css_source,
     )
 
 
 def generate_hazel_reports() -> None:
     css_source = Path(__file__).with_name("style.css")
+    tex_output = Path("output/hazel/hazel_result.tex")
+    generate_tex_table(output_path=tex_output)
     _generate_reports_for_experiments(
         title="Hazel Benchmark Index",
-        output=Path("output/index.html"),
-        experiments=_hazel_experiments(),
+        output=Path("output/hazel/index.html"),
+        experiments=_hazel_experiments(Path("output/hazel")),
+        downloads=[("Download hazel_result.tex", tex_output)],
         css_source=css_source,
+        report_kind="hazel",
     )
 
 
 def generate_arith_reports() -> None:
     css_source = Path(__file__).with_name("style.css")
+    tex_output = Path("output/arith/arith_result.tex")
+    generate_arith_tex(output_path=tex_output)
     _generate_reports_for_experiments(
         title="Arith Benchmark Index",
-        output=Path("output/arith_index.html"),
-        experiments=_arith_experiments(),
+        output=Path("output/arith/index.html"),
+        experiments=_arith_experiments(Path("output/arith")),
+        downloads=[("Download arith_result.tex", tex_output)],
         css_source=css_source,
+        report_kind="arith",
     )
 
 
-def _hazel_experiments() -> list[tuple[str, Path, Path]]:
+def _hazel_experiments(base_dir: Path) -> list[tuple[str, Path, Path]]:
     experiments: list[tuple[str, Path, Path]] = []
     for steps_pattern, output_pattern, label_suffix in VARIANTS:
         for key, label in BASE_EXPERIMENTS:
@@ -239,14 +267,14 @@ def _hazel_experiments() -> list[tuple[str, Path, Path]]:
                 (
                     f"{label} Benchmark{label_suffix}",
                     Path(steps_pattern.format(key=key)),
-                    Path(output_pattern.format(key=key)),
+                    base_dir / output_pattern.format(key=key),
                 )
             )
     return experiments
 
 
-def _arith_experiments() -> list[tuple[str, Path, Path]]:
-    return [("Arith Benchmark", Path("eval_steps_arith.json"), Path("output/arith"))]
+def _arith_experiments(base_dir: Path) -> list[tuple[str, Path, Path]]:
+    return [("Arith Benchmark", Path("eval_steps_arith.json"), base_dir / "arith")]
 
 
 def _generate_reports_for_experiments(
@@ -254,7 +282,9 @@ def _generate_reports_for_experiments(
     title: str,
     output: Path,
     experiments: Sequence[tuple[str, Path, Path]],
+    downloads: Sequence[tuple[str, Path]] | None = None,
     css_source: Path,
+    report_kind: str,
 ) -> None:
     generated_entries: list[tuple[str, Path]] = []
     for label, input_path, output_dir in experiments:
@@ -265,13 +295,16 @@ def _generate_reports_for_experiments(
             input_path=input_path,
             output_dir=output_dir,
             css_source=css_source,
+            report_kind=report_kind,
         )
         generated_entries.append((label, output_dir / "index.html"))
     generate_html(
         title=title,
         output=output,
         entries=generated_entries,
+        downloads=downloads,
         css_source=css_source,
+        report_kind=report_kind,
     )
 
 
@@ -280,6 +313,33 @@ def _geomean_memo_vs_cek_speedup(input_path: Path) -> str:
     pairs = pairs_from_profiles(result, baseline_key="cek_profile", memo_key="memo_profile")
     _, stats = compare_stats(pairs)
     return f"${fmt_speedup(stats.geo_mean)}\\times$"
+
+
+def _geometric_mean(values: Sequence[float]) -> float:
+    if not values:
+        raise ValueError("values must be non-empty")
+    if any(value <= 0 for value in values):
+        raise ValueError("values must be positive")
+    return math.exp(statistics.mean(math.log(value) for value in values))
+
+
+def _memo_vs_cek_memory_overhead_ratios(input_path: Path) -> list[float]:
+    result = load_records(input_path)
+    ratios: list[float] = []
+    for record in result.exec_times:
+        memo_heap_words = record.memo_heap_words
+        cek_heap_words = record.cek_heap_words
+        assert memo_heap_words > 0
+        assert cek_heap_words > 0
+        ratios.append(float(memo_heap_words) / float(cek_heap_words))
+    return ratios
+
+
+def _geomean_memo_vs_cek_memory_overhead(input_path: Path) -> str:
+    ratios = _memo_vs_cek_memory_overhead_ratios(input_path)
+    if not ratios:
+        return "timeout"
+    return f"${fmt_speedup(_geometric_mean(ratios))}\\times$"
 
 
 def _escape_latex(value: str) -> str:
@@ -351,37 +411,47 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
     return lines
 
 
-def generate_tex_table(*, output_path: Path = Path("output/hazel.tex")) -> None:
+def generate_tex_table(*, output_path: Path = Path("output/hazel/hazel_result.tex")) -> None:
     available_input_paths: list[Path] = []
-    rows: list[tuple[str, list[str]]] = []
+    rows: list[tuple[str, list[str], list[str]]] = []
     for variant_label, steps_pattern in TABLE_VARIANTS:
-        values: list[str] = []
+        speedup_values: list[str] = []
+        memory_overhead_values: list[str] = []
         for key, _ in BASE_EXPERIMENTS:
             input_path = Path(steps_pattern.format(key=key))
             if not input_path.exists():
-                values.append("timeout")
+                speedup_values.append("timeout")
+                memory_overhead_values.append("timeout")
                 continue
             available_input_paths.append(input_path)
-            values.append(_geomean_memo_vs_cek_speedup(input_path))
-        rows.append((variant_label, values))
+            speedup_values.append(_geomean_memo_vs_cek_speedup(input_path))
+            memory_overhead_values.append(_geomean_memo_vs_cek_memory_overhead(input_path))
+        rows.append((variant_label, speedup_values, memory_overhead_values))
 
     point_count = 0
     total_speedup = "timeout"
+    total_memory_overhead = "timeout"
     if available_input_paths:
         pairs = _collect_pairs(available_input_paths)
         point_count = len(pairs)
         if pairs:
             _, stats = compare_stats(pairs)
             total_speedup = f"${fmt_speedup(stats.geo_mean)}\\times$"
+        memory_overhead_ratios: list[float] = []
+        for input_path in available_input_paths:
+            memory_overhead_ratios.extend(_memo_vs_cek_memory_overhead_ratios(input_path))
+        if memory_overhead_ratios:
+            total_memory_overhead = f"${fmt_speedup(_geometric_mean(memory_overhead_ratios))}\\times$"
     breakdown_lines = _memo_speed_breakdown_lines(available_input_paths)
 
-    variant_labels = [variant_label for variant_label, _ in rows]
+    variant_labels = [variant_label for variant_label, _, _ in rows]
     header_cells = " & ".join(["Benchmark", *variant_labels])
     col_spec = "l" + ("r" * len(variant_labels))
     lines = [
         "% Auto-generated by tools/generate_report.py",
         "\\newcommand{\\hazelPointCount}{" + str(point_count) + "}",
         "\\newcommand{\\hazelTotalSpeedup}{" + total_speedup + "}",
+        "\\newcommand{\\hazelTotalMemoryOverhead}{" + total_memory_overhead + "}",
         "\\newcommand{\\hazelSpeedBreakdown}{%",
         *breakdown_lines,
         "}",
@@ -392,7 +462,14 @@ def generate_tex_table(*, output_path: Path = Path("output/hazel.tex")) -> None:
         "\\hline",
     ]
     for benchmark_idx, (_, benchmark_label) in enumerate(BASE_EXPERIMENTS):
-        benchmark_values = [values[benchmark_idx] for _, values in rows]
+        benchmark_values: list[str] = []
+        for _, speedup_values, memory_overhead_values in rows:
+            speedup = speedup_values[benchmark_idx]
+            memory_overhead = memory_overhead_values[benchmark_idx]
+            if speedup == "timeout" and memory_overhead == "timeout":
+                benchmark_values.append("timeout")
+            else:
+                benchmark_values.append(f"{speedup} / {memory_overhead}")
         lines.append(" & ".join([benchmark_label, *benchmark_values]) + " \\\\")
     lines.extend(
         [
@@ -402,6 +479,28 @@ def generate_tex_table(*, output_path: Path = Path("output/hazel.tex")) -> None:
             "",
         ]
     )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def generate_arith_tex(
+    *,
+    input_path: Path = Path("eval_steps_arith.json"),
+    output_path: Path = Path("output/arith/arith_result.tex"),
+) -> None:
+    speedup = "timeout"
+    if input_path.exists():
+        result = load_records(input_path)
+        pairs = pairs_from_profiles(result, baseline_key="cek_profile", memo_key="memo_profile")
+        if pairs:
+            _, stats = compare_stats(pairs)
+            speedup = f"${fmt_speedup(stats.geo_mean)}\\times$"
+
+    lines = [
+        "% Auto-generated by tools/generate_report.py",
+        "\\newcommand{\\arithTotalSpeedup}{" + speedup + "}",
+        "",
+    ]
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")
 

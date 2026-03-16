@@ -34,6 +34,8 @@ def render_html(
     output_dir: Path,
     data_label: str,
     css_href: str,
+    *,
+    report_kind: str,
 ) -> str:
     memo_plot = (
         plot_depth_breakdown(records.depth_breakdown, output_dir)
@@ -89,6 +91,7 @@ def render_html(
                 label="Memo vs CEK",
                 baseline_key="cek_profile",
                 memo_key="memo_profile",
+                report_kind=report_kind,
             )
             _render_speedup_comparison(
                 records,
@@ -96,6 +99,7 @@ def render_html(
                 label="CEK vs Plain",
                 baseline_key="plain_profile",
                 memo_key="cek_profile",
+                report_kind=report_kind,
             )
             _render_speedup_comparison(
                 records,
@@ -103,12 +107,14 @@ def render_html(
                 label="Memo vs Plain",
                 baseline_key="plain_profile",
                 memo_key="memo_profile",
+                report_kind=report_kind,
             )
             _render_speedup_comparison(
                 records,
                 output_dir,
                 label="Memo vs Plain (steps)",
                 pairs=pairs_from_steps(records),
+                report_kind=report_kind,
             )
             if memo_plot is not None:
                 _plot_image(memo_plot, "Memo stats depth vs node count plot")
@@ -150,6 +156,7 @@ def _render_speedup_comparison(
     records: Result,
     output_dir: Path,
     *,
+    report_kind: str,
     label: str,
     baseline_key: str | None = None,
     memo_key: str | None = None,
@@ -159,7 +166,9 @@ def _render_speedup_comparison(
         if baseline_key is None or memo_key is None:
             raise ValueError("baseline_key and memo_key are required when pairs is None")
         pairs = pairs_from_profiles(records, baseline_key=baseline_key, memo_key=memo_key)
-    stats, line_plot, scatter_plot = generate_plot_for_pairs(pairs, output_dir)
+    stats, line_plot, scatter_plot = generate_plot_for_pairs(
+        pairs, output_dir, report_kind=report_kind
+    )
     with tag.section(cls="comparison"):
         with tag.details():
             tag.summary(label)
@@ -216,6 +225,7 @@ def generate_speedup_report(
     input_path: Path,
     output_dir: Path,
     css_source: Path,
+    report_kind: str,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "index.html"
@@ -225,7 +235,13 @@ def generate_speedup_report(
     css_href = css_source.name
     data_label = str(input_path)
     records = load_records(input_path)
-    html = render_html(records, output_dir, data_label, css_href)
+    html = render_html(
+        records,
+        output_dir,
+        data_label,
+        css_href,
+        report_kind=report_kind,
+    )
     output_path.write_text(html, encoding="utf-8")
     shutil.copyfile(css_source, css_path)
     return None

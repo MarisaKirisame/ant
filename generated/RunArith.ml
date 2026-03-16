@@ -143,7 +143,8 @@ let eval_main_expr_with_details expr =
   { value = 0; runtime_seconds = stop -. start; steps_with_memo = res.step; steps_without_memo = res.without_memo_step }
 
 let rec make_term size =
-  if size <= 1 then
+  assert (size >= 0);
+  if size == 0 then
     match Random.int 5 with
     | 0 -> LC.Var LC.X
     | 1 -> LC.Var LC.Y
@@ -151,9 +152,8 @@ let rec make_term size =
     | 3 -> LC.Const 1
     | 4 -> LC.Const (2 + Random.int 3)
     | _ -> failwith "impossible"
-  else (
-    assert (size > 0);
-    let split f =
+  else
+    (*let split f =
       let mid = size / 2 in
       let slack = (size + 3) / 4 in
       let low = max 0 (mid - slack) in
@@ -161,33 +161,24 @@ let rec make_term size =
       let lsize = low + Random.int width in
       let rsize = size - lsize - 1 in
       f (make_term lsize) (make_term rsize)
+    in*)
+    let split f =
+      let lsize = Random.int size in
+      let rsize = size - lsize - 1 in
+      f (make_term lsize) (make_term rsize)
     in
-    match Random.int 10 with
-    | 0 -> split (fun x y -> LC.Add (x, y))
-    | 1 | 2 | 3 -> split (fun x y -> LC.Mul (x, y))
-    | 4 | 5 ->
-        let t = make_term ((size - 1) / 2) in
-        LC.Add (t, t)
-    | 6 | 7 ->
-        let t = make_term ((size - 1) / 2) in
-        LC.Mul (t, t)
-    | 8 ->
-        let a = make_term (size / 3) in
-        let b = make_term (size - (size / 3) - 2) in
-        LC.Add (LC.Mul (a, b), LC.Mul (b, a))
-    | 9 ->
-        let a = make_term (size / 3) in
-        let b = make_term (size - (size / 3) - 2) in
-        LC.Mul (LC.Add (a, b), LC.Add (a, b))
-    | _ -> failwith "impossible")
+    match Random.int 2 with 0 -> split (fun x y -> LC.Add (x, y)) | 1 -> split (fun x y -> LC.Mul (x, y))
 
 let run_bench_cases () =
-  let cases = [ ("rand-48", 48); ("rand-84", 84); ("rand-96", 96) ] in
+  let cases =
+    [ 100; 105; 110; 115; 120; 125; 130; 135; 140; 145; 150; 155; 160; 165; 170; 175; 180; 185; 190; 195; 200 ]
+  in
   List.iter
-    (fun (label, size) ->
-      Printf.printf "Running arith case %s...\n" label;
+    (fun size ->
+      let size = size * 2 in
       Out_channel.flush Stdio.stdout;
       let expr = make_term size in
+      print_endline ("Running arith case " ^ string_of_int size ^ "...");
       ignore (eval_main_expr_with_details expr))
     cases
 
