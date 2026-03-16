@@ -498,12 +498,14 @@ let run_with_test ~program_name ~program_path ~steps_file ~test =
             Format.printf "%s candidate %d expr: %a@." program_name i RunLiveCommon.pp_expr expr;
             (i, expr))
       in
+      record_resting_heap_size ();
       let baseline_pass =
         indexed_candidates
         |> List.map (fun (i, expr) ->
             let baseline_result = eval_expression_baseline_only expr in
             (i, baseline_result))
       in
+      record_resting_heap_size ();
       let memo_pass =
         indexed_candidates
         |> List.map (fun (i, expr) ->

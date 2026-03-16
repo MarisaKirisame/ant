@@ -238,7 +238,18 @@ let with_outchannel steps_path f =
   let oc = open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_path in
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 
-let measure_heap_words (f : unit -> 'a) : 'a * heap_words_stats =
+let resting_heap_words : int option ref = ref None
+
+let record_resting_heap_size () : unit =
+  Gc.full_major ();
+  resting_heap_words := Some (Gc.quick_stat ()).heap_words
+
+let subtract_resting_heap_size (heap_words : int) : int =
+  match !resting_heap_words with
+  | None -> heap_words
+  | Some resting -> max 0 (heap_words - resting)
+
+let measure_memory_consumption (f : unit -> 'a) : 'a * heap_words_stats =
   Gc.full_major ();
   let start_heap_words = (Gc.quick_stat ()).heap_words in
   let peak_heap_words = ref start_heap_words in
@@ -254,7 +265,12 @@ let measure_heap_words (f : unit -> 'a) : 'a * heap_words_stats =
       let result = f () in
       update_peak ();
       let end_heap_words = (Gc.quick_stat ()).heap_words in
-      (result, { start_heap_words; end_heap_words; peak_heap_words = !peak_heap_words }))
+      ( result,
+        {
+          start_heap_words = subtract_resting_heap_size start_heap_words;
+          end_heap_words = subtract_resting_heap_size end_heap_words;
+          peak_heap_words = subtract_resting_heap_size !peak_heap_words;
+        } ))
 
 let write_steps_json_from_parts oc ~(exec_res : Memo.exec_result) ~(memo_profile : (string * int) list)
     ~(plain_profile : (string * int) list) ~(cek_profile : (string * int) list) ~(memo_heap_words : int)
@@ -354,7 +370,7 @@ let eval_cek_slot = Profile.register_slot Profile.cek_profile "eval_cek"
 let eval_plain (expr : LC.expr) : LC.value * int =
   let env = LC.Nil in
   let _, cek_heap_stats =
-    measure_heap_words (fun () ->
+    measure_memory_consumption (fun () ->
         Profile.with_slot eval_cek_slot (fun () ->
             LC.to_ocaml_value
               (Memo.exec_cek_raw
@@ -367,7 +383,7 @@ let eval_plain (expr : LC.expr) : LC.value * int =
 
 let eval_expression_memo_only ~memo expr : memo_run_result =
   let exec_res, memo_heap_stats =
-    measure_heap_words (fun () ->
+    measure_memory_consumption (fun () ->
         LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
   in
   let memo_profile = Profile.dump_profile Profile.memo_profile in
@@ -381,7 +397,7 @@ let eval_expression_memo_only ~memo expr : memo_run_result =
 let eval_expression_baseline_only expr : baseline_run_result =
   let env = LC.Nil in
   let _, cek_heap_stats =
-    measure_heap_words (fun () ->
+    measure_memory_consumption (fun () ->
         Profile.with_slot eval_cek_slot (fun () ->
             LC.to_ocaml_value
               (Memo.exec_cek_raw
@@ -399,7 +415,7 @@ let eval_expression_baseline_only expr : baseline_run_result =
 
 let eval_expression ~memo ~write_steps expr =
   let exec_res, memo_heap_stats =
-    measure_heap_words (fun () ->
+    measure_memory_consumption (fun () ->
         LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
   in
   let _, cek_heap_words = eval_plain expr in
