@@ -176,19 +176,7 @@ let rec make_term size =
     | _ -> failwith "impossible")
 
 let run_bench_cases () =
-  let cases =
-    [
-      ("rand-120", 120);
-      ("rand-240", 240);
-      ("rand-360", 360);
-      ("rand-480", 480);
-      ("rand-600", 600);
-      ("rand-720", 720);
-      ("rand-840", 840);
-      ("rand-960", 960);
-      ("rand-1080", 1080);
-    ]
-  in
+  let cases = [ ("rand-60", 60); ("rand-72", 72); ("rand-84", 84) ] in
   List.iter
     (fun (label, size) ->
       Printf.printf "Running arith case %s...\n" label;
