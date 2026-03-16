@@ -11,6 +11,11 @@ type step_writer = Memo.exec_result -> unit
 
 let current_write_steps : step_writer option ref = ref None
 
+let init_random () =
+  match Sys.getenv_opt "ARITH_SEED" with
+  | Some seed -> ( match int_of_string_opt seed with Some n -> Random.init n | None -> Random.init 0)
+  | None -> Random.init 0
+
 let with_memo f =
   let memo = Memo.init_memo () in
   f memo
@@ -177,7 +182,7 @@ let rec make_term size =
     | _ -> failwith "impossible")
 
 let run_bench_cases () =
-  let cases = [ ("rand-60", 60); ("rand-84", 84); ("rand-96", 96) ] in
+  let cases = [ ("rand-48", 48); ("rand-84", 84); ("rand-96", 96) ] in
   List.iter
     (fun (label, size) ->
       Printf.printf "Running arith case %s...\n" label;
@@ -189,6 +194,7 @@ let run_bench_cases () =
 let run () =
   with_outchannel steps_file (fun oc ->
       let write_steps = write_steps_json oc in
+      init_random ();
       LC.populate_state ();
       let memo = Memo.init_memo () in
       current_write_steps := Some write_steps;
