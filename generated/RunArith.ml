@@ -20,15 +20,18 @@ let with_outchannel steps_path f =
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 
 let plain_var_of_lc = function LC.X -> Plain.X | LC.Y -> Plain.Y
+let rec nat_of_int n = if n <= 0 then LC.Z else LC.S (nat_of_int (n - 1))
+let rec int_of_nat = function LC.Z -> 0 | LC.S n -> 1 + int_of_nat n
+let rec plain_nat_of_lc = function LC.Z -> Plain.Z | LC.S n -> Plain.S (plain_nat_of_lc n)
 
 let rec plain_expr_of_lc = function
-  | LC.Const n -> Plain.Const n
+  | LC.Const n -> Plain.Const (plain_nat_of_lc n)
   | LC.Var v -> Plain.Var (plain_var_of_lc v)
   | LC.Add (a, b) -> Plain.Add (plain_expr_of_lc a, plain_expr_of_lc b)
   | LC.Mul (a, b) -> Plain.Mul (plain_expr_of_lc a, plain_expr_of_lc b)
 
 let rec string_of_expr = function
-  | LC.Const n -> string_of_int n
+  | LC.Const n -> string_of_int (int_of_nat n)
   | LC.Var LC.X -> "X"
   | LC.Var LC.Y -> "Y"
   | LC.Add (a, b) -> Printf.sprintf "(%s + %s)" (string_of_expr a) (string_of_expr b)
@@ -126,7 +129,7 @@ let eval_main_expr_with_details expr =
     Ant.Profile.with_slot main_cek_slot (fun () ->
         LC.to_ocaml_expr
           (Memo.exec_cek_raw
-             (Memo.pc_to_exp (Ant.Common.int_to_pc 94))
+             (Memo.pc_to_exp (Ant.Common.int_to_pc 98))
              (Dynarray.of_list [ seq_expr ])
              (Memo.from_constructor LC.tag_cont_done)))
   in
@@ -138,37 +141,52 @@ let eval_main_expr_with_details expr =
   { value = 0; runtime_seconds = stop -. start; steps_with_memo = res.step; steps_without_memo = res.without_memo_step }
 
 let rec make_term size =
-  if size == 0 then LC.Const 0
-  else if size == 1 then
-    match Random.int 3 with
+  if size <= 1 then
+    match Random.int 5 with
     | 0 -> LC.Var LC.X
     | 1 -> LC.Var LC.Y
-    | 2 -> LC.Const (Random.int 8)
+    | 2 -> LC.Const (nat_of_int 0)
+    | 3 -> LC.Const (nat_of_int 1)
+    | 4 -> LC.Const (nat_of_int (2 + Random.int 3))
     | _ -> failwith "impossible"
   else (
     assert (size > 0);
     let split f =
-      let lsize = Random.int size in
+      let mid = size / 2 in
+      let slack = (size + 3) / 4 in
+      let low = max 0 (mid - slack) in
+      let width = min size ((slack * 2) + 1) in
+      let lsize = low + Random.int width in
       let rsize = size - lsize - 1 in
       f (make_term lsize) (make_term rsize)
     in
-    match Random.int 4 with
+    match Random.int 8 with
     | 0 -> split (fun x y -> LC.Add (x, y))
-    | 1 | 2 | 3 -> split (fun x y -> LC.Mul (x, y))
+    | 1 | 2 | 3 | 4 -> split (fun x y -> LC.Mul (x, y))
+    | 5 ->
+        let t = make_term ((size - 1) / 2) in
+        LC.Add (t, t)
+    | 6 ->
+        let t = make_term ((size - 1) / 2) in
+        LC.Mul (t, t)
+    | 7 ->
+        let a = make_term (size / 3) in
+        let b = make_term (size - (size / 3) - 2) in
+        LC.Add (LC.Mul (a, b), LC.Mul (b, a))
     | _ -> failwith "impossible")
 
 let run_bench_cases () =
   let cases =
     [
-      ("rand-100", 100);
-      ("rand-200", 200);
-      ("rand-300", 300);
-      ("rand-400", 400);
-      ("rand-500", 500);
+      ("rand-120", 120);
+      ("rand-240", 240);
+      ("rand-360", 360);
+      ("rand-480", 480);
       ("rand-600", 600);
-      ("rand-700", 700);
-      ("rand-800", 800);
-      ("rand-900", 900);
+      ("rand-720", 720);
+      ("rand-840", 840);
+      ("rand-960", 960);
+      ("rand-1080", 1080);
     ]
   in
   List.iter
