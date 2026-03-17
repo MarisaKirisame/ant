@@ -7,10 +7,8 @@ speedup summaries (geometric + arithmetic means) for key comparisons.
 
 from __future__ import annotations
 
-import math
 import os
 import shutil
-import statistics
 import sys
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
@@ -315,31 +313,30 @@ def _geomean_memo_vs_cek_speedup(input_path: Path) -> str:
     return f"${fmt_speedup(stats.geo_mean)}\\times$"
 
 
-def _geometric_mean(values: Sequence[float]) -> float:
-    if not values:
-        raise ValueError("values must be non-empty")
-    if any(value <= 0 for value in values):
-        raise ValueError("values must be positive")
-    return math.exp(statistics.mean(math.log(value) for value in values))
-
-
-def _memo_vs_cek_memory_overhead_ratios(input_path: Path) -> list[float]:
+def _memo_vs_cek_max_heap_words(input_path: Path) -> tuple[int, int] | None:
     result = load_records(input_path)
-    ratios: list[float] = []
+    memo_heap_words_values: list[int] = []
+    cek_heap_words_values: list[int] = []
     for record in result.exec_times:
         memo_heap_words = record.memo_heap_words
         cek_heap_words = record.cek_heap_words
-        assert memo_heap_words > 0
-        assert cek_heap_words > 0
-        ratios.append(float(memo_heap_words) / float(cek_heap_words))
-    return ratios
+        if memo_heap_words is None or cek_heap_words is None:
+            continue
+        if memo_heap_words <= 0 or cek_heap_words <= 0:
+            continue
+        memo_heap_words_values.append(memo_heap_words)
+        cek_heap_words_values.append(cek_heap_words)
+    if not memo_heap_words_values or not cek_heap_words_values:
+        return None
+    return (max(memo_heap_words_values), max(cek_heap_words_values))
 
 
-def _geomean_memo_vs_cek_memory_overhead(input_path: Path) -> str:
-    ratios = _memo_vs_cek_memory_overhead_ratios(input_path)
-    if not ratios:
+def _max_memo_vs_cek_memory_overhead(input_path: Path) -> str:
+    max_heap_words = _memo_vs_cek_max_heap_words(input_path)
+    if not max_heap_words:
         return "timeout"
-    return f"${fmt_speedup(_geometric_mean(ratios))}\\times$"
+    max_memo_heap_words, max_cek_heap_words = max_heap_words
+    return f"${fmt_speedup(float(max_memo_heap_words) / float(max_cek_heap_words))}\\times$"
 
 
 def _escape_latex(value: str) -> str:
@@ -425,7 +422,7 @@ def generate_tex_table(*, output_path: Path = Path("output/hazel/hazel_result.te
                 continue
             available_input_paths.append(input_path)
             speedup_values.append(_geomean_memo_vs_cek_speedup(input_path))
-            memory_overhead_values.append(_geomean_memo_vs_cek_memory_overhead(input_path))
+            memory_overhead_values.append(_max_memo_vs_cek_memory_overhead(input_path))
         rows.append((variant_label, speedup_values, memory_overhead_values))
 
     point_count = 0
@@ -437,11 +434,21 @@ def generate_tex_table(*, output_path: Path = Path("output/hazel/hazel_result.te
         if pairs:
             _, stats = compare_stats(pairs)
             total_speedup = f"${fmt_speedup(stats.geo_mean)}\\times$"
-        memory_overhead_ratios: list[float] = []
+        total_max_memo_heap_words = 0
+        total_max_cek_heap_words = 0
+        has_memory_measurement = False
         for input_path in available_input_paths:
-            memory_overhead_ratios.extend(_memo_vs_cek_memory_overhead_ratios(input_path))
-        if memory_overhead_ratios:
-            total_memory_overhead = f"${fmt_speedup(_geometric_mean(memory_overhead_ratios))}\\times$"
+            max_heap_words = _memo_vs_cek_max_heap_words(input_path)
+            if not max_heap_words:
+                continue
+            max_memo_heap_words, max_cek_heap_words = max_heap_words
+            total_max_memo_heap_words = max(total_max_memo_heap_words, max_memo_heap_words)
+            total_max_cek_heap_words = max(total_max_cek_heap_words, max_cek_heap_words)
+            has_memory_measurement = True
+        if has_memory_measurement and total_max_cek_heap_words > 0:
+            total_memory_overhead = (
+                f"${fmt_speedup(float(total_max_memo_heap_words) / float(total_max_cek_heap_words))}\\times$"
+            )
     breakdown_lines = _memo_speed_breakdown_lines(available_input_paths)
 
     variant_labels = [variant_label for variant_label, _, _ in rows]
