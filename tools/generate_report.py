@@ -53,16 +53,6 @@ TABLE_VARIANTS: list[tuple[str, str]] = [
     ("Charlie", "eval_steps_th_{key}.json"),
 ]
 
-SPEED_BREAKDOWN_ORDER = [
-    "rules lookup",
-    "rule composition",
-    "rule instantiation",
-    "rule insertion",
-    "rule application",
-    "misc",
-]
-
-
 def _render_html(
     title: str,
     entries: Sequence[Tuple[str, str]],
@@ -414,8 +404,10 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
         name = bucket_name(slot_name)
         bucket_totals[name] = bucket_totals.get(name, 0.0) + slot_ns
 
-    ordered_names = [name for name in SPEED_BREAKDOWN_ORDER if name in bucket_totals]
-    ordered_names.extend(sorted(name for name in bucket_totals if name not in SPEED_BREAKDOWN_ORDER))
+    ordered_names = sorted(
+        bucket_totals,
+        key=lambda name: (-bucket_totals[name], name),
+    )
 
     lines = [
         "\\begin{tabular}{lr}",
