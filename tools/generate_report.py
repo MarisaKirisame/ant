@@ -7,8 +7,10 @@ speedup summaries (geometric + arithmetic means) for key comparisons.
 
 from __future__ import annotations
 
+import math
 import os
 import shutil
+import statistics
 import sys
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
@@ -339,6 +341,24 @@ def _max_memo_vs_cek_memory_overhead(input_path: Path) -> str:
     return f"${fmt_speedup(float(max_memo_heap_words) / float(max_cek_heap_words))}\\times$"
 
 
+def _max_memo_vs_cek_memory_overhead_ratio(input_path: Path) -> float | None:
+    max_heap_words = _memo_vs_cek_max_heap_words(input_path)
+    if not max_heap_words:
+        return None
+    max_memo_heap_words, max_cek_heap_words = max_heap_words
+    if max_memo_heap_words <= 0 or max_cek_heap_words <= 0:
+        return None
+    return float(max_memo_heap_words) / float(max_cek_heap_words)
+
+
+def _geometric_mean(values: Sequence[float]) -> float:
+    if not values:
+        raise ValueError("values must be non-empty")
+    if any(value <= 0 for value in values):
+        raise ValueError("values must be positive")
+    return math.exp(statistics.mean(math.log(value) for value in values))
+
+
 def _escape_latex(value: str) -> str:
     escaped = value.replace("\\", r"\textbackslash{}")
     escaped = escaped.replace("&", r"\&")
@@ -434,21 +454,13 @@ def generate_tex_table(*, output_path: Path = Path("output/hazel/hazel_result.te
         if pairs:
             _, stats = compare_stats(pairs)
             total_speedup = f"${fmt_speedup(stats.geo_mean)}\\times$"
-        total_max_memo_heap_words = 0
-        total_max_cek_heap_words = 0
-        has_memory_measurement = False
+        experiment_memory_overheads: list[float] = []
         for input_path in available_input_paths:
-            max_heap_words = _memo_vs_cek_max_heap_words(input_path)
-            if not max_heap_words:
-                continue
-            max_memo_heap_words, max_cek_heap_words = max_heap_words
-            total_max_memo_heap_words = max(total_max_memo_heap_words, max_memo_heap_words)
-            total_max_cek_heap_words = max(total_max_cek_heap_words, max_cek_heap_words)
-            has_memory_measurement = True
-        if has_memory_measurement and total_max_cek_heap_words > 0:
-            total_memory_overhead = (
-                f"${fmt_speedup(float(total_max_memo_heap_words) / float(total_max_cek_heap_words))}\\times$"
-            )
+            ratio = _max_memo_vs_cek_memory_overhead_ratio(input_path)
+            if ratio is not None:
+                experiment_memory_overheads.append(ratio)
+        if experiment_memory_overheads:
+            total_memory_overhead = f"${fmt_speedup(_geometric_mean(experiment_memory_overheads))}\\times$"
     breakdown_lines = _memo_speed_breakdown_lines(available_input_paths)
 
     variant_labels = [variant_label for variant_label, _, _ in rows]
