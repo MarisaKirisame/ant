@@ -177,6 +177,31 @@ let rec sort_exprs = fun xs ->
   | ENil -> ENil
   | ECons x rest -> insert_expr x (sort_exprs rest);;
 
+let compare_add_term = fun a b ->
+  let abase = coeff_base a in
+  let bbase = coeff_base b in
+  let cbase = compare_expr abase bbase in
+  if cbase = 0 then
+    let acoeff = coeff_value a in
+    let bcoeff = coeff_value b in
+    if acoeff < bcoeff then (0-1)
+    else if acoeff > bcoeff then 1
+    else compare_expr a b
+  else
+    cbase;;
+
+let rec insert_add_term = fun e xs ->
+  match xs with
+  | ENil -> ECons e ENil
+  | ECons x rest ->
+    if compare_add_term e x <= 0 then ECons e xs
+    else ECons x (insert_add_term e rest);;
+
+let rec sort_add_terms = fun xs ->
+  match xs with
+  | ENil -> ENil
+  | ECons x rest -> insert_add_term x (sort_add_terms rest);;
+
 let rec reverse_exprs_aux = fun xs acc ->
   match xs with
   | ENil -> acc
@@ -257,7 +282,7 @@ let rec combine_like_terms_acc = fun base coeff xs ->
     if expr_equal base xbase then combine_like_terms_acc base (coeff + xcoeff) rest
     else
       let tail = combine_like_terms_acc xbase xcoeff rest in
-      if coeff = 0 then tail else insert_expr (scale coeff base) tail;;
+      if coeff = 0 then tail else insert_add_term (scale coeff base) tail;;
 
 let combine_like_terms = fun xs ->
   match xs with
@@ -276,7 +301,7 @@ let rec factor_adjacent = fun xs ->
     | ECons y ys ->
       let merged = search_factor x y in
       if expr_equal merged (Add x y) then ECons x (factor_adjacent rest)
-      else factor_adjacent (insert_expr merged ys));;
+      else factor_adjacent (insert_add_term merged ys));;
 
 let rec pick_factored = fun x xs ->
   match xs with
@@ -295,7 +320,7 @@ let rec search_terms = fun xs ->
   | ECons x rest ->
     (match pick_factored x rest with
     | NoPick -> ECons x (search_terms rest)
-    | Pick merged remain -> search_terms (insert_expr merged remain));;
+    | Pick merged remain -> search_terms (insert_add_term merged remain));;
 
 let rec build_add = fun xs ->
   match xs with
@@ -313,14 +338,14 @@ let rec search_round = fun xs ->
 
 let normalize_add_flat = fun left right ->
   let terms = append_exprs (flatten_add left) (flatten_add right) in
-  let sorted = sort_exprs terms in
+  let sorted = sort_add_terms terms in
   let combined = combine_like_terms sorted in
   let forward = search_round combined in
   let backward = search_round (reverse_exprs combined) in
   let forward_expr = build_add forward in
   let backward_expr = build_add backward in
   let best = better_expr forward_expr backward_expr in
-  let rescanned = combine_like_terms (sort_exprs (flatten_add best)) in
+  let rescanned = combine_like_terms (sort_add_terms (flatten_add best)) in
   build_add rescanned;;
 
 let rec search_opt = fun fuel e ->
