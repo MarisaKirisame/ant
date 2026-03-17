@@ -34,9 +34,9 @@ BASE_EXPERIMENTS: list[tuple[str, str]] = [
     ("append", "Append"),
     ("filter", "Filter"),
     ("map", "Map"),
-    ("qs", "Quicksort"),
-    ("is", "Insertion Sort"),
-    ("ms", "Merge Sort"),
+    ("qs", "QuickSort"),
+    ("is", "InsertSort"),
+    ("ms", "MergeSort"),
     ("pair", "Pair"),
     ("rev", "Reverse"),
 ]
@@ -386,15 +386,15 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
 
     def bucket_name(slot_name: str) -> str:
         if slot_name == "lookup_step":
-            return "rules lookup"
+            return "lookup rule"
         if slot_name == "compose_step":
-            return "rule composition"
+            return "compose rule"
         if slot_name == "instantiate":
-            return "rule instantiation"
+            return "intantiation"
         if slot_name == "insert_step":
-            return "rule insertion"
+            return "insert rule"
         if slot_name == "step_through":
-            return "rule application"
+            return "apply rule"
         if slot_name == "exec_cek":
             return "misc"
         return slot_name
@@ -471,7 +471,9 @@ def generate_tex_table(*, output_path: Path = Path("output/hazel/hazel_result.te
     group_header = " & ".join(group_header_cells) + " \\\\"
     subheader_cells = [""]
     for _ in variant_labels:
-        subheader_cells.extend(["time spdup", "mem ovrhd"])
+        subheader_cells.extend(
+            [r"\shortstack{time\\spdup}", r"\shortstack{mem\\ovrhd}"]
+        )
     subheader = " & ".join(subheader_cells) + " \\\\"
     col_spec = "l" + ("rr" * len(variant_labels))
     lines = [
@@ -494,10 +496,9 @@ def generate_tex_table(*, output_path: Path = Path("output/hazel/hazel_result.te
         for _, speedup_values, memory_overhead_values in rows:
             speedup = speedup_values[benchmark_idx]
             memory_overhead = memory_overhead_values[benchmark_idx]
-            if speedup == "timeout" and memory_overhead == "timeout":
-                benchmark_values.extend(["timeout", "timeout"])
-            else:
-                benchmark_values.extend([speedup, memory_overhead])
+            display_speedup = "X" if speedup == "timeout" else speedup
+            display_memory_overhead = "X" if memory_overhead == "timeout" else memory_overhead
+            benchmark_values.extend([display_speedup, display_memory_overhead])
         lines.append(" & ".join([benchmark_label, *benchmark_values]) + " \\\\")
     lines.extend(
         [
