@@ -245,9 +245,7 @@ let record_resting_heap_size () : unit =
   resting_heap_words := Some (Gc.quick_stat ()).heap_words
 
 let subtract_resting_heap_size (heap_words : int) : int =
-  match !resting_heap_words with
-  | None -> heap_words
-  | Some resting -> max 0 (heap_words - resting)
+  match !resting_heap_words with None -> heap_words | Some resting -> max 0 (heap_words - resting)
 
 let measure_memory_consumption (f : unit -> 'a) : 'a * heap_words_stats =
   Gc.full_major ();

@@ -132,7 +132,7 @@ def plot_scatter_for_kind(
     memos = [memo for _, memo in pairs_list]
     use_arith_style = report_kind == "arith"
     use_hazel_style = report_kind == "hazel"
-    point_alpha = 1.0 if use_arith_style else 0.2
+    point_alpha = 1.0 if use_arith_style else 0.15
     annotation_alpha = 1.0
     if use_arith_style:
         guide_lines = [
@@ -213,9 +213,9 @@ def plot_scatter_for_kind(
 
     return _save_plot(
         output_dir,
-        title=f"Our vs Their ({METRIC_LABEL}, {scale_label})",
-        xlabel=f"Their ({METRIC_LABEL})",
-        ylabel=f"Our ({METRIC_LABEL})",
+        title="Chordata vs Baseline",
+        xlabel="Baseline time (ns)",
+        ylabel="Chordata time (ns)",
         xscale=xscale,
         yscale=yscale,
         legend=REPORT_DRAW_INTERPOLATION_LINE,
