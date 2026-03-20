@@ -267,9 +267,9 @@ def plot_speedup_cdf(ratios: Sequence[float], output_dir: Path) -> str:
 
     return _save_plot(
         output_dir,
-        title=f"Speedup CDF ({METRIC_LABEL})",
-        xlabel=f"Speedup ({METRIC_LABEL}, baseline / memoized)",
-        ylabel="Executions <= speedup (%)",
+        title="Speedup CDF",
+        xlabel="Speedup",
+        ylabel="Executions (%)",
         xscale="log",
         plotter=_plot,
     )
