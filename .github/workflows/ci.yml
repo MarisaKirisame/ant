@@ -26,16 +26,8 @@ jobs:
           ocaml-compiler: 5.2
           opam-pin: false
 
-      - name: Cache dune build
-        uses: actions/cache@v4
-        with:
-          path: _build
-          key: ${{ runner.os }}-build-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-build-
-
       - run: git submodule update --init
-      - name: Reset dune toolchain cache
-        run: rm -rf ~/.cache/dune/toolchains
+      - name: Reset dune state
+        run: rm -rf ~/.cache/dune/toolchains _build
       - name: Run pipeline
         run: make all
