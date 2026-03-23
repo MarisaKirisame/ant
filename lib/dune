@@ -1,3 +1,5 @@
+(include_subdirs unqualified)
+
 (library
  (name ant)
  (public_name ant)
@@ -43,8 +45,6 @@
   (language c)
   (names sl2_stubs sl2_slow_stubs crc32c_stubs hashtbl_stubs timer_stubs)
   (flags -g -fPIC -Wall -march=native -O3 -DSSE2NEON_SUPPRESS_WARNINGS)))
-
-(include_subdirs qualified)
 
 (ocamllex Lexer)
 
