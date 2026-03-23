@@ -17,7 +17,6 @@ jobs:
           path: |
             ~/.opam
             ~/.cache/opam
-            ~/.cache/dune
           key: ${{ runner.os }}-ocaml-5.2-${{ hashFiles('dune-project', 'dune.lock/**', '**/*.opam', 'nightly.py') }}
           restore-keys: |
             ${{ runner.os }}-ocaml-5.2-
@@ -36,5 +35,7 @@ jobs:
             ${{ runner.os }}-build-
 
       - run: git submodule update --init
+      - name: Reset dune toolchain cache
+        run: rm -rf ~/.cache/dune/toolchains
       - name: Run pipeline
         run: make all
