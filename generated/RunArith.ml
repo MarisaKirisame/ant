@@ -131,7 +131,7 @@ let eval_main_expr_with_details expr =
     Ant.Profile.with_slot main_cek_slot (fun () ->
         LC.to_ocaml_expr
           (Memo.exec_cek_raw
-             (Memo.pc_to_exp (Ant.Common.int_to_pc 91))
+             (Memo.pc_to_exp (Ant.Common.int_to_pc 96))
              (Dynarray.of_list [ seq_expr ])
              (Memo.from_constructor LC.tag_cont_done)))
   in
