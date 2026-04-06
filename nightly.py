@@ -362,8 +362,12 @@ def experiment_project() -> None:
     report_module.generate_reports()
 
 
-def tex_project() -> None:
-    report_module.generate_tex_table()
+def hazel_tex_project() -> None:
+    report_module.generate_tex_table(output_path=Path("output/hazel/hazel_result.tex"))
+
+
+def arith_tex_project() -> None:
+    report_module.generate_arith_tex(output_path=Path("output/arith/arith_result.tex"))
 
 
 
@@ -406,7 +410,7 @@ def main(argv: Iterable[str]) -> int:
     if len(args) > 1:
         print("Only a single stage argument is supported.", file=sys.stderr)
         print(
-            "Usage: nightly.py [dependency|build|run|profile|hazel|hazel-report|arith|arith-report|report|experiment|tex|compile-generated|all]",
+            "Usage: nightly.py [dependency|build|run|profile|hazel|hazel-report|arith|arith-report|report|experiment|hazel-tex|arith-tex|compile-generated|all]",
             file=sys.stderr,
         )
         return 1
@@ -433,8 +437,10 @@ def main(argv: Iterable[str]) -> int:
         report_project()
     elif stage == "experiment":
         experiment_project()
-    elif stage == "tex":
-        tex_project()
+    elif stage == "hazel-tex":
+        hazel_tex_project()
+    elif stage == "arith-tex":
+        arith_tex_project()
     elif stage == "compile-generated":
         compile_generated()
     elif stage == "all":
@@ -445,7 +451,7 @@ def main(argv: Iterable[str]) -> int:
     else:
         print(f"Unknown stage: {stage}", file=sys.stderr)
         print(
-            "Usage: nightly.py [dependency|build|run|profile|hazel|hazel-report|arith|arith-report|report|experiment|tex|compile-generated|all]",
+            "Usage: nightly.py [dependency|build|run|profile|hazel|hazel-report|arith|arith-report|report|experiment|hazel-tex|arith-tex|compile-generated|all]",
             file=sys.stderr,
         )
         return 1

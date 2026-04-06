@@ -17,7 +17,6 @@ jobs:
           path: |
             ~/.opam
             ~/.cache/opam
-            ~/.cache/dune
           key: ${{ runner.os }}-ocaml-5.2-${{ hashFiles('dune-project', 'dune.lock/**', '**/*.opam', 'nightly.py') }}
           restore-keys: |
             ${{ runner.os }}-ocaml-5.2-
@@ -27,14 +26,8 @@ jobs:
           ocaml-compiler: 5.2
           opam-pin: false
 
-      - name: Cache dune build
-        uses: actions/cache@v4
-        with:
-          path: _build
-          key: ${{ runner.os }}-build-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-build-
-
       - run: git submodule update --init
+      - name: Reset dune state
+        run: rm -rf ~/.cache/dune/toolchains _build
       - name: Run pipeline
         run: make all

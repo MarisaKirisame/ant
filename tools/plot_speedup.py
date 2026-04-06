@@ -47,6 +47,7 @@ REPORT_ABSOLUTE_TIME_LOG_SCALE = True
 REPORT_DRAW_INTERPOLATION_LINE = False
 # Toggle drawing grid lines on plots.
 REPORT_DRAW_GRID_LINES = False
+DEFAULT_REPORT_KIND = "hazel"
 
 if REPORT_WALL_CLOCK_TIME:
     MEMO_KEY = "memo_profile"
@@ -117,9 +118,34 @@ def _save_plot(
 
 
 def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
+    return plot_scatter_for_kind(pairs, output_dir, report_kind=DEFAULT_REPORT_KIND)
+
+
+def plot_scatter_for_kind(
+    pairs: Iterable[tuple[float, float]],
+    output_dir: Path,
+    *,
+    report_kind: str,
+) -> str:
     pairs_list = list(pairs)
     baselines = [baseline for baseline, _ in pairs_list]
     memos = [memo for _, memo in pairs_list]
+    use_arith_style = report_kind == "arith"
+    use_hazel_style = report_kind == "hazel"
+    point_alpha = 1.0 if use_arith_style else 0.15
+    annotation_alpha = 1.0
+    if use_arith_style:
+        guide_lines = [
+            (2.0, 0.5, "2x faster", (12, 10)),
+            (4.0, 0.2, "4x faster", (12, -12)),
+        ]
+    elif use_hazel_style:
+        guide_lines = [
+            (10.0, 0.5, "10x faster", (12, 10)),
+            (100.0, 0.2, "100x faster", (12, -12)),
+        ]
+    else:
+        assert False
     min_time = min(min(baselines), min(memos))
     max_time = max(max(baselines), max(memos))
     reg_x = np.array([min_time, max_time])
@@ -160,14 +186,19 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
                 xy=(x_anchor, y_anchor),
                 xytext=offset,
                 textcoords="offset points",
-                bbox={"boxstyle": "round,pad=0.25", "fc": "white", "ec": "black", "alpha": 0.9},
+                bbox={
+                    "boxstyle": "round,pad=0.25",
+                    "fc": "white",
+                    "ec": "black",
+                    "alpha": annotation_alpha,
+                },
                 arrowprops={"arrowstyle": "->", "color": "black", "lw": 1},
                 fontsize=9,
                 ha="left",
                 va="center",
             )
 
-        ax.scatter(baselines, memos, alpha=0.2)
+        ax.scatter(baselines, memos, alpha=point_alpha)
         if reg_y is not None:
             ax.plot(reg_x, reg_y, color="tab:blue", linewidth=1.5, label="Linear fit")
         ax.plot(
@@ -177,14 +208,14 @@ def plot_scatter(pairs: Iterable[tuple[float, float]], output_dir: Path) -> str:
             linestyle="--",
             linewidth=1,
         )
-        draw_ratio_line(10.0, linewidth=0.5, label="10x faster", offset=(12, 10))
-        draw_ratio_line(100.0, linewidth=0.2, label="100x faster", offset=(12, -12))
+        for factor, linewidth, label, offset in guide_lines:
+            draw_ratio_line(factor, linewidth=linewidth, label=label, offset=offset)
 
     return _save_plot(
         output_dir,
-        title=f"Our vs Their ({METRIC_LABEL}, {scale_label})",
-        xlabel=f"Their ({METRIC_LABEL})",
-        ylabel=f"Our ({METRIC_LABEL})",
+        title="Chordata vs Baseline",
+        xlabel="Baseline time (ns)",
+        ylabel="Chordata time (ns)",
         xscale=xscale,
         yscale=yscale,
         legend=REPORT_DRAW_INTERPOLATION_LINE,
@@ -236,9 +267,9 @@ def plot_speedup_cdf(ratios: Sequence[float], output_dir: Path) -> str:
 
     return _save_plot(
         output_dir,
-        title=f"Speedup CDF ({METRIC_LABEL})",
-        xlabel=f"Speedup ({METRIC_LABEL}, baseline / memoized)",
-        ylabel="Executions <= speedup (%)",
+        title="Speedup CDF",
+        xlabel="Speedup",
+        ylabel="Executions (%)",
         xscale="log",
         plotter=_plot,
     )
@@ -501,19 +532,24 @@ def render_profile_table(totals: dict[str, float], total_time: float) -> str:
 
 
 def generate_plot(
-    result: Result, output_dir: Path
+    result: Result, output_dir: Path, *, report_kind: str = DEFAULT_REPORT_KIND
 ) -> tuple[SpeedupStats, str, str]:
     """Write plots for result into output_dir and return ratios, stats, and filenames."""
     baselines, memos = pairs_from_result(result)
     pairs = list(zip(baselines, memos))
-    stats, line_plot, scatter_plot = generate_plot_for_pairs(pairs, output_dir)
+    stats, line_plot, scatter_plot = generate_plot_for_pairs(
+        pairs, output_dir, report_kind=report_kind
+    )
     return stats, line_plot, scatter_plot
 
 
 def generate_plot_for_pairs(
-    pairs: Sequence[tuple[float, float]], output_dir: Path
+    pairs: Sequence[tuple[float, float]],
+    output_dir: Path,
+    *,
+    report_kind: str = DEFAULT_REPORT_KIND,
 ) -> tuple[SpeedupStats, str, str]:
     ratios, stats = compare_stats(pairs)
     line_plot = plot_speedup_line(ratios, output_dir)
-    scatter_plot = plot_scatter(pairs, output_dir)
+    scatter_plot = plot_scatter_for_kind(pairs, output_dir, report_kind=report_kind)
     return stats, line_plot, scatter_plot

@@ -73,6 +73,8 @@ class ExecTimeRecord:
     memo_profile: list[ProfileEntry]
     cek_profile: list[ProfileEntry]
     plain_profile: list[ProfileEntry]
+    memo_heap_words: int | None
+    cek_heap_words: int | None
 
 
 @dataclass(frozen=True)
@@ -107,6 +109,12 @@ def _require_str(value: object, *, ctx: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{ctx} must be a string")
     return value
+
+
+def _optional_int(value: object, *, ctx: str) -> int | None:
+    if value is None:
+        return None
+    return _require_int(value, ctx=ctx)
 
 
 def _parse_profile(entries: object, *, key_name: str) -> list[ProfileEntry]:
@@ -154,6 +162,12 @@ def load_records(
                     plain_profile = _parse_profile(
                         rec.get("plain_profile"), key_name="plain_profile"
                     )
+                    memo_heap_words = _optional_int(
+                        rec.get("memo_heap_words"), ctx="exec_time.memo_heap_words"
+                    )
+                    cek_heap_words = _optional_int(
+                        rec.get("cek_heap_words"), ctx="exec_time.cek_heap_words"
+                    )
                     exec_times.append(
                         ExecTimeRecord(
                             step=step,
@@ -161,6 +175,8 @@ def load_records(
                             memo_profile=memo_profile,
                             cek_profile=cek_profile,
                             plain_profile=plain_profile,
+                            memo_heap_words=memo_heap_words,
+                            cek_heap_words=cek_heap_words,
                         )
                     )
                 elif name == "memo_stats":

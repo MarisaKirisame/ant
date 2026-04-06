@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := all
 
-.PHONY: dependency build run profile compile-generated nightly all report experiment tex hazel hazel-report arith arith-report
+.PHONY: dependency build run profile compile-generated nightly all report experiment hazel-tex arith-tex hazel hazel-report arith arith-report
 
 dependency:
 	uv run ./nightly.py dependency
@@ -35,8 +35,11 @@ arith-report:
 experiment:
 	uv run ./nightly.py experiment
 
-tex:
-	uv run ./nightly.py tex
+hazel-tex:
+	uv run ./nightly.py hazel-tex
+
+arith-tex:
+	uv run ./nightly.py arith-tex
 
 # Run the full pipeline and produce the HTML speedup report into output/.
 nightly all:

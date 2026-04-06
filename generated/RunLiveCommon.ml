@@ -218,28 +218,85 @@ and pp_vtype fmt = function
 
 let value_to_string value = Format.asprintf "%a" pp_value value
 
-type step_writer = Memo.exec_result -> unit
+type step_writer = Memo.exec_result -> memo_heap_words:int -> cek_heap_words:int -> unit
+type heap_words_stats = { start_heap_words : int; end_heap_words : int; peak_heap_words : int }
+
+type memo_run_result = {
+  exec_res : Memo.exec_result;
+  value : LC.value;
+  memo_profile : (string * int) list;
+  memo_heap_words : int;
+}
+
+type baseline_run_result = {
+  plain_profile : (string * int) list;
+  cek_profile : (string * int) list;
+  cek_heap_words : int;
+}
 
 let with_outchannel steps_path f =
   let oc = open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_path in
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 
-let write_steps_json oc (r : Memo.exec_result) : unit =
+let resting_heap_words : int option ref = ref None
+
+let record_resting_heap_size () : unit =
+  Gc.full_major ();
+  resting_heap_words := Some (Gc.quick_stat ()).heap_words
+
+let subtract_resting_heap_size (heap_words : int) : int =
+  match !resting_heap_words with None -> heap_words | Some resting -> max 0 (heap_words - resting)
+
+let measure_memory_consumption (f : unit -> 'a) : 'a * heap_words_stats =
+  Gc.full_major ();
+  let start_heap_words = (Gc.quick_stat ()).heap_words in
+  let peak_heap_words = ref start_heap_words in
+  let update_peak () =
+    let heap_words = (Gc.quick_stat ()).heap_words in
+    if heap_words > !peak_heap_words then peak_heap_words := heap_words
+  in
+  let alarm = Gc.create_alarm update_peak in
+  update_peak ();
+  Fun.protect
+    ~finally:(fun () -> Gc.delete_alarm alarm)
+    (fun () ->
+      let result = f () in
+      update_peak ();
+      let end_heap_words = (Gc.quick_stat ()).heap_words in
+      ( result,
+        {
+          start_heap_words = subtract_resting_heap_size start_heap_words;
+          end_heap_words = subtract_resting_heap_size end_heap_words;
+          peak_heap_words = subtract_resting_heap_size !peak_heap_words;
+        } ))
+
+let write_steps_json_from_parts oc ~(exec_res : Memo.exec_result) ~(memo_profile : (string * int) list)
+    ~(plain_profile : (string * int) list) ~(cek_profile : (string * int) list) ~(memo_heap_words : int)
+    ~(cek_heap_words : int) : unit =
   let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
   let json =
     `Assoc
       [
         ("name", `String "exec_time");
-        ("step", `Int r.step);
-        ("without_memo_step", `Int r.without_memo_step);
-        ("memo_profile", Profile.dump_profile Profile.memo_profile |> json_of_profile);
-        ("plain_profile", Profile.dump_profile Profile.plain_profile |> json_of_profile);
-        ("cek_profile", Profile.dump_profile Profile.cek_profile |> json_of_profile);
+        ("step", `Int exec_res.step);
+        ("without_memo_step", `Int exec_res.without_memo_step);
+        ("memo_profile", memo_profile |> json_of_profile);
+        ("plain_profile", plain_profile |> json_of_profile);
+        ("cek_profile", cek_profile |> json_of_profile);
+        ("memo_heap_words", `Int memo_heap_words);
+        ("cek_heap_words", `Int cek_heap_words);
       ]
   in
   Yojson.Safe.to_string json |> output_string oc;
   output_char oc '\n';
   flush oc
+
+let write_steps_json oc (r : Memo.exec_result) ~(memo_heap_words : int) ~(cek_heap_words : int) : unit =
+  write_steps_json_from_parts oc ~exec_res:r
+    ~memo_profile:(Profile.dump_profile Profile.memo_profile)
+    ~plain_profile:(Profile.dump_profile Profile.plain_profile)
+    ~cek_profile:(Profile.dump_profile Profile.cek_profile)
+    ~memo_heap_words ~cek_heap_words
 
 let write_memo_stats_json oc (memo : State.memo) : unit =
   let stats = Memo.memo_stats memo in
@@ -308,22 +365,55 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
 let eval_plain_slot = Profile.register_slot Profile.plain_profile "eval_plain"
 let eval_cek_slot = Profile.register_slot Profile.cek_profile "eval_cek"
 
-let eval_plain (expr : LC.expr) : LC.value =
+let eval_plain (expr : LC.expr) : LC.value * int =
   let env = LC.Nil in
-  Gc.full_major ();
-  let _ =
-    Profile.with_slot eval_cek_slot (fun () ->
-        let memo = Memo.init_memo () in
-        LC.to_ocaml_value (LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value env)).words)
+  let _, cek_heap_stats =
+    measure_memory_consumption (fun () ->
+        Profile.with_slot eval_cek_slot (fun () ->
+            let memo = Memo.init_memo () in
+            LC.to_ocaml_value
+              (LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value env)).words))
   in
   Gc.full_major ();
-  Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env)
+  (Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env), cek_heap_stats.peak_heap_words)
+
+let eval_expression_memo_only ~memo expr : memo_run_result =
+  let exec_res, memo_heap_stats =
+    measure_memory_consumption (fun () ->
+        LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
+  in
+  let memo_profile = Profile.dump_profile Profile.memo_profile in
+  {
+    exec_res;
+    value = LC.to_ocaml_value exec_res.words;
+    memo_profile;
+    memo_heap_words = memo_heap_stats.peak_heap_words;
+  }
+
+let eval_expression_baseline_only expr : baseline_run_result =
+  let env = LC.Nil in
+  let _, cek_heap_stats =
+    measure_memory_consumption (fun () ->
+        Profile.with_slot eval_cek_slot (fun () ->
+            let memo = Memo.init_memo () in
+            LC.to_ocaml_value
+              (LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value env)).words))
+  in
+  Gc.full_major ();
+  let _ = Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env) in
+  {
+    plain_profile = Profile.dump_profile Profile.plain_profile;
+    cek_profile = Profile.dump_profile Profile.cek_profile;
+    cek_heap_words = cek_heap_stats.peak_heap_words;
+  }
 
 let eval_expression ~memo ~write_steps expr =
-  Gc.full_major ();
-  let exec_res = LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil) in
-  let _ = eval_plain expr in
-  write_steps exec_res;
+  let exec_res, memo_heap_stats =
+    measure_memory_consumption (fun () ->
+        LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
+  in
+  let _, cek_heap_words = eval_plain expr in
+  write_steps exec_res ~memo_heap_words:memo_heap_stats.peak_heap_words ~cek_heap_words;
   LC.to_ocaml_value exec_res.words
 
 let quicksort_nexpr =

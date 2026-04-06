@@ -215,11 +215,25 @@ and lower_binding (ctx : func_ctx) (env : env) (builder : block_builder) (bindin
   match binding with
   | BSeq (expr, _) ->
       let tmp = add_value ctx "_seq" Temp in
-      emit builder (Bind (tmp, rhs_of_simple_expr env expr));
+      let rec flatten_lets env expr =
+        match expr with
+        | Let (inner_binding, inner_body, _) ->
+            let env' = lower_binding ctx env builder inner_binding in
+            flatten_lets env' inner_body
+        | _ -> emit builder (Bind (tmp, rhs_of_simple_expr env expr))
+      in
+      flatten_lets env expr;
       env
   | BOne (pat, expr, _) ->
       let name, id = lower_let_var ctx pat in
-      emit builder (Bind (id, rhs_of_simple_expr env expr));
+      let rec flatten_lets env expr =
+        match expr with
+        | Let (inner_binding, inner_body, _) ->
+            let env' = lower_binding ctx env builder inner_binding in
+            flatten_lets env' inner_body
+        | _ -> emit builder (Bind (id, rhs_of_simple_expr env expr))
+      in
+      flatten_lets env expr;
       env_with_values env [ (name, id) ]
   | BCont (pat, expr, _) ->
       let env', _ = lower_nonrec_join ctx env pat expr in

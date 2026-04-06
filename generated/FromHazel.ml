@@ -487,18 +487,39 @@ let parse_program_with_test ~program_path test =
 
 let run_with_test ~program_name ~program_path ~steps_file ~test =
   with_outchannel steps_file (fun oc ->
-      let write_steps = write_steps_json oc in
       RunLiveCommon.LC.populate_state ();
       let memo = Ant.Memo.init_memo () in
-      let eval expr = eval_expression ~memo ~write_steps expr in
       let candidates, last_expr = parse_program_with_test ~program_path test in
-      candidates
-      |> List.iteri (fun i nexpr ->
-          Format.printf "%s candidate %d: %a@." program_name i pp_nexpr nexpr;
-          let expr = expr_of_nexpr nexpr in
-          Format.printf "%s candidate %d expr: %a@." program_name i RunLiveCommon.pp_expr expr;
-          let value = eval expr in
-          Printf.printf "%s candidate %d value: %s\n" program_name i (value_to_string value));
+      let indexed_candidates =
+        candidates
+        |> List.mapi (fun i nexpr ->
+            Format.printf "%s candidate %d: %a@." program_name i pp_nexpr nexpr;
+            let expr = expr_of_nexpr nexpr in
+            Format.printf "%s candidate %d expr: %a@." program_name i RunLiveCommon.pp_expr expr;
+            (i, expr))
+      in
+      record_resting_heap_size ();
+      let baseline_pass =
+        indexed_candidates
+        |> List.map (fun (i, expr) ->
+            let baseline_result = eval_expression_baseline_only expr in
+            (i, baseline_result))
+      in
+      record_resting_heap_size ();
+      let memo_pass =
+        indexed_candidates
+        |> List.map (fun (i, expr) ->
+            let memo_result = eval_expression_memo_only ~memo expr in
+            Printf.printf "%s candidate %d value: %s\n" program_name i (value_to_string memo_result.value);
+            (i, memo_result))
+      in
+      List.iter2
+        (fun (memo_idx, memo_result) (baseline_idx, baseline_result) ->
+          if memo_idx <> baseline_idx then failwith "candidate order mismatch between memo and baseline passes";
+          write_steps_json_from_parts oc ~exec_res:memo_result.exec_res ~memo_profile:memo_result.memo_profile
+            ~plain_profile:baseline_result.plain_profile ~cek_profile:baseline_result.cek_profile
+            ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words:baseline_result.cek_heap_words)
+        memo_pass baseline_pass;
       (match last_expr with
       | None -> failwith "why"
       | Some expr -> Format.printf "%s last candidate parsed expr: %a@." program_name pp_expr expr);
