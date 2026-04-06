@@ -417,14 +417,16 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.val
                       Some (var, (vt, Rev.snoc acc vh))
                 in
                 let const_child =
-                  let Words vh, vt = Value.front_exn value in
-                  let vhh, vht = Words.words_front_exn vh in
-                  let key = Word.hash vhh in
-                  match Children.find br.const key with
-                  | None -> None
-                  | Some const ->
-                      let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
-                      Some (const, (vt, acc))
+                  match Value.front_exn value with
+                  | Words vh, vt ->
+                      let vhh, vht = Words.words_front_exn vh in
+                      let key = Word.hash vhh in
+                      (match Children.find br.const key with
+                      | None -> None
+                      | Some const ->
+                          let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
+                          Some (const, (vt, acc)))
+                  | Reference _, _ -> None
                 in
                 let var_max = match var_child with None -> 0 | Some (var, _) -> max_sc_of_trie var in
                 let const_max = match const_child with None -> 0 | Some (const, _) -> max_sc_of_trie const in
@@ -524,7 +526,7 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
       s.c.step w;
       w.state
     in
-    let rec raw_step_n s n = if n = 0 then s else raw_step_n (raw_step s) (n - 1) in
+    let rec _raw_step_n s n = if n = 0 then s else _raw_step_n (raw_step s) (n - 1) in
     let dbg_step_through step state =
       assert (step.sc > 0);
       step.hit <- step.hit + 1;

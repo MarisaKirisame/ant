@@ -9,8 +9,8 @@ module Hashtbl = AntHashtbl
 type 'a code = Code of ir | Pat of pat
 
 let code (doc : document) = Code (Raw doc)
-let to_ir (Code ir) = ir
-let to_pat (Pat pat) = pat
+let to_ir = function Code ir -> ir | Pat _ -> invalid_arg "Code.to_ir: expected Code"
+let to_pat = function Pat pat -> pat | Code _ -> invalid_arg "Code.to_pat: expected Pat"
 let from_ir ir = Code ir
 let raw (s : string) = code $ string s
 let raw_pat (s : string) = Pat (Raw (string s))

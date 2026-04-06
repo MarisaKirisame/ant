@@ -31,6 +31,7 @@ module DemandedExpansion = struct
     | SIndexError -> None
     | SApp (s, _) | SAdd0 (s, _) | SGt0 (s, _) | SIf (s, _, _) | SMatchList (s, _, _) -> get_blocking_id_stuck s
     | SAdd1 (_, s) | SGt1 (_, s) -> get_blocking_id_stuck s
+    | SZro s | SFst s -> get_blocking_id_stuck s
 
   let reveal_shallow target_expr =
     match target_expr with
@@ -94,7 +95,20 @@ module DemandedExpansion = struct
         let id1 = fresh_id () in
         Hashtbl.add oracle id1 e;
         EFix (EHole (Some id1))
-    | EInt _ | EVar _ | ETrue | EFalse | ENil | EHole _ -> target_expr
+    | EPair (l, r) ->
+        let id1, id2 = (fresh_id (), fresh_id ()) in
+        Hashtbl.add oracle id1 l;
+        Hashtbl.add oracle id2 r;
+        EPair (EHole (Some id1), EHole (Some id2))
+    | EZro e ->
+        let id1 = fresh_id () in
+        Hashtbl.add oracle id1 e;
+        EZro (EHole (Some id1))
+    | EFst e ->
+        let id1 = fresh_id () in
+        Hashtbl.add oracle id1 e;
+        EFst (EHole (Some id1))
+    | EInt _ | EVar _ | ETrue | EFalse | ENil | EHole _ | EUnit -> target_expr
 
   let rec apply_expansion expr target_id expansion =
     match expr with
@@ -120,7 +134,10 @@ module DemandedExpansion = struct
             apply_expansion n target_id expansion,
             apply_expansion c target_id expansion )
     | EFix e -> EFix (apply_expansion e target_id expansion)
-    | EInt _ | EVar _ | ETrue | EFalse | ENil -> expr
+    | EPair (l, r) -> EPair (apply_expansion l target_id expansion, apply_expansion r target_id expansion)
+    | EZro e -> EZro (apply_expansion e target_id expansion)
+    | EFst e -> EFst (apply_expansion e target_id expansion)
+    | EInt _ | EVar _ | ETrue | EFalse | ENil | EUnit -> expr
 
   let interactive prog use =
     Hashtbl.clear oracle;

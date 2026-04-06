@@ -102,7 +102,6 @@ let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
     | NEZro x -> LC.EZro (aux ctx x)
     | NEFst x -> LC.EFst (aux ctx x)
     | NESeq (x, y) -> LC.EPair (aux ctx x, aux ctx y)
-    | x -> failwith ("expr_of_nexpr not implemente for expr: " ^ Format.asprintf "%a" pp_nexpr x)
   in
   aux ctx nexpr
 
@@ -209,12 +208,15 @@ and pp_stuck fmt = function
   | LC.SIf (stuck, thn, els) -> Format.fprintf fmt "<stuck if %a %a %a>" pp_stuck stuck pp_expr thn pp_expr els
   | LC.SMatchList (stuck, nil_case, cons_case) ->
       Format.fprintf fmt "<stuck match %a %a %a>" pp_stuck stuck pp_expr nil_case pp_expr cons_case
+  | LC.SZro stuck -> Format.fprintf fmt "<stuck zro %a>" pp_stuck stuck
+  | LC.SFst stuck -> Format.fprintf fmt "<stuck fst %a>" pp_stuck stuck
 
 and pp_vtype fmt = function
   | LC.VTInt -> Format.pp_print_string fmt "int"
   | LC.VTFunc -> Format.pp_print_string fmt "func"
   | LC.VTBool -> Format.pp_print_string fmt "bool"
   | LC.VTList -> Format.pp_print_string fmt "list"
+  | LC.VTPair -> Format.pp_print_string fmt "pair"
 
 let value_to_string value = Format.asprintf "%a" pp_value value
 

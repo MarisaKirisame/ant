@@ -1,3 +1,5 @@
+[@@@ocaml.warning "-11"]
+
 open Ant
 open Word
 open Memo
