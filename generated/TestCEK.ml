@@ -28,7 +28,7 @@ let rec to_ocaml_int_list x =
 let list_incr memo (x0 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 3)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 3)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let populate_state () =
   Memo.reset ();
@@ -57,9 +57,9 @@ let populate_state () =
     (fun w_1 ->
       assert_env_length w_1 2;
       assert_env_length w_1 2;
-      let lhs_0 = Memo.to_word (get_env_slot w_1 1) in
-      let rhs_0 = Memo.to_word (Memo.from_int 1) in
-      set_env_slot w_1 1 (Memo.from_int (Word.get_value lhs_0 + Word.get_value rhs_0));
+      let resolved_0 = resolve w_1 (Source.E 1) in
+      set_env_slot w_1 1
+        (Memo.from_int (Word.get_value (fst resolved_0) + Word.get_value (Memo.to_word (Memo.from_int 1))));
       let arg0_0 = get_env_slot w_1 0 in
       assert_env_length w_1 2;
       w_1.state.k <- Memo.appends [ Memo.from_constructor tag_cont_0; collect_env_slots w_1 [ 1 ]; w_1.state.k ];
@@ -71,22 +71,20 @@ let populate_state () =
     (fun w_3 ->
       assert_env_length w_3 2;
       assert_env_length w_3 2;
-      match Memo.list_match (get_env_slot w_3 0) with
-      | None -> failwith "unreachable (3)"
-      | Some pair_0 -> (
-          let tag_0 = Word.get_value (fst pair_0) in
-          match tag_0 with
-          | 1 (* tag_Nil *) -> w_3.state.c <- pc_to_exp (int_to_pc 1)
-          | 2 (* tag_Cons *) ->
-              let parts_0 = Memo.splits (snd pair_0) in
-              if List.length parts_0 = 2 then (
-                let part0_0 = List.nth parts_0 0 in
-                let part1_0 = List.nth parts_0 1 in
-                set_env_slot w_3 1 part0_0;
-                set_env_slot w_3 0 part1_0;
-                w_3.state.c <- pc_to_exp (int_to_pc 2))
-              else failwith "unreachable (3)"
-          | _ -> failwith "unreachable (3)"))
+      let resolved_1 = resolve w_3 (Source.E 0) in
+      let tag_0 = Word.get_value (fst resolved_1) in
+      match tag_0 with
+      | 1 (* tag_Nil *) -> w_3.state.c <- pc_to_exp (int_to_pc 1)
+      | 2 (* tag_Cons *) ->
+          let parts_0 = Memo.splits (snd resolved_1) in
+          if List.length parts_0 = 2 then (
+            let part0_0 = List.nth parts_0 0 in
+            let part1_0 = List.nth parts_0 1 in
+            set_env_slot w_3 1 part0_0;
+            set_env_slot w_3 0 part1_0;
+            w_3.state.c <- pc_to_exp (int_to_pc 2))
+          else failwith "unreachable (3)"
+      | _ -> failwith "unreachable (3)")
     3;
   add_exp
     (fun w_2 ->

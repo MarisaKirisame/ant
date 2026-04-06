@@ -79,51 +79,51 @@ let rec to_ocaml_expr x =
 let var_rank memo (x0 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 3)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 3)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let expr_rank memo (x0 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 8)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 8)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let compare_expr memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 5 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 1 x0;
   Dynarray.set initial_env 0 x1;
-  exec_cek (pc_to_exp (int_to_pc 9)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 9)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let expr_equal memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 4 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 1 x0;
   Dynarray.set initial_env 0 x1;
-  exec_cek (pc_to_exp (int_to_pc 46)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 46)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let normalize memo (x0 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 5 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 92)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 92)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let simplify_aux memo (x0 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 1 x0;
-  exec_cek (pc_to_exp (int_to_pc 93)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 93)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let diffx memo (x0 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 3 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 102)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 102)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let eval memo (x0 : Value.seq) (x1 : Value.seq) (x2 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 4 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 2 x0;
   Dynarray.set initial_env 0 x1;
   Dynarray.set initial_env 1 x2;
-  exec_cek (pc_to_exp (int_to_pc 109)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 109)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let main memo (x0 : Value.seq) : exec_result =
   let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 110)) initial_env (Memo.from_int 0) memo
+  exec_cek (pc_to_exp (int_to_pc 110)) initial_env (Memo.from_constructor tag_cont_done) memo
 
 let populate_state () =
   Memo.reset ();
@@ -381,14 +381,12 @@ let populate_state () =
     (fun w_96 ->
       assert_env_length w_96 1;
       assert_env_length w_96 1;
-      match Memo.list_match (get_env_slot w_96 0) with
-      | None -> failwith "unreachable (3)"
-      | Some pair_18 -> (
-          let tag_18 = Word.get_value (fst pair_18) in
-          match tag_18 with
-          | 1 (* tag_X *) -> w_96.state.c <- pc_to_exp (int_to_pc 1)
-          | 2 (* tag_Y *) -> w_96.state.c <- pc_to_exp (int_to_pc 2)
-          | _ -> failwith "unreachable (3)"))
+      let resolved_54 = resolve w_96 (Source.E 0) in
+      let tag_18 = Word.get_value (fst resolved_54) in
+      match tag_18 with
+      | 1 (* tag_X *) -> w_96.state.c <- pc_to_exp (int_to_pc 1)
+      | 2 (* tag_Y *) -> w_96.state.c <- pc_to_exp (int_to_pc 2)
+      | _ -> failwith "unreachable (3)")
     3;
   add_exp
     (fun w_38 ->
@@ -414,38 +412,36 @@ let populate_state () =
     (fun w_42 ->
       assert_env_length w_42 1;
       assert_env_length w_42 1;
-      match Memo.list_match (get_env_slot w_42 0) with
-      | None -> failwith "unreachable (8)"
-      | Some pair_7 -> (
-          let tag_7 = Word.get_value (fst pair_7) in
-          match tag_7 with
-          | 3 (* tag_Const *) ->
-              let parts_12 = Memo.splits (snd pair_7) in
-              if List.length parts_12 = 1 then
-                let part0_12 = List.nth parts_12 0 in
-                w_42.state.c <- pc_to_exp (int_to_pc 4)
-              else failwith "unreachable (8)"
-          | 4 (* tag_Var *) ->
-              let parts_13 = Memo.splits (snd pair_7) in
-              if List.length parts_13 = 1 then
-                let part0_13 = List.nth parts_13 0 in
-                w_42.state.c <- pc_to_exp (int_to_pc 5)
-              else failwith "unreachable (8)"
-          | 5 (* tag_Add *) ->
-              let parts_14 = Memo.splits (snd pair_7) in
-              if List.length parts_14 = 2 then
-                let part0_14 = List.nth parts_14 0 in
-                let part1_6 = List.nth parts_14 1 in
-                w_42.state.c <- pc_to_exp (int_to_pc 6)
-              else failwith "unreachable (8)"
-          | 6 (* tag_Mul *) ->
-              let parts_15 = Memo.splits (snd pair_7) in
-              if List.length parts_15 = 2 then
-                let part0_15 = List.nth parts_15 0 in
-                let part1_7 = List.nth parts_15 1 in
-                w_42.state.c <- pc_to_exp (int_to_pc 7)
-              else failwith "unreachable (8)"
-          | _ -> failwith "unreachable (8)"))
+      let resolved_20 = resolve w_42 (Source.E 0) in
+      let tag_7 = Word.get_value (fst resolved_20) in
+      match tag_7 with
+      | 3 (* tag_Const *) ->
+          let parts_12 = Memo.splits (snd resolved_20) in
+          if List.length parts_12 = 1 then
+            let part0_12 = List.nth parts_12 0 in
+            w_42.state.c <- pc_to_exp (int_to_pc 4)
+          else failwith "unreachable (8)"
+      | 4 (* tag_Var *) ->
+          let parts_13 = Memo.splits (snd resolved_20) in
+          if List.length parts_13 = 1 then
+            let part0_13 = List.nth parts_13 0 in
+            w_42.state.c <- pc_to_exp (int_to_pc 5)
+          else failwith "unreachable (8)"
+      | 5 (* tag_Add *) ->
+          let parts_14 = Memo.splits (snd resolved_20) in
+          if List.length parts_14 = 2 then
+            let part0_14 = List.nth parts_14 0 in
+            let part1_6 = List.nth parts_14 1 in
+            w_42.state.c <- pc_to_exp (int_to_pc 6)
+          else failwith "unreachable (8)"
+      | 6 (* tag_Mul *) ->
+          let parts_15 = Memo.splits (snd resolved_20) in
+          if List.length parts_15 = 2 then
+            let part0_15 = List.nth parts_15 0 in
+            let part1_7 = List.nth parts_15 1 in
+            w_42.state.c <- pc_to_exp (int_to_pc 7)
+          else failwith "unreachable (8)"
+      | _ -> failwith "unreachable (8)")
     8;
   add_exp
     (fun w_97 ->
@@ -461,19 +457,21 @@ let populate_state () =
     (fun w_100 ->
       assert_env_length w_100 5;
       assert_env_length w_100 5;
-      let lhs_18 = Memo.to_word (Memo.from_int 0) in
-      let rhs_18 = Memo.to_word (Memo.from_int 1) in
-      set_env_slot w_100 0 (Memo.from_int (Word.get_value lhs_18 - Word.get_value rhs_18));
+      set_env_slot w_100 0
+        (Memo.from_int
+           (Word.get_value (Memo.to_word (Memo.from_int 0)) - Word.get_value (Memo.to_word (Memo.from_int 1))));
       return_value w_100 (get_env_slot w_100 0) (pc_to_exp (int_to_pc 0)))
     10;
   add_exp
     (fun w_101 ->
       assert_env_length w_101 5;
       assert_env_length w_101 5;
-      let lhs_19 = Memo.to_word (get_env_slot w_101 2) in
-      let rhs_19 = Memo.to_word (get_env_slot w_101 3) in
-      set_env_slot w_101 2 (Memo.from_int (if Word.get_value lhs_19 > Word.get_value rhs_19 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_101 2)) <> 0 then w_101.state.c <- pc_to_exp (int_to_pc 12)
+      let resolved_58 = resolve w_101 (Source.E 2) in
+      let resolved_59 = resolve w_101 (Source.E 3) in
+      set_env_slot w_101 2
+        (Memo.from_int (if Word.get_value (fst resolved_58) > Word.get_value (fst resolved_59) then 1 else 0));
+      let resolved_60 = resolve w_101 (Source.E 2) in
+      if Word.get_value (fst resolved_60) <> 0 then w_101.state.c <- pc_to_exp (int_to_pc 12)
       else w_101.state.c <- pc_to_exp (int_to_pc 33))
     11;
   add_exp
@@ -485,29 +483,33 @@ let populate_state () =
     (fun w_103 ->
       assert_env_length w_103 5;
       assert_env_length w_103 5;
-      let lhs_20 = Memo.to_word (get_env_slot w_103 1) in
-      let rhs_20 = Memo.to_word (get_env_slot w_103 0) in
-      set_env_slot w_103 2 (Memo.from_int (if Word.get_value lhs_20 < Word.get_value rhs_20 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_103 2)) <> 0 then w_103.state.c <- pc_to_exp (int_to_pc 14)
+      let resolved_61 = resolve w_103 (Source.E 1) in
+      let resolved_62 = resolve w_103 (Source.E 0) in
+      set_env_slot w_103 2
+        (Memo.from_int (if Word.get_value (fst resolved_61) < Word.get_value (fst resolved_62) then 1 else 0));
+      let resolved_63 = resolve w_103 (Source.E 2) in
+      if Word.get_value (fst resolved_63) <> 0 then w_103.state.c <- pc_to_exp (int_to_pc 14)
       else w_103.state.c <- pc_to_exp (int_to_pc 15))
     13;
   add_exp
     (fun w_104 ->
       assert_env_length w_104 5;
       assert_env_length w_104 5;
-      let lhs_21 = Memo.to_word (Memo.from_int 0) in
-      let rhs_21 = Memo.to_word (Memo.from_int 1) in
-      set_env_slot w_104 0 (Memo.from_int (Word.get_value lhs_21 - Word.get_value rhs_21));
+      set_env_slot w_104 0
+        (Memo.from_int
+           (Word.get_value (Memo.to_word (Memo.from_int 0)) - Word.get_value (Memo.to_word (Memo.from_int 1))));
       return_value w_104 (get_env_slot w_104 0) (pc_to_exp (int_to_pc 0)))
     14;
   add_exp
     (fun w_105 ->
       assert_env_length w_105 5;
       assert_env_length w_105 5;
-      let lhs_22 = Memo.to_word (get_env_slot w_105 1) in
-      let rhs_22 = Memo.to_word (get_env_slot w_105 0) in
-      set_env_slot w_105 0 (Memo.from_int (if Word.get_value lhs_22 > Word.get_value rhs_22 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_105 0)) <> 0 then w_105.state.c <- pc_to_exp (int_to_pc 16)
+      let resolved_64 = resolve w_105 (Source.E 1) in
+      let resolved_65 = resolve w_105 (Source.E 0) in
+      set_env_slot w_105 0
+        (Memo.from_int (if Word.get_value (fst resolved_64) > Word.get_value (fst resolved_65) then 1 else 0));
+      let resolved_66 = resolve w_105 (Source.E 0) in
+      if Word.get_value (fst resolved_66) <> 0 then w_105.state.c <- pc_to_exp (int_to_pc 16)
       else w_105.state.c <- pc_to_exp (int_to_pc 17))
     15;
   add_exp
@@ -524,19 +526,17 @@ let populate_state () =
     (fun w_108 ->
       assert_env_length w_108 5;
       assert_env_length w_108 5;
-      match Memo.list_match (get_env_slot w_108 0) with
-      | None -> failwith "unreachable (18)"
-      | Some pair_19 -> (
-          let tag_19 = Word.get_value (fst pair_19) in
-          match tag_19 with
-          | 3 (* tag_Const *) ->
-              let parts_34 = Memo.splits (snd pair_19) in
-              if List.length parts_34 = 1 then (
-                let part0_34 = List.nth parts_34 0 in
-                set_env_slot w_108 0 part0_34;
-                w_108.state.c <- pc_to_exp (int_to_pc 13))
-              else failwith "unreachable (18)"
-          | _ -> failwith "unreachable (18)"))
+      let resolved_67 = resolve w_108 (Source.E 0) in
+      let tag_19 = Word.get_value (fst resolved_67) in
+      match tag_19 with
+      | 3 (* tag_Const *) ->
+          let parts_34 = Memo.splits (snd resolved_67) in
+          if List.length parts_34 = 1 then (
+            let part0_34 = List.nth parts_34 0 in
+            set_env_slot w_108 0 part0_34;
+            w_108.state.c <- pc_to_exp (int_to_pc 13))
+          else failwith "unreachable (18)"
+      | _ -> failwith "unreachable (18)")
     18;
   add_exp
     (fun w_109 ->
@@ -552,19 +552,21 @@ let populate_state () =
     (fun w_112 ->
       assert_env_length w_112 5;
       assert_env_length w_112 5;
-      let lhs_24 = Memo.to_word (Memo.from_int 0) in
-      let rhs_24 = Memo.to_word (Memo.from_int 1) in
-      set_env_slot w_112 0 (Memo.from_int (Word.get_value lhs_24 - Word.get_value rhs_24));
+      set_env_slot w_112 0
+        (Memo.from_int
+           (Word.get_value (Memo.to_word (Memo.from_int 0)) - Word.get_value (Memo.to_word (Memo.from_int 1))));
       return_value w_112 (get_env_slot w_112 0) (pc_to_exp (int_to_pc 0)))
     20;
   add_exp
     (fun w_113 ->
       assert_env_length w_113 5;
       assert_env_length w_113 5;
-      let lhs_25 = Memo.to_word (get_env_slot w_113 0) in
-      let rhs_25 = Memo.to_word (get_env_slot w_113 1) in
-      set_env_slot w_113 0 (Memo.from_int (if Word.get_value lhs_25 > Word.get_value rhs_25 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_113 0)) <> 0 then w_113.state.c <- pc_to_exp (int_to_pc 22)
+      let resolved_71 = resolve w_113 (Source.E 0) in
+      let resolved_72 = resolve w_113 (Source.E 1) in
+      set_env_slot w_113 0
+        (Memo.from_int (if Word.get_value (fst resolved_71) > Word.get_value (fst resolved_72) then 1 else 0));
+      let resolved_73 = resolve w_113 (Source.E 0) in
+      if Word.get_value (fst resolved_73) <> 0 then w_113.state.c <- pc_to_exp (int_to_pc 22)
       else w_113.state.c <- pc_to_exp (int_to_pc 23))
     21;
   add_exp
@@ -581,19 +583,17 @@ let populate_state () =
     (fun w_116 ->
       assert_env_length w_116 5;
       assert_env_length w_116 5;
-      match Memo.list_match (get_env_slot w_116 0) with
-      | None -> failwith "unreachable (24)"
-      | Some pair_20 -> (
-          let tag_20 = Word.get_value (fst pair_20) in
-          match tag_20 with
-          | 4 (* tag_Var *) ->
-              let parts_35 = Memo.splits (snd pair_20) in
-              if List.length parts_35 = 1 then (
-                let part0_35 = List.nth parts_35 0 in
-                set_env_slot w_116 2 part0_35;
-                w_116.state.c <- pc_to_exp (int_to_pc 19))
-              else failwith "unreachable (24)"
-          | _ -> failwith "unreachable (24)"))
+      let resolved_74 = resolve w_116 (Source.E 0) in
+      let tag_20 = Word.get_value (fst resolved_74) in
+      match tag_20 with
+      | 4 (* tag_Var *) ->
+          let parts_35 = Memo.splits (snd resolved_74) in
+          if List.length parts_35 = 1 then (
+            let part0_35 = List.nth parts_35 0 in
+            set_env_slot w_116 2 part0_35;
+            w_116.state.c <- pc_to_exp (int_to_pc 19))
+          else failwith "unreachable (24)"
+      | _ -> failwith "unreachable (24)")
     24;
   add_exp
     (fun w_117 ->
@@ -628,21 +628,19 @@ let populate_state () =
     (fun w_121 ->
       assert_env_length w_121 5;
       assert_env_length w_121 5;
-      match Memo.list_match (get_env_slot w_121 0) with
-      | None -> failwith "unreachable (28)"
-      | Some pair_21 -> (
-          let tag_21 = Word.get_value (fst pair_21) in
-          match tag_21 with
-          | 5 (* tag_Add *) ->
-              let parts_36 = Memo.splits (snd pair_21) in
-              if List.length parts_36 = 2 then (
-                let part0_36 = List.nth parts_36 0 in
-                let part1_16 = List.nth parts_36 1 in
-                set_env_slot w_121 3 part0_36;
-                set_env_slot w_121 0 part1_16;
-                w_121.state.c <- pc_to_exp (int_to_pc 25))
-              else failwith "unreachable (28)"
-          | _ -> failwith "unreachable (28)"))
+      let resolved_77 = resolve w_121 (Source.E 0) in
+      let tag_21 = Word.get_value (fst resolved_77) in
+      match tag_21 with
+      | 5 (* tag_Add *) ->
+          let parts_36 = Memo.splits (snd resolved_77) in
+          if List.length parts_36 = 2 then (
+            let part0_36 = List.nth parts_36 0 in
+            let part1_16 = List.nth parts_36 1 in
+            set_env_slot w_121 3 part0_36;
+            set_env_slot w_121 0 part1_16;
+            w_121.state.c <- pc_to_exp (int_to_pc 25))
+          else failwith "unreachable (28)"
+      | _ -> failwith "unreachable (28)")
     28;
   add_exp
     (fun w_122 ->
@@ -677,72 +675,69 @@ let populate_state () =
     (fun w_126 ->
       assert_env_length w_126 5;
       assert_env_length w_126 5;
-      match Memo.list_match (get_env_slot w_126 0) with
-      | None -> failwith "unreachable (32)"
-      | Some pair_22 -> (
-          let tag_22 = Word.get_value (fst pair_22) in
-          match tag_22 with
-          | 6 (* tag_Mul *) ->
-              let parts_37 = Memo.splits (snd pair_22) in
-              if List.length parts_37 = 2 then (
-                let part0_37 = List.nth parts_37 0 in
-                let part1_17 = List.nth parts_37 1 in
-                set_env_slot w_126 3 part0_37;
-                set_env_slot w_126 0 part1_17;
-                w_126.state.c <- pc_to_exp (int_to_pc 29))
-              else failwith "unreachable (32)"
-          | _ -> failwith "unreachable (32)"))
+      let resolved_80 = resolve w_126 (Source.E 0) in
+      let tag_22 = Word.get_value (fst resolved_80) in
+      match tag_22 with
+      | 6 (* tag_Mul *) ->
+          let parts_37 = Memo.splits (snd resolved_80) in
+          if List.length parts_37 = 2 then (
+            let part0_37 = List.nth parts_37 0 in
+            let part1_17 = List.nth parts_37 1 in
+            set_env_slot w_126 3 part0_37;
+            set_env_slot w_126 0 part1_17;
+            w_126.state.c <- pc_to_exp (int_to_pc 29))
+          else failwith "unreachable (32)"
+      | _ -> failwith "unreachable (32)")
     32;
   add_exp
     (fun w_127 ->
       assert_env_length w_127 5;
       assert_env_length w_127 5;
-      match Memo.list_match (get_env_slot w_127 1) with
-      | None -> failwith "unreachable (33)"
-      | Some pair_23 -> (
-          let tag_23 = Word.get_value (fst pair_23) in
-          match tag_23 with
-          | 3 (* tag_Const *) ->
-              let parts_38 = Memo.splits (snd pair_23) in
-              if List.length parts_38 = 1 then (
-                let part0_38 = List.nth parts_38 0 in
-                set_env_slot w_127 1 part0_38;
-                w_127.state.c <- pc_to_exp (int_to_pc 18))
-              else failwith "unreachable (33)"
-          | 4 (* tag_Var *) ->
-              let parts_39 = Memo.splits (snd pair_23) in
-              if List.length parts_39 = 1 then (
-                let part0_39 = List.nth parts_39 0 in
-                set_env_slot w_127 1 part0_39;
-                w_127.state.c <- pc_to_exp (int_to_pc 24))
-              else failwith "unreachable (33)"
-          | 5 (* tag_Add *) ->
-              let parts_40 = Memo.splits (snd pair_23) in
-              if List.length parts_40 = 2 then (
-                let part0_40 = List.nth parts_40 0 in
-                let part1_18 = List.nth parts_40 1 in
-                set_env_slot w_127 2 part0_40;
-                set_env_slot w_127 1 part1_18;
-                w_127.state.c <- pc_to_exp (int_to_pc 28))
-              else failwith "unreachable (33)"
-          | 6 (* tag_Mul *) ->
-              let parts_41 = Memo.splits (snd pair_23) in
-              if List.length parts_41 = 2 then (
-                let part0_41 = List.nth parts_41 0 in
-                let part1_19 = List.nth parts_41 1 in
-                set_env_slot w_127 2 part0_41;
-                set_env_slot w_127 1 part1_19;
-                w_127.state.c <- pc_to_exp (int_to_pc 32))
-              else failwith "unreachable (33)"
-          | _ -> failwith "unreachable (33)"))
+      let resolved_81 = resolve w_127 (Source.E 1) in
+      let tag_23 = Word.get_value (fst resolved_81) in
+      match tag_23 with
+      | 3 (* tag_Const *) ->
+          let parts_38 = Memo.splits (snd resolved_81) in
+          if List.length parts_38 = 1 then (
+            let part0_38 = List.nth parts_38 0 in
+            set_env_slot w_127 1 part0_38;
+            w_127.state.c <- pc_to_exp (int_to_pc 18))
+          else failwith "unreachable (33)"
+      | 4 (* tag_Var *) ->
+          let parts_39 = Memo.splits (snd resolved_81) in
+          if List.length parts_39 = 1 then (
+            let part0_39 = List.nth parts_39 0 in
+            set_env_slot w_127 1 part0_39;
+            w_127.state.c <- pc_to_exp (int_to_pc 24))
+          else failwith "unreachable (33)"
+      | 5 (* tag_Add *) ->
+          let parts_40 = Memo.splits (snd resolved_81) in
+          if List.length parts_40 = 2 then (
+            let part0_40 = List.nth parts_40 0 in
+            let part1_18 = List.nth parts_40 1 in
+            set_env_slot w_127 2 part0_40;
+            set_env_slot w_127 1 part1_18;
+            w_127.state.c <- pc_to_exp (int_to_pc 28))
+          else failwith "unreachable (33)"
+      | 6 (* tag_Mul *) ->
+          let parts_41 = Memo.splits (snd resolved_81) in
+          if List.length parts_41 = 2 then (
+            let part0_41 = List.nth parts_41 0 in
+            let part1_19 = List.nth parts_41 1 in
+            set_env_slot w_127 2 part0_41;
+            set_env_slot w_127 1 part1_19;
+            w_127.state.c <- pc_to_exp (int_to_pc 32))
+          else failwith "unreachable (33)"
+      | _ -> failwith "unreachable (33)")
     33;
   add_exp
     (fun w_0 ->
       assert_env_length w_0 4;
       assert_env_length w_0 4;
-      let lhs_0 = Memo.to_word (get_env_slot w_0 1) in
-      let rhs_0 = Memo.to_word (get_env_slot w_0 0) in
-      set_env_slot w_0 0 (Memo.from_int (if Word.get_value lhs_0 = Word.get_value rhs_0 then 1 else 0));
+      let resolved_0 = resolve w_0 (Source.E 1) in
+      let resolved_1 = resolve w_0 (Source.E 0) in
+      set_env_slot w_0 0
+        (Memo.from_int (if Word.get_value (fst resolved_0) = Word.get_value (fst resolved_1) then 1 else 0));
       return_value w_0 (get_env_slot w_0 0) (pc_to_exp (int_to_pc 0)))
     34;
   add_exp
@@ -754,19 +749,17 @@ let populate_state () =
     (fun w_2 ->
       assert_env_length w_2 4;
       assert_env_length w_2 4;
-      match Memo.list_match (get_env_slot w_2 0) with
-      | None -> w_2.state.c <- pc_to_exp (int_to_pc 35)
-      | Some pair_0 -> (
-          let tag_0 = Word.get_value (fst pair_0) in
-          match tag_0 with
-          | 3 (* tag_Const *) ->
-              let parts_0 = Memo.splits (snd pair_0) in
-              if List.length parts_0 = 1 then (
-                let part0_0 = List.nth parts_0 0 in
-                set_env_slot w_2 0 part0_0;
-                w_2.state.c <- pc_to_exp (int_to_pc 34))
-              else w_2.state.c <- pc_to_exp (int_to_pc 35)
-          | _ -> w_2.state.c <- pc_to_exp (int_to_pc 35)))
+      let resolved_2 = resolve w_2 (Source.E 0) in
+      let tag_0 = Word.get_value (fst resolved_2) in
+      match tag_0 with
+      | 3 (* tag_Const *) ->
+          let parts_0 = Memo.splits (snd resolved_2) in
+          if List.length parts_0 = 1 then (
+            let part0_0 = List.nth parts_0 0 in
+            set_env_slot w_2 0 part0_0;
+            w_2.state.c <- pc_to_exp (int_to_pc 34))
+          else w_2.state.c <- pc_to_exp (int_to_pc 35)
+      | _ -> w_2.state.c <- pc_to_exp (int_to_pc 35))
     36;
   add_exp
     (fun w_3 ->
@@ -787,19 +780,17 @@ let populate_state () =
     (fun w_7 ->
       assert_env_length w_7 4;
       assert_env_length w_7 4;
-      match Memo.list_match (get_env_slot w_7 0) with
-      | None -> w_7.state.c <- pc_to_exp (int_to_pc 38)
-      | Some pair_1 -> (
-          let tag_1 = Word.get_value (fst pair_1) in
-          match tag_1 with
-          | 4 (* tag_Var *) ->
-              let parts_1 = Memo.splits (snd pair_1) in
-              if List.length parts_1 = 1 then (
-                let part0_1 = List.nth parts_1 0 in
-                set_env_slot w_7 0 part0_1;
-                w_7.state.c <- pc_to_exp (int_to_pc 37))
-              else w_7.state.c <- pc_to_exp (int_to_pc 38)
-          | _ -> w_7.state.c <- pc_to_exp (int_to_pc 38)))
+      let resolved_5 = resolve w_7 (Source.E 0) in
+      let tag_1 = Word.get_value (fst resolved_5) in
+      match tag_1 with
+      | 4 (* tag_Var *) ->
+          let parts_1 = Memo.splits (snd resolved_5) in
+          if List.length parts_1 = 1 then (
+            let part0_1 = List.nth parts_1 0 in
+            set_env_slot w_7 0 part0_1;
+            w_7.state.c <- pc_to_exp (int_to_pc 37))
+          else w_7.state.c <- pc_to_exp (int_to_pc 38)
+      | _ -> w_7.state.c <- pc_to_exp (int_to_pc 38))
     39;
   add_exp
     (fun w_8 ->
@@ -822,21 +813,19 @@ let populate_state () =
     (fun w_12 ->
       assert_env_length w_12 4;
       assert_env_length w_12 4;
-      match Memo.list_match (get_env_slot w_12 0) with
-      | None -> w_12.state.c <- pc_to_exp (int_to_pc 41)
-      | Some pair_2 -> (
-          let tag_2 = Word.get_value (fst pair_2) in
-          match tag_2 with
-          | 5 (* tag_Add *) ->
-              let parts_2 = Memo.splits (snd pair_2) in
-              if List.length parts_2 = 2 then (
-                let part0_2 = List.nth parts_2 0 in
-                let part1_0 = List.nth parts_2 1 in
-                set_env_slot w_12 3 part0_2;
-                set_env_slot w_12 0 part1_0;
-                w_12.state.c <- pc_to_exp (int_to_pc 40))
-              else w_12.state.c <- pc_to_exp (int_to_pc 41)
-          | _ -> w_12.state.c <- pc_to_exp (int_to_pc 41)))
+      let resolved_8 = resolve w_12 (Source.E 0) in
+      let tag_2 = Word.get_value (fst resolved_8) in
+      match tag_2 with
+      | 5 (* tag_Add *) ->
+          let parts_2 = Memo.splits (snd resolved_8) in
+          if List.length parts_2 = 2 then (
+            let part0_2 = List.nth parts_2 0 in
+            let part1_0 = List.nth parts_2 1 in
+            set_env_slot w_12 3 part0_2;
+            set_env_slot w_12 0 part1_0;
+            w_12.state.c <- pc_to_exp (int_to_pc 40))
+          else w_12.state.c <- pc_to_exp (int_to_pc 41)
+      | _ -> w_12.state.c <- pc_to_exp (int_to_pc 41))
     42;
   add_exp
     (fun w_13 ->
@@ -859,64 +848,60 @@ let populate_state () =
     (fun w_17 ->
       assert_env_length w_17 4;
       assert_env_length w_17 4;
-      match Memo.list_match (get_env_slot w_17 0) with
-      | None -> w_17.state.c <- pc_to_exp (int_to_pc 44)
-      | Some pair_3 -> (
-          let tag_3 = Word.get_value (fst pair_3) in
-          match tag_3 with
-          | 6 (* tag_Mul *) ->
-              let parts_3 = Memo.splits (snd pair_3) in
-              if List.length parts_3 = 2 then (
-                let part0_3 = List.nth parts_3 0 in
-                let part1_1 = List.nth parts_3 1 in
-                set_env_slot w_17 3 part0_3;
-                set_env_slot w_17 0 part1_1;
-                w_17.state.c <- pc_to_exp (int_to_pc 43))
-              else w_17.state.c <- pc_to_exp (int_to_pc 44)
-          | _ -> w_17.state.c <- pc_to_exp (int_to_pc 44)))
+      let resolved_11 = resolve w_17 (Source.E 0) in
+      let tag_3 = Word.get_value (fst resolved_11) in
+      match tag_3 with
+      | 6 (* tag_Mul *) ->
+          let parts_3 = Memo.splits (snd resolved_11) in
+          if List.length parts_3 = 2 then (
+            let part0_3 = List.nth parts_3 0 in
+            let part1_1 = List.nth parts_3 1 in
+            set_env_slot w_17 3 part0_3;
+            set_env_slot w_17 0 part1_1;
+            w_17.state.c <- pc_to_exp (int_to_pc 43))
+          else w_17.state.c <- pc_to_exp (int_to_pc 44)
+      | _ -> w_17.state.c <- pc_to_exp (int_to_pc 44))
     45;
   add_exp
     (fun w_18 ->
       assert_env_length w_18 4;
       assert_env_length w_18 4;
-      match Memo.list_match (get_env_slot w_18 1) with
-      | None -> failwith "unreachable (46)"
-      | Some pair_4 -> (
-          let tag_4 = Word.get_value (fst pair_4) in
-          match tag_4 with
-          | 3 (* tag_Const *) ->
-              let parts_4 = Memo.splits (snd pair_4) in
-              if List.length parts_4 = 1 then (
-                let part0_4 = List.nth parts_4 0 in
-                set_env_slot w_18 1 part0_4;
-                w_18.state.c <- pc_to_exp (int_to_pc 36))
-              else failwith "unreachable (46)"
-          | 4 (* tag_Var *) ->
-              let parts_5 = Memo.splits (snd pair_4) in
-              if List.length parts_5 = 1 then (
-                let part0_5 = List.nth parts_5 0 in
-                set_env_slot w_18 1 part0_5;
-                w_18.state.c <- pc_to_exp (int_to_pc 39))
-              else failwith "unreachable (46)"
-          | 5 (* tag_Add *) ->
-              let parts_6 = Memo.splits (snd pair_4) in
-              if List.length parts_6 = 2 then (
-                let part0_6 = List.nth parts_6 0 in
-                let part1_2 = List.nth parts_6 1 in
-                set_env_slot w_18 2 part0_6;
-                set_env_slot w_18 1 part1_2;
-                w_18.state.c <- pc_to_exp (int_to_pc 42))
-              else failwith "unreachable (46)"
-          | 6 (* tag_Mul *) ->
-              let parts_7 = Memo.splits (snd pair_4) in
-              if List.length parts_7 = 2 then (
-                let part0_7 = List.nth parts_7 0 in
-                let part1_3 = List.nth parts_7 1 in
-                set_env_slot w_18 2 part0_7;
-                set_env_slot w_18 1 part1_3;
-                w_18.state.c <- pc_to_exp (int_to_pc 45))
-              else failwith "unreachable (46)"
-          | _ -> failwith "unreachable (46)"))
+      let resolved_12 = resolve w_18 (Source.E 1) in
+      let tag_4 = Word.get_value (fst resolved_12) in
+      match tag_4 with
+      | 3 (* tag_Const *) ->
+          let parts_4 = Memo.splits (snd resolved_12) in
+          if List.length parts_4 = 1 then (
+            let part0_4 = List.nth parts_4 0 in
+            set_env_slot w_18 1 part0_4;
+            w_18.state.c <- pc_to_exp (int_to_pc 36))
+          else failwith "unreachable (46)"
+      | 4 (* tag_Var *) ->
+          let parts_5 = Memo.splits (snd resolved_12) in
+          if List.length parts_5 = 1 then (
+            let part0_5 = List.nth parts_5 0 in
+            set_env_slot w_18 1 part0_5;
+            w_18.state.c <- pc_to_exp (int_to_pc 39))
+          else failwith "unreachable (46)"
+      | 5 (* tag_Add *) ->
+          let parts_6 = Memo.splits (snd resolved_12) in
+          if List.length parts_6 = 2 then (
+            let part0_6 = List.nth parts_6 0 in
+            let part1_2 = List.nth parts_6 1 in
+            set_env_slot w_18 2 part0_6;
+            set_env_slot w_18 1 part1_2;
+            w_18.state.c <- pc_to_exp (int_to_pc 42))
+          else failwith "unreachable (46)"
+      | 6 (* tag_Mul *) ->
+          let parts_7 = Memo.splits (snd resolved_12) in
+          if List.length parts_7 = 2 then (
+            let part0_7 = List.nth parts_7 0 in
+            let part1_3 = List.nth parts_7 1 in
+            set_env_slot w_18 2 part0_7;
+            set_env_slot w_18 1 part1_3;
+            w_18.state.c <- pc_to_exp (int_to_pc 45))
+          else failwith "unreachable (46)"
+      | _ -> failwith "unreachable (46)")
     46;
   add_exp
     (fun w_43 ->
@@ -951,10 +936,12 @@ let populate_state () =
     (fun w_50 ->
       assert_env_length w_50 5;
       assert_env_length w_50 5;
-      let lhs_6 = Memo.to_word (get_env_slot w_50 1) in
-      let rhs_6 = Memo.to_word (Memo.from_int 0) in
-      set_env_slot w_50 3 (Memo.from_int (if Word.get_value lhs_6 = Word.get_value rhs_6 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_50 3)) <> 0 then w_50.state.c <- pc_to_exp (int_to_pc 52)
+      let resolved_22 = resolve w_50 (Source.E 1) in
+      set_env_slot w_50 3
+        (Memo.from_int
+           (if Word.get_value (fst resolved_22) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
+      let resolved_23 = resolve w_50 (Source.E 3) in
+      if Word.get_value (fst resolved_23) <> 0 then w_50.state.c <- pc_to_exp (int_to_pc 52)
       else w_50.state.c <- pc_to_exp (int_to_pc 55))
     51;
   add_exp
@@ -966,9 +953,9 @@ let populate_state () =
     (fun w_52 ->
       assert_env_length w_52 5;
       assert_env_length w_52 5;
-      let lhs_7 = Memo.to_word (get_env_slot w_52 1) in
-      let rhs_7 = Memo.to_word (get_env_slot w_52 0) in
-      set_env_slot w_52 0 (Memo.from_int (Word.get_value lhs_7 + Word.get_value rhs_7));
+      let resolved_24 = resolve w_52 (Source.E 1) in
+      let resolved_25 = resolve w_52 (Source.E 0) in
+      set_env_slot w_52 0 (Memo.from_int (Word.get_value (fst resolved_24) + Word.get_value (fst resolved_25)));
       assert_env_length w_52 5;
       set_env_slot w_52 0 (Memo.appends [ Memo.from_constructor tag_Const; get_env_slot w_52 0 ]);
       return_value w_52 (get_env_slot w_52 0) (pc_to_exp (int_to_pc 0)))
@@ -984,27 +971,25 @@ let populate_state () =
     (fun w_54 ->
       assert_env_length w_54 5;
       assert_env_length w_54 5;
-      match Memo.list_match (get_env_slot w_54 2) with
-      | None -> w_54.state.c <- pc_to_exp (int_to_pc 54)
-      | Some pair_8 -> (
-          let tag_8 = Word.get_value (fst pair_8) in
-          match tag_8 with
-          | 3 (* tag_Const *) ->
-              let parts_16 = Memo.splits (snd pair_8) in
-              if List.length parts_16 = 1 then (
-                let part0_16 = List.nth parts_16 0 in
-                set_env_slot w_54 0 part0_16;
-                w_54.state.c <- pc_to_exp (int_to_pc 53))
-              else w_54.state.c <- pc_to_exp (int_to_pc 54)
-          | _ -> w_54.state.c <- pc_to_exp (int_to_pc 54)))
+      let resolved_26 = resolve w_54 (Source.E 2) in
+      let tag_8 = Word.get_value (fst resolved_26) in
+      match tag_8 with
+      | 3 (* tag_Const *) ->
+          let parts_16 = Memo.splits (snd resolved_26) in
+          if List.length parts_16 = 1 then (
+            let part0_16 = List.nth parts_16 0 in
+            set_env_slot w_54 0 part0_16;
+            w_54.state.c <- pc_to_exp (int_to_pc 53))
+          else w_54.state.c <- pc_to_exp (int_to_pc 54)
+      | _ -> w_54.state.c <- pc_to_exp (int_to_pc 54))
     55;
   add_exp
     (fun w_55 ->
       assert_env_length w_55 5;
       assert_env_length w_55 5;
-      let lhs_8 = Memo.to_word (get_env_slot w_55 4) in
-      let rhs_8 = Memo.to_word (get_env_slot w_55 2) in
-      set_env_slot w_55 2 (Memo.from_int (Word.get_value lhs_8 + Word.get_value rhs_8));
+      let resolved_27 = resolve w_55 (Source.E 4) in
+      let resolved_28 = resolve w_55 (Source.E 2) in
+      set_env_slot w_55 2 (Memo.from_int (Word.get_value (fst resolved_27) + Word.get_value (fst resolved_28)));
       assert_env_length w_55 5;
       set_env_slot w_55 2 (Memo.appends [ Memo.from_constructor tag_Const; get_env_slot w_55 2 ]);
       assert_env_length w_55 5;
@@ -1028,19 +1013,17 @@ let populate_state () =
     (fun w_57 ->
       assert_env_length w_57 5;
       assert_env_length w_57 5;
-      match Memo.list_match (get_env_slot w_57 2) with
-      | None -> w_57.state.c <- pc_to_exp (int_to_pc 57)
-      | Some pair_9 -> (
-          let tag_9 = Word.get_value (fst pair_9) in
-          match tag_9 with
-          | 3 (* tag_Const *) ->
-              let parts_17 = Memo.splits (snd pair_9) in
-              if List.length parts_17 = 1 then (
-                let part0_17 = List.nth parts_17 0 in
-                set_env_slot w_57 2 part0_17;
-                w_57.state.c <- pc_to_exp (int_to_pc 56))
-              else w_57.state.c <- pc_to_exp (int_to_pc 57)
-          | _ -> w_57.state.c <- pc_to_exp (int_to_pc 57)))
+      let resolved_29 = resolve w_57 (Source.E 2) in
+      let tag_9 = Word.get_value (fst resolved_29) in
+      match tag_9 with
+      | 3 (* tag_Const *) ->
+          let parts_17 = Memo.splits (snd resolved_29) in
+          if List.length parts_17 = 1 then (
+            let part0_17 = List.nth parts_17 0 in
+            set_env_slot w_57 2 part0_17;
+            w_57.state.c <- pc_to_exp (int_to_pc 56))
+          else w_57.state.c <- pc_to_exp (int_to_pc 57)
+      | _ -> w_57.state.c <- pc_to_exp (int_to_pc 57))
     58;
   add_exp
     (fun w_58 ->
@@ -1057,19 +1040,17 @@ let populate_state () =
     (fun w_59 ->
       assert_env_length w_59 5;
       assert_env_length w_59 5;
-      match Memo.list_match (get_env_slot w_59 3) with
-      | None -> w_59.state.c <- pc_to_exp (int_to_pc 59)
-      | Some pair_10 -> (
-          let tag_10 = Word.get_value (fst pair_10) in
-          match tag_10 with
-          | 3 (* tag_Const *) ->
-              let parts_18 = Memo.splits (snd pair_10) in
-              if List.length parts_18 = 1 then (
-                let part0_18 = List.nth parts_18 0 in
-                set_env_slot w_59 4 part0_18;
-                w_59.state.c <- pc_to_exp (int_to_pc 58))
-              else w_59.state.c <- pc_to_exp (int_to_pc 59)
-          | _ -> w_59.state.c <- pc_to_exp (int_to_pc 59)))
+      let resolved_30 = resolve w_59 (Source.E 3) in
+      let tag_10 = Word.get_value (fst resolved_30) in
+      match tag_10 with
+      | 3 (* tag_Const *) ->
+          let parts_18 = Memo.splits (snd resolved_30) in
+          if List.length parts_18 = 1 then (
+            let part0_18 = List.nth parts_18 0 in
+            set_env_slot w_59 4 part0_18;
+            w_59.state.c <- pc_to_exp (int_to_pc 58))
+          else w_59.state.c <- pc_to_exp (int_to_pc 59)
+      | _ -> w_59.state.c <- pc_to_exp (int_to_pc 59))
     60;
   add_exp
     (fun w_60 ->
@@ -1082,30 +1063,30 @@ let populate_state () =
     (fun w_61 ->
       assert_env_length w_61 5;
       assert_env_length w_61 5;
-      match Memo.list_match (get_env_slot w_61 2) with
-      | None -> w_61.state.c <- pc_to_exp (int_to_pc 61)
-      | Some pair_11 -> (
-          let tag_11 = Word.get_value (fst pair_11) in
-          match tag_11 with
-          | 5 (* tag_Add *) ->
-              let parts_19 = Memo.splits (snd pair_11) in
-              if List.length parts_19 = 2 then (
-                let part0_19 = List.nth parts_19 0 in
-                let part1_8 = List.nth parts_19 1 in
-                set_env_slot w_61 2 part0_19;
-                set_env_slot w_61 0 part1_8;
-                w_61.state.c <- pc_to_exp (int_to_pc 60))
-              else w_61.state.c <- pc_to_exp (int_to_pc 61)
-          | _ -> w_61.state.c <- pc_to_exp (int_to_pc 61)))
+      let resolved_31 = resolve w_61 (Source.E 2) in
+      let tag_11 = Word.get_value (fst resolved_31) in
+      match tag_11 with
+      | 5 (* tag_Add *) ->
+          let parts_19 = Memo.splits (snd resolved_31) in
+          if List.length parts_19 = 2 then (
+            let part0_19 = List.nth parts_19 0 in
+            let part1_8 = List.nth parts_19 1 in
+            set_env_slot w_61 2 part0_19;
+            set_env_slot w_61 0 part1_8;
+            w_61.state.c <- pc_to_exp (int_to_pc 60))
+          else w_61.state.c <- pc_to_exp (int_to_pc 61)
+      | _ -> w_61.state.c <- pc_to_exp (int_to_pc 61))
     62;
   add_exp
     (fun w_62 ->
       assert_env_length w_62 5;
       assert_env_length w_62 5;
-      let lhs_9 = Memo.to_word (get_env_slot w_62 1) in
-      let rhs_9 = Memo.to_word (Memo.from_int 0) in
-      set_env_slot w_62 1 (Memo.from_int (if Word.get_value lhs_9 = Word.get_value rhs_9 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_62 1)) <> 0 then w_62.state.c <- pc_to_exp (int_to_pc 64)
+      let resolved_32 = resolve w_62 (Source.E 1) in
+      set_env_slot w_62 1
+        (Memo.from_int
+           (if Word.get_value (fst resolved_32) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
+      let resolved_33 = resolve w_62 (Source.E 1) in
+      if Word.get_value (fst resolved_33) <> 0 then w_62.state.c <- pc_to_exp (int_to_pc 64)
       else w_62.state.c <- pc_to_exp (int_to_pc 65))
     63;
   add_exp
@@ -1140,64 +1121,62 @@ let populate_state () =
     (fun w_67 ->
       assert_env_length w_67 5;
       assert_env_length w_67 5;
-      match Memo.list_match (get_env_slot w_67 2) with
-      | None -> w_67.state.c <- pc_to_exp (int_to_pc 67)
-      | Some pair_12 -> (
-          let tag_12 = Word.get_value (fst pair_12) in
-          match tag_12 with
-          | 3 (* tag_Const *) ->
-              let parts_20 = Memo.splits (snd pair_12) in
-              if List.length parts_20 = 1 then (
-                let part0_20 = List.nth parts_20 0 in
-                set_env_slot w_67 1 part0_20;
-                w_67.state.c <- pc_to_exp (int_to_pc 63))
-              else w_67.state.c <- pc_to_exp (int_to_pc 67)
-          | 5 (* tag_Add *) ->
-              let parts_21 = Memo.splits (snd pair_12) in
-              if List.length parts_21 = 2 then (
-                let part0_21 = List.nth parts_21 0 in
-                let part1_9 = List.nth parts_21 1 in
-                set_env_slot w_67 2 part0_21;
-                set_env_slot w_67 1 part1_9;
-                w_67.state.c <- pc_to_exp (int_to_pc 66))
-              else w_67.state.c <- pc_to_exp (int_to_pc 67)
-          | _ -> w_67.state.c <- pc_to_exp (int_to_pc 67)))
+      let resolved_34 = resolve w_67 (Source.E 2) in
+      let tag_12 = Word.get_value (fst resolved_34) in
+      match tag_12 with
+      | 3 (* tag_Const *) ->
+          let parts_20 = Memo.splits (snd resolved_34) in
+          if List.length parts_20 = 1 then (
+            let part0_20 = List.nth parts_20 0 in
+            set_env_slot w_67 1 part0_20;
+            w_67.state.c <- pc_to_exp (int_to_pc 63))
+          else w_67.state.c <- pc_to_exp (int_to_pc 67)
+      | 5 (* tag_Add *) ->
+          let parts_21 = Memo.splits (snd resolved_34) in
+          if List.length parts_21 = 2 then (
+            let part0_21 = List.nth parts_21 0 in
+            let part1_9 = List.nth parts_21 1 in
+            set_env_slot w_67 2 part0_21;
+            set_env_slot w_67 1 part1_9;
+            w_67.state.c <- pc_to_exp (int_to_pc 66))
+          else w_67.state.c <- pc_to_exp (int_to_pc 67)
+      | _ -> w_67.state.c <- pc_to_exp (int_to_pc 67))
     68;
   add_exp
     (fun w_68 ->
       assert_env_length w_68 5;
       assert_env_length w_68 5;
-      match Memo.list_match (get_env_slot w_68 0) with
-      | None -> w_68.state.c <- pc_to_exp (int_to_pc 68)
-      | Some pair_13 -> (
-          let tag_13 = Word.get_value (fst pair_13) in
-          match tag_13 with
-          | 3 (* tag_Const *) ->
-              let parts_22 = Memo.splits (snd pair_13) in
-              if List.length parts_22 = 1 then (
-                let part0_22 = List.nth parts_22 0 in
-                set_env_slot w_68 1 part0_22;
-                w_68.state.c <- pc_to_exp (int_to_pc 51))
-              else w_68.state.c <- pc_to_exp (int_to_pc 68)
-          | 5 (* tag_Add *) ->
-              let parts_23 = Memo.splits (snd pair_13) in
-              if List.length parts_23 = 2 then (
-                let part0_23 = List.nth parts_23 0 in
-                let part1_10 = List.nth parts_23 1 in
-                set_env_slot w_68 3 part0_23;
-                set_env_slot w_68 1 part1_10;
-                w_68.state.c <- pc_to_exp (int_to_pc 62))
-              else w_68.state.c <- pc_to_exp (int_to_pc 68)
-          | _ -> w_68.state.c <- pc_to_exp (int_to_pc 68)))
+      let resolved_35 = resolve w_68 (Source.E 0) in
+      let tag_13 = Word.get_value (fst resolved_35) in
+      match tag_13 with
+      | 3 (* tag_Const *) ->
+          let parts_22 = Memo.splits (snd resolved_35) in
+          if List.length parts_22 = 1 then (
+            let part0_22 = List.nth parts_22 0 in
+            set_env_slot w_68 1 part0_22;
+            w_68.state.c <- pc_to_exp (int_to_pc 51))
+          else w_68.state.c <- pc_to_exp (int_to_pc 68)
+      | 5 (* tag_Add *) ->
+          let parts_23 = Memo.splits (snd resolved_35) in
+          if List.length parts_23 = 2 then (
+            let part0_23 = List.nth parts_23 0 in
+            let part1_10 = List.nth parts_23 1 in
+            set_env_slot w_68 3 part0_23;
+            set_env_slot w_68 1 part1_10;
+            w_68.state.c <- pc_to_exp (int_to_pc 62))
+          else w_68.state.c <- pc_to_exp (int_to_pc 68)
+      | _ -> w_68.state.c <- pc_to_exp (int_to_pc 68))
     69;
   add_exp
     (fun w_69 ->
       assert_env_length w_69 5;
       assert_env_length w_69 5;
-      let lhs_10 = Memo.to_word (get_env_slot w_69 2) in
-      let rhs_10 = Memo.to_word (Memo.from_int 0) in
-      set_env_slot w_69 3 (Memo.from_int (if Word.get_value lhs_10 = Word.get_value rhs_10 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_69 3)) <> 0 then w_69.state.c <- pc_to_exp (int_to_pc 71)
+      let resolved_36 = resolve w_69 (Source.E 2) in
+      set_env_slot w_69 3
+        (Memo.from_int
+           (if Word.get_value (fst resolved_36) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
+      let resolved_37 = resolve w_69 (Source.E 3) in
+      if Word.get_value (fst resolved_37) <> 0 then w_69.state.c <- pc_to_exp (int_to_pc 71)
       else w_69.state.c <- pc_to_exp (int_to_pc 72))
     70;
   add_exp
@@ -1211,10 +1190,12 @@ let populate_state () =
     (fun w_71 ->
       assert_env_length w_71 5;
       assert_env_length w_71 5;
-      let lhs_11 = Memo.to_word (get_env_slot w_71 2) in
-      let rhs_11 = Memo.to_word (Memo.from_int 1) in
-      set_env_slot w_71 3 (Memo.from_int (if Word.get_value lhs_11 = Word.get_value rhs_11 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_71 3)) <> 0 then w_71.state.c <- pc_to_exp (int_to_pc 73)
+      let resolved_38 = resolve w_71 (Source.E 2) in
+      set_env_slot w_71 3
+        (Memo.from_int
+           (if Word.get_value (fst resolved_38) = Word.get_value (Memo.to_word (Memo.from_int 1)) then 1 else 0));
+      let resolved_39 = resolve w_71 (Source.E 3) in
+      if Word.get_value (fst resolved_39) <> 0 then w_71.state.c <- pc_to_exp (int_to_pc 73)
       else w_71.state.c <- pc_to_exp (int_to_pc 80))
     72;
   add_exp
@@ -1226,10 +1207,12 @@ let populate_state () =
     (fun w_73 ->
       assert_env_length w_73 5;
       assert_env_length w_73 5;
-      let lhs_12 = Memo.to_word (get_env_slot w_73 1) in
-      let rhs_12 = Memo.to_word (Memo.from_int 0) in
-      set_env_slot w_73 3 (Memo.from_int (if Word.get_value lhs_12 = Word.get_value rhs_12 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_73 3)) <> 0 then w_73.state.c <- pc_to_exp (int_to_pc 75)
+      let resolved_40 = resolve w_73 (Source.E 1) in
+      set_env_slot w_73 3
+        (Memo.from_int
+           (if Word.get_value (fst resolved_40) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
+      let resolved_41 = resolve w_73 (Source.E 3) in
+      if Word.get_value (fst resolved_41) <> 0 then w_73.state.c <- pc_to_exp (int_to_pc 75)
       else w_73.state.c <- pc_to_exp (int_to_pc 76))
     74;
   add_exp
@@ -1243,10 +1226,12 @@ let populate_state () =
     (fun w_75 ->
       assert_env_length w_75 5;
       assert_env_length w_75 5;
-      let lhs_13 = Memo.to_word (get_env_slot w_75 1) in
-      let rhs_13 = Memo.to_word (Memo.from_int 1) in
-      set_env_slot w_75 3 (Memo.from_int (if Word.get_value lhs_13 = Word.get_value rhs_13 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_75 3)) <> 0 then w_75.state.c <- pc_to_exp (int_to_pc 77)
+      let resolved_42 = resolve w_75 (Source.E 1) in
+      set_env_slot w_75 3
+        (Memo.from_int
+           (if Word.get_value (fst resolved_42) = Word.get_value (Memo.to_word (Memo.from_int 1)) then 1 else 0));
+      let resolved_43 = resolve w_75 (Source.E 3) in
+      if Word.get_value (fst resolved_43) <> 0 then w_75.state.c <- pc_to_exp (int_to_pc 77)
       else w_75.state.c <- pc_to_exp (int_to_pc 78))
     76;
   add_exp
@@ -1258,9 +1243,9 @@ let populate_state () =
     (fun w_77 ->
       assert_env_length w_77 5;
       assert_env_length w_77 5;
-      let lhs_14 = Memo.to_word (get_env_slot w_77 2) in
-      let rhs_14 = Memo.to_word (get_env_slot w_77 1) in
-      set_env_slot w_77 0 (Memo.from_int (Word.get_value lhs_14 * Word.get_value rhs_14));
+      let resolved_44 = resolve w_77 (Source.E 2) in
+      let resolved_45 = resolve w_77 (Source.E 1) in
+      set_env_slot w_77 0 (Memo.from_int (Word.get_value (fst resolved_44) * Word.get_value (fst resolved_45)));
       assert_env_length w_77 5;
       set_env_slot w_77 0 (Memo.appends [ Memo.from_constructor tag_Const; get_env_slot w_77 0 ]);
       return_value w_77 (get_env_slot w_77 0) (pc_to_exp (int_to_pc 0)))
@@ -1276,19 +1261,17 @@ let populate_state () =
     (fun w_79 ->
       assert_env_length w_79 5;
       assert_env_length w_79 5;
-      match Memo.list_match (get_env_slot w_79 1) with
-      | None -> w_79.state.c <- pc_to_exp (int_to_pc 79)
-      | Some pair_14 -> (
-          let tag_14 = Word.get_value (fst pair_14) in
-          match tag_14 with
-          | 3 (* tag_Const *) ->
-              let parts_24 = Memo.splits (snd pair_14) in
-              if List.length parts_24 = 1 then (
-                let part0_24 = List.nth parts_24 0 in
-                set_env_slot w_79 1 part0_24;
-                w_79.state.c <- pc_to_exp (int_to_pc 74))
-              else w_79.state.c <- pc_to_exp (int_to_pc 79)
-          | _ -> w_79.state.c <- pc_to_exp (int_to_pc 79)))
+      let resolved_46 = resolve w_79 (Source.E 1) in
+      let tag_14 = Word.get_value (fst resolved_46) in
+      match tag_14 with
+      | 3 (* tag_Const *) ->
+          let parts_24 = Memo.splits (snd resolved_46) in
+          if List.length parts_24 = 1 then (
+            let part0_24 = List.nth parts_24 0 in
+            set_env_slot w_79 1 part0_24;
+            w_79.state.c <- pc_to_exp (int_to_pc 74))
+          else w_79.state.c <- pc_to_exp (int_to_pc 79)
+      | _ -> w_79.state.c <- pc_to_exp (int_to_pc 79))
     80;
   add_exp
     (fun w_80 ->
@@ -1305,10 +1288,12 @@ let populate_state () =
     (fun w_81 ->
       assert_env_length w_81 5;
       assert_env_length w_81 5;
-      let lhs_15 = Memo.to_word (get_env_slot w_81 2) in
-      let rhs_15 = Memo.to_word (Memo.from_int 0) in
-      set_env_slot w_81 3 (Memo.from_int (if Word.get_value lhs_15 = Word.get_value rhs_15 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_81 3)) <> 0 then w_81.state.c <- pc_to_exp (int_to_pc 83)
+      let resolved_47 = resolve w_81 (Source.E 2) in
+      set_env_slot w_81 3
+        (Memo.from_int
+           (if Word.get_value (fst resolved_47) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
+      let resolved_48 = resolve w_81 (Source.E 3) in
+      if Word.get_value (fst resolved_48) <> 0 then w_81.state.c <- pc_to_exp (int_to_pc 83)
       else w_81.state.c <- pc_to_exp (int_to_pc 84))
     82;
   add_exp
@@ -1322,10 +1307,12 @@ let populate_state () =
     (fun w_83 ->
       assert_env_length w_83 5;
       assert_env_length w_83 5;
-      let lhs_16 = Memo.to_word (get_env_slot w_83 2) in
-      let rhs_16 = Memo.to_word (Memo.from_int 1) in
-      set_env_slot w_83 2 (Memo.from_int (if Word.get_value lhs_16 = Word.get_value rhs_16 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_83 2)) <> 0 then w_83.state.c <- pc_to_exp (int_to_pc 85)
+      let resolved_49 = resolve w_83 (Source.E 2) in
+      set_env_slot w_83 2
+        (Memo.from_int
+           (if Word.get_value (fst resolved_49) = Word.get_value (Memo.to_word (Memo.from_int 1)) then 1 else 0));
+      let resolved_50 = resolve w_83 (Source.E 2) in
+      if Word.get_value (fst resolved_50) <> 0 then w_83.state.c <- pc_to_exp (int_to_pc 85)
       else w_83.state.c <- pc_to_exp (int_to_pc 86))
     84;
   add_exp
@@ -1371,37 +1358,35 @@ let populate_state () =
     (fun w_89 ->
       assert_env_length w_89 5;
       assert_env_length w_89 5;
-      match Memo.list_match (get_env_slot w_89 1) with
-      | None -> w_89.state.c <- pc_to_exp (int_to_pc 89)
-      | Some pair_15 -> (
-          let tag_15 = Word.get_value (fst pair_15) in
-          match tag_15 with
-          | 3 (* tag_Const *) ->
-              let parts_25 = Memo.splits (snd pair_15) in
-              if List.length parts_25 = 1 then (
-                let part0_25 = List.nth parts_25 0 in
-                set_env_slot w_89 2 part0_25;
-                w_89.state.c <- pc_to_exp (int_to_pc 82))
-              else w_89.state.c <- pc_to_exp (int_to_pc 89)
-          | 5 (* tag_Add *) ->
-              let parts_26 = Memo.splits (snd pair_15) in
-              if List.length parts_26 = 2 then (
-                let part0_26 = List.nth parts_26 0 in
-                let part1_11 = List.nth parts_26 1 in
-                set_env_slot w_89 2 part0_26;
-                set_env_slot w_89 1 part1_11;
-                w_89.state.c <- pc_to_exp (int_to_pc 87))
-              else w_89.state.c <- pc_to_exp (int_to_pc 89)
-          | 6 (* tag_Mul *) ->
-              let parts_27 = Memo.splits (snd pair_15) in
-              if List.length parts_27 = 2 then (
-                let part0_27 = List.nth parts_27 0 in
-                let part1_12 = List.nth parts_27 1 in
-                set_env_slot w_89 1 part0_27;
-                set_env_slot w_89 2 part1_12;
-                w_89.state.c <- pc_to_exp (int_to_pc 88))
-              else w_89.state.c <- pc_to_exp (int_to_pc 89)
-          | _ -> w_89.state.c <- pc_to_exp (int_to_pc 89)))
+      let resolved_51 = resolve w_89 (Source.E 1) in
+      let tag_15 = Word.get_value (fst resolved_51) in
+      match tag_15 with
+      | 3 (* tag_Const *) ->
+          let parts_25 = Memo.splits (snd resolved_51) in
+          if List.length parts_25 = 1 then (
+            let part0_25 = List.nth parts_25 0 in
+            set_env_slot w_89 2 part0_25;
+            w_89.state.c <- pc_to_exp (int_to_pc 82))
+          else w_89.state.c <- pc_to_exp (int_to_pc 89)
+      | 5 (* tag_Add *) ->
+          let parts_26 = Memo.splits (snd resolved_51) in
+          if List.length parts_26 = 2 then (
+            let part0_26 = List.nth parts_26 0 in
+            let part1_11 = List.nth parts_26 1 in
+            set_env_slot w_89 2 part0_26;
+            set_env_slot w_89 1 part1_11;
+            w_89.state.c <- pc_to_exp (int_to_pc 87))
+          else w_89.state.c <- pc_to_exp (int_to_pc 89)
+      | 6 (* tag_Mul *) ->
+          let parts_27 = Memo.splits (snd resolved_51) in
+          if List.length parts_27 = 2 then (
+            let part0_27 = List.nth parts_27 0 in
+            let part1_12 = List.nth parts_27 1 in
+            set_env_slot w_89 1 part0_27;
+            set_env_slot w_89 2 part1_12;
+            w_89.state.c <- pc_to_exp (int_to_pc 88))
+          else w_89.state.c <- pc_to_exp (int_to_pc 89)
+      | _ -> w_89.state.c <- pc_to_exp (int_to_pc 89))
     90;
   add_exp
     (fun w_90 ->
@@ -1417,42 +1402,40 @@ let populate_state () =
     (fun w_93 ->
       assert_env_length w_93 5;
       assert_env_length w_93 5;
-      match Memo.list_match (get_env_slot w_93 0) with
-      | None -> failwith "unreachable (92)"
-      | Some pair_17 -> (
-          let tag_17 = Word.get_value (fst pair_17) in
-          match tag_17 with
-          | 3 (* tag_Const *) ->
-              let parts_30 = Memo.splits (snd pair_17) in
-              if List.length parts_30 = 1 then
-                let part0_30 = List.nth parts_30 0 in
-                w_93.state.c <- pc_to_exp (int_to_pc 47)
-              else failwith "unreachable (92)"
-          | 4 (* tag_Var *) ->
-              let parts_31 = Memo.splits (snd pair_17) in
-              if List.length parts_31 = 1 then
-                let part0_31 = List.nth parts_31 0 in
-                w_93.state.c <- pc_to_exp (int_to_pc 48)
-              else failwith "unreachable (92)"
-          | 5 (* tag_Add *) ->
-              let parts_32 = Memo.splits (snd pair_17) in
-              if List.length parts_32 = 2 then (
-                let part0_32 = List.nth parts_32 0 in
-                let part1_14 = List.nth parts_32 1 in
-                set_env_slot w_93 0 part0_32;
-                set_env_slot w_93 1 part1_14;
-                w_93.state.c <- pc_to_exp (int_to_pc 49))
-              else failwith "unreachable (92)"
-          | 6 (* tag_Mul *) ->
-              let parts_33 = Memo.splits (snd pair_17) in
-              if List.length parts_33 = 2 then (
-                let part0_33 = List.nth parts_33 0 in
-                let part1_15 = List.nth parts_33 1 in
-                set_env_slot w_93 0 part0_33;
-                set_env_slot w_93 2 part1_15;
-                w_93.state.c <- pc_to_exp (int_to_pc 91))
-              else failwith "unreachable (92)"
-          | _ -> failwith "unreachable (92)"))
+      let resolved_53 = resolve w_93 (Source.E 0) in
+      let tag_17 = Word.get_value (fst resolved_53) in
+      match tag_17 with
+      | 3 (* tag_Const *) ->
+          let parts_30 = Memo.splits (snd resolved_53) in
+          if List.length parts_30 = 1 then
+            let part0_30 = List.nth parts_30 0 in
+            w_93.state.c <- pc_to_exp (int_to_pc 47)
+          else failwith "unreachable (92)"
+      | 4 (* tag_Var *) ->
+          let parts_31 = Memo.splits (snd resolved_53) in
+          if List.length parts_31 = 1 then
+            let part0_31 = List.nth parts_31 0 in
+            w_93.state.c <- pc_to_exp (int_to_pc 48)
+          else failwith "unreachable (92)"
+      | 5 (* tag_Add *) ->
+          let parts_32 = Memo.splits (snd resolved_53) in
+          if List.length parts_32 = 2 then (
+            let part0_32 = List.nth parts_32 0 in
+            let part1_14 = List.nth parts_32 1 in
+            set_env_slot w_93 0 part0_32;
+            set_env_slot w_93 1 part1_14;
+            w_93.state.c <- pc_to_exp (int_to_pc 49))
+          else failwith "unreachable (92)"
+      | 6 (* tag_Mul *) ->
+          let parts_33 = Memo.splits (snd resolved_53) in
+          if List.length parts_33 = 2 then (
+            let part0_33 = List.nth parts_33 0 in
+            let part1_15 = List.nth parts_33 1 in
+            set_env_slot w_93 0 part0_33;
+            set_env_slot w_93 2 part1_15;
+            w_93.state.c <- pc_to_exp (int_to_pc 91))
+          else failwith "unreachable (92)"
+      | _ -> failwith "unreachable (92)")
     92;
   add_exp
     (fun w_19 ->
@@ -1503,14 +1486,12 @@ let populate_state () =
     (fun w_131 ->
       assert_env_length w_131 3;
       assert_env_length w_131 3;
-      match Memo.list_match (get_env_slot w_131 0) with
-      | None -> failwith "unreachable (99)"
-      | Some pair_24 -> (
-          let tag_24 = Word.get_value (fst pair_24) in
-          match tag_24 with
-          | 1 (* tag_X *) -> w_131.state.c <- pc_to_exp (int_to_pc 97)
-          | 2 (* tag_Y *) -> w_131.state.c <- pc_to_exp (int_to_pc 98)
-          | _ -> failwith "unreachable (99)"))
+      let resolved_82 = resolve w_131 (Source.E 0) in
+      let tag_24 = Word.get_value (fst resolved_82) in
+      match tag_24 with
+      | 1 (* tag_X *) -> w_131.state.c <- pc_to_exp (int_to_pc 97)
+      | 2 (* tag_Y *) -> w_131.state.c <- pc_to_exp (int_to_pc 98)
+      | _ -> failwith "unreachable (99)")
     99;
   add_exp
     (fun w_132 ->
@@ -1537,43 +1518,41 @@ let populate_state () =
     (fun w_138 ->
       assert_env_length w_138 3;
       assert_env_length w_138 3;
-      match Memo.list_match (get_env_slot w_138 0) with
-      | None -> failwith "unreachable (102)"
-      | Some pair_25 -> (
-          let tag_25 = Word.get_value (fst pair_25) in
-          match tag_25 with
-          | 3 (* tag_Const *) ->
-              let parts_42 = Memo.splits (snd pair_25) in
-              if List.length parts_42 = 1 then
-                let part0_42 = List.nth parts_42 0 in
-                w_138.state.c <- pc_to_exp (int_to_pc 96)
-              else failwith "unreachable (102)"
-          | 4 (* tag_Var *) ->
-              let parts_43 = Memo.splits (snd pair_25) in
-              if List.length parts_43 = 1 then (
-                let part0_43 = List.nth parts_43 0 in
-                set_env_slot w_138 0 part0_43;
-                w_138.state.c <- pc_to_exp (int_to_pc 99))
-              else failwith "unreachable (102)"
-          | 5 (* tag_Add *) ->
-              let parts_44 = Memo.splits (snd pair_25) in
-              if List.length parts_44 = 2 then (
-                let part0_44 = List.nth parts_44 0 in
-                let part1_20 = List.nth parts_44 1 in
-                set_env_slot w_138 1 part0_44;
-                set_env_slot w_138 0 part1_20;
-                w_138.state.c <- pc_to_exp (int_to_pc 100))
-              else failwith "unreachable (102)"
-          | 6 (* tag_Mul *) ->
-              let parts_45 = Memo.splits (snd pair_25) in
-              if List.length parts_45 = 2 then (
-                let part0_45 = List.nth parts_45 0 in
-                let part1_21 = List.nth parts_45 1 in
-                set_env_slot w_138 0 part0_45;
-                set_env_slot w_138 2 part1_21;
-                w_138.state.c <- pc_to_exp (int_to_pc 101))
-              else failwith "unreachable (102)"
-          | _ -> failwith "unreachable (102)"))
+      let resolved_83 = resolve w_138 (Source.E 0) in
+      let tag_25 = Word.get_value (fst resolved_83) in
+      match tag_25 with
+      | 3 (* tag_Const *) ->
+          let parts_42 = Memo.splits (snd resolved_83) in
+          if List.length parts_42 = 1 then
+            let part0_42 = List.nth parts_42 0 in
+            w_138.state.c <- pc_to_exp (int_to_pc 96)
+          else failwith "unreachable (102)"
+      | 4 (* tag_Var *) ->
+          let parts_43 = Memo.splits (snd resolved_83) in
+          if List.length parts_43 = 1 then (
+            let part0_43 = List.nth parts_43 0 in
+            set_env_slot w_138 0 part0_43;
+            w_138.state.c <- pc_to_exp (int_to_pc 99))
+          else failwith "unreachable (102)"
+      | 5 (* tag_Add *) ->
+          let parts_44 = Memo.splits (snd resolved_83) in
+          if List.length parts_44 = 2 then (
+            let part0_44 = List.nth parts_44 0 in
+            let part1_20 = List.nth parts_44 1 in
+            set_env_slot w_138 1 part0_44;
+            set_env_slot w_138 0 part1_20;
+            w_138.state.c <- pc_to_exp (int_to_pc 100))
+          else failwith "unreachable (102)"
+      | 6 (* tag_Mul *) ->
+          let parts_45 = Memo.splits (snd resolved_83) in
+          if List.length parts_45 = 2 then (
+            let part0_45 = List.nth parts_45 0 in
+            let part1_21 = List.nth parts_45 1 in
+            set_env_slot w_138 0 part0_45;
+            set_env_slot w_138 2 part1_21;
+            w_138.state.c <- pc_to_exp (int_to_pc 101))
+          else failwith "unreachable (102)"
+      | _ -> failwith "unreachable (102)")
     102;
   add_exp
     (fun w_27 ->
@@ -1594,14 +1573,12 @@ let populate_state () =
     (fun w_30 ->
       assert_env_length w_30 4;
       assert_env_length w_30 4;
-      match Memo.list_match (get_env_slot w_30 2) with
-      | None -> failwith "unreachable (106)"
-      | Some pair_5 -> (
-          let tag_5 = Word.get_value (fst pair_5) in
-          match tag_5 with
-          | 1 (* tag_X *) -> w_30.state.c <- pc_to_exp (int_to_pc 104)
-          | 2 (* tag_Y *) -> w_30.state.c <- pc_to_exp (int_to_pc 105)
-          | _ -> failwith "unreachable (106)"))
+      let resolved_14 = resolve w_30 (Source.E 2) in
+      let tag_5 = Word.get_value (fst resolved_14) in
+      match tag_5 with
+      | 1 (* tag_X *) -> w_30.state.c <- pc_to_exp (int_to_pc 104)
+      | 2 (* tag_Y *) -> w_30.state.c <- pc_to_exp (int_to_pc 105)
+      | _ -> failwith "unreachable (106)")
     106;
   add_exp
     (fun w_31 ->
@@ -1637,44 +1614,42 @@ let populate_state () =
     (fun w_37 ->
       assert_env_length w_37 4;
       assert_env_length w_37 4;
-      match Memo.list_match (get_env_slot w_37 2) with
-      | None -> failwith "unreachable (109)"
-      | Some pair_6 -> (
-          let tag_6 = Word.get_value (fst pair_6) in
-          match tag_6 with
-          | 3 (* tag_Const *) ->
-              let parts_8 = Memo.splits (snd pair_6) in
-              if List.length parts_8 = 1 then (
-                let part0_8 = List.nth parts_8 0 in
-                set_env_slot w_37 0 part0_8;
-                w_37.state.c <- pc_to_exp (int_to_pc 103))
-              else failwith "unreachable (109)"
-          | 4 (* tag_Var *) ->
-              let parts_9 = Memo.splits (snd pair_6) in
-              if List.length parts_9 = 1 then (
-                let part0_9 = List.nth parts_9 0 in
-                set_env_slot w_37 2 part0_9;
-                w_37.state.c <- pc_to_exp (int_to_pc 106))
-              else failwith "unreachable (109)"
-          | 5 (* tag_Add *) ->
-              let parts_10 = Memo.splits (snd pair_6) in
-              if List.length parts_10 = 2 then (
-                let part0_10 = List.nth parts_10 0 in
-                let part1_4 = List.nth parts_10 1 in
-                set_env_slot w_37 3 part0_10;
-                set_env_slot w_37 2 part1_4;
-                w_37.state.c <- pc_to_exp (int_to_pc 107))
-              else failwith "unreachable (109)"
-          | 6 (* tag_Mul *) ->
-              let parts_11 = Memo.splits (snd pair_6) in
-              if List.length parts_11 = 2 then (
-                let part0_11 = List.nth parts_11 0 in
-                let part1_5 = List.nth parts_11 1 in
-                set_env_slot w_37 3 part0_11;
-                set_env_slot w_37 2 part1_5;
-                w_37.state.c <- pc_to_exp (int_to_pc 108))
-              else failwith "unreachable (109)"
-          | _ -> failwith "unreachable (109)"))
+      let resolved_19 = resolve w_37 (Source.E 2) in
+      let tag_6 = Word.get_value (fst resolved_19) in
+      match tag_6 with
+      | 3 (* tag_Const *) ->
+          let parts_8 = Memo.splits (snd resolved_19) in
+          if List.length parts_8 = 1 then (
+            let part0_8 = List.nth parts_8 0 in
+            set_env_slot w_37 0 part0_8;
+            w_37.state.c <- pc_to_exp (int_to_pc 103))
+          else failwith "unreachable (109)"
+      | 4 (* tag_Var *) ->
+          let parts_9 = Memo.splits (snd resolved_19) in
+          if List.length parts_9 = 1 then (
+            let part0_9 = List.nth parts_9 0 in
+            set_env_slot w_37 2 part0_9;
+            w_37.state.c <- pc_to_exp (int_to_pc 106))
+          else failwith "unreachable (109)"
+      | 5 (* tag_Add *) ->
+          let parts_10 = Memo.splits (snd resolved_19) in
+          if List.length parts_10 = 2 then (
+            let part0_10 = List.nth parts_10 0 in
+            let part1_4 = List.nth parts_10 1 in
+            set_env_slot w_37 3 part0_10;
+            set_env_slot w_37 2 part1_4;
+            w_37.state.c <- pc_to_exp (int_to_pc 107))
+          else failwith "unreachable (109)"
+      | 6 (* tag_Mul *) ->
+          let parts_11 = Memo.splits (snd resolved_19) in
+          if List.length parts_11 = 2 then (
+            let part0_11 = List.nth parts_11 0 in
+            let part1_5 = List.nth parts_11 1 in
+            set_env_slot w_37 3 part0_11;
+            set_env_slot w_37 2 part1_5;
+            w_37.state.c <- pc_to_exp (int_to_pc 108))
+          else failwith "unreachable (109)"
+      | _ -> failwith "unreachable (109)")
     109;
   add_exp
     (fun w_24 ->
@@ -1700,9 +1675,10 @@ let populate_state () =
     (fun w_5 ->
       assert_env_length w_5 4;
       assert_env_length w_5 4;
-      let lhs_1 = Memo.to_word (get_env_slot w_5 1) in
-      let rhs_1 = Memo.to_word (get_env_slot w_5 0) in
-      set_env_slot w_5 0 (Memo.from_int (if Word.get_value lhs_1 = Word.get_value rhs_1 then 1 else 0));
+      let resolved_3 = resolve w_5 (Source.E 1) in
+      let resolved_4 = resolve w_5 (Source.E 0) in
+      set_env_slot w_5 0
+        (Memo.from_int (if Word.get_value (fst resolved_3) = Word.get_value (fst resolved_4) then 1 else 0));
       return_value w_5 (get_env_slot w_5 0) (pc_to_exp (int_to_pc 0)))
     112;
   add_exp
@@ -1721,9 +1697,10 @@ let populate_state () =
     (fun w_10 ->
       assert_env_length w_10 4;
       assert_env_length w_10 4;
-      let lhs_2 = Memo.to_word (get_env_slot w_10 2) in
-      let rhs_2 = Memo.to_word (get_env_slot w_10 0) in
-      set_env_slot w_10 0 (Memo.from_int (if Word.get_value lhs_2 <> 0 && Word.get_value rhs_2 <> 0 then 1 else 0));
+      let resolved_6 = resolve w_10 (Source.E 2) in
+      let resolved_7 = resolve w_10 (Source.E 0) in
+      set_env_slot w_10 0
+        (Memo.from_int (if Word.get_value (fst resolved_6) <> 0 && Word.get_value (fst resolved_7) <> 0 then 1 else 0));
       return_value w_10 (get_env_slot w_10 0) (pc_to_exp (int_to_pc 0)))
     114;
   add_exp
@@ -1742,9 +1719,10 @@ let populate_state () =
     (fun w_15 ->
       assert_env_length w_15 4;
       assert_env_length w_15 4;
-      let lhs_3 = Memo.to_word (get_env_slot w_15 2) in
-      let rhs_3 = Memo.to_word (get_env_slot w_15 0) in
-      set_env_slot w_15 0 (Memo.from_int (if Word.get_value lhs_3 <> 0 && Word.get_value rhs_3 <> 0 then 1 else 0));
+      let resolved_9 = resolve w_15 (Source.E 2) in
+      let resolved_10 = resolve w_15 (Source.E 0) in
+      set_env_slot w_15 0
+        (Memo.from_int (if Word.get_value (fst resolved_9) <> 0 && Word.get_value (fst resolved_10) <> 0 then 1 else 0));
       return_value w_15 (get_env_slot w_15 0) (pc_to_exp (int_to_pc 0)))
     116;
   add_exp
@@ -1762,7 +1740,8 @@ let populate_state () =
   add_exp
     (fun w_21 ->
       assert_env_length w_21 2;
-      if Word.get_value (Memo.to_word (get_env_slot w_21 1)) <> 0 then w_21.state.c <- pc_to_exp (int_to_pc 94)
+      let resolved_13 = resolve w_21 (Source.E 1) in
+      if Word.get_value (fst resolved_13) <> 0 then w_21.state.c <- pc_to_exp (int_to_pc 94)
       else w_21.state.c <- pc_to_exp (int_to_pc 95))
     118;
   add_exp
@@ -1802,9 +1781,9 @@ let populate_state () =
     (fun w_33 ->
       assert_env_length w_33 4;
       assert_env_length w_33 4;
-      let lhs_4 = Memo.to_word (get_env_slot w_33 3) in
-      let rhs_4 = Memo.to_word (get_env_slot w_33 0) in
-      set_env_slot w_33 0 (Memo.from_int (Word.get_value lhs_4 + Word.get_value rhs_4));
+      let resolved_15 = resolve w_33 (Source.E 3) in
+      let resolved_16 = resolve w_33 (Source.E 0) in
+      set_env_slot w_33 0 (Memo.from_int (Word.get_value (fst resolved_15) + Word.get_value (fst resolved_16)));
       return_value w_33 (get_env_slot w_33 0) (pc_to_exp (int_to_pc 0)))
     122;
   add_exp
@@ -1825,9 +1804,9 @@ let populate_state () =
     (fun w_36 ->
       assert_env_length w_36 4;
       assert_env_length w_36 4;
-      let lhs_5 = Memo.to_word (get_env_slot w_36 3) in
-      let rhs_5 = Memo.to_word (get_env_slot w_36 0) in
-      set_env_slot w_36 0 (Memo.from_int (Word.get_value lhs_5 * Word.get_value rhs_5));
+      let resolved_17 = resolve w_36 (Source.E 3) in
+      let resolved_18 = resolve w_36 (Source.E 0) in
+      set_env_slot w_36 0 (Memo.from_int (Word.get_value (fst resolved_17) * Word.get_value (fst resolved_18)));
       return_value w_36 (get_env_slot w_36 0) (pc_to_exp (int_to_pc 0)))
     124;
   add_exp
@@ -1855,7 +1834,8 @@ let populate_state () =
   add_exp
     (fun w_48 ->
       assert_env_length w_48 5;
-      if Word.get_value (Memo.to_word (get_env_slot w_48 1)) <> 0 then w_48.state.c <- pc_to_exp (int_to_pc 50)
+      let resolved_21 = resolve w_48 (Source.E 1) in
+      if Word.get_value (fst resolved_21) <> 0 then w_48.state.c <- pc_to_exp (int_to_pc 50)
       else w_48.state.c <- pc_to_exp (int_to_pc 69))
     127;
   add_exp
@@ -1872,28 +1852,26 @@ let populate_state () =
     (fun w_92 ->
       assert_env_length w_92 5;
       assert_env_length w_92 5;
-      match Memo.list_match (get_env_slot w_92 0) with
-      | None -> w_92.state.c <- pc_to_exp (int_to_pc 90)
-      | Some pair_16 -> (
-          let tag_16 = Word.get_value (fst pair_16) in
-          match tag_16 with
-          | 3 (* tag_Const *) ->
-              let parts_28 = Memo.splits (snd pair_16) in
-              if List.length parts_28 = 1 then (
-                let part0_28 = List.nth parts_28 0 in
-                set_env_slot w_92 2 part0_28;
-                w_92.state.c <- pc_to_exp (int_to_pc 70))
-              else w_92.state.c <- pc_to_exp (int_to_pc 90)
-          | 5 (* tag_Add *) ->
-              let parts_29 = Memo.splits (snd pair_16) in
-              if List.length parts_29 = 2 then (
-                let part0_29 = List.nth parts_29 0 in
-                let part1_13 = List.nth parts_29 1 in
-                set_env_slot w_92 1 part0_29;
-                set_env_slot w_92 0 part1_13;
-                w_92.state.c <- pc_to_exp (int_to_pc 81))
-              else w_92.state.c <- pc_to_exp (int_to_pc 90)
-          | _ -> w_92.state.c <- pc_to_exp (int_to_pc 90)))
+      let resolved_52 = resolve w_92 (Source.E 0) in
+      let tag_16 = Word.get_value (fst resolved_52) in
+      match tag_16 with
+      | 3 (* tag_Const *) ->
+          let parts_28 = Memo.splits (snd resolved_52) in
+          if List.length parts_28 = 1 then (
+            let part0_28 = List.nth parts_28 0 in
+            set_env_slot w_92 2 part0_28;
+            w_92.state.c <- pc_to_exp (int_to_pc 70))
+          else w_92.state.c <- pc_to_exp (int_to_pc 90)
+      | 5 (* tag_Add *) ->
+          let parts_29 = Memo.splits (snd resolved_52) in
+          if List.length parts_29 = 2 then (
+            let part0_29 = List.nth parts_29 0 in
+            let part1_13 = List.nth parts_29 1 in
+            set_env_slot w_92 1 part0_29;
+            set_env_slot w_92 0 part1_13;
+            w_92.state.c <- pc_to_exp (int_to_pc 81))
+          else w_92.state.c <- pc_to_exp (int_to_pc 90)
+      | _ -> w_92.state.c <- pc_to_exp (int_to_pc 90))
     129;
   add_exp
     (fun w_98 ->
@@ -1910,10 +1888,12 @@ let populate_state () =
     (fun w_99 ->
       assert_env_length w_99 5;
       assert_env_length w_99 5;
-      let lhs_17 = Memo.to_word (get_env_slot w_99 2) in
-      let rhs_17 = Memo.to_word (get_env_slot w_99 3) in
-      set_env_slot w_99 4 (Memo.from_int (if Word.get_value lhs_17 < Word.get_value rhs_17 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_99 4)) <> 0 then w_99.state.c <- pc_to_exp (int_to_pc 10)
+      let resolved_55 = resolve w_99 (Source.E 2) in
+      let resolved_56 = resolve w_99 (Source.E 3) in
+      set_env_slot w_99 4
+        (Memo.from_int (if Word.get_value (fst resolved_55) < Word.get_value (fst resolved_56) then 1 else 0));
+      let resolved_57 = resolve w_99 (Source.E 4) in
+      if Word.get_value (fst resolved_57) <> 0 then w_99.state.c <- pc_to_exp (int_to_pc 10)
       else w_99.state.c <- pc_to_exp (int_to_pc 11))
     131;
   add_exp
@@ -1930,30 +1910,36 @@ let populate_state () =
     (fun w_111 ->
       assert_env_length w_111 5;
       assert_env_length w_111 5;
-      let lhs_23 = Memo.to_word (get_env_slot w_111 0) in
-      let rhs_23 = Memo.to_word (get_env_slot w_111 1) in
-      set_env_slot w_111 2 (Memo.from_int (if Word.get_value lhs_23 < Word.get_value rhs_23 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_111 2)) <> 0 then w_111.state.c <- pc_to_exp (int_to_pc 20)
+      let resolved_68 = resolve w_111 (Source.E 0) in
+      let resolved_69 = resolve w_111 (Source.E 1) in
+      set_env_slot w_111 2
+        (Memo.from_int (if Word.get_value (fst resolved_68) < Word.get_value (fst resolved_69) then 1 else 0));
+      let resolved_70 = resolve w_111 (Source.E 2) in
+      if Word.get_value (fst resolved_70) <> 0 then w_111.state.c <- pc_to_exp (int_to_pc 20)
       else w_111.state.c <- pc_to_exp (int_to_pc 21))
     133;
   add_exp
     (fun w_118 ->
       assert_env_length w_118 5;
       assert_env_length w_118 5;
-      let lhs_26 = Memo.to_word (get_env_slot w_118 2) in
-      let rhs_26 = Memo.to_word (Memo.from_int 0) in
-      set_env_slot w_118 3 (Memo.from_int (if Word.get_value lhs_26 = Word.get_value rhs_26 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_118 3)) <> 0 then w_118.state.c <- pc_to_exp (int_to_pc 26)
+      let resolved_75 = resolve w_118 (Source.E 2) in
+      set_env_slot w_118 3
+        (Memo.from_int
+           (if Word.get_value (fst resolved_75) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
+      let resolved_76 = resolve w_118 (Source.E 3) in
+      if Word.get_value (fst resolved_76) <> 0 then w_118.state.c <- pc_to_exp (int_to_pc 26)
       else w_118.state.c <- pc_to_exp (int_to_pc 27))
     134;
   add_exp
     (fun w_123 ->
       assert_env_length w_123 5;
       assert_env_length w_123 5;
-      let lhs_27 = Memo.to_word (get_env_slot w_123 2) in
-      let rhs_27 = Memo.to_word (Memo.from_int 0) in
-      set_env_slot w_123 3 (Memo.from_int (if Word.get_value lhs_27 = Word.get_value rhs_27 then 1 else 0));
-      if Word.get_value (Memo.to_word (get_env_slot w_123 3)) <> 0 then w_123.state.c <- pc_to_exp (int_to_pc 30)
+      let resolved_78 = resolve w_123 (Source.E 2) in
+      set_env_slot w_123 3
+        (Memo.from_int
+           (if Word.get_value (fst resolved_78) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
+      let resolved_79 = resolve w_123 (Source.E 3) in
+      if Word.get_value (fst resolved_79) <> 0 then w_123.state.c <- pc_to_exp (int_to_pc 30)
       else w_123.state.c <- pc_to_exp (int_to_pc 31))
     135;
   add_exp

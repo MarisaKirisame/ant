@@ -414,8 +414,8 @@ let compile_ctor_arm ctx unit_cg pair w default ({ pattern; block } : match_arm)
       (Hashtbl.find_exn ctx.ctag ctor, Hashtbl.find_exn ctx.ctag_name ctor, body)
   | _ -> failwith "CompileRegMemo: internal error while compiling ctor dispatch"
 
-let compile_ctor_dispatch ctx unit_cg subject arms w current_pc =
-  let default = compile_default_arm unit_cg subject arms w current_pc in
+let compile_ctor_dispatch ctx unit_cg raw_subject resolved arms w current_pc =
+  let default = compile_default_arm unit_cg raw_subject arms w current_pc in
   let ctor_arms =
     List.filter_map
       (fun ({ pattern; _ } as arm) ->
@@ -428,16 +428,12 @@ let compile_ctor_dispatch ctx unit_cg subject arms w current_pc =
   match ctor_arms with
   | [] -> default
   | _ ->
-      match_option_ (memo_list_match_ subject)
-        (fun () -> default)
-        "pair"
-        (fun pair ->
-          let_in_ "tag"
-            (word_get_value_ (zro_ pair))
-            (fun tag ->
-              match_ctor_tag_literal_default_ tag
-                (List.map (compile_ctor_arm ctx unit_cg pair w default) ctor_arms)
-                default))
+      let_in_ "tag"
+        (word_get_value_ (zro_ resolved))
+        (fun tag ->
+          match_ctor_tag_literal_default_ tag
+            (List.map (compile_ctor_arm ctx unit_cg resolved w default) ctor_arms)
+            default)
 
 let compile_non_call_rhs (ctx : cg_ctx) (unit_cg : unit_codegen) (w : world code) dst rhs =
   let dst_slot = slot_of_value unit_cg.allocation dst in
@@ -455,12 +451,15 @@ let compile_non_call_rhs (ctx : cg_ctx) (unit_cg : unit_codegen) (w : world code
   | Select (_, FName name) -> unsupported_codegen ("named field selection ." ^ name)
   | BinOp (op, lhs, rhs) ->
       let op_code = binop_code op in
-      let_in_ "lhs"
-        (memo_to_word_ (operand_value_code ctx unit_cg w lhs))
-        (fun lhs_word ->
-          let_in_ "rhs"
-            (memo_to_word_ (operand_value_code ctx unit_cg w rhs))
-            (fun rhs_word ->
+      let resolve_word operand k =
+        match operand with
+        | OLocal value_id ->
+            let slot = slot_of_value unit_cg.allocation value_id in
+            let_in_ "resolved" (resolve_ w (src_E_ slot)) (fun pair -> k (zro_ pair))
+        | _ -> k (memo_to_word_ (operand_value_code ctx unit_cg w operand))
+      in
+      resolve_word lhs (fun lhs_word ->
+          resolve_word rhs (fun rhs_word ->
               write_slot w dst_slot (memo_from_int_ (op_code (word_get_value_ lhs_word) (word_get_value_ rhs_word)))))
   | Call _ -> failwith "CompileRegMemo: call rhs handled separately"
 
@@ -589,23 +588,40 @@ and compile_terminator ctx unit_cg block current_pc w term =
           (match IntMap.find_opt succ_id unit_cg.block_pcs with
           | Some pc -> pc
           | None -> failf "CompileRegMemo: missing pc for block b%d" succ_id)]
-  | Branch (cond, then_id, else_id) ->
-      let cond_value = operand_value_code ctx unit_cg w cond in
-      let cond_word = memo_to_word_ cond_value in
-      if_
-        (bool_nonzero_code (word_get_value_ cond_word))
-        (goto_ w
-           (match IntMap.find_opt then_id unit_cg.block_pcs with
-           | Some pc -> pc
-           | None -> failf "CompileRegMemo: missing pc for block b%d" then_id))
-        (goto_ w
-           (match IntMap.find_opt else_id unit_cg.block_pcs with
-           | Some pc -> pc
-           | None -> failf "CompileRegMemo: missing pc for block b%d" else_id))
+  | Branch (cond, then_id, else_id) -> (
+      let then_pc =
+        match IntMap.find_opt then_id unit_cg.block_pcs with
+        | Some pc -> pc
+        | None -> failf "CompileRegMemo: missing pc for block b%d" then_id
+      in
+      let else_pc =
+        match IntMap.find_opt else_id unit_cg.block_pcs with
+        | Some pc -> pc
+        | None -> failf "CompileRegMemo: missing pc for block b%d" else_id
+      in
+      let do_branch cond_word =
+        if_ (bool_nonzero_code (word_get_value_ cond_word)) (goto_ w then_pc) (goto_ w else_pc)
+      in
+      match cond with
+      | OLocal value_id ->
+          let slot = slot_of_value unit_cg.allocation value_id in
+          let_in_ "resolved" (resolve_ w (src_E_ slot)) (fun pair -> do_branch (zro_ pair))
+      | _ ->
+          let cond_word = memo_to_word_ (operand_value_code ctx unit_cg w cond) in
+          do_branch cond_word)
   | Match (scrutinee, arms) ->
       [%seqs
         assert_env_length_ w (int_ unit_cg.allocation.frame_size);
-        compile_ctor_dispatch ctx unit_cg (operand_value_code ctx unit_cg w scrutinee) arms w current_pc]
+        match scrutinee with
+        | OLocal value_id ->
+            let slot = slot_of_value unit_cg.allocation value_id in
+            let_in_ "resolved"
+              (resolve_ w (src_E_ slot))
+              (fun resolved ->
+                compile_ctor_dispatch ctx unit_cg
+                  (operand_value_code ctx unit_cg w scrutinee)
+                  resolved arms w current_pc)
+        | _ -> failf "CompileRegMemo: match scrutinee must be a local operand"]
 
 let compile_block ctx unit_cg (block : block) =
   let current_pc =
@@ -675,7 +691,9 @@ let compile_unit_wrapper (ctx : cg_ctx) (unit_cg : unit_codegen) =
   ^^ (if arg_inits = [] then empty else hardline ^^ separate_map hardline (fun doc -> string "  " ^^ doc) arg_inits)
   ^^ hardline ^^ string "  exec_cek "
   ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int unit_cg.entry_pc) ^ "))")
-  ^^ string " initial_env (" ^^ uncode dummy_value_ ^^ string ") memo"
+  ^^ string " initial_env ("
+  ^^ uncode (from_constructor_ (ctor_tag_name ctx "cont_done"))
+  ^^ string ") memo"
 
 let compile_type_stmt (ctx : cg_ctx) = function
   | Type (TBOne (_, Enum { ctors; _ }) as binding) ->

@@ -313,11 +313,8 @@ let eval_plain (expr : LC.expr) : LC.value =
   Gc.full_major ();
   let _ =
     Profile.with_slot eval_cek_slot (fun () ->
-        LC.to_ocaml_value
-          (Memo.exec_cek_raw
-             (Memo.pc_to_exp (Common.int_to_pc 4))
-             (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
-             (Memo.from_constructor LC.tag_cont_done)))
+        let memo = Memo.init_memo () in
+        LC.to_ocaml_value (LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value env)).words)
   in
   Gc.full_major ();
   Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env)
