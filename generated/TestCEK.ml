@@ -75,18 +75,14 @@ let populate_state () =
       let tag_0 = Word.get_value (fst resolved_1) in
       match tag_0 with
       | 1 (* tag_Nil *) ->
-          init_frame w_3 0 (Memo.from_int 0);
+          shuffle_frame w_3 [||] (Memo.from_int 0);
           w_3.state.c <- pc_to_exp (int_to_pc 1)
       | 2 (* tag_Cons *) ->
           let parts_0 = Memo.splits (snd resolved_1) in
           if List.length parts_0 = 2 then (
             let part0_0 = List.nth parts_0 0 in
             let part1_0 = List.nth parts_0 1 in
-            let edge0_0 = part0_0 in
-            let edge1_0 = part1_0 in
-            init_frame w_3 2 (Memo.from_int 0);
-            set_env_slot w_3 1 edge0_0;
-            set_env_slot w_3 0 edge1_0;
+            shuffle_frame w_3 [| NewValue part1_0; NewValue part0_0 |] (Memo.from_int 0);
             w_3.state.c <- pc_to_exp (int_to_pc 2))
           else failwith "unreachable (3)"
       | _ -> failwith "unreachable (3)")

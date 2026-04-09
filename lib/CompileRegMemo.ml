@@ -113,19 +113,22 @@ let pp_block_layout values block_id (layout : block_layout) =
   ^^ string ("b" ^ string_of_int block_id)
   ^^ space ^^ string "params=" ^^ lbracket
   ^^ pp_list pp_slot (comma ^^ space) layout.param_slots
-  ^^ rbracket ^^ space ^^ string "frame="
+  ^^ rbracket ^^ space ^^ string "entry="
+  ^^ string (string_of_int layout.entry_size)
+  ^^ string " frame="
   ^^ string (string_of_int layout.frame_size)
   ^^ space ^^ slot_doc
 
+let pp_frame_source = function
+  | RegAlloc.FromSlot s -> string "s" ^^ string (string_of_int s)
+  | RegAlloc.FromOperand _ -> string "op"
+  | RegAlloc.FromBinder vid -> string "binder(v" ^^ string (string_of_int vid) ^^ string ")"
+  | RegAlloc.Unset -> string "_"
+
 let pp_edge_plan = function
   | RegAlloc.Elide -> string "elide"
-  | RegAlloc.InPlace { moves; scratch } ->
-      string "in_place("
-      ^^ string (string_of_int (List.length moves))
-      ^^ string " moves"
-      ^^ (match scratch with Some s -> string ", scratch=s" ^^ string (string_of_int s) | None -> empty)
-      ^^ string ")"
-  | RegAlloc.Reshape fs -> string "reshape(frame=" ^^ string (string_of_int fs) ^^ string ")"
+  | RegAlloc.Shuffle { mapping } ->
+      string "shuffle[" ^^ pp_list pp_frame_source (string ", ") (Array.to_list mapping) ^^ string "]"
 
 let pp_unit_allocation (unit_ir : unit_ir) (allocation : unit_allocation) =
   let values = value_table unit_ir in
@@ -355,152 +358,72 @@ let stmt_live_afters (block : block) (info : CfgLiveness.block_liveness) =
 let saved_slots_for_call (layout : block_layout) dst live_after =
   IntSet.remove dst live_after |> IntSet.elements |> List.map (slot_in_layout layout) |> List.sort_uniq Int.compare
 
-(* ----- Plan-aware edge code generation ----- *)
+(* Emit frame growth from entry_size to working frame_size when needed. *)
+let emit_frame_growth (w : world code) (entry : int) (working : int) =
+  if working > entry then resize_frame_ w (int_ working) dummy_value_ else unit_
 
-(* Emit code for a move_step *)
-let emit_move_step (ctx : cg_ctx) (src_layout : block_layout) (w : world code) (step : RegAlloc.move_step) =
-  match step.src with
-  | SlotSrc s -> write_slot w step.dst (get_env_slot_ w (int_ s))
-  | OperandSrc op -> write_slot w step.dst (operand_value_code ctx src_layout w op)
+(* Trim resolved env back to the step's canonical entry size before step exits.
+   `step_entry` is the env size at step start (layout.entry_size for block entry,
+   rsize for non-tail call resume points). *)
+let emit_trim_resolved (w : world code) (step_entry : int) (working : int) =
+  if working > step_entry then trim_resolved_ w (int_ step_entry) else unit_
 
-(* Compile an edge using its pre-computed plan.  Falls back to bind-init-write for Reshape. *)
-let compile_planned_edge (ctx : cg_ctx) (unit_cg : unit_codegen) (src_layout : block_layout) (w : world code)
-    (src_block_id : block_id) (target_id : block_id) (extra_assigns : (value_id * Value.seq code) list) =
+(* ----- Shuffle-based edge code generation ----- *)
+
+(* Translate a RegAlloc.frame_source into a code-level frame_source expression. *)
+let compile_frame_source (ctx : cg_ctx) (src_layout : block_layout) (w : world code)
+    (extra_assigns : (value_id * Value.seq code) list) (src : RegAlloc.frame_source) : 'a code =
+  match src with
+  | FromSlot s -> old_slot_ s
+  | FromOperand op -> new_value_ (operand_value_code ctx src_layout w op)
+  | FromBinder vid -> (
+      match List.assoc_opt vid extra_assigns with
+      | Some value_code -> new_value_ value_code
+      | None -> failf "CompileRegMemo: missing binder value for v%d" vid)
+  | Unset -> blank_
+
+(* Compile an edge using its pre-computed shuffle plan.
+   [step_entry] is the env size at the start of the current step. *)
+let compile_shuffle_edge (ctx : cg_ctx) (unit_cg : unit_codegen) (src_layout : block_layout) ~step_entry
+    (w : world code) (src_block_id : block_id) (target_id : block_id) (extra_assigns : (value_id * Value.seq code) list)
+    =
   let target_pc = block_pc_or_fail unit_cg target_id in
-  (* If there are extra_assigns (from match binders), always do full Reshape *)
-  if extra_assigns <> [] then
-    let dst_layout = block_layout_exn unit_cg.allocation target_id in
-    let dst_info = block_liveness_exn unit_cg target_id in
-    let extra_ids = List.fold_left (fun acc (vid, _) -> IntSet.add vid acc) IntSet.empty extra_assigns in
-    let frame_transfers =
-      IntSet.diff dst_info.live_in extra_ids |> IntSet.elements
-      |> List.map (fun vid -> (slot_in_layout dst_layout vid, get_env_slot_ w (int_ (slot_in_layout src_layout vid))))
-    in
-    let assign_transfers =
-      List.filter_map
-        (fun (vid, value) ->
-          if IntMap.mem vid dst_layout.slot_of_value then Some (slot_in_layout dst_layout vid, value) else None)
-        extra_assigns
-    in
-    let all_transfers = frame_transfers @ assign_transfers in
-    match all_transfers with
-    | [] ->
-        [%seqs
-          init_frame_ w (int_ dst_layout.frame_size) dummy_value_;
-          goto_ w target_pc]
-    | _ ->
-        bind_values "edge" (List.map snd all_transfers) (fun bound ->
-            [%seqs
-              init_frame_ w (int_ dst_layout.frame_size) dummy_value_;
-              seqs_ (List.map2 (fun (dst_slot, _) v -> fun _ -> write_slot w dst_slot v) all_transfers bound);
-              goto_ w target_pc])
-  else
-    let plan = edge_plan_exn unit_cg src_block_id target_id in
-    match plan with
-    | Elide -> goto_ w target_pc
-    | InPlace { moves; scratch } -> (
-        match scratch with
-        | None ->
-            (* No cycles — emit moves in order *)
-            [%seqs
-              seqs_ (List.map (fun step -> fun _ -> emit_move_step ctx src_layout w step) moves);
-              goto_ w target_pc]
-        | Some scratch_slot ->
-            (* Cycles — scratch slot is beyond current frame, need to grow temporarily *)
-            [%seqs
-              resize_frame_ w (int_ (scratch_slot + 1)) dummy_value_;
-              seqs_ (List.map (fun step -> fun _ -> emit_move_step ctx src_layout w step) moves);
-              resize_frame_ w (int_ src_layout.frame_size) dummy_value_;
-              goto_ w target_pc])
-    | Reshape target_frame_size -> (
-        let dst_layout = block_layout_exn unit_cg.allocation target_id in
-        let dst_info = block_liveness_exn unit_cg target_id in
-        let transfers =
-          IntSet.elements dst_info.live_in
-          |> List.map (fun vid ->
-              (slot_in_layout dst_layout vid, get_env_slot_ w (int_ (slot_in_layout src_layout vid))))
-        in
-        match transfers with
-        | [] ->
-            [%seqs
-              init_frame_ w (int_ target_frame_size) dummy_value_;
-              goto_ w target_pc]
-        | _ ->
-            bind_values "rsh" (List.map snd transfers) (fun bound ->
-                [%seqs
-                  init_frame_ w (int_ target_frame_size) dummy_value_;
-                  seqs_ (List.map2 (fun (dst_slot, _) v -> fun _ -> write_slot w dst_slot v) transfers bound);
-                  goto_ w target_pc]))
-
-(* Compile a Jump edge using its plan *)
-let compile_jump_edge (ctx : cg_ctx) (unit_cg : unit_codegen) (src_layout : block_layout) (block : block)
-    (succ_id : block_id) (args : operand list) (w : world code) =
-  let plan = edge_plan_exn unit_cg block.id succ_id in
-  let target_pc = block_pc_or_fail unit_cg succ_id in
+  let plan = edge_plan_exn unit_cg src_block_id target_id in
+  let trim = emit_trim_resolved w step_entry src_layout.frame_size in
   match plan with
-  | Elide -> goto_ w target_pc
-  | InPlace { moves; scratch } -> (
-      match scratch with
-      | None ->
-          [%seqs
-            seqs_ (List.map (fun step -> fun _ -> emit_move_step ctx src_layout w step) moves);
-            goto_ w target_pc]
-      | Some scratch_slot ->
-          [%seqs
-            resize_frame_ w (int_ (scratch_slot + 1)) dummy_value_;
-            seqs_ (List.map (fun step -> fun _ -> emit_move_step ctx src_layout w step) moves);
-            resize_frame_ w (int_ src_layout.frame_size) dummy_value_;
-            goto_ w target_pc])
-  | Reshape target_frame_size -> (
-      let succ =
-        match IntMap.find_opt succ_id unit_cg.block_map with
-        | Some s -> s
-        | None -> failf "CompileRegMemo: unknown jump target b%d" succ_id
+  | Elide when extra_assigns = [] ->
+      [%seqs
+        trim;
+        goto_ w target_pc]
+  | _ ->
+      let mapping =
+        match plan with
+        | Shuffle { mapping } -> mapping
+        | Elide ->
+            let dst_layout = block_layout_exn unit_cg.allocation target_id in
+            Array.init dst_layout.entry_size (fun i ->
+                match
+                  List.find_opt
+                    (fun (vid, _) ->
+                      match IntMap.find_opt vid dst_layout.slot_of_value with Some s -> s = i | None -> false)
+                    extra_assigns
+                with
+                | Some (vid, _) -> RegAlloc.FromBinder vid
+                | None -> RegAlloc.FromSlot i)
       in
-      let block_info = block_liveness_exn unit_cg block.id in
-      let edge_live =
-        match IntMap.find_opt succ_id block_info.live_on_edge with
-        | Some info -> info
-        | None -> failf "CompileRegMemo: missing edge liveness from b%d to b%d" block.id succ_id
-      in
-      let dst_layout = block_layout_exn unit_cg.allocation succ_id in
-      let dst_info = block_liveness_exn unit_cg succ_id in
-      let param_ids = IntSet.of_list (List.map Fun.id succ.params) in
-      let frame_transfers =
-        IntSet.diff dst_info.live_in param_ids |> IntSet.elements
-        |> List.map (fun vid -> (slot_in_layout dst_layout vid, get_env_slot_ w (int_ (slot_in_layout src_layout vid))))
-      in
-      let param_transfers =
-        try
-          List.fold_left2
-            (fun acc param_id arg ->
-              if IntMap.mem param_id edge_live.live_params then
-                let dst_slot = slot_in_layout dst_layout param_id in
-                (dst_slot, operand_value_code ctx src_layout w arg) :: acc
-              else acc)
-            [] succ.params args
-        with Invalid_argument _ ->
-          failf "CompileRegMemo: jump to block b%d expects %d args, got %d" succ.id (List.length succ.params)
-            (List.length args)
-      in
-      let all_transfers = frame_transfers @ List.rev param_transfers in
-      match all_transfers with
-      | [] ->
-          [%seqs
-            init_frame_ w (int_ target_frame_size) dummy_value_;
-            goto_ w target_pc]
-      | _ ->
-          bind_values "jmp" (List.map snd all_transfers) (fun bound ->
-              [%seqs
-                init_frame_ w (int_ target_frame_size) dummy_value_;
-                seqs_ (List.map2 (fun (dst_slot, _) v -> fun _ -> write_slot w dst_slot v) all_transfers bound);
-                goto_ w target_pc]))
+      let sources = Array.to_list mapping in
+      let compiled_sources = List.map (compile_frame_source ctx src_layout w extra_assigns) sources in
+      [%seqs
+        trim;
+        shuffle_frame_ w (frame_mapping_ compiled_sources) dummy_value_;
+        goto_ w target_pc]
 
 (* Match support *)
 
-let compile_match_success (ctx : cg_ctx) (unit_cg : unit_codegen) (src_layout : block_layout) (w : world code)
-    (src_block_id : block_id) (target_block_id : block_id) (assigns : (value_id * Value.seq code) list) =
-  compile_planned_edge ctx unit_cg src_layout w src_block_id target_block_id assigns
+let compile_match_success (ctx : cg_ctx) (unit_cg : unit_codegen) (src_layout : block_layout) ~step_entry
+    (w : world code) (src_block_id : block_id) (target_block_id : block_id) (assigns : (value_id * Value.seq code) list)
+    =
+  compile_shuffle_edge ctx unit_cg src_layout ~step_entry w src_block_id target_block_id assigns
 
 let tuple_pattern_assigns unit_cg whole_pattern patterns parts =
   List.rev
@@ -512,32 +435,33 @@ let tuple_pattern_assigns unit_cg whole_pattern patterns parts =
          | _ -> unsupported_match_pattern unit_cg whole_pattern)
        [] patterns parts)
 
-let compile_tuple_bindings ctx unit_cg src_layout whole_pattern parts patterns w src_block_id block =
+let compile_tuple_bindings ctx unit_cg src_layout ~step_entry whole_pattern parts patterns w src_block_id block =
   bind_values "part"
     (List.mapi (fun index _ -> nth_seq parts index) patterns)
     (fun bound_parts ->
-      compile_match_success ctx unit_cg src_layout w src_block_id block
+      compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block
         (tuple_pattern_assigns unit_cg whole_pattern patterns bound_parts))
 
-let compile_default_arm ctx unit_cg src_layout subject arms w src_block_id current_pc =
+let compile_default_arm ctx unit_cg src_layout ~step_entry subject arms w src_block_id current_pc =
   let rec loop = function
     | [] -> unreachable_ (pc_to_int current_pc)
     | ({ pattern = RPAny; block } : match_arm) :: _ ->
-        compile_match_success ctx unit_cg src_layout w src_block_id block []
+        compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block []
     | ({ pattern = RPBind value_id; block } : match_arm) :: _ ->
-        compile_match_success ctx unit_cg src_layout w src_block_id block [ (value_id, subject) ]
+        compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block [ (value_id, subject) ]
     | _ :: rest -> loop rest
   in
   loop arms
 
-let compile_ctor_arm ctx unit_cg src_layout pair w src_block_id default ({ pattern; block } : match_arm) =
+let compile_ctor_arm ctx unit_cg src_layout ~step_entry pair w src_block_id default ({ pattern; block } : match_arm) =
   match pattern with
   | RPCtor (ctor, payload) ->
       let body =
         match payload with
-        | None | Some RPAny -> compile_match_success ctx unit_cg src_layout w src_block_id block []
+        | None | Some RPAny -> compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block []
         | Some (RPBind value_id) ->
-            compile_match_success ctx unit_cg src_layout w src_block_id block [ (value_id, pair_value_ pair) ]
+            compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block
+              [ (value_id, pair_value_ pair) ]
         | Some (RPTuple patterns) ->
             let whole_pattern = RPCtor (ctor, Some (RPTuple patterns)) in
             let_in_ "parts"
@@ -550,15 +474,16 @@ let compile_ctor_arm ctx unit_cg src_layout pair w src_block_id default ({ patte
                       ^^ string (string_of_int (List.length patterns)))
                 in
                 if_ len_ok
-                  (compile_tuple_bindings ctx unit_cg src_layout whole_pattern parts patterns w src_block_id block)
+                  (compile_tuple_bindings ctx unit_cg src_layout ~step_entry whole_pattern parts patterns w src_block_id
+                     block)
                   default)
         | Some unsupported -> unsupported_match_pattern unit_cg (RPCtor (ctor, Some unsupported))
       in
       (Hashtbl.find_exn ctx.ctag ctor, Hashtbl.find_exn ctx.ctag_name ctor, body)
   | _ -> failwith "CompileRegMemo: internal error while compiling ctor dispatch"
 
-let compile_ctor_dispatch ctx unit_cg src_layout raw_subject resolved arms w src_block_id current_pc =
-  let default = compile_default_arm ctx unit_cg src_layout raw_subject arms w src_block_id current_pc in
+let compile_ctor_dispatch ctx unit_cg src_layout ~step_entry raw_subject resolved arms w src_block_id current_pc =
+  let default = compile_default_arm ctx unit_cg src_layout ~step_entry raw_subject arms w src_block_id current_pc in
   let ctor_arms =
     List.filter_map
       (fun ({ pattern; _ } as arm) ->
@@ -575,7 +500,7 @@ let compile_ctor_dispatch ctx unit_cg src_layout raw_subject resolved arms w src
         (word_get_value_ (zro_ resolved))
         (fun tag ->
           match_ctor_tag_literal_default_ tag
-            (List.map (compile_ctor_arm ctx unit_cg src_layout resolved w src_block_id default) ctor_arms)
+            (List.map (compile_ctor_arm ctx unit_cg src_layout ~step_entry resolved w src_block_id default) ctor_arms)
             default)
 
 (* Non-call RHS *)
@@ -616,14 +541,20 @@ let compile_call_setup _ctx callee w arg_values =
     failf "CompileRegMemo: direct call to `%s` expects %d args, got %d" callee.unit_ir.name
       (List.length entry_layout.param_slots) (List.length arg_values);
   [%seqs
-    init_frame_ w (int_ entry_layout.frame_size) dummy_value_;
+    init_frame_ w (int_ entry_layout.entry_size) dummy_value_;
     seqs_ (List.map2 (fun slot value -> fun _ -> set_env_slot_ w (int_ slot) value) entry_layout.param_slots arg_values)]
 
 (* Statement chain and call handling *)
 
-let rec compile_stmt_chain ctx unit_cg block layout current_pc w stmts stmt_afters term =
+(* Compute the minimal resume-entry size for a non-tail call site. *)
+let resume_entry_size (layout : block_layout) dst live_after =
+  let keep_slots = saved_slots_for_call layout dst live_after in
+  let dst_slot = slot_in_layout layout dst in
+  List.fold_left max 0 (dst_slot :: keep_slots) + 1
+
+let rec compile_stmt_chain ctx unit_cg block layout ~step_entry current_pc w stmts stmt_afters term =
   match (stmts, stmt_afters) with
-  | [], [] -> compile_terminator ctx unit_cg block layout current_pc w term
+  | [], [] -> compile_terminator ctx unit_cg block layout ~step_entry current_pc w term
   | Bind (dst, Call (Direct callee_name, args)) :: rest, live_after :: rest_afters ->
       let callee = compiled_unit_exn ctx callee_name in
       bind_values "arg"
@@ -634,38 +565,47 @@ let rec compile_stmt_chain ctx unit_cg block layout current_pc w stmts stmt_afte
             | Return (OLocal return_id) when return_id = dst ->
                 [%seqs
                   assert_env_length_ w (int_ layout.frame_size);
+                  emit_trim_resolved w step_entry layout.frame_size;
                   compile_call_setup ctx callee w arg_values;
                   goto_ w callee.entry_pc]
             | _ ->
+                let rsize = resume_entry_size layout dst live_after in
                 let resume_pc =
                   add_code_k ctx (fun resume_pc ->
                       ( lam_ "w" (fun w ->
                             [%seqs
-                              assert_env_length_ w (int_ layout.frame_size);
-                              compile_terminator ctx unit_cg block layout resume_pc w term]),
+                              assert_env_length_ w (int_ rsize);
+                              emit_frame_growth w rsize layout.frame_size;
+                              compile_terminator ctx unit_cg block layout ~step_entry:rsize resume_pc w term]),
                         resume_pc ))
                 in
-                compile_non_tail_call ctx unit_cg block layout w dst callee arg_values live_after resume_pc
+                compile_non_tail_call ctx unit_cg block layout ~step_entry w dst callee arg_values live_after rsize
+                  resume_pc
           else
+            let rsize = resume_entry_size layout dst live_after in
             let resume_pc =
               add_code_k ctx (fun resume_pc ->
                   ( lam_ "w" (fun w ->
                         [%seqs
-                          assert_env_length_ w (int_ layout.frame_size);
-                          compile_stmt_chain ctx unit_cg block layout resume_pc w rest rest_afters term]),
+                          assert_env_length_ w (int_ rsize);
+                          emit_frame_growth w rsize layout.frame_size;
+                          compile_stmt_chain ctx unit_cg block layout ~step_entry:rsize resume_pc w rest rest_afters
+                            term]),
                     resume_pc ))
             in
-            compile_non_tail_call ctx unit_cg block layout w dst callee arg_values live_after resume_pc)
+            compile_non_tail_call ctx unit_cg block layout ~step_entry w dst callee arg_values live_after rsize
+              resume_pc)
   | Bind (_, Call (Indirect _, _)) :: _, _ -> unsupported_codegen "indirect call"
   | Bind (_, Call (Direct _, _)) :: _, [] -> failwith "CompileRegMemo: missing live-after information for call"
   | Bind (dst, rhs) :: rest, _live_after :: rest_afters ->
       [%seqs
         assert_env_length_ w (int_ layout.frame_size);
         compile_non_call_rhs ctx layout w dst rhs;
-        compile_stmt_chain ctx unit_cg block layout current_pc w rest rest_afters term]
+        compile_stmt_chain ctx unit_cg block layout ~step_entry current_pc w rest rest_afters term]
   | _ -> failwith "CompileRegMemo: mismatched statement and liveness counts"
 
-and compile_non_tail_call ctx _unit_cg _block layout w dst callee arg_values live_after resume_pc =
+and compile_non_tail_call (ctx : cg_ctx) (_unit_cg : unit_codegen) (_block : block) (layout : block_layout) ~step_entry
+    w dst (callee : unit_codegen) arg_values live_after (rsize : int) resume_pc =
   ignore _unit_cg;
   let keep_slots = saved_slots_for_call layout dst live_after in
   let cont_name = "cont_" ^ string_of_int ctx.conts_count in
@@ -679,7 +619,7 @@ and compile_non_tail_call ctx _unit_cg _block layout w dst callee arg_values liv
           [%seqs
             assert_env_length_ w (int_ 1);
             set_k_ w (get_next_cont_ tl);
-            init_frame_ w (int_ layout.frame_size) dummy_value_;
+            init_frame_ w (int_ rsize) dummy_value_;
             restore_env_slots_ w (list_literal_of_ int_ keep_slots) tl;
             set_env_slot_ w (int_ dst_slot) ret;
             goto_ w resume_pc]));
@@ -687,20 +627,24 @@ and compile_non_tail_call ctx _unit_cg _block layout w dst callee arg_values liv
   [%seqs
     assert_env_length_ w (int_ layout.frame_size);
     set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); saved; world_kont_ w ]);
+    emit_trim_resolved w step_entry layout.frame_size;
     compile_call_setup ctx callee w arg_values;
     goto_ w callee.entry_pc]
 
-and compile_terminator ctx unit_cg block layout current_pc w term =
+and compile_terminator ctx unit_cg block layout ~step_entry current_pc w term =
   match term with
-  | Return operand -> return_value_ w (operand_value_code ctx layout w operand) (pc_to_exp_ (pc_ ctx.apply_cont))
-  | Jump (succ_id, args) ->
+  | Return operand ->
+      [%seqs
+        emit_trim_resolved w step_entry layout.frame_size;
+        return_value_ w (operand_value_code ctx layout w operand) (pc_to_exp_ (pc_ ctx.apply_cont))]
+  | Jump (succ_id, _args) ->
       [%seqs
         assert_env_length_ w (int_ layout.frame_size);
-        compile_jump_edge ctx unit_cg layout block succ_id args w]
+        compile_shuffle_edge ctx unit_cg layout ~step_entry w block.id succ_id []]
   | Branch (cond, then_id, else_id) -> (
       let do_branch cond_word target_id =
         ignore cond_word;
-        compile_planned_edge ctx unit_cg layout w block.id target_id []
+        compile_shuffle_edge ctx unit_cg layout ~step_entry w block.id target_id []
       in
       let do_resolve_branch cond_word =
         if_ (bool_nonzero_code (word_get_value_ cond_word)) (do_branch cond_word then_id) (do_branch cond_word else_id)
@@ -721,25 +665,28 @@ and compile_terminator ctx unit_cg block layout current_pc w term =
             let_in_ "resolved"
               (resolve_ w (src_E_ slot))
               (fun resolved ->
-                compile_ctor_dispatch ctx unit_cg layout
+                compile_ctor_dispatch ctx unit_cg layout ~step_entry
                   (operand_value_code ctx layout w scrutinee)
                   resolved arms w block.id current_pc)
         | _ -> failf "CompileRegMemo: match scrutinee must be a local operand"]
 
-let compile_block ctx unit_cg (block : block) =
+let compile_block ctx unit_cg (blk : block) =
   let current_pc =
-    match IntMap.find_opt block.id unit_cg.block_pcs with
+    match IntMap.find_opt blk.id unit_cg.block_pcs with
     | Some pc -> pc
-    | None -> failf "CompileRegMemo: missing pc for block b%d" block.id
+    | None -> failf "CompileRegMemo: missing pc for block b%d" blk.id
   in
-  let info = block_liveness_exn unit_cg block.id in
-  let layout = block_layout_exn unit_cg.allocation block.id in
-  let stmt_afters = stmt_live_afters block info in
+  let info = block_liveness_exn unit_cg blk.id in
+  let layout = block_layout_exn unit_cg.allocation blk.id in
+  let stmt_afters = stmt_live_afters blk info in
   set_code ctx current_pc
     (lam_ "w" (fun w ->
-         [%seqs
-           assert_env_length_ w (int_ layout.frame_size);
-           compile_stmt_chain ctx unit_cg block layout current_pc w block.body stmt_afters block.term]))
+         seq_
+           (assert_env_length_ w (int_ layout.entry_size))
+           (fun () ->
+             seq_ (emit_frame_growth w layout.entry_size layout.frame_size) (fun () ->
+                 compile_stmt_chain ctx unit_cg blk layout ~step_entry:layout.entry_size current_pc w blk.body
+                   stmt_afters blk.term))))
 
 let generate_apply_cont (ctx : cg_ctx) =
   set_code ctx ctx.apply_cont
@@ -790,7 +737,7 @@ let compile_unit_wrapper (ctx : cg_ctx) (unit_cg : unit_codegen) =
   ^^ (if args = [] then empty else space ^^ separate space args)
   ^^ string " : exec_result =" ^^ hardline
   ^^ string "  let initial_env = Dynarray.init "
-  ^^ string (string_of_int entry_layout.frame_size)
+  ^^ string (string_of_int entry_layout.entry_size)
   ^^ string " (fun _ -> " ^^ uncode dummy_value_ ^^ string ") in"
   ^^ (if arg_inits = [] then empty else hardline ^^ separate_map hardline (fun doc -> string "  " ^^ doc) arg_inits)
   ^^ hardline ^^ string "  exec_cek "

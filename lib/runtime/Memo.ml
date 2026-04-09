@@ -221,14 +221,42 @@ let init_frame (w : world) (frame_size : int) (fill : value) : unit =
 
 let resize_frame (w : world) (new_size : int) (fill : value) : unit =
   let old_size = Dynarray.length w.state.e in
-  if new_size > old_size then
+  if new_size > old_size then (
     for _ = old_size to new_size - 1 do
       Dynarray.add_last w.state.e fill
-    done
+    done;
+    (* Grow resolved env in sync so that resolve calls on body slots work. *)
+    for _ = Dynarray.length w.resolved.e to new_size - 1 do
+      Dynarray.add_last w.resolved.e false
+    done)
   else if new_size < old_size then
     for _ = new_size to old_size - 1 do
       Dynarray.remove_last w.state.e
     done
+
+(* Trim resolved env back to a given size.  Called by generated code before
+   step exits (edge transitions, calls, returns) to restore the resolved env
+   to the canonical entry size that make_step expects. *)
+let trim_resolved (w : world) (size : int) : unit =
+  while Dynarray.length w.resolved.e > size do
+    Dynarray.remove_last w.resolved.e
+  done
+
+type frame_source = OldSlot of int | NewValue of value | Blank
+
+let shuffle_frame (w : world) (mapping : frame_source array) (fill : value) : unit =
+  let old_size = Dynarray.length w.state.e in
+  let old = Array.init old_size (Dynarray.get w.state.e) in
+  let new_size = Array.length mapping in
+  w.state.e <-
+    Dynarray.init new_size (fun i ->
+        match mapping.(i) with
+        | OldSlot j ->
+            if j < 0 || j >= old_size then
+              failwith (Printf.sprintf "shuffle_frame: source slot %d out of bounds (old frame size %d)" j old_size);
+            old.(j)
+        | NewValue v -> v
+        | Blank -> fill)
 
 let collect_env_slots (w : world) (slots : int list) : seq =
   appends (List.map slots ~f:(fun slot -> get_env_slot w slot))

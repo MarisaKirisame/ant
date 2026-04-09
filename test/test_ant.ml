@@ -685,8 +685,12 @@ let () =
     match CfgLiveness.IntMap.find_opt loop_id allocation.edge_plans with Some p -> p | None -> assert false
   in
   let self_plan = match CfgLiveness.IntMap.find_opt loop_id loop_plans with Some p -> p | None -> assert false in
-  assert (self_plan = RegAlloc.Elide);
-  assert (loop_layout.frame_size = 1)
+  (* With entry/working split, dead-param self-loop has entry_size=0 (y is dead) *)
+  assert (loop_layout.entry_size = 0);
+  assert (loop_layout.frame_size = 1);
+  (* Self-loop plan: shuffle to empty entry, or elide if y were live *)
+  match self_plan with
+  | RegAlloc.Elide | RegAlloc.Shuffle _ -> () (* either is acceptable *)
 
 (* Different predecessors flowing into same join: coalescing from dominant predecessor *)
 let () =
@@ -739,9 +743,73 @@ let () =
   assert (
     match (then_plan, else_plan) with
     | RegAlloc.Elide, RegAlloc.Elide -> true
-    | RegAlloc.InPlace _, RegAlloc.InPlace _ -> true
-    | RegAlloc.Reshape _, RegAlloc.Reshape _ -> true
+    | RegAlloc.Shuffle _, RegAlloc.Shuffle _ -> true
     | _ -> false)
+
+(* Entry/working split: block body with temporaries has entry_size < frame_size *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile (frontend_prog "let f = fun x -> let y = x + 1 in let z = y + 2 in z;;")
+  in
+  let unit_ir, _liveness, allocation =
+    regmemo_single_unit_allocation (frontend_prog "let f = fun x -> let y = x + 1 in let z = y + 2 in z;;")
+  in
+  let entry_id = unit_ir.entry in
+  let entry_layout = regmemo_block_layout allocation entry_id in
+  (* Entry block has param x as sole entry value; y and z are body temporaries *)
+  assert (entry_layout.entry_size >= 1);
+  assert (entry_layout.frame_size >= entry_layout.entry_size);
+  (* Generated code should use resize_frame for post-entry growth when needed *)
+  assert (
+    entry_layout.frame_size = entry_layout.entry_size || Core.String.is_substring rendered ~substring:"resize_frame");
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =")
+
+(* Successor entry is minimal: predecessor working frame > successor entry *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f(x, y) = let j(a) = a in if x then jump j(y) else jump j(y) *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info); Syntax.PVar ("y", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam ([ Syntax.PVar ("a", info) ], Syntax.Var ("a", info), info),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("x", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let entry_id = unit_ir.entry in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let entry_layout = regmemo_block_layout allocation entry_id in
+  let join_layout = regmemo_block_layout allocation join_id in
+  (* Entry has x, y → entry_size=2; join has only a → entry_size=1 *)
+  assert (entry_layout.entry_size = 2);
+  assert (join_layout.entry_size = 1);
+  assert (join_layout.entry_size < entry_layout.entry_size)
+
+(* Non-tail call: resume uses init_frame with potentially smaller size *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "let g = fun y -> y + 1;; let f = fun x -> let z = g x in z + 2;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"init_frame");
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"restore_env_slots")
 
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =

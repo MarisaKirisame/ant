@@ -160,6 +160,18 @@ let init_frame_ (w : world code) (frame_size : int code) (fill : Value.seq code)
 let resize_frame_ (w : world code) (new_size : int code) (fill : Value.seq code) : unit code =
   app3_ (from_ir $ Function "resize_frame") w new_size fill
 
+let old_slot_ (i : int) : 'a code = ctor_ "OldSlot" (int_ i)
+let new_value_ (v : Value.seq code) : 'a code = ctor_ "NewValue" v
+let blank_ : 'a code = ctor'_ "Blank"
+
+let frame_mapping_ (entries : 'a code list) : 'b code =
+  code $ string "[|" ^^ separate (string "; ") (Stdlib.List.map uncode entries) ^^ string "|]"
+
+let shuffle_frame_ (w : world code) (mapping : 'a code) (fill : Value.seq code) : unit code =
+  app3_ (from_ir $ Function "shuffle_frame") w mapping fill
+
+let trim_resolved_ (w : world code) (size : int code) : unit code = app2_ (from_ir $ Function "trim_resolved") w size
+
 let collect_env_slots_ (w : world code) (slots : int list code) : Value.seq code =
   app2_ (from_ir $ Function "collect_env_slots") w slots
 
