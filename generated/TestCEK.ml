@@ -26,7 +26,7 @@ let rec to_ocaml_int_list x =
   | _ -> failwith "unreachable"
 
 let list_incr memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
+  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
   Dynarray.set initial_env 0 x0;
   exec_cek (pc_to_exp (int_to_pc 3)) initial_env (Memo.from_constructor tag_cont_done) memo
 
@@ -50,7 +50,7 @@ let populate_state () =
     0;
   add_exp
     (fun w_0 ->
-      assert_env_length w_0 2;
+      assert_env_length w_0 0;
       return_value w_0 (Memo.from_constructor tag_Nil) (pc_to_exp (int_to_pc 0)))
     1;
   add_exp
@@ -63,25 +63,30 @@ let populate_state () =
       let arg0_0 = get_env_slot w_1 0 in
       assert_env_length w_1 2;
       w_1.state.k <- Memo.appends [ Memo.from_constructor tag_cont_0; collect_env_slots w_1 [ 1 ]; w_1.state.k ];
-      init_frame w_1 2 (Memo.from_int 0);
+      init_frame w_1 1 (Memo.from_int 0);
       set_env_slot w_1 0 arg0_0;
       w_1.state.c <- pc_to_exp (int_to_pc 3))
     2;
   add_exp
     (fun w_3 ->
-      assert_env_length w_3 2;
-      assert_env_length w_3 2;
+      assert_env_length w_3 1;
+      assert_env_length w_3 1;
       let resolved_1 = resolve w_3 (Source.E 0) in
       let tag_0 = Word.get_value (fst resolved_1) in
       match tag_0 with
-      | 1 (* tag_Nil *) -> w_3.state.c <- pc_to_exp (int_to_pc 1)
+      | 1 (* tag_Nil *) ->
+          init_frame w_3 0 (Memo.from_int 0);
+          w_3.state.c <- pc_to_exp (int_to_pc 1)
       | 2 (* tag_Cons *) ->
           let parts_0 = Memo.splits (snd resolved_1) in
           if List.length parts_0 = 2 then (
             let part0_0 = List.nth parts_0 0 in
             let part1_0 = List.nth parts_0 1 in
-            set_env_slot w_3 1 part0_0;
-            set_env_slot w_3 0 part1_0;
+            let edge0_0 = part0_0 in
+            let edge1_0 = part1_0 in
+            init_frame w_3 2 (Memo.from_int 0);
+            set_env_slot w_3 1 edge0_0;
+            set_env_slot w_3 0 edge1_0;
             w_3.state.c <- pc_to_exp (int_to_pc 2))
           else failwith "unreachable (3)"
       | _ -> failwith "unreachable (3)")

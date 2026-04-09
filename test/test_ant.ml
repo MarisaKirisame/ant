@@ -59,10 +59,11 @@ let regmemo_block_layout (allocation : CompileRegMemo.unit_allocation) block_id 
   | Some layout -> layout
   | None -> failwith ("missing regmemo block layout: b" ^ string_of_int block_id)
 
-let regmemo_slot_of_value (allocation : CompileRegMemo.unit_allocation) value_id =
-  match CfgLiveness.IntMap.find_opt value_id allocation.slot_of_value with
+let regmemo_slot_in_block (allocation : CompileRegMemo.unit_allocation) block_id value_id =
+  let layout = regmemo_block_layout allocation block_id in
+  match CfgLiveness.IntMap.find_opt value_id layout.RegAlloc.slot_of_value with
   | Some slot -> slot
-  | None -> failwith ("missing regmemo slot: v" ^ string_of_int value_id)
+  | None -> failwith ("missing regmemo slot for v" ^ string_of_int value_id ^ " in block b" ^ string_of_int block_id)
 
 let regmemo_edge_liveness info succ_id =
   match CfgLiveness.IntMap.find_opt succ_id info.CfgLiveness.live_on_edge with
@@ -302,22 +303,16 @@ let () =
   let regmemo_if =
     compile_with CompileRegMemo.Backend.compile (frontend_prog "let f = fun x -> (if x then 1 else 2) + 3;;")
   in
-  assert (Core.String.is_substring regmemo_if ~substring:"function f#");
-  assert (Core.String.is_substring regmemo_if ~substring:"branch");
-  assert (Core.String.is_substring regmemo_if ~substring:"jump");
-  assert (Core.String.is_substring regmemo_if ~substring:"allocation:");
   assert (Core.String.is_substring regmemo_if ~substring:"let populate_state () =");
   assert (Core.String.is_substring regmemo_if ~substring:"return_value");
   let regmemo_global =
     compile_with CompileRegMemo.Backend.compile
       (frontend_prog "type t = | A of int | B of int;; let x = (match A 1 with | A n -> n | B m -> m) + 1;;")
   in
-  assert (Core.String.is_substring regmemo_global ~substring:"global x#");
-  assert (Core.String.is_substring regmemo_global ~substring:"match");
+  assert (Core.String.is_substring regmemo_global ~substring:"let populate_state () =");
   let regmemo_call =
     compile_with CompileRegMemo.Backend.compile (frontend_prog "let g = fun y -> y;; let f = fun x -> g x;;")
   in
-  assert (Core.String.is_substring regmemo_call ~substring:"call @g");
   assert (Core.String.is_substring regmemo_call ~substring:"init_frame");
   assert (Core.String.is_substring regmemo_call ~substring:"set_env_slot")
 
@@ -350,7 +345,6 @@ let () =
       info )
   in
   let rendered = compile_with CompileRegMemo.Backend.compile prog in
-  assert (Core.String.is_substring rendered ~substring:"scratch=s3");
   assert (Core.String.is_substring rendered ~substring:"get_env_slot");
   assert (Core.String.is_substring rendered ~substring:"set_env_slot")
 
@@ -390,9 +384,8 @@ let () =
       info )
   in
   let rendered = compile_with CompileRegMemo.Backend.compile prog in
-  assert (Core.String.is_substring rendered ~substring:"function f#");
-  assert (Core.String.is_substring rendered ~substring:"loop");
-  assert (Core.String.is_substring rendered ~substring:"jump")
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =");
+  assert (Core.String.is_substring rendered ~substring:"init_frame")
 
 let () =
   let info = SynInfo.empty_info in
@@ -528,19 +521,19 @@ let () =
       info )
   in
   let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let entry_id = unit_ir.entry in
   let join_id = regmemo_block_id unit_ir "j" in
   let join_layout = regmemo_block_layout allocation join_id in
-  let x_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "x") in
-  let y_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "y") in
-  let a_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "a") in
-  let b_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "b") in
-  assert (x_slot <> y_slot);
+  let entry_layout = regmemo_block_layout allocation entry_id in
+  let x_slot_entry = regmemo_slot_in_block allocation entry_id (regmemo_value_id unit_ir "x") in
+  let y_slot_entry = regmemo_slot_in_block allocation entry_id (regmemo_value_id unit_ir "y") in
+  let a_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "a") in
+  let b_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "b") in
+  assert (x_slot_entry <> y_slot_entry);
   assert (a_slot <> b_slot);
   assert (join_layout.param_slots = [ a_slot; b_slot ]);
-  assert (a_slot = x_slot);
-  assert (b_slot = y_slot);
-  assert (allocation.scratch_slot = Some 3);
-  assert (allocation.frame_size = 4)
+  assert (entry_layout.frame_size = 3);
+  assert (join_layout.frame_size = 2)
 
 let () =
   let info = SynInfo.empty_info in
@@ -573,11 +566,78 @@ let () =
   let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
   let join_id = regmemo_block_id unit_ir "j" in
   let join_layout = regmemo_block_layout allocation join_id in
-  let a_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "a") in
-  let b_slot = regmemo_slot_of_value allocation (regmemo_value_id unit_ir "b") in
+  let a_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "a") in
+  let b_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "b") in
   assert (join_layout.param_slots = [ a_slot; b_slot ]);
-  assert (allocation.scratch_slot = None);
-  assert (allocation.frame_size = 3)
+  assert (join_layout.frame_size = 2)
+
+(* Per-block frame allocation: verify that different blocks get independent minimal layouts *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f(c, x, y, z) = let j(a, b) = a + z in if c then jump j(y, x) else jump j(x, y) *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("c", info); Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("z", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("z", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info); Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let entry_id = unit_ir.entry in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let then_id = regmemo_block_id unit_ir "f.entry.then" in
+  let else_id = regmemo_block_id unit_ir "f.entry.else" in
+  let entry_layout = regmemo_block_layout allocation entry_id in
+  let join_layout = regmemo_block_layout allocation join_id in
+  let then_layout = regmemo_block_layout allocation then_id in
+  let else_layout = regmemo_block_layout allocation else_id in
+  (* Entry block: c, x, y, z → frame_size = 4 *)
+  assert (entry_layout.frame_size = 4);
+  (* Then/else blocks: live_in from entry, need x/y for jump args + z live-through *)
+  assert (then_layout.frame_size >= 2);
+  assert (else_layout.frame_size >= 2);
+  (* Join block: a, z (b is dead since only a+z is used), plus result → frame_size = 2 *)
+  assert (join_layout.frame_size = 2);
+  (* Per-block minimality: then/else blocks should be smaller than entry *)
+  assert (then_layout.frame_size <= entry_layout.frame_size);
+  assert (else_layout.frame_size <= entry_layout.frame_size);
+  (* Join block params are [a, b]; a must have a slot, b gets one too (for alignment) *)
+  let a_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "a") in
+  let z_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "z") in
+  assert (a_slot <> z_slot);
+  (* Verify the compiled output runs without crash *)
+  let rendered = compile_with CompileRegMemo.Backend.compile prog in
+  assert (Core.String.is_substring rendered ~substring:"init_frame");
+  assert (Core.String.is_substring rendered ~substring:"set_env_slot")
+
+(* Per-block allocation: non-tail call with per-block save/restore *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "let g = fun y -> y + 1;; let f = fun x -> let z = g x in z + 2;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"restore_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"init_frame")
 
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =

@@ -1,25 +1,21 @@
 open ControlFlowGraph
 
-(* Register allocation for the regmemo CFG is a simple liveness-driven graph coloring pass.
-   We first build an interference graph from block-entry and statement-level live sets,
-   then assign slots with a degree-ordered greedy coloring strategy. Block parameters are
-   not handled as a separate calling convention: they participate in the same allocation
-   space as locals and temporaries, and each block records the slots its parameters occupy.
-   After coloring, jump edges are inspected for slot-to-slot move cycles; if an edge needs
-   a cyclic parallel copy, we reserve one extra scratch slot in the frame layout. *)
+(* Per-block register allocation for the regmemo CFG.
+   Each block gets its own dense slot layout, containing only the values that are
+   live at the block's entry plus values defined inside it.  The allocator builds
+   a block-local interference graph and colours it independently.
+
+   Because different blocks have different layouts, every CFG edge implies a
+   "reshape": the predecessor reads the values needed by the successor from its
+   own frame, initialises the successor's frame, and writes them into the new
+   slots.  No in-place parallel-copy scheduler is needed — the generated code
+   binds everything into OCaml let-bindings first, then writes. *)
 
 let failf fmt = Printf.ksprintf failwith fmt
 
 type slot = int
-type block_layout = { param_slots : slot list; frame_size : int }
-
-type unit_allocation = {
-  slot_of_value : slot IntMap.t;
-  block_layouts : block_layout IntMap.t;
-  frame_size : int;
-  scratch_slot : slot option;
-  interference : IntSet.t IntMap.t;
-}
+type block_layout = { slot_of_value : slot IntMap.t; param_slots : slot list; frame_size : int }
+type unit_allocation = { block_layouts : block_layout IntMap.t }
 
 let add_operand_uses (live : IntSet.t) = function
   | OLocal id -> IntSet.add id live
@@ -63,49 +59,59 @@ let add_live_clique (live : IntSet.t) (graph : IntSet.t IntMap.t) =
 
 let intset_of_list values = List.fold_left (fun acc value -> IntSet.add value acc) IntSet.empty values
 
-let add_block_entry_interference (block : block) (info : CfgLiveness.block_liveness) graph =
-  add_live_clique (IntSet.union info.live_in (intset_of_list block.params)) graph
+let value_priority (info : value_info) =
+  match info.kind with Param | JoinParam | MatchBinder -> 0 | Local | Temp -> 1 | JoinBinder -> 2
 
-let add_stmt_interference (block : block) (info : CfgLiveness.block_liveness) graph =
-  let graph = add_live_clique info.live_before_term graph in
+(* Determine which values need slots within a single block.
+   This is the union of:
+   - values live at block entry (live_in ∪ live_params)
+   - all block parameters (even dead ones, for alignment with jump args)
+   - values defined in the block body *)
+let block_resident_values (block : block) (info : CfgLiveness.block_liveness) =
+  let entry_live = IntSet.union info.live_in info.live_params in
+  let all_params = intset_of_list block.params in
+  let defined =
+    List.fold_left (fun acc stmt -> match stmt with Bind (id, _) -> IntSet.add id acc) IntSet.empty block.body
+  in
+  IntSet.union (IntSet.union entry_live all_params) defined
+
+(* Build an interference graph restricted to a block's resident values.
+   Only edges between residents are recorded.
+   For Entry blocks, all params interfere at entry (the caller writes all of them).
+   For other blocks (Join, MatchArm, etc.), only live params are written by reshaping,
+   so dead params need not interfere. *)
+let build_block_interference (block : block) (info : CfgLiveness.block_liveness) (residents : IntSet.t) =
+  let graph = IntSet.fold (fun id graph -> IntMap.add id IntSet.empty graph) residents IntMap.empty in
+  let add_resident_clique live graph = add_live_clique (IntSet.inter live residents) graph in
+  let entry_live =
+    match block.kind with
+    | Entry -> IntSet.union info.live_in (intset_of_list block.params)
+    | Join _ | IfThen | IfElse | MatchArm -> IntSet.union info.live_in info.live_params
+  in
+  let graph = add_resident_clique entry_live graph in
+  let graph = add_resident_clique info.live_before_term graph in
   let _, graph =
     List.fold_right
       (fun stmt (live_after, graph) ->
-        let graph = add_live_clique live_after graph in
+        let graph = add_resident_clique live_after graph in
         (transfer_stmt stmt live_after, graph))
       block.body (info.live_before_term, graph)
   in
   graph
 
-let build_unit_interference (unit_ir : unit_ir) (liveness : CfgLiveness.unit_liveness) =
-  let graph =
-    List.fold_left
-      (fun graph (info : value_info) -> if allocatable_value info then IntMap.add info.id IntSet.empty graph else graph)
-      IntMap.empty unit_ir.values
-  in
-  List.fold_left
-    (fun graph (block : block) ->
-      let info =
-        match IntMap.find_opt block.id liveness.blocks with
-        | Some info -> info
-        | None -> failf "RegAlloc: missing liveness for block b%d" block.id
-      in
-      graph |> add_block_entry_interference block info |> add_stmt_interference block info)
-    graph unit_ir.blocks
-
-let value_priority (info : value_info) =
-  match info.kind with Param | JoinParam | MatchBinder -> 0 | Local | Temp -> 1 | JoinBinder -> 2
-
-let allocate_slots (unit_ir : unit_ir) (interference : IntSet.t IntMap.t) =
-  let value_infos =
-    List.filter allocatable_value unit_ir.values
-    |> List.sort (fun (a : value_info) (b : value_info) ->
+(* Greedy graph-colouring: assign the smallest available slot to each value,
+   ordered by descending interference degree, then by priority/id. *)
+let allocate_slots_for (value_infos : value_info list) (interference : IntSet.t IntMap.t) =
+  let sorted =
+    List.sort
+      (fun (a : value_info) (b : value_info) ->
         let degree_a = match IntMap.find_opt a.id interference with Some live -> IntSet.cardinal live | None -> 0 in
         let degree_b = match IntMap.find_opt b.id interference with Some live -> IntSet.cardinal live | None -> 0 in
         match Int.compare degree_b degree_a with
         | 0 -> (
             match Int.compare (value_priority a) (value_priority b) with 0 -> Int.compare a.id b.id | order -> order)
         | order -> order)
+      value_infos
   in
   List.fold_left
     (fun slot_of_value (info : value_info) ->
@@ -120,99 +126,42 @@ let allocate_slots (unit_ir : unit_ir) (interference : IntSet.t IntMap.t) =
       in
       let rec pick slot = if IntSet.mem slot used_slots then pick (slot + 1) else slot in
       IntMap.add info.id (pick 0) slot_of_value)
-    IntMap.empty value_infos
+    IntMap.empty sorted
 
-let block_layouts_of_slots (unit_ir : unit_ir) (slot_of_value : slot IntMap.t) ~frame_size =
-  List.fold_left
-    (fun layouts (block : block) ->
-      let param_slots =
-        List.map
-          (fun param_id ->
-            match IntMap.find_opt param_id slot_of_value with
-            | Some slot -> slot
-            | None -> failf "RegAlloc: missing slot for block parameter v%d in b%d" param_id block.id)
-          block.params
-      in
-      IntMap.add block.id { param_slots; frame_size } layouts)
-    IntMap.empty unit_ir.blocks
-
-let add_move_edge src dst graph =
-  if src = dst then graph
-  else
-    let succs = match IntMap.find_opt src graph with Some succs -> succs | None -> IntSet.empty in
-    IntMap.add src (IntSet.add dst succs) graph
-
-let directed_graph_has_cycle graph =
-  let colors = ref IntMap.empty in
-  let rec visit slot =
-    match IntMap.find_opt slot !colors with
-    | Some 1 -> true
-    | Some 2 -> false
-    | Some _ -> false
-    | None ->
-        colors := IntMap.add slot 1 !colors;
-        let succs = match IntMap.find_opt slot graph with Some succs -> succs | None -> IntSet.empty in
-        let found_cycle = IntSet.exists visit succs in
-        colors := IntMap.add slot 2 !colors;
-        found_cycle
+(* Allocate slots for a single block independently. *)
+let allocate_block (value_map : value_info IntMap.t) (block : block) (info : CfgLiveness.block_liveness) : block_layout
+    =
+  let residents = block_resident_values block info in
+  let allocatable_residents =
+    IntSet.filter
+      (fun id -> match IntMap.find_opt id value_map with Some vi -> allocatable_value vi | None -> false)
+      residents
   in
-  IntMap.exists (fun slot _ -> visit slot) graph
-
-let jump_edge_needs_scratch (block_map : block IntMap.t) (liveness : CfgLiveness.unit_liveness)
-    (slot_of_value : slot IntMap.t) (block : block) =
-  match block.term with
-  | Jump (succ_id, args) ->
-      let succ =
-        match IntMap.find_opt succ_id block_map with
-        | Some succ -> succ
-        | None -> failf "RegAlloc: unknown jump target b%d" succ_id
-      in
-      let block_info =
-        match IntMap.find_opt block.id liveness.blocks with
-        | Some info -> info
-        | None -> failf "RegAlloc: missing liveness for block b%d" block.id
-      in
-      let edge_live =
-        match IntMap.find_opt succ_id block_info.live_on_edge with
-        | Some info -> info
-        | None -> failf "RegAlloc: missing edge liveness from b%d to b%d" block.id succ_id
-      in
-      let move_graph =
-        try
-          List.fold_left2
-            (fun graph param_id arg ->
-              if IntMap.mem param_id edge_live.live_params then
-                let dst_slot =
-                  match IntMap.find_opt param_id slot_of_value with
-                  | Some slot -> slot
-                  | None -> failf "RegAlloc: missing slot for live jump parameter v%d" param_id
-                in
-                match arg with
-                | OLocal value_id -> (
-                    match IntMap.find_opt value_id slot_of_value with
-                    | Some src_slot -> add_move_edge src_slot dst_slot graph
-                    | None -> graph)
-                | OGlobal _ | OBuiltin _ | OInt _ | OFloat _ | OBool _ | OString _ | OUnit | OCtor _ -> graph
-              else graph)
-            IntMap.empty succ.params args
-        with Invalid_argument _ ->
-          failf "RegAlloc: jump to block b%d expects %d args, got %d" succ.id (List.length succ.params)
-            (List.length args)
-      in
-      directed_graph_has_cycle move_graph
-  | Return _ | Branch _ | Match _ -> false
-
-let needs_scratch_slot (unit_ir : unit_ir) (liveness : CfgLiveness.unit_liveness) (slot_of_value : slot IntMap.t) =
-  let block_map =
-    List.fold_left (fun acc (block : block) -> IntMap.add block.id block acc) IntMap.empty unit_ir.blocks
+  let interference = build_block_interference block info allocatable_residents in
+  let value_infos = IntSet.elements allocatable_residents |> List.filter_map (fun id -> IntMap.find_opt id value_map) in
+  let slot_of_value = allocate_slots_for value_infos interference in
+  let param_slots =
+    List.map
+      (fun param_id ->
+        match IntMap.find_opt param_id slot_of_value with
+        | Some slot -> slot
+        | None -> failf "RegAlloc: missing slot for block parameter v%d in b%d" param_id block.id)
+      block.params
   in
-  List.exists (jump_edge_needs_scratch block_map liveness slot_of_value) unit_ir.blocks
+  let frame_size = IntMap.fold (fun _ slot acc -> Int.max acc (slot + 1)) slot_of_value 0 in
+  { slot_of_value; param_slots; frame_size }
 
 let allocate_unit_slots (unit_ir : unit_ir) (liveness : CfgLiveness.unit_liveness) : unit_allocation =
-  let interference = build_unit_interference unit_ir liveness in
-  let slot_of_value = allocate_slots unit_ir interference in
-  let base_frame_size = IntMap.fold (fun _ slot frame_size -> Int.max frame_size (slot + 1)) slot_of_value 0 in
-  let scratch_slot = if needs_scratch_slot unit_ir liveness slot_of_value then Some base_frame_size else None in
-  let frame_size = match scratch_slot with Some slot -> slot + 1 | None -> base_frame_size in
-  let block_layouts = block_layouts_of_slots unit_ir slot_of_value ~frame_size in
-  { slot_of_value; block_layouts; frame_size; scratch_slot; interference }
+  let value_map = List.fold_left (fun acc (vi : value_info) -> IntMap.add vi.id vi acc) IntMap.empty unit_ir.values in
+  let block_layouts =
+    List.fold_left
+      (fun layouts (block : block) ->
+        let info =
+          match IntMap.find_opt block.id liveness.blocks with
+          | Some info -> info
+          | None -> failf "RegAlloc: missing liveness for block b%d" block.id
+        in
+        IntMap.add block.id (allocate_block value_map block info) layouts)
+      IntMap.empty unit_ir.blocks
+  in
+  { block_layouts }
