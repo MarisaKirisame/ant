@@ -157,6 +157,9 @@ let set_env_slot_ (w : world code) (i : int code) (v : Value.seq code) : unit co
 let init_frame_ (w : world code) (frame_size : int code) (fill : Value.seq code) : unit code =
   app3_ (from_ir $ Function "init_frame") w frame_size fill
 
+let resize_frame_ (w : world code) (new_size : int code) (fill : Value.seq code) : unit code =
+  app3_ (from_ir $ Function "resize_frame") w new_size fill
+
 let collect_env_slots_ (w : world code) (slots : int list code) : Value.seq code =
   app2_ (from_ir $ Function "collect_env_slots") w slots
 

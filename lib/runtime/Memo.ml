@@ -219,6 +219,17 @@ let init_frame (w : world) (frame_size : int) (fill : value) : unit =
   if frame_size < 0 then failwith (Printf.sprintf "init_frame: negative frame size %d" frame_size);
   w.state.e <- Dynarray.init frame_size (fun _ -> fill)
 
+let resize_frame (w : world) (new_size : int) (fill : value) : unit =
+  let old_size = Dynarray.length w.state.e in
+  if new_size > old_size then
+    for _ = old_size to new_size - 1 do
+      Dynarray.add_last w.state.e fill
+    done
+  else if new_size < old_size then
+    for _ = new_size to old_size - 1 do
+      Dynarray.remove_last w.state.e
+    done
+
 let collect_env_slots (w : world) (slots : int list) : seq =
   appends (List.map slots ~f:(fun slot -> get_env_slot w slot))
 
