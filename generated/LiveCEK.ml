@@ -1,5 +1,3 @@
-[@@@ocaml.warning "-11"]
-
 open Ant
 open Word
 open Memo
@@ -644,7 +642,7 @@ let populate_state () =
           push_env w_1 (Memo.from_constructor tag_None);
           assert_env_length w_1 3;
           return_n w_1 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (3)")
+    )
     3;
   add_exp
     (fun w_3 ->
@@ -1021,7 +1019,7 @@ let populate_state () =
           drop_n w_6 3 1;
           assert_env_length w_6 2;
           return_n w_6 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (6)")
+    )
     6;
   add_exp
     (fun w_7 ->
@@ -1085,7 +1083,7 @@ let populate_state () =
           drop_n w_7 3 1;
           assert_env_length w_7 2;
           return_n w_7 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (7)")
+    )
     7;
   add_exp
     (fun w_8 ->
@@ -1149,7 +1147,7 @@ let populate_state () =
           drop_n w_8 3 1;
           assert_env_length w_8 2;
           return_n w_8 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (8)")
+    )
     8;
   add_exp
     (fun w_9 ->
@@ -1213,7 +1211,7 @@ let populate_state () =
           drop_n w_9 3 1;
           assert_env_length w_9 2;
           return_n w_9 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (9)")
+    )
     9;
   add_exp
     (fun w_10 ->
@@ -1277,7 +1275,7 @@ let populate_state () =
           drop_n w_10 3 1;
           assert_env_length w_10 2;
           return_n w_10 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (10)")
+    )
     10;
   add_exp
     (fun w_11 ->
@@ -1394,7 +1392,7 @@ let populate_state () =
           drop_n w_12 3 1;
           assert_env_length w_12 2;
           return_n w_12 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (12)")
+    )
     12;
   add_exp
     (fun w_13 ->
@@ -1465,7 +1463,7 @@ let populate_state () =
           drop_n w_13 4 2;
           assert_env_length w_13 2;
           return_n w_13 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (13)")
+    )
     13;
   add_exp
     (fun w_14 ->
@@ -1527,7 +1525,7 @@ let populate_state () =
           drop_n w_14 1 0;
           assert_env_length w_14 1;
           return_n w_14 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (14)")
+    )
     14;
   add_exp
     (fun w_15 ->
@@ -1589,7 +1587,7 @@ let populate_state () =
           drop_n w_15 1 0;
           assert_env_length w_15 1;
           return_n w_15 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (15)")
+    )
     15;
   add_exp
     (fun w_16 ->
@@ -1677,7 +1675,7 @@ let populate_state () =
           drop_n w_16 4 2;
           assert_env_length w_16 2;
           return_n w_16 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (16)")
+    )
     16;
   add_exp
     (fun w_18 ->
@@ -1770,7 +1768,7 @@ let populate_state () =
           drop_n w_17 1 0;
           assert_env_length w_17 1;
           return_n w_17 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (18)")
+    )
     18;
   add_exp
     (fun w_21 ->
@@ -1885,7 +1883,7 @@ let populate_state () =
           drop_n w_19 1 0;
           assert_env_length w_19 1;
           return_n w_19 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (21)")
+    )
     21;
   add_exp
     (fun w_24 ->
@@ -2000,7 +1998,7 @@ let populate_state () =
           drop_n w_22 1 0;
           assert_env_length w_22 1;
           return_n w_22 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (24)")
+    )
     24;
   add_exp
     (fun w_27 ->
@@ -2115,7 +2113,7 @@ let populate_state () =
           drop_n w_25 1 0;
           assert_env_length w_25 1;
           return_n w_25 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (27)")
+    )
     27;
   add_exp
     (fun w_30 ->
@@ -2230,7 +2228,7 @@ let populate_state () =
           drop_n w_28 1 0;
           assert_env_length w_28 1;
           return_n w_28 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (30)")
+    )
     30;
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;

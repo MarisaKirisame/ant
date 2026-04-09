@@ -49,4 +49,4 @@
 (env
  (dev
   (flags
-   (:standard -w @A-27-32-33-39 -warn-error -A))))
+   (:standard -warn-error -A))))

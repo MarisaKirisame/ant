@@ -1,5 +1,3 @@
-[@@@ocaml.warning "-11"]
-
 open Ant
 open Word
 open Memo
@@ -1503,7 +1501,7 @@ let populate_state () =
           drop_n w_7 4 1;
           assert_env_length w_7 3;
           return_n w_7 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (8)")
+    )
     8;
   add_exp
     (fun w_9 ->
@@ -1530,7 +1528,7 @@ let populate_state () =
           drop_n w_9 4 1;
           assert_env_length w_9 3;
           return_n w_9 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (9)")
+    )
     9;
   add_exp
     (fun w_10 ->
@@ -1561,7 +1559,7 @@ let populate_state () =
           drop_n w_10 5 2;
           assert_env_length w_10 3;
           return_n w_10 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (10)")
+    )
     10;
   add_exp
     (fun w_11 ->
@@ -1592,7 +1590,7 @@ let populate_state () =
           drop_n w_11 5 2;
           assert_env_length w_11 3;
           return_n w_11 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (11)")
+    )
     11;
   add_exp
     (fun w_6 ->
@@ -1795,7 +1793,7 @@ let populate_state () =
           assert_env_length w_18 3;
           push_env w_18 (Memo.from_int 1);
           w_18.state.c <- pc_to_exp (int_to_pc 19)
-      | _ -> failwith "unreachable (20)")
+    )
     20;
   add_exp
     (fun w_17 ->
@@ -1858,7 +1856,7 @@ let populate_state () =
           drop_n w_24 4 2;
           assert_env_length w_24 2;
           return_n w_24 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (24)")
+    )
     24;
   add_exp
     (fun w_23 ->
@@ -1893,7 +1891,7 @@ let populate_state () =
           push_env w_23 (Memo.from_int 1);
           assert_env_length w_23 2;
           return_n w_23 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (25)")
+    )
     25;
   add_exp
     (fun w_25 ->
@@ -1928,7 +1926,7 @@ let populate_state () =
           drop_n w_27 4 2;
           assert_env_length w_27 2;
           return_n w_27 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (27)")
+    )
     27;
   add_exp
     (fun w_26 ->
@@ -1966,7 +1964,7 @@ let populate_state () =
           push_env w_26 (Dynarray.get w_26.state.e 0);
           assert_env_length w_26 2;
           return_n w_26 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (28)")
+    )
     28;
   add_exp
     (fun w_28 ->
@@ -2018,7 +2016,7 @@ let populate_state () =
           push_env w_30 (Memo.appends [ Memo.from_constructor tag_Add; ctor_arg_7; ctor_arg_6 ]);
           assert_env_length w_30 3;
           return_n w_30 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (31)")
+    )
     31;
   add_exp
     (fun w_31 ->
@@ -2351,7 +2349,7 @@ let populate_state () =
           push_env w_46 (Memo.appends [ Memo.from_constructor tag_ECons; ctor_arg_17; ctor_arg_16 ]);
           assert_env_length w_46 2;
           return_n w_46 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (49)")
+    )
     49;
   add_exp
     (fun w_49 ->
@@ -2390,7 +2388,7 @@ let populate_state () =
           push_env w_50 (Memo.appends [ Memo.from_constructor tag_ECons; ctor_arg_19; ctor_arg_18 ]);
           assert_env_length w_50 2;
           return_n w_50 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (51)")
+    )
     51;
   add_exp
     (fun w_51 ->
@@ -2425,7 +2423,7 @@ let populate_state () =
           drop_n w_53 4 2;
           assert_env_length w_53 2;
           return_n w_53 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (53)")
+    )
     53;
   add_exp
     (fun w_52 ->
@@ -2460,7 +2458,7 @@ let populate_state () =
           push_env w_52 (Memo.from_int 1);
           assert_env_length w_52 2;
           return_n w_52 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (54)")
+    )
     54;
   add_exp
     (fun w_54 ->
@@ -2495,7 +2493,7 @@ let populate_state () =
           drop_n w_56 4 2;
           assert_env_length w_56 2;
           return_n w_56 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (56)")
+    )
     56;
   add_exp
     (fun w_55 ->
@@ -2533,7 +2531,7 @@ let populate_state () =
           push_env w_55 (Dynarray.get w_55.state.e 0);
           assert_env_length w_55 2;
           return_n w_55 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (57)")
+    )
     57;
   add_exp
     (fun w_57 ->
@@ -2631,7 +2629,7 @@ let populate_state () =
           let keep_19 = env_call w_63 [ 3 ] 1 in
           w_63.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; keep_19; w_63.state.k ];
           w_63.state.c <- pc_to_exp (int_to_pc 62)
-      | _ -> failwith "unreachable (63)")
+    )
     63;
   add_exp
     (fun w_62 ->
@@ -2933,7 +2931,7 @@ let populate_state () =
           let keep_27 = env_call w_80 [ 3 ] 1 in
           w_80.state.k <- Memo.appends [ Memo.from_constructor tag_cont_29; keep_27; w_80.state.k ];
           w_80.state.c <- pc_to_exp (int_to_pc 79)
-      | _ -> failwith "unreachable (80)")
+    )
     80;
   add_exp
     (fun w_79 ->
@@ -3030,7 +3028,7 @@ let populate_state () =
           drop_n w_85 4 1;
           assert_env_length w_85 3;
           return_n w_85 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (85)")
+    )
     85;
   add_exp
     (fun w_84 ->
@@ -3374,7 +3372,7 @@ let populate_state () =
           push_env w_100 (Memo.from_constructor tag_Missing);
           assert_env_length w_100 3;
           return_n w_100 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (99)")
+    )
     99;
   add_exp
     (fun w_99 ->
@@ -3579,7 +3577,7 @@ let populate_state () =
           let keep_56 = env_call w_106 [ 2 ] 1 in
           w_106.state.k <- Memo.appends [ Memo.from_constructor tag_cont_59; keep_56; w_106.state.k ];
           w_106.state.c <- pc_to_exp (int_to_pc 60)
-      | _ -> failwith "unreachable (108)")
+    )
     108;
   add_exp
     (fun w_109 ->
@@ -4301,7 +4299,7 @@ let populate_state () =
           assert_env_length w_141 4;
           ignore (env_call w_141 [] 2);
           w_141.state.c <- pc_to_exp (int_to_pc 83)
-      | _ -> failwith "unreachable (143)")
+    )
     143;
   add_exp
     (fun w_148 ->
@@ -4400,7 +4398,7 @@ let populate_state () =
           assert_env_length w_144 4;
           ignore (env_call w_144 [] 2);
           w_144.state.c <- pc_to_exp (int_to_pc 65)
-      | _ -> failwith "unreachable (148)")
+    )
     148;
   add_exp
     (fun w_149 ->
