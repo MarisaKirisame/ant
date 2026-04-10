@@ -183,7 +183,8 @@ let rec lower_tail_expr (ctx : func_ctx) (env : env) (builder : block_builder) (
       let cond_op = operand_of_atom env cond in
       let then_builder = new_builder ctx (builder.label ^ ".then") IfThen [] in
       let else_builder = new_builder ctx (builder.label ^ ".else") IfElse [] in
-      seal_block ctx builder (Branch (cond_op, then_builder.id, else_builder.id));
+      seal_block ctx builder
+        (Branch (cond_op, mk_plain_branch_target then_builder.id, mk_plain_branch_target else_builder.id));
       lower_tail_expr ctx env then_builder if_true;
       lower_tail_expr ctx env else_builder if_false
   | Match (scrutinee, MatchPattern cases, _) ->
@@ -196,7 +197,7 @@ let rec lower_tail_expr (ctx : func_ctx) (env : env) (builder : block_builder) (
             let arm_builder = new_builder ctx (Printf.sprintf "%s.match%d" builder.label index) MatchArm params in
             let arm_env = env_with_values env bindings in
             lower_tail_expr ctx arm_env arm_builder arm_expr;
-            { pattern = pattern'; block = arm_builder.id })
+            mk_plain_match_arm pattern' arm_builder.id)
           cases
       in
       seal_block ctx builder (Match (scrutinee_op, arms))

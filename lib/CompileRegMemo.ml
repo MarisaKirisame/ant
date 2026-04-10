@@ -19,7 +19,11 @@ type prog_slot_analysis = {
   allocations : unit_allocation list;
 }
 
-let lower_prog = AnfToCfg.lower_prog
+(* Lower ANF to the block IR, then run the inlining optimization passes
+   (trivial block inlining and dispatch inlining) before liveness / register
+   allocation. The passes reduce the number of memo-visible PCs and
+   cross-block frame reshapes while preserving canonical memo boundaries. *)
+let lower_prog (prog : 'a prog) : prog_ir = prog |> AnfToCfg.lower_prog |> BlockInlining.apply
 
 let live_on_jump_edge (succ : block) (succ_info : CfgLiveness.block_liveness) (args : operand list) =
   try
@@ -34,14 +38,43 @@ let live_on_jump_edge (succ : block) (succ_info : CfgLiveness.block_liveness) (a
     failf "CompileRegMemo: jump to block b%d expects %d args, got %d" succ.id (List.length succ.params)
       (List.length args)
 
-let successors (block : block) =
-  match block.term with
-  | Return _ -> []
-  | Jump (succ_id, _) -> [ succ_id ]
-  | Branch (_, then_id, else_id) -> [ then_id; else_id ]
-  | Match (_, arms) -> List.map (fun ({ block; _ } : match_arm) -> block) arms
-
+let successors (block : block) = terminator_external_succs block.term
 let allocate_unit_slots = RegAlloc.allocate_unit_slots
+
+(* Compute the live-in set at the top of an inline region, given a function
+   that returns the live_in of a real block. This walks the region's body
+   backward from its terminator's live-out. Inlined arms inside the region's
+   terminator recurse. *)
+let rec inline_region_live_in ~(find_live : block_id -> CfgLiveness.block_liveness) (region : inline_region) : IntSet.t
+    =
+  let live_out = terminator_live_out ~find_live region.term in
+  List.fold_right RegAlloc.transfer_stmt region.body live_out
+
+and terminator_live_out ~(find_live : block_id -> CfgLiveness.block_liveness) (term : terminator) : IntSet.t =
+  match term with
+  | Return operand -> RegAlloc.add_operand_uses IntSet.empty operand
+  | Jump (succ_id, _) -> (find_live succ_id).live_in
+  | Branch (cond, t, e) ->
+      let t_live =
+        match t.inline with None -> (find_live t.block).live_in | Some r -> inline_region_live_in ~find_live r
+      in
+      let e_live =
+        match e.inline with None -> (find_live e.block).live_in | Some r -> inline_region_live_in ~find_live r
+      in
+      RegAlloc.add_operand_uses (IntSet.union t_live e_live) cond
+  | Match (scrutinee, arms) ->
+      let live =
+        List.fold_left
+          (fun acc (arm : match_arm) ->
+            let arm_live =
+              match arm.inline with
+              | None -> (find_live arm.block).live_in
+              | Some r -> inline_region_live_in ~find_live r
+            in
+            IntSet.union acc arm_live)
+          IntSet.empty arms
+      in
+      RegAlloc.add_operand_uses live scrutinee
 
 let analyze_unit_liveness (unit_ir : unit_ir) : CfgLiveness.unit_liveness =
   CfgLiveness.analyze_unit ~blocks:unit_ir.blocks ~entry_id:unit_ir.entry ~successors
@@ -50,30 +83,56 @@ let analyze_unit_liveness (unit_ir : unit_ir) : CfgLiveness.unit_liveness =
     ~body:(fun (block : block) -> block.body)
     ~transfer_stmt:RegAlloc.transfer_stmt
     ~analyze_term:(fun ~find_block ~find_live (block : block) ->
-      let live_on_edge, live_out =
-        match block.term with
-        | Return _ -> (IntMap.empty, IntSet.empty)
+      (* Walk the terminator (including inline regions for dispatch-inlined
+         arms) and register live_on_edge entries for each *external* successor
+         block reached. Edges originating inside an inline region are
+         attributed to the dispatcher block, because the inlined arm does not
+         own a PC. *)
+      let edges = ref IntMap.empty in
+      let add_edge succ_id edge = edges := IntMap.add succ_id edge !edges in
+      let rec walk_term term =
+        match term with
+        | Return operand -> RegAlloc.add_operand_uses IntSet.empty operand
         | Jump (succ_id, args) ->
             let succ = find_block succ_id in
             let succ_info = find_live succ_id in
             let edge_live = live_on_jump_edge succ succ_info args in
-            (IntMap.singleton succ_id edge_live, CfgLiveness.edge_live_values edge_live)
-        | Branch (_, then_id, else_id) ->
-            let then_live = (find_live then_id).live_in in
-            let else_live = (find_live else_id).live_in in
-            ( IntMap.(
-                empty
-                |> add then_id { CfgLiveness.live_in = then_live; live_params = IntMap.empty }
-                |> add else_id { CfgLiveness.live_in = else_live; live_params = IntMap.empty }),
-              IntSet.union then_live else_live )
-        | Match (_, arms) ->
-            List.fold_left
-              (fun (edge_acc, live_acc) ({ block = succ_id; _ } : match_arm) ->
-                let succ_live = (find_live succ_id).live_in in
-                ( IntMap.add succ_id { CfgLiveness.live_in = succ_live; live_params = IntMap.empty } edge_acc,
-                  IntSet.union live_acc succ_live ))
-              (IntMap.empty, IntSet.empty) arms
+            add_edge succ_id edge_live;
+            CfgLiveness.edge_live_values edge_live
+        | Branch (cond, t, e) ->
+            let t_live = walk_branch_target t in
+            let e_live = walk_branch_target e in
+            RegAlloc.add_operand_uses (IntSet.union t_live e_live) cond
+        | Match (scrutinee, arms) ->
+            let live =
+              List.fold_left (fun acc (arm : match_arm) -> IntSet.union acc (walk_match_arm arm)) IntSet.empty arms
+            in
+            RegAlloc.add_operand_uses live scrutinee
+      and walk_branch_target (tgt : branch_target) =
+        match tgt.inline with
+        | None ->
+            let live = (find_live tgt.block).live_in in
+            add_edge tgt.block { CfgLiveness.live_in = live; live_params = IntMap.empty };
+            live
+        | Some region -> walk_inline region
+      and walk_match_arm (arm : match_arm) =
+        match arm.inline with
+        | None ->
+            let live = (find_live arm.block).live_in in
+            add_edge arm.block { CfgLiveness.live_in = live; live_params = IntMap.empty };
+            live
+        | Some region ->
+            let region_live = walk_inline region in
+            (* Match-arm binders are defined inside the region (by the pattern
+               match); remove them from the region's entry-live set so they
+               don't leak upward into the parent's live_before_term. *)
+            let binders = pattern_binders arm.pattern in
+            List.fold_left (fun acc id -> IntSet.remove id acc) region_live binders
+      and walk_inline (region : inline_region) =
+        let term_live = walk_term region.term in
+        List.fold_right RegAlloc.transfer_stmt region.body term_live
       in
+      let live_out = walk_term block.term in
       let live_before_term =
         match block.term with
         | Return operand -> RegAlloc.add_operand_uses IntSet.empty operand
@@ -81,7 +140,7 @@ let analyze_unit_liveness (unit_ir : unit_ir) : CfgLiveness.unit_liveness =
         | Branch (cond, _, _) -> RegAlloc.add_operand_uses live_out cond
         | Match (cond, _) -> RegAlloc.add_operand_uses live_out cond
       in
-      (live_on_edge, live_out, live_before_term))
+      (!edges, live_out, live_before_term))
 
 let analyze_prog (ir : prog_ir) : prog_analysis =
   CfgLiveness.analyze_prog ~units:ir.units ~analyze_unit:analyze_unit_liveness ir
@@ -418,12 +477,13 @@ let compile_shuffle_edge (ctx : cg_ctx) (unit_cg : unit_codegen) (src_layout : b
         shuffle_frame_ w (frame_mapping_ compiled_sources) dummy_value_;
         goto_ w target_pc]
 
-(* Match support *)
+(* Match support.
 
-let compile_match_success (ctx : cg_ctx) (unit_cg : unit_codegen) (src_layout : block_layout) ~step_entry
-    (w : world code) (src_block_id : block_id) (target_block_id : block_id) (assigns : (value_id * Value.seq code) list)
-    =
-  compile_shuffle_edge ctx unit_cg src_layout ~step_entry w src_block_id target_block_id assigns
+   For non-inlined arms, control transfers to the arm's block via a shuffled
+   edge (compile_shuffle_edge). For inlined (dispatch-inlined) arms, the arm
+   block has been merged into the dispatcher's step: we write pattern binder
+   values directly into their parent-layout slots, then emit the inline
+   region's body and terminator in place. *)
 
 let tuple_pattern_assigns unit_cg whole_pattern patterns parts =
   List.rev
@@ -434,74 +494,6 @@ let tuple_pattern_assigns unit_cg whole_pattern patterns parts =
          | RPBind value_id -> (value_id, part) :: acc
          | _ -> unsupported_match_pattern unit_cg whole_pattern)
        [] patterns parts)
-
-let compile_tuple_bindings ctx unit_cg src_layout ~step_entry whole_pattern parts patterns w src_block_id block =
-  bind_values "part"
-    (List.mapi (fun index _ -> nth_seq parts index) patterns)
-    (fun bound_parts ->
-      compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block
-        (tuple_pattern_assigns unit_cg whole_pattern patterns bound_parts))
-
-let compile_default_arm ctx unit_cg src_layout ~step_entry subject arms w src_block_id current_pc =
-  let rec loop = function
-    | [] -> unreachable_ (pc_to_int current_pc)
-    | ({ pattern = RPAny; block } : match_arm) :: _ ->
-        compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block []
-    | ({ pattern = RPBind value_id; block } : match_arm) :: _ ->
-        compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block [ (value_id, subject) ]
-    | _ :: rest -> loop rest
-  in
-  loop arms
-
-let compile_ctor_arm ctx unit_cg src_layout ~step_entry pair w src_block_id default ({ pattern; block } : match_arm) =
-  match pattern with
-  | RPCtor (ctor, payload) ->
-      let body =
-        match payload with
-        | None | Some RPAny -> compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block []
-        | Some (RPBind value_id) ->
-            compile_match_success ctx unit_cg src_layout ~step_entry w src_block_id block
-              [ (value_id, pair_value_ pair) ]
-        | Some (RPTuple patterns) ->
-            let whole_pattern = RPCtor (ctor, Some (RPTuple patterns)) in
-            let_in_ "parts"
-              (memo_splits_ (pair_value_ pair))
-              (fun parts ->
-                let len_ok =
-                  code
-                  $ parens
-                      (string "List.length " ^^ uncode parts ^^ string " = "
-                      ^^ string (string_of_int (List.length patterns)))
-                in
-                if_ len_ok
-                  (compile_tuple_bindings ctx unit_cg src_layout ~step_entry whole_pattern parts patterns w src_block_id
-                     block)
-                  default)
-        | Some unsupported -> unsupported_match_pattern unit_cg (RPCtor (ctor, Some unsupported))
-      in
-      (Hashtbl.find_exn ctx.ctag ctor, Hashtbl.find_exn ctx.ctag_name ctor, body)
-  | _ -> failwith "CompileRegMemo: internal error while compiling ctor dispatch"
-
-let compile_ctor_dispatch ctx unit_cg src_layout ~step_entry raw_subject resolved arms w src_block_id current_pc =
-  let default = compile_default_arm ctx unit_cg src_layout ~step_entry raw_subject arms w src_block_id current_pc in
-  let ctor_arms =
-    List.filter_map
-      (fun ({ pattern; _ } as arm) ->
-        match pattern with
-        | RPCtor _ -> Some arm
-        | RPAny | RPBind _ -> None
-        | unsupported -> unsupported_match_pattern unit_cg unsupported)
-      arms
-  in
-  match ctor_arms with
-  | [] -> default
-  | _ ->
-      let_in_ "tag"
-        (word_get_value_ (zro_ resolved))
-        (fun tag ->
-          match_ctor_tag_literal_default_ tag
-            (List.map (compile_ctor_arm ctx unit_cg src_layout ~step_entry resolved w src_block_id default) ctor_arms)
-            default)
 
 (* Non-call RHS *)
 
@@ -641,13 +633,17 @@ and compile_terminator ctx unit_cg block layout ~step_entry current_pc w term =
       [%seqs
         assert_env_length_ w (int_ layout.frame_size);
         compile_shuffle_edge ctx unit_cg layout ~step_entry w block.id succ_id []]
-  | Branch (cond, then_id, else_id) -> (
-      let do_branch cond_word target_id =
+  | Branch (cond, then_tgt, else_tgt) -> (
+      let do_branch cond_word (tgt : branch_target) =
         ignore cond_word;
-        compile_shuffle_edge ctx unit_cg layout ~step_entry w block.id target_id []
+        match tgt.inline with
+        | None -> compile_shuffle_edge ctx unit_cg layout ~step_entry w block.id tgt.block []
+        | Some region -> compile_inline_region ctx unit_cg block layout ~step_entry current_pc w region
       in
       let do_resolve_branch cond_word =
-        if_ (bool_nonzero_code (word_get_value_ cond_word)) (do_branch cond_word then_id) (do_branch cond_word else_id)
+        if_
+          (bool_nonzero_code (word_get_value_ cond_word))
+          (do_branch cond_word then_tgt) (do_branch cond_word else_tgt)
       in
       match cond with
       | OLocal value_id ->
@@ -665,10 +661,115 @@ and compile_terminator ctx unit_cg block layout ~step_entry current_pc w term =
             let_in_ "resolved"
               (resolve_ w (src_E_ slot))
               (fun resolved ->
-                compile_ctor_dispatch ctx unit_cg layout ~step_entry
+                compile_ctor_dispatch ctx unit_cg block layout ~step_entry current_pc
                   (operand_value_code ctx layout w scrutinee)
-                  resolved arms w block.id current_pc)
+                  resolved arms w)
         | _ -> failf "CompileRegMemo: match scrutinee must be a local operand"]
+
+(* Compile an inline region in place: its body runs inside the dispatcher's
+   memo step using the dispatcher's layout, and its terminator is compiled
+   recursively. *)
+and compile_inline_region ctx unit_cg parent_block parent_layout ~step_entry current_pc w (region : inline_region) =
+  let find_live id = block_liveness_exn unit_cg id in
+  let live_before_term = terminator_live_out ~find_live region.term in
+  let _, afters =
+    List.fold_right
+      (fun stmt (live_after, acc) -> (RegAlloc.transfer_stmt stmt live_after, live_after :: acc))
+      region.body (live_before_term, [])
+  in
+  compile_stmt_chain ctx unit_cg parent_block parent_layout ~step_entry current_pc w region.body afters region.term
+
+(* Match arm dispatch: handle both non-inlined and inlined arms. *)
+and compile_arm_take ctx unit_cg (parent_block : block) parent_layout ~step_entry current_pc w (arm : match_arm)
+    (assigns : (value_id * Value.seq code) list) =
+  match arm.inline with
+  | None -> compile_shuffle_edge ctx unit_cg parent_layout ~step_entry w parent_block.id arm.block assigns
+  | Some region ->
+      (* Write each binder value into its slot in the dispatcher's layout, then
+         run the inline region. The binder's slot was allocated as part of the
+         parent block's residents. *)
+      let write_binders =
+        seqs_
+          (List.map
+             (fun (binder_id, value_code) ->
+               let slot = slot_in_layout parent_layout binder_id in
+               fun _ -> set_env_slot_ w (int_ slot) value_code)
+             assigns)
+      in
+      [%seqs
+        write_binders;
+        compile_inline_region ctx unit_cg parent_block parent_layout ~step_entry current_pc w region]
+
+and compile_tuple_bindings ctx unit_cg parent_block parent_layout ~step_entry current_pc whole_pattern parts patterns w
+    arm =
+  bind_values "part"
+    (List.mapi (fun index _ -> nth_seq parts index) patterns)
+    (fun bound_parts ->
+      compile_arm_take ctx unit_cg parent_block parent_layout ~step_entry current_pc w arm
+        (tuple_pattern_assigns unit_cg whole_pattern patterns bound_parts))
+
+and compile_default_arm ctx unit_cg parent_block parent_layout ~step_entry subject arms w current_pc =
+  let rec loop = function
+    | [] -> unreachable_ (pc_to_int current_pc)
+    | ({ pattern = RPAny; _ } as arm : match_arm) :: _ ->
+        compile_arm_take ctx unit_cg parent_block parent_layout ~step_entry current_pc w arm []
+    | ({ pattern = RPBind value_id; _ } as arm : match_arm) :: _ ->
+        compile_arm_take ctx unit_cg parent_block parent_layout ~step_entry current_pc w arm [ (value_id, subject) ]
+    | _ :: rest -> loop rest
+  in
+  loop arms
+
+and compile_ctor_arm ctx unit_cg parent_block parent_layout ~step_entry current_pc pair w default (arm : match_arm) =
+  match arm.pattern with
+  | RPCtor (ctor, payload) ->
+      let body =
+        match payload with
+        | None | Some RPAny -> compile_arm_take ctx unit_cg parent_block parent_layout ~step_entry current_pc w arm []
+        | Some (RPBind value_id) ->
+            compile_arm_take ctx unit_cg parent_block parent_layout ~step_entry current_pc w arm
+              [ (value_id, pair_value_ pair) ]
+        | Some (RPTuple patterns) ->
+            let whole_pattern = RPCtor (ctor, Some (RPTuple patterns)) in
+            let_in_ "parts"
+              (memo_splits_ (pair_value_ pair))
+              (fun parts ->
+                let len_ok =
+                  code
+                  $ parens
+                      (string "List.length " ^^ uncode parts ^^ string " = "
+                      ^^ string (string_of_int (List.length patterns)))
+                in
+                if_ len_ok
+                  (compile_tuple_bindings ctx unit_cg parent_block parent_layout ~step_entry current_pc whole_pattern
+                     parts patterns w arm)
+                  default)
+        | Some unsupported -> unsupported_match_pattern unit_cg (RPCtor (ctor, Some unsupported))
+      in
+      (Hashtbl.find_exn ctx.ctag ctor, Hashtbl.find_exn ctx.ctag_name ctor, body)
+  | _ -> failwith "CompileRegMemo: internal error while compiling ctor dispatch"
+
+and compile_ctor_dispatch ctx unit_cg parent_block parent_layout ~step_entry current_pc raw_subject resolved arms w =
+  let default = compile_default_arm ctx unit_cg parent_block parent_layout ~step_entry raw_subject arms w current_pc in
+  let ctor_arms =
+    List.filter_map
+      (fun ({ pattern; _ } as arm : match_arm) ->
+        match pattern with
+        | RPCtor _ -> Some arm
+        | RPAny | RPBind _ -> None
+        | unsupported -> unsupported_match_pattern unit_cg unsupported)
+      arms
+  in
+  match ctor_arms with
+  | [] -> default
+  | _ ->
+      let_in_ "tag"
+        (word_get_value_ (zro_ resolved))
+        (fun tag ->
+          match_ctor_tag_literal_default_ tag
+            (List.map
+               (compile_ctor_arm ctx unit_cg parent_block parent_layout ~step_entry current_pc resolved w default)
+               ctor_arms)
+            default)
 
 let compile_block ctx unit_cg (blk : block) =
   let current_pc =

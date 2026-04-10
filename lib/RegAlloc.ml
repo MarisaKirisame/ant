@@ -94,7 +94,49 @@ let block_resident_values (block : block) (info : CfgLiveness.block_liveness) =
   let defined =
     List.fold_left (fun acc stmt -> match stmt with Bind (id, _) -> IntSet.add id acc) IntSet.empty block.body
   in
-  IntSet.union (IntSet.union entry_live all_params) defined
+  (* Include values defined in inlined arms of the terminator. Inline regions
+     execute within this block's memo step and their locals must live in this
+     block's working frame. *)
+  let inline_defined =
+    List.fold_left
+      (fun acc stmt -> match stmt with Bind (id, _) -> IntSet.add id acc)
+      IntSet.empty (collect_inline_stmts block.term)
+  in
+  (* Match-arm binders from inlined arms are also allocated in this block. *)
+  let inline_binders = inlined_arm_binders block.term in
+  IntSet.union (IntSet.union (IntSet.union (IntSet.union entry_live all_params) defined) inline_defined) inline_binders
+
+(* Compute external successors' live_in for the terminator (what must be live
+   when control leaves the block toward an external block).  For inlined arms,
+   this is the live_in of the arm's continuation block (walked transitively
+   through inline regions). *)
+let rec inline_region_entry_live ~(arm_live_in : block_id -> IntSet.t) (region : inline_region) : IntSet.t =
+  let live_out = terminator_live_out ~arm_live_in region.term in
+  List.fold_right transfer_stmt region.body live_out
+
+and terminator_live_out ~(arm_live_in : block_id -> IntSet.t) (term : terminator) : IntSet.t =
+  match term with
+  | Return operand -> add_operand_uses IntSet.empty operand
+  | Jump (succ_id, _) -> arm_live_in succ_id
+  | Branch (cond, t, e) ->
+      let then_live =
+        match t.inline with None -> arm_live_in t.block | Some r -> inline_region_entry_live ~arm_live_in r
+      in
+      let else_live =
+        match e.inline with None -> arm_live_in e.block | Some r -> inline_region_entry_live ~arm_live_in r
+      in
+      add_operand_uses (IntSet.union then_live else_live) cond
+  | Match (scrutinee, arms) ->
+      let live =
+        List.fold_left
+          (fun acc (arm : match_arm) ->
+            let arm_live =
+              match arm.inline with None -> arm_live_in arm.block | Some r -> inline_region_entry_live ~arm_live_in r
+            in
+            IntSet.union acc arm_live)
+          IntSet.empty arms
+      in
+      add_operand_uses live scrutinee
 
 let build_block_interference (block : block) (info : CfgLiveness.block_liveness) (residents : IntSet.t) =
   let graph = IntSet.fold (fun id graph -> IntMap.add id IntSet.empty graph) residents IntMap.empty in
@@ -113,6 +155,28 @@ let build_block_interference (block : block) (info : CfgLiveness.block_liveness)
         (transfer_stmt stmt live_after, graph))
       block.body (info.live_before_term, graph)
   in
+  (* Add interference edges for values that live inside inlined arms: their
+     match binders and body-defined values. We over-approximate by treating
+     them as a single clique that remains live with the parent's
+     [live_before_term]; values in different arms may therefore end up
+     interfering with each other, but this is safe and keeps the allocator
+     simple. *)
+  let inline_stmts = collect_inline_stmts block.term in
+  let inline_defs = List.fold_left (fun acc (Bind (id, _)) -> IntSet.add id acc) IntSet.empty inline_stmts in
+  let binders = inlined_arm_binders block.term in
+  let inline_vals = IntSet.union inline_defs binders in
+  let graph =
+    if IntSet.is_empty inline_vals then graph
+    else add_resident_clique (IntSet.union info.live_before_term inline_vals) graph
+  in
+  let graph =
+    List.fold_left
+      (fun graph (Bind (id, rhs)) ->
+        let uses = add_rhs_uses IntSet.empty rhs in
+        let live = IntSet.union info.live_before_term (IntSet.add id uses) in
+        add_resident_clique live graph)
+      graph inline_stmts
+  in
   graph
 
 (* ----- Affinity computation ----- *)
@@ -124,13 +188,7 @@ let collect_affinities (unit_ir : unit_ir) (liveness : CfgLiveness.unit_liveness
   let block_map = List.fold_left (fun acc (b : block) -> IntMap.add b.id b acc) IntMap.empty unit_ir.blocks in
   let affinities = ref [] in
   let add_affinity vid slot = affinities := { value_id = vid; preferred_slot = slot } :: !affinities in
-  let succs =
-    match block.term with
-    | Return _ -> []
-    | Jump (succ_id, _) -> [ succ_id ]
-    | Branch (_, then_id, else_id) -> [ then_id; else_id ]
-    | Match (_, arms) -> List.map (fun ({ block = b; _ } : match_arm) -> b) arms
-  in
+  let succs = terminator_external_succs block.term in
   List.iter
     (fun succ_id ->
       match IntMap.find_opt succ_id coloured with
@@ -161,15 +219,7 @@ let collect_affinities (unit_ir : unit_ir) (liveness : CfgLiveness.unit_liveness
       | None -> ()
       | Some (pred_layout : block_layout) ->
           IntMap.iter (fun vid slot -> if IntSet.mem vid residents then add_affinity vid slot) pred_layout.slot_of_value)
-    (List.filter
-       (fun (b : block) ->
-         List.mem block.id
-           (match b.term with
-           | Return _ -> []
-           | Jump (s, _) -> [ s ]
-           | Branch (_, t, e) -> [ t; e ]
-           | Match (_, arms) -> List.map (fun ({ block = b; _ } : match_arm) -> b) arms))
-       unit_ir.blocks);
+    (List.filter (fun (b : block) -> List.mem block.id (terminator_external_succs b.term)) unit_ir.blocks);
   !affinities
 
 (* ----- Two-phase allocation ----- *)
@@ -260,14 +310,7 @@ let compute_rpo (unit_ir : unit_ir) =
     if not (IntSet.mem id !visited) then (
       visited := IntSet.add id !visited;
       let block = match IntMap.find_opt id block_map with Some b -> b | None -> assert false in
-      let succs =
-        match block.term with
-        | Return _ -> []
-        | Jump (s, _) -> [ s ]
-        | Branch (_, t, e) -> [ t; e ]
-        | Match (_, arms) -> List.map (fun ({ block = b; _ } : match_arm) -> b) arms
-      in
-      List.iter visit succs;
+      List.iter visit (terminator_external_succs block.term);
       order := id :: !order)
   in
   visit unit_ir.entry;
@@ -406,30 +449,49 @@ let compute_match_arm_shuffle (liveness : CfgLiveness.unit_liveness) (layouts : 
   in
   if is_elide_mapping src_layout.frame_size mapping then Elide else Shuffle { mapping }
 
+(* Compute edge plans for a terminator, including edges originating from
+   inlined arms' terminators (which use the parent block's layout). Inlined
+   arms themselves do not receive incoming edge plans, because they do not
+   cross a memo boundary. *)
+let rec collect_term_edge_plans ~(unit_ir : unit_ir) ~(liveness : CfgLiveness.unit_liveness)
+    ~(layouts : block_layout IntMap.t) ~(block_map : block IntMap.t) ~(src_block : block) (term : terminator) plans =
+  match term with
+  | Return _ -> plans
+  | Jump (succ_id, args) ->
+      let plan = compute_jump_shuffle unit_ir liveness layouts src_block succ_id args in
+      IntMap.add succ_id plan plans
+  | Branch (_, t, e) ->
+      let plans = collect_branch_target_plans ~unit_ir ~liveness ~layouts ~block_map ~src_block t plans in
+      collect_branch_target_plans ~unit_ir ~liveness ~layouts ~block_map ~src_block e plans
+  | Match (_, arms) ->
+      List.fold_left
+        (fun plans arm -> collect_match_arm_plans ~unit_ir ~liveness ~layouts ~block_map ~src_block arm plans)
+        plans arms
+
+and collect_branch_target_plans ~unit_ir ~liveness ~layouts ~block_map ~src_block (tgt : branch_target) plans =
+  match tgt.inline with
+  | None ->
+      let plan = compute_branch_shuffle liveness layouts src_block.id tgt.block in
+      IntMap.add tgt.block plan plans
+  | Some region -> collect_term_edge_plans ~unit_ir ~liveness ~layouts ~block_map ~src_block region.term plans
+
+and collect_match_arm_plans ~unit_ir ~liveness ~layouts ~block_map ~src_block (arm : match_arm) plans =
+  match arm.inline with
+  | None ->
+      let succ_block =
+        match IntMap.find_opt arm.block block_map with Some b -> b | None -> failf "missing block b%d" arm.block
+      in
+      let plan = compute_match_arm_shuffle liveness layouts src_block.id arm.block succ_block in
+      IntMap.add arm.block plan plans
+  | Some region -> collect_term_edge_plans ~unit_ir ~liveness ~layouts ~block_map ~src_block region.term plans
+
 let compute_all_edge_plans (unit_ir : unit_ir) (liveness : CfgLiveness.unit_liveness) (layouts : block_layout IntMap.t)
     =
   let block_map = List.fold_left (fun acc (b : block) -> IntMap.add b.id b acc) IntMap.empty unit_ir.blocks in
   List.fold_left
     (fun plans (block : block) ->
       let block_plans =
-        match block.term with
-        | Return _ -> IntMap.empty
-        | Jump (succ_id, args) ->
-            let plan = compute_jump_shuffle unit_ir liveness layouts block succ_id args in
-            IntMap.singleton succ_id plan
-        | Branch (_, then_id, else_id) ->
-            let then_plan = compute_branch_shuffle liveness layouts block.id then_id in
-            let else_plan = compute_branch_shuffle liveness layouts block.id else_id in
-            IntMap.add then_id then_plan (IntMap.singleton else_id else_plan)
-        | Match (_, arms) ->
-            List.fold_left
-              (fun acc ({ block = succ_id; _ } : match_arm) ->
-                let succ_block =
-                  match IntMap.find_opt succ_id block_map with Some b -> b | None -> failf "missing block b%d" succ_id
-                in
-                let plan = compute_match_arm_shuffle liveness layouts block.id succ_id succ_block in
-                IntMap.add succ_id plan acc)
-              IntMap.empty arms
+        collect_term_edge_plans ~unit_ir ~liveness ~layouts ~block_map ~src_block:block block.term IntMap.empty
       in
       IntMap.add block.id block_plans plans)
     IntMap.empty unit_ir.blocks

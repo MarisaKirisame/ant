@@ -29,8 +29,13 @@ let frontend_prog source = source |> parse |> Typing.top_type_of_prog |> Transfo
 let frontend_example name = name |> example_path |> read_all |> frontend_prog
 let compile_with backend prog = prog |> backend |> Syntax.string_of_document
 
+(* These helpers inspect the unoptimized CFG produced by [AnfToCfg.lower_prog],
+   before [BlockInlining] runs. They preserve the block names and shapes that
+   the fine-grained per-block liveness / layout tests expect. Tests that care
+   about the end-to-end compiled output still go through
+   [CompileRegMemo.Backend.compile], which runs the full optimization pipeline. *)
 let regmemo_single_unit_liveness prog =
-  let ir = CompileRegMemo.lower_prog prog in
+  let ir = AnfToCfg.lower_prog prog in
   match ir.units with
   | [ unit_ir ] -> (unit_ir, CompileRegMemo.analyze_unit_liveness unit_ir)
   | _ -> failwith "expected a single regmemo unit"
@@ -38,6 +43,15 @@ let regmemo_single_unit_liveness prog =
 let regmemo_single_unit_allocation prog =
   let unit_ir, liveness = regmemo_single_unit_liveness prog in
   (unit_ir, liveness, CompileRegMemo.allocate_unit_slots unit_ir liveness)
+
+let[@warning "-32"] regmemo_lowered_unit_allocation prog =
+  let ir = CompileRegMemo.lower_prog prog in
+  match ir.units with
+  | [ unit_ir ] ->
+      let liveness = CompileRegMemo.analyze_unit_liveness unit_ir in
+      let allocation = CompileRegMemo.allocate_unit_slots unit_ir liveness in
+      (unit_ir, liveness, allocation)
+  | _ -> failwith "expected a single regmemo unit"
 
 let regmemo_value_id (unit_ir : CompileRegMemo.unit_ir) name =
   match List.find_opt (fun (info : CompileRegMemo.value_info) -> String.equal info.name name) unit_ir.values with
@@ -810,6 +824,288 @@ let () =
   assert (Core.String.is_substring rendered ~substring:"init_frame");
   assert (Core.String.is_substring rendered ~substring:"collect_env_slots");
   assert (Core.String.is_substring rendered ~substring:"restore_env_slots")
+
+(* ===== BlockInlining tests ===== *)
+
+(* Helpers shared by the inlining tests below. *)
+
+let inlined_unit prog =
+  let ir = CompileRegMemo.lower_prog prog in
+  match ir.units with [ unit_ir ] -> unit_ir | _ -> failwith "expected single unit"
+
+let unoptimized_unit prog =
+  let ir = AnfToCfg.lower_prog prog in
+  match ir.units with [ unit_ir ] -> unit_ir | _ -> failwith "expected single unit"
+
+(* Pick a unit by name from a multi-unit program. *)
+let inlined_unit_named prog name =
+  let ir = CompileRegMemo.lower_prog prog in
+  match List.find_opt (fun (u : CompileRegMemo.unit_ir) -> String.equal u.name name) ir.units with
+  | Some u -> u
+  | None -> failwith ("unit not found: " ^ name)
+
+let blocks_count (unit_ir : CompileRegMemo.unit_ir) = List.length unit_ir.blocks
+
+let has_block_with_label (unit_ir : CompileRegMemo.unit_ir) label =
+  List.exists (fun (b : CompileRegMemo.block) -> String.equal b.label label) unit_ir.blocks
+
+(* The terminator of a block, walking through inline regions, has the inline
+   regions reachable from the entry block. *)
+let entry_block (unit_ir : CompileRegMemo.unit_ir) =
+  List.find (fun (b : CompileRegMemo.block) -> b.id = unit_ir.entry) unit_ir.blocks
+
+let count_inline_regions (term : CompileRegMemo.terminator) =
+  let n = ref 0 in
+  CompileRegMemo.terminator_iter_inline (fun _ -> incr n) term;
+  !n
+
+(* 1. Trivial block inlining for `Jump -> tiny block`. *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f x = let j(a) = a in jump j(x).  Without inlining the lowered CFG has
+     two blocks (entry + j); after trivial Jump inlining only the entry
+     remains. *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam ([ Syntax.PVar ("a", info) ], Syntax.Var ("a", info), info),
+                           info ),
+                       Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info) ], info),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unopt = unoptimized_unit prog in
+  assert (blocks_count unopt = 2);
+  assert (has_block_with_label unopt "j");
+  let opt = inlined_unit prog in
+  assert (blocks_count opt = 1);
+  assert (not (has_block_with_label opt "j"))
+
+(* 2. Dispatch inlining for a `Match` arm whose target is a tiny block. *)
+let () =
+  (* type t = A | B; f p = match p with | A -> 1 | B -> 2.  The arms are tiny
+     blocks with no binders, so dispatch inlining should fold them into the
+     entry block's match terminator. *)
+  let prog =
+    parse "type t = | A | B;; let f = fun p -> match p with | A -> 1 | B -> 2;;"
+    |> Typing.top_type_of_prog |> Transform.anf_prog |> Pat.compile
+  in
+  let unopt = unoptimized_unit prog in
+  let unopt_blocks = blocks_count unopt in
+  assert (unopt_blocks >= 3);
+  let opt = inlined_unit prog in
+  assert (blocks_count opt = 1);
+  let entry = entry_block opt in
+  let inline_regions = count_inline_regions entry.term in
+  assert (inline_regions = 2)
+
+(* 3. Dispatch inlining for a `Branch` arm whose target is a tiny block. *)
+let () =
+  let prog = frontend_prog "let f = fun c -> if c then 1 else 2;;" in
+  let unopt = unoptimized_unit prog in
+  let unopt_blocks = blocks_count unopt in
+  assert (unopt_blocks >= 3);
+  let opt = inlined_unit prog in
+  assert (blocks_count opt = 1);
+  let entry = entry_block opt in
+  let inline_regions = count_inline_regions entry.term in
+  assert (inline_regions = 2)
+
+(* 4. Preservation of the dispatcher PC itself: the function entry block is
+   never eliminated even if its terminator's arms have all been inlined. *)
+let () =
+  let prog = frontend_prog "let f = fun c -> if c then 1 else 2;;" in
+  let opt = inlined_unit prog in
+  assert (has_block_with_label opt "f.entry");
+  let entry = entry_block opt in
+  assert (entry.id = opt.entry)
+
+(* 5. Preservation of function entry PCs across all functions in a multi-unit
+   program. *)
+let () =
+  let prog = frontend_prog "let g = fun y -> y + 1;; let f = fun x -> if x = 0 then 1 else g x;;" in
+  let ir = CompileRegMemo.lower_prog prog in
+  List.iter
+    (fun (u : CompileRegMemo.unit_ir) ->
+      assert (List.exists (fun (b : CompileRegMemo.block) -> b.id = u.entry) u.blocks))
+    ir.units;
+  assert (List.length ir.units = 2)
+
+(* 6. Preservation of Join blocks: a join target reached from multiple
+   predecessors is not absorbed by dispatch inlining. *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f c x y = let j(a) = a + 1 in if c then jump j(x) else jump j(y).  The
+     join 'j' has two predecessors and must remain a separate block. *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("c", info); Syntax.PVar ("x", info); Syntax.PVar ("y", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Int 1, info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let opt = inlined_unit prog in
+  assert (has_block_with_label opt "j")
+
+(* 7. Preservation of loop headers / backedge targets. *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f x = let rec loop(y) = jump loop(y) in jump loop(x).  The loop header
+     'loop' is a back-edge target and must not be inlined. *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info) ],
+                   Syntax.Let
+                     ( Syntax.BRecC
+                         [
+                           ( Syntax.PVar ("loop", info),
+                             Syntax.Lam
+                               ( [ Syntax.PVar ("y", info) ],
+                                 Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("y", info) ], info),
+                                 info ),
+                             info );
+                         ],
+                       Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("x", info) ], info),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let opt = inlined_unit prog in
+  assert (has_block_with_label opt "loop")
+
+(* 8. Preservation of non-tail direct call continuation behavior.  A non-tail
+   call's resume point gets its own PC; inlining must not break that. *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "let g = fun y -> y + 1;; let f = fun x -> let z = g x in z + 2;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"restore_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"init_frame")
+
+(* 9. Multi-predecessor bounded copying.  A small block reached by multiple
+   Jumps may still be copied into each predecessor when within the cost
+   budget. *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f c x y = let j(a) = a in if c then jump j(x) else jump j(y).  Two preds
+     for j; with our copy budget the small body of j (which only returns its
+     argument) should be inlined into both branches, eliminating j. *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("c", info); Syntax.PVar ("x", info); Syntax.PVar ("y", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam ([ Syntax.PVar ("a", info) ], Syntax.Var ("a", info), info),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unopt = unoptimized_unit prog in
+  assert (has_block_with_label unopt "j");
+  (* For multi-predecessor copying we expect strictly fewer blocks after the
+     pass than before, even though 'j' may or may not be physically gone. *)
+  let opt = inlined_unit prog in
+  assert (blocks_count opt < blocks_count unopt)
+
+(* 10. Correct handling of match binders and block params: an arm whose
+   binder is used as a non-resolving operand (e.g. passed to Construct) can
+   be safely inlined. *)
+let () =
+  let prog =
+    parse
+      "type t = | A of int | B of int;; let wrap = fun n -> n;; let f = fun p -> match p with | A x -> wrap x | B y -> \
+       wrap y;;"
+    |> Typing.top_type_of_prog |> Transform.anf_prog |> Pat.compile
+  in
+  let opt = inlined_unit_named prog "f" in
+  (* The two arm blocks should be folded into the entry block's match
+     terminator (their binder is only used as a call argument, no resolves). *)
+  let entry = entry_block opt in
+  let inline_regions = count_inline_regions entry.term in
+  assert (inline_regions >= 2);
+  (* The compiled output still runs to completion. *)
+  let rendered = compile_with CompileRegMemo.Backend.compile prog in
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =")
+
+(* 10b. Negative case: an arm whose binder IS resolved (used as a Match
+   scrutinee) is NOT inlined, preserving the memo boundary. *)
+let () =
+  let prog =
+    parse
+      "type tag = | X | Y;; type t = | A of tag;; let f = fun p -> match p with | A v -> match v with | X -> 1 | Y -> \
+       2;;"
+    |> Typing.top_type_of_prog |> Transform.anf_prog |> Pat.compile
+  in
+  let opt = inlined_unit_named prog "f" in
+  (* The arm 'A v -> match v with ...' resolves v, so it should NOT be
+     dispatch-inlined into the entry. The arm's block must remain. *)
+  assert (blocks_count opt >= 2)
+
+(* 11. Runtime equivalence: the optimized backend produces a program that
+   compiles cleanly and contains the populate_state entry point. The actual
+   runtime equivalence is exercised by [make run] / generated benchmark
+   binaries; here we just verify the compiler emits a well-formed program for
+   a non-trivial example. *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog
+         "type lst = | Nil | Cons of int * lst;; let rec sum = fun l -> match l with | Nil -> 0 | Cons x xs -> let r = \
+          sum xs in x + r;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =");
+  assert (Core.String.is_substring rendered ~substring:"return_value");
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots")
 
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =

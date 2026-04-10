@@ -29,6 +29,7 @@
   CfgLiveness
   ControlFlowGraph
   AnfToCfg
+  BlockInlining
   RegAlloc
   AntHashtbl
   Profile

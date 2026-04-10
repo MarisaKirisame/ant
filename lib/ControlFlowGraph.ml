@@ -43,11 +43,27 @@ type ir_pattern =
   | RPTuple of ir_pattern list
   | RPCtor of string * ir_pattern option
 
-type match_arm = { pattern : ir_pattern; block : block_id }
+(* An inline_region represents the body and terminator of a block that has been
+   dispatch-inlined into a predecessor's Match/Branch arm. The inlined fragment
+   executes in-place without crossing a memo-step boundary, reusing the
+   dispatcher's working frame for its local values. *)
+type inline_region = { body : stmt list; term : terminator }
 
-type terminator =
+and match_arm = {
+  pattern : ir_pattern;
+  block : block_id;
+  (* When [inline] is [Some region], control does NOT transfer to [block] via a
+     PC; [region.body] and [region.term] run inline inside the dispatcher's step,
+     and [block] is removed from [unit_ir.blocks]. The [block] field is retained
+     only as a provenance tag for pretty-printing and debugging. *)
+  inline : inline_region option;
+}
+
+and branch_target = { block : block_id; inline : inline_region option }
+
+and terminator =
   | Jump of block_id * operand list
-  | Branch of operand * block_id * block_id
+  | Branch of operand * branch_target * branch_target
   | Match of operand * match_arm list
   | Return of operand
 
@@ -61,6 +77,9 @@ type block = {
   body : stmt list;
   term : terminator;
 }
+
+let mk_plain_branch_target block_id : branch_target = { block = block_id; inline = None }
+let mk_plain_match_arm pattern block_id : match_arm = { pattern; block = block_id; inline = None }
 
 type unit_kind = Function | Global
 
@@ -150,23 +169,40 @@ let rec pp_pattern values = function
   | RPCtor (ctor, None) -> string ctor
   | RPCtor (ctor, Some payload) -> string ctor ^^ space ^^ pp_pattern values payload
 
-let pp_terminator values = function
+let rec pp_terminator values = function
   | Jump (block_id, args) ->
       string "jump" ^^ space
       ^^ string ("b" ^ string_of_int block_id)
       ^^ parens (pp_list (pp_operand values) (comma ^^ space) args)
   | Branch (cond, if_true, if_false) ->
       string "branch" ^^ space ^^ pp_operand values cond ^^ space ^^ string "?" ^^ space
-      ^^ string ("b" ^ string_of_int if_true)
-      ^^ space ^^ colon ^^ space
-      ^^ string ("b" ^ string_of_int if_false)
+      ^^ pp_branch_target values if_true ^^ space ^^ colon ^^ space ^^ pp_branch_target values if_false
   | Match (scrutinee, arms) ->
-      let pp_arm { pattern; block } =
-        pp_pattern values pattern ^^ space ^^ string "->" ^^ space ^^ string ("b" ^ string_of_int block)
-      in
       string "match" ^^ space ^^ pp_operand values scrutinee ^^ space ^^ string "with" ^^ space
-      ^^ pp_list pp_arm (space ^^ string "|" ^^ space) arms
+      ^^ pp_list (pp_match_arm values) (space ^^ string "|" ^^ space) arms
   | Return operand -> string "return" ^^ space ^^ pp_operand values operand
+
+and pp_branch_target values { block; inline } =
+  match inline with
+  | None -> string ("b" ^ string_of_int block)
+  | Some region ->
+      string "inline<" ^^ string ("b" ^ string_of_int block) ^^ string ">" ^^ pp_inline_region values region
+
+and pp_match_arm values { pattern; block; inline } =
+  let pat = pp_pattern values pattern ^^ space ^^ string "->" ^^ space in
+  match inline with
+  | None -> pat ^^ string ("b" ^ string_of_int block)
+  | Some region ->
+      pat ^^ string "inline<" ^^ string ("b" ^ string_of_int block) ^^ string ">" ^^ pp_inline_region values region
+
+and pp_inline_region values { body; term } =
+  let body_doc =
+    match body with
+    | [] -> empty
+    | stmts -> hardline ^^ separate_map hardline (fun stmt -> string "    " ^^ pp_stmt values stmt) stmts
+  in
+  space ^^ lbrace ^^ body_doc ^^ hardline ^^ string "    " ^^ pp_terminator values term ^^ hardline ^^ string "  "
+  ^^ rbrace
 
 let pp_block values (block : block) =
   let header =
@@ -267,3 +303,94 @@ let pp_prog_analysis (analysis : prog_analysis) =
 
 let pp_prog_ir (prog : prog_ir) =
   match prog.units with [] -> string "prog empty" | units -> separate_map (hardline ^^ hardline) pp_unit_ir units
+
+(* ----- Helpers for traversing terminators with inline regions ----- *)
+
+(* External (cross-block) successors of a terminator. An inlined arm contributes
+   the successors of its inline region's terminator (recursively) rather than
+   the arm's nominal block id, because control does not transfer to that block
+   as a memo boundary. *)
+let rec terminator_external_succs (term : terminator) : block_id list =
+  match term with
+  | Return _ -> []
+  | Jump (s, _) -> [ s ]
+  | Branch (_, then_tgt, else_tgt) -> branch_target_external_succs then_tgt @ branch_target_external_succs else_tgt
+  | Match (_, arms) -> List.concat_map match_arm_external_succs arms
+
+and branch_target_external_succs (tgt : branch_target) : block_id list =
+  match tgt.inline with None -> [ tgt.block ] | Some region -> terminator_external_succs region.term
+
+and match_arm_external_succs (arm : match_arm) : block_id list =
+  match arm.inline with None -> [ arm.block ] | Some region -> terminator_external_succs region.term
+
+(* Walk all inline regions reachable from a terminator. *)
+let rec terminator_iter_inline (f : inline_region -> unit) (term : terminator) : unit =
+  match term with
+  | Return _ | Jump _ -> ()
+  | Branch (_, t, e) ->
+      Option.iter
+        (fun region ->
+          f region;
+          terminator_iter_inline f region.term)
+        t.inline;
+      Option.iter
+        (fun region ->
+          f region;
+          terminator_iter_inline f region.term)
+        e.inline
+  | Match (_, arms) ->
+      List.iter
+        (fun (arm : match_arm) ->
+          Option.iter
+            (fun region ->
+              f region;
+              terminator_iter_inline f region.term)
+            arm.inline)
+        arms
+
+(* All statements in a terminator's inline regions (flattened, includes nested). *)
+let collect_inline_stmts (term : terminator) : stmt list =
+  let acc = ref [] in
+  terminator_iter_inline (fun region -> acc := !acc @ region.body) term;
+  !acc
+
+(* All value ids defined across a block's body and all its inline regions. *)
+let block_and_inline_defined_values (block : block) : IntSet.t =
+  let add_stmt_def set (Bind (id, _)) = IntSet.add id set in
+  let from_body = List.fold_left add_stmt_def IntSet.empty block.body in
+  let from_inline = List.fold_left add_stmt_def IntSet.empty (collect_inline_stmts block.term) in
+  IntSet.union from_body from_inline
+
+(* Extract value ids introduced by a match-arm pattern (binders). *)
+let rec pattern_binders (pat : ir_pattern) : int list =
+  match pat with
+  | RPAny | RPInt _ | RPBool _ | RPUnit -> []
+  | RPBind id -> [ id ]
+  | RPTuple ps -> List.concat_map pattern_binders ps
+  | RPCtor (_, None) -> []
+  | RPCtor (_, Some p) -> pattern_binders p
+
+(* Collect match-arm binder value ids that belong to inlined arms anywhere in
+   a terminator (including nested inline regions). These binders must live in
+   the enclosing dispatcher block's working frame because the inlined arm runs
+   in that block's memo step. *)
+let inlined_arm_binders (term : terminator) : IntSet.t =
+  let acc = ref IntSet.empty in
+  let add_binders ids = List.iter (fun id -> acc := IntSet.add id !acc) ids in
+  let rec walk = function
+    | Return _ | Jump _ -> ()
+    | Branch (_, t, e) ->
+        Option.iter (fun (r : inline_region) -> walk r.term) t.inline;
+        Option.iter (fun (r : inline_region) -> walk r.term) e.inline
+    | Match (_, arms) ->
+        List.iter
+          (fun (arm : match_arm) ->
+            match arm.inline with
+            | None -> ()
+            | Some region ->
+                add_binders (pattern_binders arm.pattern);
+                walk region.term)
+          arms
+  in
+  walk term;
+  !acc
