@@ -414,8 +414,26 @@ let stmt_live_afters (block : block) (info : CfgLiveness.block_liveness) =
   in
   afters
 
+let saved_values_for_call (layout : block_layout) dst live_after =
+  IntSet.remove dst live_after |> IntSet.elements
+  |> List.map (fun value_id -> (value_id, slot_in_layout layout value_id))
+  |> List.sort (fun (_, slot_a) (_, slot_b) -> Int.compare slot_a slot_b)
+
 let saved_slots_for_call (layout : block_layout) dst live_after =
-  IntSet.remove dst live_after |> IntSet.elements |> List.map (slot_in_layout layout) |> List.sort_uniq Int.compare
+  List.map snd (saved_values_for_call layout dst live_after)
+
+(* Source-side working frame: minimum parent-layout frame needed to access
+   saved continuation slots and call argument operands before init_frame. *)
+let call_src_working (layout : block_layout) dst live_after args =
+  let max_s = List.fold_left max (layout.entry_size - 1) (saved_slots_for_call layout dst live_after) in
+  let max_s =
+    List.fold_left
+      (fun acc -> function
+        | OLocal vid -> ( match IntMap.find_opt vid layout.slot_of_value with Some s -> max s acc | None -> acc)
+        | _ -> acc)
+      max_s args
+  in
+  max_s + 1
 
 (* Emit frame growth from entry_size to working frame_size when needed. *)
 let emit_frame_growth (w : world code) (entry : int) (working : int) =
@@ -429,6 +447,17 @@ let emit_trim_resolved (w : world code) (step_entry : int) (working : int) =
 
 (* ----- Shuffle-based edge code generation ----- *)
 
+let reverse_entry_slots (layout : block_layout) (entry_values : IntSet.t) =
+  IntMap.fold
+    (fun vid slot acc -> if IntSet.mem vid entry_values then IntMap.add slot vid acc else acc)
+    layout.slot_of_value IntMap.empty
+
+let edge_mapping_is_elide (src_layout : block_layout) (mapping : RegAlloc.frame_source array) =
+  src_layout.frame_size = Array.length mapping
+  &&
+  let rec check i = i >= Array.length mapping || (mapping.(i) = RegAlloc.FromSlot i && check (i + 1)) in
+  check 0
+
 (* Translate a RegAlloc.frame_source into a code-level frame_source expression. *)
 let compile_frame_source (ctx : cg_ctx) (src_layout : block_layout) (w : world code)
     (extra_assigns : (value_id * Value.seq code) list) (src : RegAlloc.frame_source) : 'a code =
@@ -439,43 +468,77 @@ let compile_frame_source (ctx : cg_ctx) (src_layout : block_layout) (w : world c
       match List.assoc_opt vid extra_assigns with
       | Some value_code -> new_value_ value_code
       | None -> failf "CompileRegMemo: missing binder value for v%d" vid)
-  | Unset -> blank_
+  | Unset -> failf "CompileRegMemo: Unset"
 
-(* Compile an edge using its pre-computed shuffle plan.
-   [step_entry] is the env size at the start of the current step. *)
+let compile_shuffle_mapping (unit_cg : unit_codegen) (src_layout : block_layout) (src_block_id : block_id)
+    (target_id : block_id) ?jump_args (extra_assigns : (value_id * Value.seq code) list) =
+  let dst_layout = block_layout_exn unit_cg.allocation target_id in
+  let dst_info = block_liveness_exn unit_cg target_id in
+  let dst_entry_values = IntSet.union dst_info.live_in dst_info.live_params in
+  let dst_reverse = reverse_entry_slots dst_layout dst_entry_values in
+  let target_block =
+    match IntMap.find_opt target_id unit_cg.block_map with
+    | Some block -> block
+    | None -> failf "CompileRegMemo: missing block b%d" target_id
+  in
+  let param_ids = List.fold_left (fun acc param_id -> IntSet.add param_id acc) IntSet.empty target_block.params in
+  let edge_live =
+    match jump_args with
+    | None -> CfgLiveness.empty_edge_liveness
+    | Some _ -> (
+        let block_info = block_liveness_exn unit_cg src_block_id in
+        match IntMap.find_opt target_id block_info.live_on_edge with
+        | Some edge_live -> edge_live
+        | None -> failf "CompileRegMemo: missing edge liveness b%d -> b%d" src_block_id target_id)
+  in
+  let param_index =
+    List.mapi (fun i param_id -> (param_id, i)) target_block.params
+    |> List.fold_left (fun acc (param_id, i) -> IntMap.add param_id i acc) IntMap.empty
+  in
+  Array.init dst_layout.entry_size (fun slot ->
+      match IntMap.find_opt slot dst_reverse with
+      | None -> RegAlloc.Unset
+      | Some vid ->
+          if IntSet.mem vid dst_info.live_in && not (IntSet.mem vid param_ids) then
+            RegAlloc.FromSlot (slot_in_layout src_layout vid)
+          else if IntSet.mem vid param_ids then
+            match List.assoc_opt vid extra_assigns with
+            | Some _ -> RegAlloc.FromBinder vid
+            | None -> (
+                match jump_args with
+                | Some args when IntMap.mem vid edge_live.live_params -> (
+                    let arg_index =
+                      match IntMap.find_opt vid param_index with
+                      | Some i -> i
+                      | None -> failf "CompileRegMemo: missing jump param index for v%d" vid
+                    in
+                    let arg = List.nth args arg_index in
+                    match arg with
+                    | OLocal arg_vid -> RegAlloc.FromSlot (slot_in_layout src_layout arg_vid)
+                    | operand -> RegAlloc.FromOperand operand)
+                | _ -> RegAlloc.Unset)
+          else RegAlloc.Unset)
+
+(* Compile an edge from the current layout to the target block's canonical
+   entry layout. [step_entry] is the env size at the start of the current
+   step. *)
 let compile_shuffle_edge (ctx : cg_ctx) (unit_cg : unit_codegen) (src_layout : block_layout) ~step_entry
-    (w : world code) (src_block_id : block_id) (target_id : block_id) (extra_assigns : (value_id * Value.seq code) list)
-    =
+    (w : world code) (src_block_id : block_id) (target_id : block_id) ?jump_args
+    (extra_assigns : (value_id * Value.seq code) list) =
   let target_pc = block_pc_or_fail unit_cg target_id in
-  let plan = edge_plan_exn unit_cg src_block_id target_id in
   let trim = emit_trim_resolved w step_entry src_layout.frame_size in
-  match plan with
-  | Elide when extra_assigns = [] ->
-      [%seqs
-        trim;
-        goto_ w target_pc]
-  | _ ->
-      let mapping =
-        match plan with
-        | Shuffle { mapping } -> mapping
-        | Elide ->
-            let dst_layout = block_layout_exn unit_cg.allocation target_id in
-            Array.init dst_layout.entry_size (fun i ->
-                match
-                  List.find_opt
-                    (fun (vid, _) ->
-                      match IntMap.find_opt vid dst_layout.slot_of_value with Some s -> s = i | None -> false)
-                    extra_assigns
-                with
-                | Some (vid, _) -> RegAlloc.FromBinder vid
-                | None -> RegAlloc.FromSlot i)
-      in
-      let sources = Array.to_list mapping in
-      let compiled_sources = List.map (compile_frame_source ctx src_layout w extra_assigns) sources in
-      [%seqs
-        trim;
-        shuffle_frame_ w (frame_mapping_ compiled_sources) dummy_value_;
-        goto_ w target_pc]
+  let mapping = compile_shuffle_mapping unit_cg src_layout src_block_id target_id ?jump_args extra_assigns in
+  if extra_assigns = [] && edge_mapping_is_elide src_layout mapping then
+    [%seqs
+      trim;
+      goto_ w target_pc]
+  else
+    let sources = Array.to_list mapping in
+    let compiled_sources = List.map (compile_frame_source ctx src_layout w extra_assigns) sources in
+    [%seqs
+      trim;
+      shuffle_frame_ w (frame_mapping_ compiled_sources) dummy_value_;
+      goto_ w target_pc]
 
 (* Match support.
 
@@ -538,13 +601,105 @@ let compile_call_setup _ctx callee w arg_values =
 
 (* Statement chain and call handling *)
 
-(* Compute the minimal resume-entry size for a non-tail call site. *)
-let resume_entry_size (layout : block_layout) dst live_after =
-  let keep_slots = saved_slots_for_call layout dst live_after in
-  let dst_slot = slot_in_layout layout dst in
-  List.fold_left max 0 (dst_slot :: keep_slots) + 1
+type call_resume = {
+  layout : block_layout;
+  saved_src_slots : int list;
+  saved_dst_slots : int list;
+  dst_slot : int;
+  src_working : int;
+}
 
-let rec compile_stmt_chain ctx unit_cg block layout ~step_entry current_pc w stmts stmt_afters term =
+let rhs_resident_values rhs = RegAlloc.add_rhs_uses IntSet.empty rhs
+let stmt_resident_values (Bind (dst, rhs)) = IntSet.add dst (rhs_resident_values rhs)
+
+let compact_layout_subset (layout : block_layout) (param_ids : value_id list) ~(entry_ids : IntSet.t)
+    ~(resident_ids : IntSet.t) =
+  let resident_ids = IntSet.filter (fun value_id -> IntMap.mem value_id layout.slot_of_value) resident_ids in
+  let entry_ids = IntSet.filter (fun value_id -> IntMap.mem value_id layout.slot_of_value) entry_ids in
+  let add_old_slots ids acc =
+    IntSet.fold
+      (fun value_id acc ->
+        match IntMap.find_opt value_id layout.slot_of_value with Some slot -> IntSet.add slot acc | None -> acc)
+      ids acc
+  in
+  let entry_slots = add_old_slots entry_ids IntSet.empty in
+  let resident_slots = add_old_slots resident_ids IntSet.empty in
+  let slot_remap = ref IntMap.empty in
+  let next_slot = ref 0 in
+  let assign old_slot =
+    if not (IntMap.mem old_slot !slot_remap) then (
+      slot_remap := IntMap.add old_slot !next_slot !slot_remap;
+      incr next_slot)
+  in
+  List.iter assign (IntSet.elements entry_slots);
+  List.iter assign (IntSet.elements resident_slots);
+  let slot_of_value =
+    IntSet.fold
+      (fun value_id acc ->
+        match IntMap.find_opt value_id layout.slot_of_value with
+        | Some old_slot -> (
+            match IntMap.find_opt old_slot !slot_remap with
+            | Some new_slot -> IntMap.add value_id new_slot acc
+            | None -> acc)
+        | None -> acc)
+      resident_ids IntMap.empty
+  in
+  let entry_size =
+    IntSet.fold
+      (fun value_id acc ->
+        match IntMap.find_opt value_id slot_of_value with Some slot -> Int.max acc (slot + 1) | None -> acc)
+      entry_ids 0
+  in
+  let frame_size = !next_slot in
+  let param_slots =
+    List.filter_map
+      (fun param_id -> match IntMap.find_opt param_id slot_of_value with Some slot -> Some slot | None -> None)
+      param_ids
+  in
+  let compacted_layout : block_layout = { RegAlloc.slot_of_value; param_slots; entry_size; frame_size } in
+  (compacted_layout, !slot_remap)
+
+let build_call_resume_layout (unit_cg : unit_codegen) (block : block) (layout : block_layout) dst live_after args
+    (rest : stmt list) (rest_afters : IntSet.t list) term =
+  let saved_values = saved_values_for_call layout dst live_after in
+  let entry_ids =
+    List.fold_left (fun acc (value_id, _) -> IntSet.add value_id acc) (IntSet.singleton dst) saved_values
+  in
+  let suffix_lives = List.fold_left IntSet.union live_after rest_afters in
+  let suffix_stmt_values =
+    List.fold_left (fun acc stmt -> IntSet.union acc (stmt_resident_values stmt)) IntSet.empty rest
+  in
+  let find_live id = block_liveness_exn unit_cg id in
+  let term_values = terminator_live_out ~find_live term in
+  let inline_values =
+    List.fold_left
+      (fun acc stmt -> IntSet.union acc (stmt_resident_values stmt))
+      IntSet.empty (collect_inline_stmts term)
+  in
+  let resident_ids =
+    IntSet.union entry_ids
+      (IntSet.union suffix_lives (IntSet.union suffix_stmt_values (IntSet.union term_values inline_values)))
+    |> IntSet.union (inlined_arm_binders term)
+  in
+  let src_working = call_src_working layout dst live_after args in
+  let layout, slot_remap = compact_layout_subset layout block.params ~entry_ids ~resident_ids in
+  let saved_src_slots = List.map snd saved_values in
+  let saved_dst_slots =
+    List.map
+      (fun (_, old_slot) ->
+        match IntMap.find_opt old_slot slot_remap with
+        | Some slot -> slot
+        | None -> failf "CompileRegMemo: missing compact resume slot for old slot %d" old_slot)
+      saved_values
+  in
+  let dst_slot =
+    match IntMap.find_opt dst layout.slot_of_value with
+    | Some slot -> slot
+    | None -> failf "CompileRegMemo: missing compact resume slot for v%d" dst
+  in
+  { layout; saved_src_slots; saved_dst_slots; dst_slot; src_working }
+
+let rec compile_stmt_chain ctx unit_cg block layout ~step_entry ~working current_pc w stmts stmt_afters term =
   match (stmts, stmt_afters) with
   | [], [] -> compile_terminator ctx unit_cg block layout ~step_entry current_pc w term
   | Bind (dst, Call (Direct callee_name, args)) :: rest, live_after :: rest_afters ->
@@ -556,54 +711,56 @@ let rec compile_stmt_chain ctx unit_cg block layout ~step_entry current_pc w stm
             match term with
             | Return (OLocal return_id) when return_id = dst ->
                 [%seqs
-                  assert_env_length_ w (int_ layout.frame_size);
-                  emit_trim_resolved w step_entry layout.frame_size;
+                  assert_env_length_ w (int_ working);
+                  emit_trim_resolved w step_entry working;
                   compile_call_setup ctx callee w arg_values;
                   goto_ w callee.entry_pc]
             | _ ->
-                let rsize = resume_entry_size layout dst live_after in
+                let resume = build_call_resume_layout unit_cg block layout dst live_after args [] [] term in
                 let resume_pc =
                   add_code_k ctx (fun resume_pc ->
                       ( lam_ "w" (fun w ->
                             [%seqs
-                              assert_env_length_ w (int_ rsize);
-                              emit_frame_growth w rsize layout.frame_size;
-                              compile_terminator ctx unit_cg block layout ~step_entry:rsize resume_pc w term]),
+                              assert_env_length_ w (int_ resume.layout.entry_size);
+                              emit_frame_growth w resume.layout.entry_size resume.layout.frame_size;
+                              compile_terminator ctx unit_cg block resume.layout ~step_entry:resume.layout.entry_size
+                                resume_pc w term]),
                         resume_pc ))
                 in
-                compile_non_tail_call ctx unit_cg block layout ~step_entry w dst callee arg_values live_after rsize
-                  resume_pc
+                compile_non_tail_call ctx layout ~step_entry ~working w callee arg_values resume resume_pc
           else
-            let rsize = resume_entry_size layout dst live_after in
+            let resume = build_call_resume_layout unit_cg block layout dst live_after args rest rest_afters term in
+            let resume_working =
+              match (rest, rest_afters) with
+              | Bind (dst2, Call (Direct _, args2)) :: _, live_after2 :: _ ->
+                  call_src_working resume.layout dst2 live_after2 args2
+              | _ -> resume.layout.frame_size
+            in
             let resume_pc =
               add_code_k ctx (fun resume_pc ->
                   ( lam_ "w" (fun w ->
                         [%seqs
-                          assert_env_length_ w (int_ rsize);
-                          emit_frame_growth w rsize layout.frame_size;
-                          compile_stmt_chain ctx unit_cg block layout ~step_entry:rsize resume_pc w rest rest_afters
-                            term]),
+                          assert_env_length_ w (int_ resume.layout.entry_size);
+                          emit_frame_growth w resume.layout.entry_size resume_working;
+                          compile_stmt_chain ctx unit_cg block resume.layout ~step_entry:resume.layout.entry_size
+                            ~working:resume_working resume_pc w rest rest_afters term]),
                     resume_pc ))
             in
-            compile_non_tail_call ctx unit_cg block layout ~step_entry w dst callee arg_values live_after rsize
-              resume_pc)
+            compile_non_tail_call ctx layout ~step_entry ~working w callee arg_values resume resume_pc)
   | Bind (_, Call (Indirect _, _)) :: _, _ -> unsupported_codegen "indirect call"
   | Bind (_, Call (Direct _, _)) :: _, [] -> failwith "CompileRegMemo: missing live-after information for call"
   | Bind (dst, rhs) :: rest, _live_after :: rest_afters ->
       [%seqs
-        assert_env_length_ w (int_ layout.frame_size);
+        assert_env_length_ w (int_ working);
         compile_non_call_rhs ctx layout w dst rhs;
-        compile_stmt_chain ctx unit_cg block layout ~step_entry current_pc w rest rest_afters term]
+        compile_stmt_chain ctx unit_cg block layout ~step_entry ~working current_pc w rest rest_afters term]
   | _ -> failwith "CompileRegMemo: mismatched statement and liveness counts"
 
-and compile_non_tail_call (ctx : cg_ctx) (_unit_cg : unit_codegen) (_block : block) (layout : block_layout) ~step_entry
-    w dst (callee : unit_codegen) arg_values live_after (rsize : int) resume_pc =
-  ignore _unit_cg;
-  let keep_slots = saved_slots_for_call layout dst live_after in
+and compile_non_tail_call (ctx : cg_ctx) (layout : block_layout) ~step_entry ~working w (callee : unit_codegen)
+    arg_values (resume : call_resume) resume_pc =
   let cont_name = "cont_" ^ string_of_int ctx.conts_count in
-  let dst_slot = slot_in_layout layout dst in
   add_cont ctx cont_name
-    (List.length keep_slots + 1)
+    (List.length resume.saved_src_slots + 1)
     (fun w tl ->
       let_in_ "ret"
         (get_env_slot_ w (int_ 0))
@@ -611,15 +768,15 @@ and compile_non_tail_call (ctx : cg_ctx) (_unit_cg : unit_codegen) (_block : blo
           [%seqs
             assert_env_length_ w (int_ 1);
             set_k_ w (get_next_cont_ tl);
-            init_frame_ w (int_ rsize) dummy_value_;
-            restore_env_slots_ w (list_literal_of_ int_ keep_slots) tl;
-            set_env_slot_ w (int_ dst_slot) ret;
+            init_frame_ w (int_ resume.layout.entry_size) dummy_value_;
+            restore_env_slots_ w (list_literal_of_ int_ resume.saved_dst_slots) tl;
+            set_env_slot_ w (int_ resume.dst_slot) ret;
             goto_ w resume_pc]));
-  let saved = collect_env_slots_ w (list_literal_of_ int_ keep_slots) in
+  let saved = collect_env_slots_ w (list_literal_of_ int_ resume.saved_src_slots) in
   [%seqs
-    assert_env_length_ w (int_ layout.frame_size);
+    assert_env_length_ w (int_ working);
     set_k_ w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); saved; world_kont_ w ]);
-    emit_trim_resolved w step_entry layout.frame_size;
+    emit_trim_resolved w step_entry working;
     compile_call_setup ctx callee w arg_values;
     goto_ w callee.entry_pc]
 
@@ -629,21 +786,18 @@ and compile_terminator ctx unit_cg block layout ~step_entry current_pc w term =
       [%seqs
         emit_trim_resolved w step_entry layout.frame_size;
         return_value_ w (operand_value_code ctx layout w operand) (pc_to_exp_ (pc_ ctx.apply_cont))]
-  | Jump (succ_id, _args) ->
+  | Jump (succ_id, args) ->
       [%seqs
         assert_env_length_ w (int_ layout.frame_size);
-        compile_shuffle_edge ctx unit_cg layout ~step_entry w block.id succ_id []]
+        compile_shuffle_edge ctx unit_cg layout ~step_entry w block.id succ_id ~jump_args:args []]
   | Branch (cond, then_tgt, else_tgt) -> (
-      let do_branch cond_word (tgt : branch_target) =
-        ignore cond_word;
+      let do_branch (tgt : branch_target) =
         match tgt.inline with
         | None -> compile_shuffle_edge ctx unit_cg layout ~step_entry w block.id tgt.block []
         | Some region -> compile_inline_region ctx unit_cg block layout ~step_entry current_pc w region
       in
       let do_resolve_branch cond_word =
-        if_
-          (bool_nonzero_code (word_get_value_ cond_word))
-          (do_branch cond_word then_tgt) (do_branch cond_word else_tgt)
+        if_ (bool_nonzero_code (word_get_value_ cond_word)) (do_branch then_tgt) (do_branch else_tgt)
       in
       match cond with
       | OLocal value_id ->
@@ -677,7 +831,8 @@ and compile_inline_region ctx unit_cg parent_block parent_layout ~step_entry cur
       (fun stmt (live_after, acc) -> (RegAlloc.transfer_stmt stmt live_after, live_after :: acc))
       region.body (live_before_term, [])
   in
-  compile_stmt_chain ctx unit_cg parent_block parent_layout ~step_entry current_pc w region.body afters region.term
+  compile_stmt_chain ctx unit_cg parent_block parent_layout ~step_entry ~working:parent_layout.frame_size current_pc w
+    region.body afters region.term
 
 (* Match arm dispatch: handle both non-inlined and inlined arms. *)
 and compile_arm_take ctx unit_cg (parent_block : block) parent_layout ~step_entry current_pc w (arm : match_arm)
@@ -780,13 +935,18 @@ let compile_block ctx unit_cg (blk : block) =
   let info = block_liveness_exn unit_cg blk.id in
   let layout = block_layout_exn unit_cg.allocation blk.id in
   let stmt_afters = stmt_live_afters blk info in
+  let working =
+    match (blk.body, stmt_afters) with
+    | Bind (dst, Call (Direct _, args)) :: _, live_after :: _ -> call_src_working layout dst live_after args
+    | _ -> layout.frame_size
+  in
   set_code ctx current_pc
     (lam_ "w" (fun w ->
          seq_
            (assert_env_length_ w (int_ layout.entry_size))
            (fun () ->
-             seq_ (emit_frame_growth w layout.entry_size layout.frame_size) (fun () ->
-                 compile_stmt_chain ctx unit_cg blk layout ~step_entry:layout.entry_size current_pc w blk.body
+             seq_ (emit_frame_growth w layout.entry_size working) (fun () ->
+                 compile_stmt_chain ctx unit_cg blk layout ~step_entry:layout.entry_size ~working current_pc w blk.body
                    stmt_afters blk.term))))
 
 let generate_apply_cont (ctx : cg_ctx) =

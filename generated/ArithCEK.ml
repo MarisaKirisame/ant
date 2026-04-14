@@ -473,33 +473,33 @@ let populate_state () =
           let ret_0 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 5 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 3 ] tl_0;
-          set_env_slot w_175 4 ret_0;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_0;
           w_175.state.c <- pc_to_exp (int_to_pc 59)
       | 16 (* tag_cont_1 *) ->
           let ret_1 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 4 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1; 2 ] tl_0;
-          set_env_slot w_175 3 ret_1;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_1;
           w_175.state.c <- pc_to_exp (int_to_pc 58)
       | 17 (* tag_cont_2 *) ->
           let ret_2 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 6 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 1; 4 ] tl_0;
-          set_env_slot w_175 5 ret_2;
+          init_frame w_175 4 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2 ] tl_0;
+          set_env_slot w_175 3 ret_2;
           w_175.state.c <- pc_to_exp (int_to_pc 64)
       | 18 (* tag_cont_3 *) ->
           let ret_3 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 5 (Memo.from_int 0);
+          init_frame w_175 3 (Memo.from_int 0);
           restore_env_slots w_175 [ 0; 1 ] tl_0;
-          set_env_slot w_175 4 ret_3;
+          set_env_slot w_175 2 ret_3;
           w_175.state.c <- pc_to_exp (int_to_pc 63)
       | 19 (* tag_cont_4 *) ->
           let ret_4 = get_env_slot w_175 0 in
@@ -529,65 +529,65 @@ let populate_state () =
           let ret_7 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 5 (Memo.from_int 0);
-          restore_env_slots w_175 [ 3 ] tl_0;
-          set_env_slot w_175 4 ret_7;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_7;
           w_175.state.c <- pc_to_exp (int_to_pc 66)
       | 23 (* tag_cont_8 *) ->
           let ret_8 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 4 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 3 ret_8;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_8;
           w_175.state.c <- pc_to_exp (int_to_pc 65)
       | 24 (* tag_cont_9 *) ->
           let ret_9 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 5 (Memo.from_int 0);
-          restore_env_slots w_175 [ 3 ] tl_0;
-          set_env_slot w_175 4 ret_9;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_9;
           w_175.state.c <- pc_to_exp (int_to_pc 68)
       | 25 (* tag_cont_10 *) ->
           let ret_10 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 4 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 3 ret_10;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_10;
           w_175.state.c <- pc_to_exp (int_to_pc 67)
       | 26 (* tag_cont_11 *) ->
           let ret_11 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 7 (Memo.from_int 0);
-          restore_env_slots w_175 [ 5 ] tl_0;
-          set_env_slot w_175 6 ret_11;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_11;
           w_175.state.c <- pc_to_exp (int_to_pc 70)
       | 27 (* tag_cont_12 *) ->
           let ret_12 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 6 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 5 ret_12;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_12;
           w_175.state.c <- pc_to_exp (int_to_pc 69)
       | 28 (* tag_cont_13 *) ->
           let ret_13 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 10 (Memo.from_int 0);
-          restore_env_slots w_175 [ 8 ] tl_0;
-          set_env_slot w_175 9 ret_13;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_13;
           w_175.state.c <- pc_to_exp (int_to_pc 72)
       | 29 (* tag_cont_14 *) ->
           let ret_14 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 9 (Memo.from_int 0);
-          restore_env_slots w_175 [ 4 ] tl_0;
-          set_env_slot w_175 8 ret_14;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_14;
           w_175.state.c <- pc_to_exp (int_to_pc 71)
       | 30 (* tag_cont_15 *) ->
           let ret_15 = get_env_slot w_175 0 in
@@ -626,48 +626,48 @@ let populate_state () =
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
           init_frame w_175 2 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0 ] tl_0;
-          set_env_slot w_175 1 ret_19;
+          restore_env_slots w_175 [ 1 ] tl_0;
+          set_env_slot w_175 0 ret_19;
           w_175.state.c <- pc_to_exp (int_to_pc 82)
       | 35 (* tag_cont_20 *) ->
           let ret_20 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
           init_frame w_175 2 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1 ] tl_0;
-          set_env_slot w_175 0 ret_20;
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_20;
           w_175.state.c <- pc_to_exp (int_to_pc 81)
       | 36 (* tag_cont_21 *) ->
           let ret_21 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
           init_frame w_175 2 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0 ] tl_0;
-          set_env_slot w_175 1 ret_21;
+          restore_env_slots w_175 [ 1 ] tl_0;
+          set_env_slot w_175 0 ret_21;
           w_175.state.c <- pc_to_exp (int_to_pc 80)
       | 37 (* tag_cont_22 *) ->
           let ret_22 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
           init_frame w_175 2 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0 ] tl_0;
-          set_env_slot w_175 1 ret_22;
+          restore_env_slots w_175 [ 1 ] tl_0;
+          set_env_slot w_175 0 ret_22;
           w_175.state.c <- pc_to_exp (int_to_pc 79)
       | 38 (* tag_cont_23 *) ->
           let ret_23 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
           init_frame w_175 2 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1 ] tl_0;
-          set_env_slot w_175 0 ret_23;
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_23;
           w_175.state.c <- pc_to_exp (int_to_pc 78)
       | 39 (* tag_cont_24 *) ->
           let ret_24 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 2 (Memo.from_int 0);
+          init_frame w_175 1 (Memo.from_int 0);
           restore_env_slots w_175 [] tl_0;
-          set_env_slot w_175 1 ret_24;
+          set_env_slot w_175 0 ret_24;
           w_175.state.c <- pc_to_exp (int_to_pc 77)
       | 40 (* tag_cont_25 *) ->
           let ret_25 = get_env_slot w_175 0 in
@@ -705,97 +705,97 @@ let populate_state () =
           let ret_29 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 4 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1 ] tl_0;
-          set_env_slot w_175 3 ret_29;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_29;
           w_175.state.c <- pc_to_exp (int_to_pc 87)
       | 45 (* tag_cont_30 *) ->
           let ret_30 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 20 (Memo.from_int 0);
-          restore_env_slots w_175 [ 18 ] tl_0;
-          set_env_slot w_175 19 ret_30;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_30;
           w_175.state.c <- pc_to_exp (int_to_pc 91)
       | 46 (* tag_cont_31 *) ->
           let ret_31 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 19 (Memo.from_int 0);
-          restore_env_slots w_175 [ 4 ] tl_0;
-          set_env_slot w_175 18 ret_31;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_31;
           w_175.state.c <- pc_to_exp (int_to_pc 90)
       | 47 (* tag_cont_32 *) ->
           let ret_32 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 24 (Memo.from_int 0);
-          restore_env_slots w_175 [ 6; 8 ] tl_0;
-          set_env_slot w_175 23 ret_32;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_32;
           w_175.state.c <- pc_to_exp (int_to_pc 92)
       | 48 (* tag_cont_33 *) ->
           let ret_33 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 27 (Memo.from_int 0);
-          restore_env_slots w_175 [ 10; 12 ] tl_0;
-          set_env_slot w_175 26 ret_33;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_33;
           w_175.state.c <- pc_to_exp (int_to_pc 93)
       | 49 (* tag_cont_34 *) ->
           let ret_34 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 15 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 1; 13 ] tl_0;
-          set_env_slot w_175 14 ret_34;
+          init_frame w_175 4 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2 ] tl_0;
+          set_env_slot w_175 3 ret_34;
           w_175.state.c <- pc_to_exp (int_to_pc 89)
       | 50 (* tag_cont_35 *) ->
           let ret_35 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 14 (Memo.from_int 0);
+          init_frame w_175 3 (Memo.from_int 0);
           restore_env_slots w_175 [ 0; 1 ] tl_0;
-          set_env_slot w_175 13 ret_35;
+          set_env_slot w_175 2 ret_35;
           w_175.state.c <- pc_to_exp (int_to_pc 88)
       | 51 (* tag_cont_36 *) ->
           let ret_36 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 7 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1 ] tl_0;
-          set_env_slot w_175 6 ret_36;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_36;
           w_175.state.c <- pc_to_exp (int_to_pc 95)
       | 52 (* tag_cont_37 *) ->
           let ret_37 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 9 (Memo.from_int 0);
+          init_frame w_175 1 (Memo.from_int 0);
           restore_env_slots w_175 [] tl_0;
-          set_env_slot w_175 8 ret_37;
+          set_env_slot w_175 0 ret_37;
           w_175.state.c <- pc_to_exp (int_to_pc 96)
       | 53 (* tag_cont_38 *) ->
           let ret_38 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 6 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1; 2; 3; 4 ] tl_0;
-          set_env_slot w_175 5 ret_38;
+          init_frame w_175 5 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2; 3 ] tl_0;
+          set_env_slot w_175 4 ret_38;
           w_175.state.c <- pc_to_exp (int_to_pc 94)
       | 54 (* tag_cont_39 *) ->
           let ret_39 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 9 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 8 ret_39;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_39;
           w_175.state.c <- pc_to_exp (int_to_pc 98)
       | 55 (* tag_cont_40 *) ->
           let ret_40 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 6 (Memo.from_int 0);
+          init_frame w_175 5 (Memo.from_int 0);
           restore_env_slots w_175 [ 0; 1; 2; 3 ] tl_0;
-          set_env_slot w_175 5 ret_40;
+          set_env_slot w_175 4 ret_40;
           w_175.state.c <- pc_to_exp (int_to_pc 97)
       | 56 (* tag_cont_41 *) ->
           let ret_41 = get_env_slot w_175 0 in
@@ -833,137 +833,137 @@ let populate_state () =
           let ret_45 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 10 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 4; 5 ] tl_0;
-          set_env_slot w_175 9 ret_45;
+          init_frame w_175 4 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2 ] tl_0;
+          set_env_slot w_175 3 ret_45;
           w_175.state.c <- pc_to_exp (int_to_pc 105)
       | 61 (* tag_cont_46 *) ->
           let ret_46 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 9 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 2; 3; 4; 5; 6 ] tl_0;
-          set_env_slot w_175 8 ret_46;
+          init_frame w_175 7 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2; 3; 4; 5 ] tl_0;
+          set_env_slot w_175 6 ret_46;
           w_175.state.c <- pc_to_exp (int_to_pc 104)
       | 62 (* tag_cont_47 *) ->
           let ret_47 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 7 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 2; 3; 4; 5 ] tl_0;
-          set_env_slot w_175 6 ret_47;
+          init_frame w_175 6 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2; 3; 4 ] tl_0;
+          set_env_slot w_175 5 ret_47;
           w_175.state.c <- pc_to_exp (int_to_pc 103)
       | 63 (* tag_cont_48 *) ->
           let ret_48 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 5 (Memo.from_int 0);
-          restore_env_slots w_175 [ 3 ] tl_0;
-          set_env_slot w_175 4 ret_48;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_48;
           w_175.state.c <- pc_to_exp (int_to_pc 106)
       | 64 (* tag_cont_49 *) ->
           let ret_49 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 5 (Memo.from_int 0);
-          restore_env_slots w_175 [ 3 ] tl_0;
-          set_env_slot w_175 4 ret_49;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_49;
           w_175.state.c <- pc_to_exp (int_to_pc 108)
       | 65 (* tag_cont_50 *) ->
           let ret_50 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 4 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 3 ret_50;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_50;
           w_175.state.c <- pc_to_exp (int_to_pc 107)
       | 66 (* tag_cont_51 *) ->
           let ret_51 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 15 (Memo.from_int 0);
-          restore_env_slots w_175 [ 13 ] tl_0;
-          set_env_slot w_175 14 ret_51;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_51;
           w_175.state.c <- pc_to_exp (int_to_pc 110)
       | 67 (* tag_cont_52 *) ->
           let ret_52 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 14 (Memo.from_int 0);
-          restore_env_slots w_175 [ 4 ] tl_0;
-          set_env_slot w_175 13 ret_52;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_52;
           w_175.state.c <- pc_to_exp (int_to_pc 109)
       | 68 (* tag_cont_53 *) ->
           let ret_53 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 18 (Memo.from_int 0);
-          restore_env_slots w_175 [ 16 ] tl_0;
-          set_env_slot w_175 17 ret_53;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_53;
           w_175.state.c <- pc_to_exp (int_to_pc 112)
       | 69 (* tag_cont_54 *) ->
           let ret_54 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 17 (Memo.from_int 0);
-          restore_env_slots w_175 [ 6; 8 ] tl_0;
-          set_env_slot w_175 16 ret_54;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_54;
           w_175.state.c <- pc_to_exp (int_to_pc 111)
       | 70 (* tag_cont_55 *) ->
           let ret_55 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 21 (Memo.from_int 0);
-          restore_env_slots w_175 [ 19 ] tl_0;
-          set_env_slot w_175 20 ret_55;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_55;
           w_175.state.c <- pc_to_exp (int_to_pc 114)
       | 71 (* tag_cont_56 *) ->
           let ret_56 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 20 (Memo.from_int 0);
-          restore_env_slots w_175 [ 10; 12 ] tl_0;
-          set_env_slot w_175 19 ret_56;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_56;
           w_175.state.c <- pc_to_exp (int_to_pc 113)
       | 72 (* tag_cont_57 *) ->
           let ret_57 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 10 (Memo.from_int 0);
-          restore_env_slots w_175 [ 8 ] tl_0;
-          set_env_slot w_175 9 ret_57;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_57;
           w_175.state.c <- pc_to_exp (int_to_pc 116)
       | 73 (* tag_cont_58 *) ->
           let ret_58 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 9 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1; 2; 5 ] tl_0;
-          set_env_slot w_175 8 ret_58;
+          init_frame w_175 4 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2 ] tl_0;
+          set_env_slot w_175 3 ret_58;
           w_175.state.c <- pc_to_exp (int_to_pc 115)
       | 74 (* tag_cont_59 *) ->
           let ret_59 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 13 (Memo.from_int 0);
-          restore_env_slots w_175 [ 11 ] tl_0;
-          set_env_slot w_175 12 ret_59;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_59;
           w_175.state.c <- pc_to_exp (int_to_pc 118)
       | 75 (* tag_cont_60 *) ->
           let ret_60 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 12 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1; 2; 7 ] tl_0;
-          set_env_slot w_175 11 ret_60;
+          init_frame w_175 4 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2 ] tl_0;
+          set_env_slot w_175 3 ret_60;
           w_175.state.c <- pc_to_exp (int_to_pc 117)
       | 76 (* tag_cont_61 *) ->
           let ret_61 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 10 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 1; 2; 3; 5 ] tl_0;
-          set_env_slot w_175 9 ret_61;
+          init_frame w_175 6 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2; 3; 4 ] tl_0;
+          set_env_slot w_175 5 ret_61;
           w_175.state.c <- pc_to_exp (int_to_pc 120)
       | 77 (* tag_cont_62 *) ->
           let ret_62 = get_env_slot w_175 0 in
@@ -977,9 +977,9 @@ let populate_state () =
           let ret_63 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 4 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1 ] tl_0;
-          set_env_slot w_175 3 ret_63;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_63;
           w_175.state.c <- pc_to_exp (int_to_pc 121)
       | 79 (* tag_cont_64 *) ->
           let ret_64 = get_env_slot w_175 0 in
@@ -1009,17 +1009,17 @@ let populate_state () =
           let ret_67 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 6 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1 ] tl_0;
-          set_env_slot w_175 5 ret_67;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_67;
           w_175.state.c <- pc_to_exp (int_to_pc 130)
       | 83 (* tag_cont_68 *) ->
           let ret_68 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 5 (Memo.from_int 0);
-          restore_env_slots w_175 [ 1 ] tl_0;
-          set_env_slot w_175 4 ret_68;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_68;
           w_175.state.c <- pc_to_exp (int_to_pc 129)
       | 84 (* tag_cont_69 *) ->
           let ret_69 = get_env_slot w_175 0 in
@@ -1057,209 +1057,209 @@ let populate_state () =
           let ret_73 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 5 (Memo.from_int 0);
-          restore_env_slots w_175 [ 3 ] tl_0;
-          set_env_slot w_175 4 ret_73;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_73;
           w_175.state.c <- pc_to_exp (int_to_pc 132)
       | 89 (* tag_cont_74 *) ->
           let ret_74 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 4 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 3 ret_74;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_74;
           w_175.state.c <- pc_to_exp (int_to_pc 131)
       | 90 (* tag_cont_75 *) ->
           let ret_75 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 3 (Memo.from_int 0);
+          init_frame w_175 2 (Memo.from_int 0);
           restore_env_slots w_175 [ 0 ] tl_0;
-          set_env_slot w_175 2 ret_75;
+          set_env_slot w_175 1 ret_75;
           w_175.state.c <- pc_to_exp (int_to_pc 133)
       | 91 (* tag_cont_76 *) ->
           let ret_76 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 11 (Memo.from_int 0);
+          init_frame w_175 1 (Memo.from_int 0);
           restore_env_slots w_175 [] tl_0;
-          set_env_slot w_175 10 ret_76;
+          set_env_slot w_175 0 ret_76;
           w_175.state.c <- pc_to_exp (int_to_pc 136)
       | 92 (* tag_cont_77 *) ->
           let ret_77 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 9 (Memo.from_int 0);
+          init_frame w_175 2 (Memo.from_int 0);
           restore_env_slots w_175 [ 0 ] tl_0;
-          set_env_slot w_175 8 ret_77;
+          set_env_slot w_175 1 ret_77;
           w_175.state.c <- pc_to_exp (int_to_pc 137)
       | 93 (* tag_cont_78 *) ->
           let ret_78 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 8 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 1; 3; 5 ] tl_0;
-          set_env_slot w_175 7 ret_78;
+          init_frame w_175 5 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2; 3 ] tl_0;
+          set_env_slot w_175 4 ret_78;
           w_175.state.c <- pc_to_exp (int_to_pc 135)
       | 94 (* tag_cont_79 *) ->
           let ret_79 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 6 (Memo.from_int 0);
+          init_frame w_175 5 (Memo.from_int 0);
           restore_env_slots w_175 [ 0; 1; 2; 3 ] tl_0;
-          set_env_slot w_175 5 ret_79;
+          set_env_slot w_175 4 ret_79;
           w_175.state.c <- pc_to_exp (int_to_pc 134)
       | 95 (* tag_cont_80 *) ->
           let ret_80 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 7 (Memo.from_int 0);
+          init_frame w_175 1 (Memo.from_int 0);
           restore_env_slots w_175 [] tl_0;
-          set_env_slot w_175 6 ret_80;
+          set_env_slot w_175 0 ret_80;
           w_175.state.c <- pc_to_exp (int_to_pc 138)
       | 96 (* tag_cont_81 *) ->
           let ret_81 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 16 (Memo.from_int 0);
-          restore_env_slots w_175 [ 13 ] tl_0;
-          set_env_slot w_175 15 ret_81;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_81;
           w_175.state.c <- pc_to_exp (int_to_pc 143)
       | 97 (* tag_cont_82 *) ->
           let ret_82 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 14 (Memo.from_int 0);
+          init_frame w_175 3 (Memo.from_int 0);
           restore_env_slots w_175 [ 0; 1 ] tl_0;
-          set_env_slot w_175 13 ret_82;
+          set_env_slot w_175 2 ret_82;
           w_175.state.c <- pc_to_exp (int_to_pc 142)
       | 98 (* tag_cont_83 *) ->
           let ret_83 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 11 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 1; 4; 8; 9 ] tl_0;
-          set_env_slot w_175 10 ret_83;
+          init_frame w_175 6 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2; 3; 4 ] tl_0;
+          set_env_slot w_175 5 ret_83;
           w_175.state.c <- pc_to_exp (int_to_pc 141)
       | 99 (* tag_cont_84 *) ->
           let ret_84 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 10 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 1; 4; 8 ] tl_0;
-          set_env_slot w_175 9 ret_84;
+          init_frame w_175 5 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2; 3 ] tl_0;
+          set_env_slot w_175 4 ret_84;
           w_175.state.c <- pc_to_exp (int_to_pc 140)
       | 100 (* tag_cont_85 *) ->
           let ret_85 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 9 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 1; 3; 4 ] tl_0;
-          set_env_slot w_175 8 ret_85;
+          init_frame w_175 5 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2; 3 ] tl_0;
+          set_env_slot w_175 4 ret_85;
           w_175.state.c <- pc_to_exp (int_to_pc 139)
       | 101 (* tag_cont_86 *) ->
           let ret_86 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 5 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 4 ret_86;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_86;
           w_175.state.c <- pc_to_exp (int_to_pc 144)
       | 102 (* tag_cont_87 *) ->
           let ret_87 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 13 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 5 ] tl_0;
-          set_env_slot w_175 12 ret_87;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_87;
           w_175.state.c <- pc_to_exp (int_to_pc 147)
       | 103 (* tag_cont_88 *) ->
           let ret_88 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 10 (Memo.from_int 0);
-          restore_env_slots w_175 [ 0; 2; 3; 4; 5 ] tl_0;
-          set_env_slot w_175 9 ret_88;
+          init_frame w_175 6 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2; 3; 4 ] tl_0;
+          set_env_slot w_175 5 ret_88;
           w_175.state.c <- pc_to_exp (int_to_pc 146)
       | 104 (* tag_cont_89 *) ->
           let ret_89 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 7 (Memo.from_int 0);
+          init_frame w_175 3 (Memo.from_int 0);
           restore_env_slots w_175 [ 0; 1 ] tl_0;
-          set_env_slot w_175 6 ret_89;
+          set_env_slot w_175 2 ret_89;
           w_175.state.c <- pc_to_exp (int_to_pc 145)
       | 105 (* tag_cont_90 *) ->
           let ret_90 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 8 (Memo.from_int 0);
-          restore_env_slots w_175 [ 6 ] tl_0;
-          set_env_slot w_175 7 ret_90;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_90;
           w_175.state.c <- pc_to_exp (int_to_pc 149)
       | 106 (* tag_cont_91 *) ->
           let ret_91 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 7 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 6 ret_91;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_91;
           w_175.state.c <- pc_to_exp (int_to_pc 148)
       | 107 (* tag_cont_92 *) ->
           let ret_92 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 12 (Memo.from_int 0);
-          restore_env_slots w_175 [ 3; 10 ] tl_0;
-          set_env_slot w_175 11 ret_92;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_92;
           w_175.state.c <- pc_to_exp (int_to_pc 151)
       | 108 (* tag_cont_93 *) ->
           let ret_93 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 10 (Memo.from_int 0);
-          restore_env_slots w_175 [ 3; 4 ] tl_0;
-          set_env_slot w_175 9 ret_93;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_93;
           w_175.state.c <- pc_to_exp (int_to_pc 150)
       | 109 (* tag_cont_94 *) ->
           let ret_94 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 8 (Memo.from_int 0);
-          restore_env_slots w_175 [ 6 ] tl_0;
-          set_env_slot w_175 7 ret_94;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_94;
           w_175.state.c <- pc_to_exp (int_to_pc 153)
       | 110 (* tag_cont_95 *) ->
           let ret_95 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 6 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 5 ret_95;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_95;
           w_175.state.c <- pc_to_exp (int_to_pc 152)
       | 111 (* tag_cont_96 *) ->
           let ret_96 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 12 (Memo.from_int 0);
-          restore_env_slots w_175 [ 10 ] tl_0;
-          set_env_slot w_175 11 ret_96;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_96;
           w_175.state.c <- pc_to_exp (int_to_pc 155)
       | 112 (* tag_cont_97 *) ->
           let ret_97 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 10 (Memo.from_int 0);
-          restore_env_slots w_175 [ 4 ] tl_0;
-          set_env_slot w_175 9 ret_97;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_97;
           w_175.state.c <- pc_to_exp (int_to_pc 154)
       | 113 (* tag_cont_98 *) ->
           let ret_98 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 7 (Memo.from_int 0);
+          init_frame w_175 3 (Memo.from_int 0);
           restore_env_slots w_175 [ 0; 1 ] tl_0;
-          set_env_slot w_175 6 ret_98;
+          set_env_slot w_175 2 ret_98;
           w_175.state.c <- pc_to_exp (int_to_pc 158)
       | 114 (* tag_cont_99 *) ->
           let ret_99 = get_env_slot w_175 0 in
@@ -1281,137 +1281,137 @@ let populate_state () =
           let ret_101 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 14 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 9; 12 ] tl_0;
-          set_env_slot w_175 13 ret_101;
+          init_frame w_175 4 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2 ] tl_0;
+          set_env_slot w_175 3 ret_101;
           w_175.state.c <- pc_to_exp (int_to_pc 165)
       | 117 (* tag_cont_102 *) ->
           let ret_102 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 13 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 9 ] tl_0;
-          set_env_slot w_175 12 ret_102;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_102;
           w_175.state.c <- pc_to_exp (int_to_pc 164)
       | 118 (* tag_cont_103 *) ->
           let ret_103 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 12 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 9 ] tl_0;
-          set_env_slot w_175 11 ret_103;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_103;
           w_175.state.c <- pc_to_exp (int_to_pc 163)
       | 119 (* tag_cont_104 *) ->
           let ret_104 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 11 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 9 ] tl_0;
-          set_env_slot w_175 10 ret_104;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_104;
           w_175.state.c <- pc_to_exp (int_to_pc 162)
       | 120 (* tag_cont_105 *) ->
           let ret_105 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 10 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 7; 8 ] tl_0;
-          set_env_slot w_175 9 ret_105;
+          init_frame w_175 4 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2 ] tl_0;
+          set_env_slot w_175 3 ret_105;
           w_175.state.c <- pc_to_exp (int_to_pc 161)
       | 121 (* tag_cont_106 *) ->
           let ret_106 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 9 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 7 ] tl_0;
-          set_env_slot w_175 8 ret_106;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_106;
           w_175.state.c <- pc_to_exp (int_to_pc 160)
       | 122 (* tag_cont_107 *) ->
           let ret_107 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 8 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 4 ] tl_0;
-          set_env_slot w_175 7 ret_107;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_107;
           w_175.state.c <- pc_to_exp (int_to_pc 159)
       | 123 (* tag_cont_108 *) ->
           let ret_108 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 22 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 17; 20 ] tl_0;
-          set_env_slot w_175 21 ret_108;
+          init_frame w_175 4 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2 ] tl_0;
+          set_env_slot w_175 3 ret_108;
           w_175.state.c <- pc_to_exp (int_to_pc 172)
       | 124 (* tag_cont_109 *) ->
           let ret_109 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 21 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 17 ] tl_0;
-          set_env_slot w_175 20 ret_109;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_109;
           w_175.state.c <- pc_to_exp (int_to_pc 171)
       | 125 (* tag_cont_110 *) ->
           let ret_110 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 20 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 17 ] tl_0;
-          set_env_slot w_175 19 ret_110;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_110;
           w_175.state.c <- pc_to_exp (int_to_pc 170)
       | 126 (* tag_cont_111 *) ->
           let ret_111 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 19 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 17 ] tl_0;
-          set_env_slot w_175 18 ret_111;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_111;
           w_175.state.c <- pc_to_exp (int_to_pc 169)
       | 127 (* tag_cont_112 *) ->
           let ret_112 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 18 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 15; 16 ] tl_0;
-          set_env_slot w_175 17 ret_112;
+          init_frame w_175 4 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1; 2 ] tl_0;
+          set_env_slot w_175 3 ret_112;
           w_175.state.c <- pc_to_exp (int_to_pc 168)
       | 128 (* tag_cont_113 *) ->
           let ret_113 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 17 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 15 ] tl_0;
-          set_env_slot w_175 16 ret_113;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_113;
           w_175.state.c <- pc_to_exp (int_to_pc 167)
       | 129 (* tag_cont_114 *) ->
           let ret_114 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 16 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2; 6 ] tl_0;
-          set_env_slot w_175 15 ret_114;
+          init_frame w_175 3 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0; 1 ] tl_0;
+          set_env_slot w_175 2 ret_114;
           w_175.state.c <- pc_to_exp (int_to_pc 166)
       | 130 (* tag_cont_115 *) ->
           let ret_115 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 3 (Memo.from_int 0);
+          init_frame w_175 2 (Memo.from_int 0);
           restore_env_slots w_175 [ 0 ] tl_0;
-          set_env_slot w_175 2 ret_115;
+          set_env_slot w_175 1 ret_115;
           w_175.state.c <- pc_to_exp (int_to_pc 173)
       | 131 (* tag_cont_116 *) ->
           let ret_116 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 9 (Memo.from_int 0);
-          restore_env_slots w_175 [ 2 ] tl_0;
-          set_env_slot w_175 8 ret_116;
+          init_frame w_175 2 (Memo.from_int 0);
+          restore_env_slots w_175 [ 0 ] tl_0;
+          set_env_slot w_175 1 ret_116;
           w_175.state.c <- pc_to_exp (int_to_pc 175)
       | 132 (* tag_cont_117 *) ->
           let ret_117 = get_env_slot w_175 0 in
           assert_env_length w_175 1;
           w_175.state.k <- get_next_cont tl_0;
-          init_frame w_175 6 (Memo.from_int 0);
+          init_frame w_175 5 (Memo.from_int 0);
           restore_env_slots w_175 [ 0; 1; 2; 3 ] tl_0;
-          set_env_slot w_175 5 ret_117;
+          set_env_slot w_175 4 ret_117;
           w_175.state.c <- pc_to_exp (int_to_pc 174)
       | _ -> failwith "unreachable (0)")
     0;
@@ -1464,51 +1464,49 @@ let populate_state () =
   add_exp
     (fun w_47 ->
       assert_env_length w_47 2;
-      resize_frame w_47 29 (Memo.from_int 0);
       let arg0_42 = get_env_slot w_47 0 in
-      assert_env_length w_47 29;
+      assert_env_length w_47 2;
       w_47.state.k <- Memo.appends [ Memo.from_constructor tag_cont_35; collect_env_slots w_47 [ 0; 1 ]; w_47.state.k ];
-      trim_resolved w_47 2;
       init_frame w_47 1 (Memo.from_int 0);
       set_env_slot w_47 0 arg0_42;
       w_47.state.c <- pc_to_exp (int_to_pc 2))
     3;
   add_exp
     (fun w_54 ->
-      assert_env_length w_54 3;
+      assert_env_length w_54 2;
       resize_frame w_54 5 (Memo.from_int 0);
       assert_env_length w_54 5;
-      let resolved_55 = resolve w_54 (Source.E 2) in
+      let resolved_55 = resolve w_54 (Source.E 1) in
       let resolved_56 = resolve w_54 (Source.E 0) in
-      set_env_slot w_54 1
+      set_env_slot w_54 2
         (Memo.from_int (if Word.get_value (fst resolved_55) < Word.get_value (fst resolved_56) then 1 else 0));
-      let resolved_57 = resolve w_54 (Source.E 1) in
+      let resolved_57 = resolve w_54 (Source.E 2) in
       if Word.get_value (fst resolved_57) <> 0 then (
         assert_env_length w_54 5;
         set_env_slot w_54 3
           (Memo.from_int
              (Word.get_value (Memo.to_word (Memo.from_int 0)) - Word.get_value (Memo.to_word (Memo.from_int 1))));
-        trim_resolved w_54 3;
+        trim_resolved w_54 2;
         return_value w_54 (get_env_slot w_54 3) (pc_to_exp (int_to_pc 0)))
       else (
         assert_env_length w_54 5;
-        let resolved_58 = resolve w_54 (Source.E 2) in
+        let resolved_58 = resolve w_54 (Source.E 1) in
         let resolved_59 = resolve w_54 (Source.E 0) in
         set_env_slot w_54 4
           (Memo.from_int (if Word.get_value (fst resolved_58) > Word.get_value (fst resolved_59) then 1 else 0));
         let resolved_60 = resolve w_54 (Source.E 4) in
         if Word.get_value (fst resolved_60) <> 0 then (
-          trim_resolved w_54 3;
+          trim_resolved w_54 2;
           return_value w_54 (Memo.from_int 1) (pc_to_exp (int_to_pc 0)))
         else (
-          trim_resolved w_54 3;
+          trim_resolved w_54 2;
           return_value w_54 (Memo.from_int 0) (pc_to_exp (int_to_pc 0)))))
     4;
   add_exp
     (fun w_77 ->
-      assert_env_length w_77 3;
-      assert_env_length w_77 3;
-      let resolved_74 = resolve w_77 (Source.E 2) in
+      assert_env_length w_77 2;
+      assert_env_length w_77 2;
+      let resolved_74 = resolve w_77 (Source.E 1) in
       let resolved_75 = resolve w_77 (Source.E 0) in
       set_env_slot w_77 0
         (Memo.from_int (if Word.get_value (fst resolved_74) = Word.get_value (fst resolved_75) then 1 else 0));
@@ -1536,7 +1534,7 @@ let populate_state () =
                 if List.length parts_36 = 1 then (
                   let part0_36 = List.nth parts_36 0 in
                   trim_resolved w_78 2;
-                  shuffle_frame w_78 [| NewValue part0_36; Blank; OldSlot 2 |] (Memo.from_int 0);
+                  shuffle_frame w_78 [| NewValue part0_36; OldSlot 2 |] (Memo.from_int 0);
                   w_78.state.c <- pc_to_exp (int_to_pc 5))
                 else (
                   trim_resolved w_78 2;
@@ -1705,12 +1703,10 @@ let populate_state () =
   add_exp
     (fun w_150 ->
       assert_env_length w_150 2;
-      resize_frame w_150 8 (Memo.from_int 0);
       let arg0_124 = get_env_slot w_150 0 in
-      assert_env_length w_150 8;
+      assert_env_length w_150 2;
       w_150.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_100; collect_env_slots w_150 [ 0; 1 ]; w_150.state.k ];
-      trim_resolved w_150 2;
       init_frame w_150 1 (Memo.from_int 0);
       set_env_slot w_150 0 arg0_124;
       w_150.state.c <- pc_to_exp (int_to_pc 7))
@@ -1897,13 +1893,11 @@ let populate_state () =
   add_exp
     (fun w_132 ->
       assert_env_length w_132 2;
-      resize_frame w_132 15 (Memo.from_int 0);
       let arg0_113 = get_env_slot w_132 0 in
       let arg1_51 = get_env_slot w_132 1 in
-      assert_env_length w_132 15;
+      assert_env_length w_132 2;
       w_132.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_89; collect_env_slots w_132 [ 0; 1 ]; w_132.state.k ];
-      trim_resolved w_132 2;
       init_frame w_132 2 (Memo.from_int 0);
       set_env_slot w_132 0 arg0_113;
       set_env_slot w_132 1 arg1_51;
@@ -2045,11 +2039,9 @@ let populate_state () =
   add_exp
     (fun w_5 ->
       assert_env_length w_5 2;
-      resize_frame w_5 10 (Memo.from_int 0);
       let arg0_5 = get_env_slot w_5 0 in
-      assert_env_length w_5 10;
+      assert_env_length w_5 2;
       w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; collect_env_slots w_5 [ 0; 1 ]; w_5.state.k ];
-      trim_resolved w_5 2;
       init_frame w_5 1 (Memo.from_int 0);
       set_env_slot w_5 0 arg0_5;
       w_5.state.c <- pc_to_exp (int_to_pc 14))
@@ -2400,7 +2392,7 @@ let populate_state () =
     32;
   add_exp
     (fun w_72 ->
-      assert_env_length w_72 4;
+      assert_env_length w_72 3;
       resize_frame w_72 6 (Memo.from_int 0);
       assert_env_length w_72 6;
       let resolved_70 = resolve w_72 (Source.E 0) in
@@ -2409,17 +2401,17 @@ let populate_state () =
            (if Word.get_value (fst resolved_70) = Word.get_value (Memo.to_word (Memo.from_int 1)) then 1 else 0));
       let resolved_71 = resolve w_72 (Source.E 0) in
       if Word.get_value (fst resolved_71) <> 0 then (
-        let arg0_67 = get_env_slot w_72 2 in
+        let arg0_67 = get_env_slot w_72 1 in
         assert_env_length w_72 6;
-        trim_resolved w_72 4;
+        trim_resolved w_72 3;
         init_frame w_72 1 (Memo.from_int 0);
         set_env_slot w_72 0 arg0_67;
         w_72.state.c <- pc_to_exp (int_to_pc 34))
       else
-        let arg0_65 = get_env_slot w_72 2 in
+        let arg0_65 = get_env_slot w_72 1 in
         assert_env_length w_72 6;
-        w_72.state.k <- Memo.appends [ Memo.from_constructor tag_cont_48; collect_env_slots w_72 [ 3 ]; w_72.state.k ];
-        trim_resolved w_72 4;
+        w_72.state.k <- Memo.appends [ Memo.from_constructor tag_cont_48; collect_env_slots w_72 [ 2 ]; w_72.state.k ];
+        trim_resolved w_72 3;
         init_frame w_72 1 (Memo.from_int 0);
         set_env_slot w_72 0 arg0_65;
         w_72.state.c <- pc_to_exp (int_to_pc 34))
@@ -2501,11 +2493,9 @@ let populate_state () =
   add_exp
     (fun w_104 ->
       assert_env_length w_104 2;
-      resize_frame w_104 8 (Memo.from_int 0);
       let arg0_89 = get_env_slot w_104 1 in
-      assert_env_length w_104 8;
+      assert_env_length w_104 2;
       w_104.state.k <- Memo.appends [ Memo.from_constructor tag_cont_72; collect_env_slots w_104 [ 0 ]; w_104.state.k ];
-      trim_resolved w_104 2;
       init_frame w_104 1 (Memo.from_int 0);
       set_env_slot w_104 0 arg0_89;
       w_104.state.c <- pc_to_exp (int_to_pc 27))
@@ -2833,18 +2823,22 @@ let populate_state () =
     48;
   add_exp
     (fun w_23 ->
-      assert_env_length w_23 7;
-      assert_env_length w_23 7;
+      assert_env_length w_23 3;
+      resize_frame w_23 4 (Memo.from_int 0);
+      assert_env_length w_23 4;
       let resolved_24 = resolve w_23 (Source.E 0) in
       set_env_slot w_23 0
         (Memo.from_int
            (if Word.get_value (fst resolved_24) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
       let resolved_25 = resolve w_23 (Source.E 0) in
-      if Word.get_value (fst resolved_25) <> 0 then return_value w_23 (get_env_slot w_23 6) (pc_to_exp (int_to_pc 0))
+      if Word.get_value (fst resolved_25) <> 0 then (
+        trim_resolved w_23 3;
+        return_value w_23 (get_env_slot w_23 2) (pc_to_exp (int_to_pc 0)))
       else
-        let arg0_17 = get_env_slot w_23 5 in
-        let arg1_7 = get_env_slot w_23 6 in
-        assert_env_length w_23 7;
+        let arg0_17 = get_env_slot w_23 1 in
+        let arg1_7 = get_env_slot w_23 2 in
+        assert_env_length w_23 4;
+        trim_resolved w_23 3;
         init_frame w_23 2 (Memo.from_int 0);
         set_env_slot w_23 1 arg0_17;
         set_env_slot w_23 0 arg1_7;
@@ -2852,26 +2846,32 @@ let populate_state () =
     49;
   add_exp
     (fun w_24 ->
-      assert_env_length w_24 10;
-      assert_env_length w_24 10;
+      assert_env_length w_24 3;
+      resize_frame w_24 6 (Memo.from_int 0);
+      assert_env_length w_24 6;
       let resolved_26 = resolve w_24 (Source.E 0) in
-      set_env_slot w_24 1
+      set_env_slot w_24 3
         (Memo.from_int
            (if Word.get_value (fst resolved_26) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
-      let resolved_27 = resolve w_24 (Source.E 1) in
-      if Word.get_value (fst resolved_27) <> 0 then return_value w_24 (get_env_slot w_24 8) (pc_to_exp (int_to_pc 0))
+      let resolved_27 = resolve w_24 (Source.E 3) in
+      if Word.get_value (fst resolved_27) <> 0 then (
+        trim_resolved w_24 3;
+        return_value w_24 (get_env_slot w_24 1) (pc_to_exp (int_to_pc 0)))
       else (
-        assert_env_length w_24 10;
+        assert_env_length w_24 6;
         let resolved_28 = resolve w_24 (Source.E 0) in
-        set_env_slot w_24 2
+        set_env_slot w_24 4
           (Memo.from_int
              (if Word.get_value (fst resolved_28) = Word.get_value (Memo.to_word (Memo.from_int 1)) then 1 else 0));
-        let resolved_29 = resolve w_24 (Source.E 2) in
-        if Word.get_value (fst resolved_29) <> 0 then return_value w_24 (get_env_slot w_24 9) (pc_to_exp (int_to_pc 0))
+        let resolved_29 = resolve w_24 (Source.E 4) in
+        if Word.get_value (fst resolved_29) <> 0 then (
+          trim_resolved w_24 3;
+          return_value w_24 (get_env_slot w_24 2) (pc_to_exp (int_to_pc 0)))
         else
-          let arg0_18 = get_env_slot w_24 8 in
-          let arg1_8 = get_env_slot w_24 9 in
-          assert_env_length w_24 10;
+          let arg0_18 = get_env_slot w_24 1 in
+          let arg1_8 = get_env_slot w_24 2 in
+          assert_env_length w_24 6;
+          trim_resolved w_24 3;
           init_frame w_24 2 (Memo.from_int 0);
           set_env_slot w_24 1 arg0_18;
           set_env_slot w_24 0 arg1_8;
@@ -2936,11 +2936,9 @@ let populate_state () =
   add_exp
     (fun w_65 ->
       assert_env_length w_65 1;
-      resize_frame w_65 3 (Memo.from_int 0);
       let arg0_59 = get_env_slot w_65 0 in
-      assert_env_length w_65 3;
+      assert_env_length w_65 1;
       w_65.state.k <- Memo.appends [ Memo.from_constructor tag_cont_44; collect_env_slots w_65 [ 0 ]; w_65.state.k ];
-      trim_resolved w_65 1;
       init_frame w_65 1 (Memo.from_int 0);
       set_env_slot w_65 0 arg0_59;
       w_65.state.c <- pc_to_exp (int_to_pc 51))
@@ -3113,25 +3111,21 @@ let populate_state () =
     57;
   add_exp
     (fun w_1 ->
-      assert_env_length w_1 4;
-      resize_frame w_1 6 (Memo.from_int 0);
-      let arg0_1 = get_env_slot w_1 1 in
-      assert_env_length w_1 6;
-      w_1.state.k <- Memo.appends [ Memo.from_constructor tag_cont_0; collect_env_slots w_1 [ 2; 3 ]; w_1.state.k ];
-      trim_resolved w_1 4;
+      assert_env_length w_1 3;
+      let arg0_1 = get_env_slot w_1 0 in
+      assert_env_length w_1 3;
+      w_1.state.k <- Memo.appends [ Memo.from_constructor tag_cont_0; collect_env_slots w_1 [ 1; 2 ]; w_1.state.k ];
       init_frame w_1 1 (Memo.from_int 0);
       set_env_slot w_1 0 arg0_1;
       w_1.state.c <- pc_to_exp (int_to_pc 12))
     58;
   add_exp
     (fun w_2 ->
-      assert_env_length w_2 5;
-      resize_frame w_2 6 (Memo.from_int 0);
-      let arg0_2 = get_env_slot w_2 3 in
-      let arg1_0 = get_env_slot w_2 4 in
-      let arg2_0 = get_env_slot w_2 2 in
-      assert_env_length w_2 6;
-      trim_resolved w_2 5;
+      assert_env_length w_2 3;
+      let arg0_2 = get_env_slot w_2 1 in
+      let arg1_0 = get_env_slot w_2 2 in
+      let arg2_0 = get_env_slot w_2 0 in
+      assert_env_length w_2 3;
       init_frame w_2 3 (Memo.from_int 0);
       set_env_slot w_2 0 arg0_2;
       set_env_slot w_2 1 arg1_0;
@@ -3141,11 +3135,9 @@ let populate_state () =
   add_exp
     (fun w_6 ->
       assert_env_length w_6 3;
-      resize_frame w_6 10 (Memo.from_int 0);
       let arg0_6 = get_env_slot w_6 1 in
-      assert_env_length w_6 10;
+      assert_env_length w_6 3;
       w_6.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; collect_env_slots w_6 [ 0; 1; 2 ]; w_6.state.k ];
-      trim_resolved w_6 3;
       init_frame w_6 1 (Memo.from_int 0);
       set_env_slot w_6 0 arg0_6;
       w_6.state.c <- pc_to_exp (int_to_pc 14))
@@ -3153,12 +3145,10 @@ let populate_state () =
   add_exp
     (fun w_7 ->
       assert_env_length w_7 4;
-      resize_frame w_7 10 (Memo.from_int 0);
       let arg0_7 = get_env_slot w_7 2 in
       let arg1_3 = get_env_slot w_7 3 in
-      assert_env_length w_7 10;
+      assert_env_length w_7 4;
       w_7.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; collect_env_slots w_7 [ 0; 1 ]; w_7.state.k ];
-      trim_resolved w_7 4;
       init_frame w_7 2 (Memo.from_int 0);
       set_env_slot w_7 0 arg0_7;
       set_env_slot w_7 1 arg1_3;
@@ -3188,48 +3178,46 @@ let populate_state () =
     62;
   add_exp
     (fun w_9 ->
-      assert_env_length w_9 5;
-      resize_frame w_9 10 (Memo.from_int 0);
+      assert_env_length w_9 3;
       let arg0_9 = get_env_slot w_9 1 in
-      assert_env_length w_9 10;
-      w_9.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; collect_env_slots w_9 [ 0; 1; 4 ]; w_9.state.k ];
-      trim_resolved w_9 5;
+      assert_env_length w_9 3;
+      w_9.state.k <- Memo.appends [ Memo.from_constructor tag_cont_2; collect_env_slots w_9 [ 0; 1; 2 ]; w_9.state.k ];
       init_frame w_9 1 (Memo.from_int 0);
       set_env_slot w_9 0 arg0_9;
       w_9.state.c <- pc_to_exp (int_to_pc 12))
     63;
   add_exp
     (fun w_10 ->
-      assert_env_length w_10 6;
-      resize_frame w_10 10 (Memo.from_int 0);
-      assert_env_length w_10 10;
-      let resolved_4 = resolve w_10 (Source.E 4) in
-      let resolved_5 = resolve w_10 (Source.E 5) in
-      set_env_slot w_10 6
+      assert_env_length w_10 4;
+      resize_frame w_10 8 (Memo.from_int 0);
+      assert_env_length w_10 8;
+      let resolved_4 = resolve w_10 (Source.E 2) in
+      let resolved_5 = resolve w_10 (Source.E 3) in
+      set_env_slot w_10 4
         (Memo.from_int (if Word.get_value (fst resolved_4) < Word.get_value (fst resolved_5) then 1 else 0));
-      let resolved_6 = resolve w_10 (Source.E 6) in
+      let resolved_6 = resolve w_10 (Source.E 4) in
       if Word.get_value (fst resolved_6) <> 0 then (
-        assert_env_length w_10 10;
-        set_env_slot w_10 7
+        assert_env_length w_10 8;
+        set_env_slot w_10 5
           (Memo.from_int
              (Word.get_value (Memo.to_word (Memo.from_int 0)) - Word.get_value (Memo.to_word (Memo.from_int 1))));
-        trim_resolved w_10 6;
-        return_value w_10 (get_env_slot w_10 7) (pc_to_exp (int_to_pc 0)))
+        trim_resolved w_10 4;
+        return_value w_10 (get_env_slot w_10 5) (pc_to_exp (int_to_pc 0)))
       else (
-        assert_env_length w_10 10;
-        let resolved_7 = resolve w_10 (Source.E 4) in
-        let resolved_8 = resolve w_10 (Source.E 5) in
-        set_env_slot w_10 8
+        assert_env_length w_10 8;
+        let resolved_7 = resolve w_10 (Source.E 2) in
+        let resolved_8 = resolve w_10 (Source.E 3) in
+        set_env_slot w_10 6
           (Memo.from_int (if Word.get_value (fst resolved_7) > Word.get_value (fst resolved_8) then 1 else 0));
-        let resolved_9 = resolve w_10 (Source.E 8) in
+        let resolved_9 = resolve w_10 (Source.E 6) in
         if Word.get_value (fst resolved_9) <> 0 then (
-          trim_resolved w_10 6;
+          trim_resolved w_10 4;
           return_value w_10 (Memo.from_int 1) (pc_to_exp (int_to_pc 0)))
         else
           let arg0_10 = get_env_slot w_10 0 in
           let arg1_4 = get_env_slot w_10 1 in
-          assert_env_length w_10 10;
-          trim_resolved w_10 6;
+          assert_env_length w_10 8;
+          trim_resolved w_10 4;
           init_frame w_10 2 (Memo.from_int 0);
           set_env_slot w_10 0 arg0_10;
           set_env_slot w_10 1 arg1_4;
@@ -3237,24 +3225,20 @@ let populate_state () =
     64;
   add_exp
     (fun w_15 ->
-      assert_env_length w_15 4;
-      resize_frame w_15 7 (Memo.from_int 0);
-      let arg0_12 = get_env_slot w_15 2 in
-      assert_env_length w_15 7;
-      w_15.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; collect_env_slots w_15 [ 3 ]; w_15.state.k ];
-      trim_resolved w_15 4;
+      assert_env_length w_15 2;
+      let arg0_12 = get_env_slot w_15 0 in
+      assert_env_length w_15 2;
+      w_15.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; collect_env_slots w_15 [ 1 ]; w_15.state.k ];
       init_frame w_15 1 (Memo.from_int 0);
       set_env_slot w_15 0 arg0_12;
       w_15.state.c <- pc_to_exp (int_to_pc 27))
     65;
   add_exp
     (fun w_16 ->
-      assert_env_length w_16 5;
-      resize_frame w_16 7 (Memo.from_int 0);
-      let arg0_13 = get_env_slot w_16 3 in
-      let arg1_5 = get_env_slot w_16 4 in
-      assert_env_length w_16 7;
-      trim_resolved w_16 5;
+      assert_env_length w_16 2;
+      let arg0_13 = get_env_slot w_16 0 in
+      let arg1_5 = get_env_slot w_16 1 in
+      assert_env_length w_16 2;
       init_frame w_16 2 (Memo.from_int 0);
       set_env_slot w_16 0 arg0_13;
       set_env_slot w_16 1 arg1_5;
@@ -3262,24 +3246,20 @@ let populate_state () =
     66;
   add_exp
     (fun w_21 ->
-      assert_env_length w_21 4;
-      resize_frame w_21 7 (Memo.from_int 0);
-      let arg0_15 = get_env_slot w_21 2 in
-      assert_env_length w_21 7;
-      w_21.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; collect_env_slots w_21 [ 3 ]; w_21.state.k ];
-      trim_resolved w_21 4;
+      assert_env_length w_21 2;
+      let arg0_15 = get_env_slot w_21 0 in
+      assert_env_length w_21 2;
+      w_21.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; collect_env_slots w_21 [ 1 ]; w_21.state.k ];
       init_frame w_21 1 (Memo.from_int 0);
       set_env_slot w_21 0 arg0_15;
       w_21.state.c <- pc_to_exp (int_to_pc 26))
     67;
   add_exp
     (fun w_22 ->
-      assert_env_length w_22 5;
-      resize_frame w_22 7 (Memo.from_int 0);
-      let arg0_16 = get_env_slot w_22 3 in
-      let arg1_6 = get_env_slot w_22 4 in
-      assert_env_length w_22 7;
-      trim_resolved w_22 5;
+      assert_env_length w_22 2;
+      let arg0_16 = get_env_slot w_22 0 in
+      let arg1_6 = get_env_slot w_22 1 in
+      assert_env_length w_22 2;
       init_frame w_22 2 (Memo.from_int 0);
       set_env_slot w_22 0 arg0_16;
       set_env_slot w_22 1 arg1_6;
@@ -3287,47 +3267,43 @@ let populate_state () =
     68;
   add_exp
     (fun w_26 ->
-      assert_env_length w_26 6;
-      resize_frame w_26 11 (Memo.from_int 0);
-      let arg0_20 = get_env_slot w_26 2 in
-      assert_env_length w_26 11;
-      w_26.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; collect_env_slots w_26 [ 5 ]; w_26.state.k ];
-      trim_resolved w_26 6;
+      assert_env_length w_26 2;
+      let arg0_20 = get_env_slot w_26 0 in
+      assert_env_length w_26 2;
+      w_26.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; collect_env_slots w_26 [ 1 ]; w_26.state.k ];
       init_frame w_26 1 (Memo.from_int 0);
       set_env_slot w_26 0 arg0_20;
       w_26.state.c <- pc_to_exp (int_to_pc 51))
     69;
   add_exp
     (fun w_27 ->
-      assert_env_length w_27 7;
-      resize_frame w_27 11 (Memo.from_int 0);
-      assert_env_length w_27 11;
-      let resolved_31 = resolve w_27 (Source.E 5) in
+      assert_env_length w_27 2;
+      resize_frame w_27 3 (Memo.from_int 0);
+      assert_env_length w_27 3;
+      let resolved_31 = resolve w_27 (Source.E 0) in
       let tag_9 = Word.get_value (fst resolved_31) in
       match tag_9 with
       | 5 (* tag_Const *) ->
           let parts_16 = Memo.splits (snd resolved_31) in
           if List.length parts_16 = 1 then (
             let part0_16 = List.nth parts_16 0 in
-            trim_resolved w_27 7;
-            shuffle_frame w_27
-              [| NewValue part0_16; Blank; Blank; Blank; Blank; OldSlot 5; OldSlot 6 |]
-              (Memo.from_int 0);
+            trim_resolved w_27 2;
+            shuffle_frame w_27 [| NewValue part0_16; OldSlot 0; OldSlot 1 |] (Memo.from_int 0);
             w_27.state.c <- pc_to_exp (int_to_pc 49))
           else
-            let arg0_21 = get_env_slot w_27 5 in
-            let arg1_9 = get_env_slot w_27 6 in
-            assert_env_length w_27 11;
-            trim_resolved w_27 7;
+            let arg0_21 = get_env_slot w_27 0 in
+            let arg1_9 = get_env_slot w_27 1 in
+            assert_env_length w_27 3;
+            trim_resolved w_27 2;
             init_frame w_27 2 (Memo.from_int 0);
             set_env_slot w_27 1 arg0_21;
             set_env_slot w_27 0 arg1_9;
             w_27.state.c <- pc_to_exp (int_to_pc 47)
       | _ ->
-          let arg0_21 = get_env_slot w_27 5 in
-          let arg1_9 = get_env_slot w_27 6 in
-          assert_env_length w_27 11;
-          trim_resolved w_27 7;
+          let arg0_21 = get_env_slot w_27 0 in
+          let arg1_9 = get_env_slot w_27 1 in
+          assert_env_length w_27 3;
+          trim_resolved w_27 2;
           init_frame w_27 2 (Memo.from_int 0);
           set_env_slot w_27 1 arg0_21;
           set_env_slot w_27 0 arg1_9;
@@ -3335,47 +3311,43 @@ let populate_state () =
     70;
   add_exp
     (fun w_28 ->
-      assert_env_length w_28 9;
-      resize_frame w_28 11 (Memo.from_int 0);
-      let arg0_23 = get_env_slot w_28 4 in
-      assert_env_length w_28 11;
-      w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; collect_env_slots w_28 [ 8 ]; w_28.state.k ];
-      trim_resolved w_28 9;
+      assert_env_length w_28 2;
+      let arg0_23 = get_env_slot w_28 0 in
+      assert_env_length w_28 2;
+      w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; collect_env_slots w_28 [ 1 ]; w_28.state.k ];
       init_frame w_28 1 (Memo.from_int 0);
       set_env_slot w_28 0 arg0_23;
       w_28.state.c <- pc_to_exp (int_to_pc 51))
     71;
   add_exp
     (fun w_29 ->
-      assert_env_length w_29 10;
-      resize_frame w_29 11 (Memo.from_int 0);
-      assert_env_length w_29 11;
-      let resolved_32 = resolve w_29 (Source.E 8) in
+      assert_env_length w_29 2;
+      resize_frame w_29 3 (Memo.from_int 0);
+      assert_env_length w_29 3;
+      let resolved_32 = resolve w_29 (Source.E 0) in
       let tag_10 = Word.get_value (fst resolved_32) in
       match tag_10 with
       | 5 (* tag_Const *) ->
           let parts_18 = Memo.splits (snd resolved_32) in
           if List.length parts_18 = 1 then (
             let part0_18 = List.nth parts_18 0 in
-            trim_resolved w_29 10;
-            shuffle_frame w_29
-              [| NewValue part0_18; Blank; Blank; Blank; Blank; Blank; Blank; Blank; OldSlot 8; OldSlot 9 |]
-              (Memo.from_int 0);
+            trim_resolved w_29 2;
+            shuffle_frame w_29 [| NewValue part0_18; OldSlot 0; OldSlot 1 |] (Memo.from_int 0);
             w_29.state.c <- pc_to_exp (int_to_pc 50))
           else
-            let arg0_24 = get_env_slot w_29 8 in
-            let arg1_10 = get_env_slot w_29 9 in
-            assert_env_length w_29 11;
-            trim_resolved w_29 10;
+            let arg0_24 = get_env_slot w_29 0 in
+            let arg1_10 = get_env_slot w_29 1 in
+            assert_env_length w_29 3;
+            trim_resolved w_29 2;
             init_frame w_29 2 (Memo.from_int 0);
             set_env_slot w_29 1 arg0_24;
             set_env_slot w_29 0 arg1_10;
             w_29.state.c <- pc_to_exp (int_to_pc 37)
       | _ ->
-          let arg0_24 = get_env_slot w_29 8 in
-          let arg1_10 = get_env_slot w_29 9 in
-          assert_env_length w_29 11;
-          trim_resolved w_29 10;
+          let arg0_24 = get_env_slot w_29 0 in
+          let arg1_10 = get_env_slot w_29 1 in
+          assert_env_length w_29 3;
+          trim_resolved w_29 2;
           init_frame w_29 2 (Memo.from_int 0);
           set_env_slot w_29 1 arg0_24;
           set_env_slot w_29 0 arg1_10;
@@ -3406,11 +3378,9 @@ let populate_state () =
   add_exp
     (fun w_33 ->
       assert_env_length w_33 1;
-      resize_frame w_33 2 (Memo.from_int 0);
       let arg0_28 = get_env_slot w_33 0 in
-      assert_env_length w_33 2;
+      assert_env_length w_33 1;
       w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_25; collect_env_slots w_33 []; w_33.state.k ];
-      trim_resolved w_33 1;
       init_frame w_33 1 (Memo.from_int 0);
       set_env_slot w_33 0 arg0_28;
       w_33.state.c <- pc_to_exp (int_to_pc 22))
@@ -3418,21 +3388,19 @@ let populate_state () =
   add_exp
     (fun w_34 ->
       assert_env_length w_34 1;
-      resize_frame w_34 2 (Memo.from_int 0);
       let arg0_29 = get_env_slot w_34 0 in
-      assert_env_length w_34 2;
+      assert_env_length w_34 1;
       w_34.state.k <- Memo.appends [ Memo.from_constructor tag_cont_24; collect_env_slots w_34 []; w_34.state.k ];
-      trim_resolved w_34 1;
       init_frame w_34 1 (Memo.from_int 0);
       set_env_slot w_34 0 arg0_29;
       w_34.state.c <- pc_to_exp (int_to_pc 39))
     76;
   add_exp
     (fun w_35 ->
-      assert_env_length w_35 2;
-      let arg0_30 = get_env_slot w_35 1 in
-      assert_env_length w_35 2;
-      w_35.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; collect_env_slots w_35 [ 1 ]; w_35.state.k ];
+      assert_env_length w_35 1;
+      let arg0_30 = get_env_slot w_35 0 in
+      assert_env_length w_35 1;
+      w_35.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; collect_env_slots w_35 [ 0 ]; w_35.state.k ];
       init_frame w_35 1 (Memo.from_int 0);
       set_env_slot w_35 0 arg0_30;
       w_35.state.c <- pc_to_exp (int_to_pc 46))
@@ -3440,9 +3408,9 @@ let populate_state () =
   add_exp
     (fun w_36 ->
       assert_env_length w_36 2;
-      let arg0_31 = get_env_slot w_36 1 in
+      let arg0_31 = get_env_slot w_36 0 in
       assert_env_length w_36 2;
-      w_36.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; collect_env_slots w_36 [ 0 ]; w_36.state.k ];
+      w_36.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; collect_env_slots w_36 [ 1 ]; w_36.state.k ];
       init_frame w_36 1 (Memo.from_int 0);
       set_env_slot w_36 0 arg0_31;
       w_36.state.c <- pc_to_exp (int_to_pc 24))
@@ -3450,9 +3418,9 @@ let populate_state () =
   add_exp
     (fun w_37 ->
       assert_env_length w_37 2;
-      let arg0_32 = get_env_slot w_37 1 in
+      let arg0_32 = get_env_slot w_37 0 in
       assert_env_length w_37 2;
-      w_37.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; collect_env_slots w_37 [ 0 ]; w_37.state.k ];
+      w_37.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; collect_env_slots w_37 [ 1 ]; w_37.state.k ];
       init_frame w_37 1 (Memo.from_int 0);
       set_env_slot w_37 0 arg0_32;
       w_37.state.c <- pc_to_exp (int_to_pc 46))
@@ -3460,9 +3428,9 @@ let populate_state () =
   add_exp
     (fun w_38 ->
       assert_env_length w_38 2;
-      let arg0_33 = get_env_slot w_38 0 in
+      let arg0_33 = get_env_slot w_38 1 in
       assert_env_length w_38 2;
-      w_38.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; collect_env_slots w_38 [ 1 ]; w_38.state.k ];
+      w_38.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; collect_env_slots w_38 [ 0 ]; w_38.state.k ];
       init_frame w_38 1 (Memo.from_int 0);
       set_env_slot w_38 0 arg0_33;
       w_38.state.c <- pc_to_exp (int_to_pc 45))
@@ -3470,9 +3438,9 @@ let populate_state () =
   add_exp
     (fun w_39 ->
       assert_env_length w_39 2;
-      let arg0_34 = get_env_slot w_39 1 in
+      let arg0_34 = get_env_slot w_39 0 in
       assert_env_length w_39 2;
-      w_39.state.k <- Memo.appends [ Memo.from_constructor tag_cont_19; collect_env_slots w_39 [ 0 ]; w_39.state.k ];
+      w_39.state.k <- Memo.appends [ Memo.from_constructor tag_cont_19; collect_env_slots w_39 [ 1 ]; w_39.state.k ];
       init_frame w_39 1 (Memo.from_int 0);
       set_env_slot w_39 0 arg0_34;
       w_39.state.c <- pc_to_exp (int_to_pc 45))
@@ -3480,8 +3448,8 @@ let populate_state () =
   add_exp
     (fun w_40 ->
       assert_env_length w_40 2;
-      let arg0_35 = get_env_slot w_40 0 in
-      let arg1_12 = get_env_slot w_40 1 in
+      let arg0_35 = get_env_slot w_40 1 in
+      let arg1_12 = get_env_slot w_40 0 in
       assert_env_length w_40 2;
       w_40.state.k <- Memo.appends [ Memo.from_constructor tag_cont_18; collect_env_slots w_40 []; w_40.state.k ];
       init_frame w_40 2 (Memo.from_int 0);
@@ -3492,11 +3460,9 @@ let populate_state () =
   add_exp
     (fun w_41 ->
       assert_env_length w_41 1;
-      resize_frame w_41 2 (Memo.from_int 0);
       let arg0_36 = get_env_slot w_41 0 in
-      assert_env_length w_41 2;
+      assert_env_length w_41 1;
       w_41.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; collect_env_slots w_41 []; w_41.state.k ];
-      trim_resolved w_41 1;
       init_frame w_41 1 (Memo.from_int 0);
       set_env_slot w_41 0 arg0_36;
       w_41.state.c <- pc_to_exp (int_to_pc 26))
@@ -3504,11 +3470,9 @@ let populate_state () =
   add_exp
     (fun w_42 ->
       assert_env_length w_42 1;
-      resize_frame w_42 2 (Memo.from_int 0);
       let arg0_37 = get_env_slot w_42 0 in
-      assert_env_length w_42 2;
+      assert_env_length w_42 1;
       w_42.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; collect_env_slots w_42 []; w_42.state.k ];
-      trim_resolved w_42 1;
       init_frame w_42 1 (Memo.from_int 0);
       set_env_slot w_42 0 arg0_37;
       w_42.state.c <- pc_to_exp (int_to_pc 22))
@@ -3516,11 +3480,9 @@ let populate_state () =
   add_exp
     (fun w_43 ->
       assert_env_length w_43 1;
-      resize_frame w_43 2 (Memo.from_int 0);
       let arg0_38 = get_env_slot w_43 0 in
-      assert_env_length w_43 2;
+      assert_env_length w_43 1;
       w_43.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; collect_env_slots w_43 []; w_43.state.k ];
-      trim_resolved w_43 1;
       init_frame w_43 1 (Memo.from_int 0);
       set_env_slot w_43 0 arg0_38;
       w_43.state.c <- pc_to_exp (int_to_pc 39))
@@ -3528,22 +3490,18 @@ let populate_state () =
   add_exp
     (fun w_44 ->
       assert_env_length w_44 1;
-      resize_frame w_44 2 (Memo.from_int 0);
       let arg0_39 = get_env_slot w_44 0 in
-      assert_env_length w_44 2;
-      trim_resolved w_44 1;
+      assert_env_length w_44 1;
       init_frame w_44 1 (Memo.from_int 0);
       set_env_slot w_44 0 arg0_39;
       w_44.state.c <- pc_to_exp (int_to_pc 45))
     86;
   add_exp
     (fun w_46 ->
-      assert_env_length w_46 4;
-      resize_frame w_46 5 (Memo.from_int 0);
-      let arg0_41 = get_env_slot w_46 1 in
-      let arg1_13 = get_env_slot w_46 3 in
-      assert_env_length w_46 5;
-      trim_resolved w_46 4;
+      assert_env_length w_46 2;
+      let arg0_41 = get_env_slot w_46 0 in
+      let arg1_13 = get_env_slot w_46 1 in
+      assert_env_length w_46 2;
       init_frame w_46 2 (Memo.from_int 0);
       set_env_slot w_46 0 arg0_41;
       set_env_slot w_46 1 arg1_13;
@@ -3551,24 +3509,22 @@ let populate_state () =
     87;
   add_exp
     (fun w_48 ->
-      assert_env_length w_48 14;
-      resize_frame w_48 29 (Memo.from_int 0);
+      assert_env_length w_48 3;
       let arg0_43 = get_env_slot w_48 1 in
-      assert_env_length w_48 29;
+      assert_env_length w_48 3;
       w_48.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_34; collect_env_slots w_48 [ 0; 1; 13 ]; w_48.state.k ];
-      trim_resolved w_48 14;
+        Memo.appends [ Memo.from_constructor tag_cont_34; collect_env_slots w_48 [ 0; 1; 2 ]; w_48.state.k ];
       init_frame w_48 1 (Memo.from_int 0);
       set_env_slot w_48 0 arg0_43;
       w_48.state.c <- pc_to_exp (int_to_pc 2))
     88;
   add_exp
     (fun w_49 ->
-      assert_env_length w_49 15;
+      assert_env_length w_49 4;
       resize_frame w_49 29 (Memo.from_int 0);
       assert_env_length w_49 29;
-      let resolved_34 = resolve w_49 (Source.E 13) in
-      let resolved_35 = resolve w_49 (Source.E 14) in
+      let resolved_34 = resolve w_49 (Source.E 2) in
+      let resolved_35 = resolve w_49 (Source.E 3) in
       set_env_slot w_49 15
         (Memo.from_int (if Word.get_value (fst resolved_34) < Word.get_value (fst resolved_35) then 1 else 0));
       let resolved_36 = resolve w_49 (Source.E 15) in
@@ -3577,17 +3533,17 @@ let populate_state () =
         set_env_slot w_49 16
           (Memo.from_int
              (Word.get_value (Memo.to_word (Memo.from_int 0)) - Word.get_value (Memo.to_word (Memo.from_int 1))));
-        trim_resolved w_49 15;
+        trim_resolved w_49 4;
         return_value w_49 (get_env_slot w_49 16) (pc_to_exp (int_to_pc 0)))
       else (
         assert_env_length w_49 29;
-        let resolved_37 = resolve w_49 (Source.E 13) in
-        let resolved_38 = resolve w_49 (Source.E 14) in
+        let resolved_37 = resolve w_49 (Source.E 2) in
+        let resolved_38 = resolve w_49 (Source.E 3) in
         set_env_slot w_49 17
           (Memo.from_int (if Word.get_value (fst resolved_37) > Word.get_value (fst resolved_38) then 1 else 0));
         let resolved_39 = resolve w_49 (Source.E 17) in
         if Word.get_value (fst resolved_39) <> 0 then (
-          trim_resolved w_49 15;
+          trim_resolved w_49 4;
           return_value w_49 (Memo.from_int 1) (pc_to_exp (int_to_pc 0)))
         else (
           assert_env_length w_49 29;
@@ -3598,7 +3554,7 @@ let populate_state () =
               let parts_20 = Memo.splits (snd resolved_40) in
               if List.length parts_20 = 1 then (
                 let part0_20 = List.nth parts_20 0 in
-                set_env_slot w_49 2 part0_20;
+                set_env_slot w_49 4 part0_20;
                 assert_env_length w_49 29;
                 let resolved_41 = resolve w_49 (Source.E 1) in
                 let tag_13 = Word.get_value (fst resolved_41) in
@@ -3607,8 +3563,8 @@ let populate_state () =
                     let parts_21 = Memo.splits (snd resolved_41) in
                     if List.length parts_21 = 1 then (
                       let part0_21 = List.nth parts_21 0 in
-                      trim_resolved w_49 15;
-                      shuffle_frame w_49 [| NewValue part0_21; Blank; OldSlot 2 |] (Memo.from_int 0);
+                      trim_resolved w_49 4;
+                      shuffle_frame w_49 [| NewValue part0_21; OldSlot 4 |] (Memo.from_int 0);
                       w_49.state.c <- pc_to_exp (int_to_pc 4))
                     else failwith "unreachable (89)"
                 | _ -> failwith "unreachable (89)")
@@ -3617,7 +3573,7 @@ let populate_state () =
               let parts_22 = Memo.splits (snd resolved_40) in
               if List.length parts_22 = 1 then (
                 let part0_22 = List.nth parts_22 0 in
-                set_env_slot w_49 3 part0_22;
+                set_env_slot w_49 5 part0_22;
                 assert_env_length w_49 29;
                 let resolved_42 = resolve w_49 (Source.E 1) in
                 let tag_14 = Word.get_value (fst resolved_42) in
@@ -3626,12 +3582,12 @@ let populate_state () =
                     let parts_23 = Memo.splits (snd resolved_42) in
                     if List.length parts_23 = 1 then (
                       let part0_23 = List.nth parts_23 0 in
-                      set_env_slot w_49 4 part0_23;
-                      let arg0_44 = get_env_slot w_49 3 in
+                      set_env_slot w_49 6 part0_23;
+                      let arg0_44 = get_env_slot w_49 5 in
                       assert_env_length w_49 29;
                       w_49.state.k <-
-                        Memo.appends [ Memo.from_constructor tag_cont_31; collect_env_slots w_49 [ 4 ]; w_49.state.k ];
-                      trim_resolved w_49 15;
+                        Memo.appends [ Memo.from_constructor tag_cont_31; collect_env_slots w_49 [ 6 ]; w_49.state.k ];
+                      trim_resolved w_49 4;
                       init_frame w_49 1 (Memo.from_int 0);
                       set_env_slot w_49 0 arg0_44;
                       w_49.state.c <- pc_to_exp (int_to_pc 1))
@@ -3643,8 +3599,8 @@ let populate_state () =
               if List.length parts_24 = 2 then (
                 let part0_24 = List.nth parts_24 0 in
                 let part1_10 = List.nth parts_24 1 in
-                set_env_slot w_49 5 part0_24;
-                set_env_slot w_49 6 part1_10;
+                set_env_slot w_49 7 part0_24;
+                set_env_slot w_49 8 part1_10;
                 assert_env_length w_49 29;
                 let resolved_49 = resolve w_49 (Source.E 1) in
                 let tag_15 = Word.get_value (fst resolved_49) in
@@ -3654,15 +3610,15 @@ let populate_state () =
                     if List.length parts_25 = 2 then (
                       let part0_25 = List.nth parts_25 0 in
                       let part1_11 = List.nth parts_25 1 in
-                      set_env_slot w_49 7 part0_25;
-                      set_env_slot w_49 8 part1_11;
-                      let arg0_46 = get_env_slot w_49 5 in
-                      let arg1_14 = get_env_slot w_49 7 in
+                      set_env_slot w_49 9 part0_25;
+                      set_env_slot w_49 10 part1_11;
+                      let arg0_46 = get_env_slot w_49 7 in
+                      let arg1_14 = get_env_slot w_49 9 in
                       assert_env_length w_49 29;
                       w_49.state.k <-
                         Memo.appends
-                          [ Memo.from_constructor tag_cont_32; collect_env_slots w_49 [ 6; 8 ]; w_49.state.k ];
-                      trim_resolved w_49 15;
+                          [ Memo.from_constructor tag_cont_32; collect_env_slots w_49 [ 8; 10 ]; w_49.state.k ];
+                      trim_resolved w_49 4;
                       init_frame w_49 2 (Memo.from_int 0);
                       set_env_slot w_49 0 arg0_46;
                       set_env_slot w_49 1 arg1_14;
@@ -3675,8 +3631,8 @@ let populate_state () =
               if List.length parts_26 = 2 then (
                 let part0_26 = List.nth parts_26 0 in
                 let part1_12 = List.nth parts_26 1 in
-                set_env_slot w_49 9 part0_26;
-                set_env_slot w_49 10 part1_12;
+                set_env_slot w_49 11 part0_26;
+                set_env_slot w_49 12 part1_12;
                 assert_env_length w_49 29;
                 let resolved_52 = resolve w_49 (Source.E 1) in
                 let tag_16 = Word.get_value (fst resolved_52) in
@@ -3686,15 +3642,15 @@ let populate_state () =
                     if List.length parts_27 = 2 then (
                       let part0_27 = List.nth parts_27 0 in
                       let part1_13 = List.nth parts_27 1 in
-                      set_env_slot w_49 11 part0_27;
-                      set_env_slot w_49 12 part1_13;
-                      let arg0_48 = get_env_slot w_49 9 in
-                      let arg1_16 = get_env_slot w_49 11 in
+                      set_env_slot w_49 13 part0_27;
+                      set_env_slot w_49 14 part1_13;
+                      let arg0_48 = get_env_slot w_49 11 in
+                      let arg1_16 = get_env_slot w_49 13 in
                       assert_env_length w_49 29;
                       w_49.state.k <-
                         Memo.appends
-                          [ Memo.from_constructor tag_cont_33; collect_env_slots w_49 [ 10; 12 ]; w_49.state.k ];
-                      trim_resolved w_49 15;
+                          [ Memo.from_constructor tag_cont_33; collect_env_slots w_49 [ 12; 14 ]; w_49.state.k ];
+                      trim_resolved w_49 4;
                       init_frame w_49 2 (Memo.from_int 0);
                       set_env_slot w_49 0 arg0_48;
                       set_env_slot w_49 1 arg1_16;
@@ -3706,106 +3662,104 @@ let populate_state () =
     89;
   add_exp
     (fun w_50 ->
-      assert_env_length w_50 19;
-      resize_frame w_50 29 (Memo.from_int 0);
-      let arg0_45 = get_env_slot w_50 4 in
-      assert_env_length w_50 29;
-      w_50.state.k <- Memo.appends [ Memo.from_constructor tag_cont_30; collect_env_slots w_50 [ 18 ]; w_50.state.k ];
-      trim_resolved w_50 19;
+      assert_env_length w_50 2;
+      let arg0_45 = get_env_slot w_50 0 in
+      assert_env_length w_50 2;
+      w_50.state.k <- Memo.appends [ Memo.from_constructor tag_cont_30; collect_env_slots w_50 [ 1 ]; w_50.state.k ];
       init_frame w_50 1 (Memo.from_int 0);
       set_env_slot w_50 0 arg0_45;
       w_50.state.c <- pc_to_exp (int_to_pc 1))
     90;
   add_exp
     (fun w_51 ->
-      assert_env_length w_51 20;
-      resize_frame w_51 29 (Memo.from_int 0);
-      assert_env_length w_51 29;
-      let resolved_43 = resolve w_51 (Source.E 18) in
-      let resolved_44 = resolve w_51 (Source.E 19) in
-      set_env_slot w_51 20
+      assert_env_length w_51 2;
+      resize_frame w_51 5 (Memo.from_int 0);
+      assert_env_length w_51 5;
+      let resolved_43 = resolve w_51 (Source.E 0) in
+      let resolved_44 = resolve w_51 (Source.E 1) in
+      set_env_slot w_51 2
         (Memo.from_int (if Word.get_value (fst resolved_43) < Word.get_value (fst resolved_44) then 1 else 0));
-      let resolved_45 = resolve w_51 (Source.E 20) in
+      let resolved_45 = resolve w_51 (Source.E 2) in
       if Word.get_value (fst resolved_45) <> 0 then (
-        assert_env_length w_51 29;
-        set_env_slot w_51 21
+        assert_env_length w_51 5;
+        set_env_slot w_51 3
           (Memo.from_int
              (Word.get_value (Memo.to_word (Memo.from_int 0)) - Word.get_value (Memo.to_word (Memo.from_int 1))));
-        trim_resolved w_51 20;
-        return_value w_51 (get_env_slot w_51 21) (pc_to_exp (int_to_pc 0)))
+        trim_resolved w_51 2;
+        return_value w_51 (get_env_slot w_51 3) (pc_to_exp (int_to_pc 0)))
       else (
-        assert_env_length w_51 29;
-        let resolved_46 = resolve w_51 (Source.E 18) in
-        let resolved_47 = resolve w_51 (Source.E 19) in
-        set_env_slot w_51 22
+        assert_env_length w_51 5;
+        let resolved_46 = resolve w_51 (Source.E 0) in
+        let resolved_47 = resolve w_51 (Source.E 1) in
+        set_env_slot w_51 4
           (Memo.from_int (if Word.get_value (fst resolved_46) > Word.get_value (fst resolved_47) then 1 else 0));
-        let resolved_48 = resolve w_51 (Source.E 22) in
+        let resolved_48 = resolve w_51 (Source.E 4) in
         if Word.get_value (fst resolved_48) <> 0 then (
-          trim_resolved w_51 20;
+          trim_resolved w_51 2;
           return_value w_51 (Memo.from_int 1) (pc_to_exp (int_to_pc 0)))
         else (
-          trim_resolved w_51 20;
+          trim_resolved w_51 2;
           return_value w_51 (Memo.from_int 0) (pc_to_exp (int_to_pc 0)))))
     91;
   add_exp
     (fun w_52 ->
-      assert_env_length w_52 24;
-      resize_frame w_52 29 (Memo.from_int 0);
-      assert_env_length w_52 29;
-      let resolved_50 = resolve w_52 (Source.E 23) in
-      set_env_slot w_52 24
+      assert_env_length w_52 3;
+      resize_frame w_52 5 (Memo.from_int 0);
+      assert_env_length w_52 5;
+      let resolved_50 = resolve w_52 (Source.E 2) in
+      set_env_slot w_52 3
         (Memo.from_int
            (if Word.get_value (fst resolved_50) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
-      let resolved_51 = resolve w_52 (Source.E 24) in
+      let resolved_51 = resolve w_52 (Source.E 3) in
       if Word.get_value (fst resolved_51) <> 0 then (
-        let arg0_47 = get_env_slot w_52 6 in
-        let arg1_15 = get_env_slot w_52 8 in
-        assert_env_length w_52 29;
-        trim_resolved w_52 24;
+        let arg0_47 = get_env_slot w_52 0 in
+        let arg1_15 = get_env_slot w_52 1 in
+        assert_env_length w_52 5;
+        trim_resolved w_52 3;
         init_frame w_52 2 (Memo.from_int 0);
         set_env_slot w_52 0 arg0_47;
         set_env_slot w_52 1 arg1_15;
         w_52.state.c <- pc_to_exp (int_to_pc 3))
       else (
-        trim_resolved w_52 24;
-        return_value w_52 (get_env_slot w_52 23) (pc_to_exp (int_to_pc 0))))
+        trim_resolved w_52 3;
+        return_value w_52 (get_env_slot w_52 2) (pc_to_exp (int_to_pc 0))))
     92;
   add_exp
     (fun w_53 ->
-      assert_env_length w_53 27;
-      resize_frame w_53 29 (Memo.from_int 0);
-      assert_env_length w_53 29;
-      let resolved_53 = resolve w_53 (Source.E 26) in
-      set_env_slot w_53 27
+      assert_env_length w_53 3;
+      resize_frame w_53 5 (Memo.from_int 0);
+      assert_env_length w_53 5;
+      let resolved_53 = resolve w_53 (Source.E 2) in
+      set_env_slot w_53 3
         (Memo.from_int
            (if Word.get_value (fst resolved_53) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
-      let resolved_54 = resolve w_53 (Source.E 27) in
+      let resolved_54 = resolve w_53 (Source.E 3) in
       if Word.get_value (fst resolved_54) <> 0 then (
-        let arg0_49 = get_env_slot w_53 10 in
-        let arg1_17 = get_env_slot w_53 12 in
-        assert_env_length w_53 29;
-        trim_resolved w_53 27;
+        let arg0_49 = get_env_slot w_53 0 in
+        let arg1_17 = get_env_slot w_53 1 in
+        assert_env_length w_53 5;
+        trim_resolved w_53 3;
         init_frame w_53 2 (Memo.from_int 0);
         set_env_slot w_53 0 arg0_49;
         set_env_slot w_53 1 arg1_17;
         w_53.state.c <- pc_to_exp (int_to_pc 3))
       else (
-        trim_resolved w_53 27;
-        return_value w_53 (get_env_slot w_53 26) (pc_to_exp (int_to_pc 0))))
+        trim_resolved w_53 3;
+        return_value w_53 (get_env_slot w_53 2) (pc_to_exp (int_to_pc 0))))
     93;
   add_exp
     (fun w_56 ->
-      assert_env_length w_56 6;
-      resize_frame w_56 10 (Memo.from_int 0);
-      assert_env_length w_56 10;
-      let resolved_62 = resolve w_56 (Source.E 5) in
+      assert_env_length w_56 5;
+      resize_frame w_56 9 (Memo.from_int 0);
+      assert_env_length w_56 9;
+      let resolved_62 = resolve w_56 (Source.E 4) in
       let tag_18 = Word.get_value (fst resolved_62) in
       match tag_18 with
       | 13 (* tag_NoPick *) ->
-          let arg0_51 = get_env_slot w_56 2 in
-          assert_env_length w_56 10;
-          w_56.state.k <- Memo.appends [ Memo.from_constructor tag_cont_36; collect_env_slots w_56 [ 1 ]; w_56.state.k ];
-          trim_resolved w_56 6;
+          let arg0_51 = get_env_slot w_56 1 in
+          assert_env_length w_56 9;
+          w_56.state.k <- Memo.appends [ Memo.from_constructor tag_cont_36; collect_env_slots w_56 [ 0 ]; w_56.state.k ];
+          trim_resolved w_56 5;
           init_frame w_56 1 (Memo.from_int 0);
           set_env_slot w_56 0 arg0_51;
           w_56.state.c <- pc_to_exp (int_to_pc 43)
@@ -3814,13 +3768,13 @@ let populate_state () =
           if List.length parts_29 = 2 then (
             let part0_29 = List.nth parts_29 0 in
             let part1_15 = List.nth parts_29 1 in
-            set_env_slot w_56 3 part0_29;
-            set_env_slot w_56 4 part1_15;
-            let arg0_52 = get_env_slot w_56 3 in
-            let arg1_19 = get_env_slot w_56 4 in
-            assert_env_length w_56 10;
+            set_env_slot w_56 2 part0_29;
+            set_env_slot w_56 3 part1_15;
+            let arg0_52 = get_env_slot w_56 2 in
+            let arg1_19 = get_env_slot w_56 3 in
+            assert_env_length w_56 9;
             w_56.state.k <- Memo.appends [ Memo.from_constructor tag_cont_37; collect_env_slots w_56 []; w_56.state.k ];
-            trim_resolved w_56 6;
+            trim_resolved w_56 5;
             init_frame w_56 2 (Memo.from_int 0);
             set_env_slot w_56 0 arg0_52;
             set_env_slot w_56 1 arg1_19;
@@ -3830,45 +3784,43 @@ let populate_state () =
     94;
   add_exp
     (fun w_57 ->
-      assert_env_length w_57 7;
-      resize_frame w_57 10 (Memo.from_int 0);
-      assert_env_length w_57 10;
-      set_env_slot w_57 7 (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_57 1; get_env_slot w_57 6 ]);
-      trim_resolved w_57 7;
-      return_value w_57 (get_env_slot w_57 7) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_57 2;
+      resize_frame w_57 3 (Memo.from_int 0);
+      assert_env_length w_57 3;
+      set_env_slot w_57 2 (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_57 0; get_env_slot w_57 1 ]);
+      trim_resolved w_57 2;
+      return_value w_57 (get_env_slot w_57 2) (pc_to_exp (int_to_pc 0)))
     95;
   add_exp
     (fun w_58 ->
-      assert_env_length w_58 9;
-      resize_frame w_58 10 (Memo.from_int 0);
-      let arg0_53 = get_env_slot w_58 8 in
-      assert_env_length w_58 10;
-      trim_resolved w_58 9;
+      assert_env_length w_58 1;
+      let arg0_53 = get_env_slot w_58 0 in
+      assert_env_length w_58 1;
       init_frame w_58 1 (Memo.from_int 0);
       set_env_slot w_58 0 arg0_53;
       w_58.state.c <- pc_to_exp (int_to_pc 43))
     96;
   add_exp
     (fun w_60 ->
-      assert_env_length w_60 6;
-      resize_frame w_60 10 (Memo.from_int 0);
-      assert_env_length w_60 10;
-      let resolved_64 = resolve w_60 (Source.E 5) in
-      set_env_slot w_60 6
+      assert_env_length w_60 5;
+      resize_frame w_60 9 (Memo.from_int 0);
+      assert_env_length w_60 9;
+      let resolved_64 = resolve w_60 (Source.E 4) in
+      set_env_slot w_60 5
         (Memo.from_int
            (if Word.get_value (fst resolved_64) <= Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
-      let resolved_65 = resolve w_60 (Source.E 6) in
+      let resolved_65 = resolve w_60 (Source.E 5) in
       if Word.get_value (fst resolved_65) <> 0 then (
-        assert_env_length w_60 10;
-        set_env_slot w_60 7 (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_60 0; get_env_slot w_60 1 ]);
-        trim_resolved w_60 6;
-        return_value w_60 (get_env_slot w_60 7) (pc_to_exp (int_to_pc 0)))
+        assert_env_length w_60 9;
+        set_env_slot w_60 6 (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_60 0; get_env_slot w_60 1 ]);
+        trim_resolved w_60 5;
+        return_value w_60 (get_env_slot w_60 6) (pc_to_exp (int_to_pc 0)))
       else
         let arg0_55 = get_env_slot w_60 0 in
         let arg1_21 = get_env_slot w_60 3 in
-        assert_env_length w_60 10;
+        assert_env_length w_60 9;
         w_60.state.k <- Memo.appends [ Memo.from_constructor tag_cont_39; collect_env_slots w_60 [ 2 ]; w_60.state.k ];
-        trim_resolved w_60 6;
+        trim_resolved w_60 5;
         init_frame w_60 2 (Memo.from_int 0);
         set_env_slot w_60 0 arg0_55;
         set_env_slot w_60 1 arg1_21;
@@ -3876,12 +3828,12 @@ let populate_state () =
     97;
   add_exp
     (fun w_61 ->
-      assert_env_length w_61 9;
-      resize_frame w_61 10 (Memo.from_int 0);
-      assert_env_length w_61 10;
-      set_env_slot w_61 9 (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_61 2; get_env_slot w_61 8 ]);
-      trim_resolved w_61 9;
-      return_value w_61 (get_env_slot w_61 9) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_61 2;
+      resize_frame w_61 3 (Memo.from_int 0);
+      assert_env_length w_61 3;
+      set_env_slot w_61 2 (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_61 0; get_env_slot w_61 1 ]);
+      trim_resolved w_61 2;
+      return_value w_61 (get_env_slot w_61 2) (pc_to_exp (int_to_pc 0)))
     98;
   add_exp
     (fun w_63 ->
@@ -3905,12 +3857,10 @@ let populate_state () =
   add_exp
     (fun w_66 ->
       assert_env_length w_66 2;
-      resize_frame w_66 3 (Memo.from_int 0);
       let arg0_60 = get_env_slot w_66 0 in
       let arg1_22 = get_env_slot w_66 1 in
-      assert_env_length w_66 3;
+      assert_env_length w_66 2;
       w_66.state.k <- Memo.appends [ Memo.from_constructor tag_cont_43; collect_env_slots w_66 [ 1 ]; w_66.state.k ];
-      trim_resolved w_66 2;
       init_frame w_66 2 (Memo.from_int 0);
       set_env_slot w_66 0 arg0_60;
       set_env_slot w_66 1 arg1_22;
@@ -3934,16 +3884,16 @@ let populate_state () =
     102;
   add_exp
     (fun w_69 ->
-      assert_env_length w_69 7;
-      resize_frame w_69 13 (Memo.from_int 0);
-      assert_env_length w_69 13;
-      set_env_slot w_69 7 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_69 0; get_env_slot w_69 2 ]);
-      let arg0_63 = get_env_slot w_69 6 in
-      let arg1_24 = get_env_slot w_69 7 in
-      assert_env_length w_69 13;
+      assert_env_length w_69 6;
+      resize_frame w_69 12 (Memo.from_int 0);
+      assert_env_length w_69 12;
+      set_env_slot w_69 6 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_69 0; get_env_slot w_69 1 ]);
+      let arg0_63 = get_env_slot w_69 5 in
+      let arg1_24 = get_env_slot w_69 6 in
+      assert_env_length w_69 12;
       w_69.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_46; collect_env_slots w_69 [ 0; 2; 3; 4; 5; 6 ]; w_69.state.k ];
-      trim_resolved w_69 7;
+        Memo.appends [ Memo.from_constructor tag_cont_46; collect_env_slots w_69 [ 0; 1; 2; 3; 4; 5 ]; w_69.state.k ];
+      trim_resolved w_69 6;
       init_frame w_69 2 (Memo.from_int 0);
       set_env_slot w_69 0 arg0_63;
       set_env_slot w_69 1 arg1_24;
@@ -3951,63 +3901,61 @@ let populate_state () =
     103;
   add_exp
     (fun w_70 ->
-      assert_env_length w_70 9;
-      resize_frame w_70 13 (Memo.from_int 0);
-      let resolved_68 = resolve w_70 (Source.E 8) in
+      assert_env_length w_70 7;
+      resize_frame w_70 11 (Memo.from_int 0);
+      let resolved_68 = resolve w_70 (Source.E 6) in
       if Word.get_value (fst resolved_68) <> 0 then (
         let arg0_64 = get_env_slot w_70 0 in
-        let arg1_25 = get_env_slot w_70 3 in
-        assert_env_length w_70 13;
+        let arg1_25 = get_env_slot w_70 2 in
+        assert_env_length w_70 11;
         w_70.state.k <-
-          Memo.appends [ Memo.from_constructor tag_cont_45; collect_env_slots w_70 [ 2; 4; 5 ]; w_70.state.k ];
-        trim_resolved w_70 9;
+          Memo.appends [ Memo.from_constructor tag_cont_45; collect_env_slots w_70 [ 1; 3; 4 ]; w_70.state.k ];
+        trim_resolved w_70 7;
         init_frame w_70 2 (Memo.from_int 0);
         set_env_slot w_70 0 arg0_64;
         set_env_slot w_70 1 arg1_25;
         w_70.state.c <- pc_to_exp (int_to_pc 42))
       else (
-        assert_env_length w_70 13;
-        set_env_slot w_70 12 (Memo.appends [ Memo.from_constructor tag_Pick; get_env_slot w_70 6; get_env_slot w_70 3 ]);
-        trim_resolved w_70 9;
-        return_value w_70 (get_env_slot w_70 12) (pc_to_exp (int_to_pc 0))))
+        assert_env_length w_70 11;
+        set_env_slot w_70 10 (Memo.appends [ Memo.from_constructor tag_Pick; get_env_slot w_70 5; get_env_slot w_70 2 ]);
+        trim_resolved w_70 7;
+        return_value w_70 (get_env_slot w_70 10) (pc_to_exp (int_to_pc 0))))
     104;
   add_exp
     (fun w_71 ->
-      assert_env_length w_71 10;
-      resize_frame w_71 13 (Memo.from_int 0);
-      assert_env_length w_71 13;
-      let resolved_69 = resolve w_71 (Source.E 9) in
+      assert_env_length w_71 4;
+      resize_frame w_71 6 (Memo.from_int 0);
+      assert_env_length w_71 6;
+      let resolved_69 = resolve w_71 (Source.E 3) in
       let tag_21 = Word.get_value (fst resolved_69) in
       match tag_21 with
       | 13 (* tag_NoPick *) ->
-          trim_resolved w_71 10;
+          trim_resolved w_71 4;
           return_value w_71 (Memo.from_constructor tag_NoPick) (pc_to_exp (int_to_pc 0))
       | 14 (* tag_Pick *) ->
           let parts_32 = Memo.splits (snd resolved_69) in
           if List.length parts_32 = 2 then (
             let part0_32 = List.nth parts_32 0 in
             let part1_18 = List.nth parts_32 1 in
-            set_env_slot w_71 4 part0_32;
-            set_env_slot w_71 5 part1_18;
-            assert_env_length w_71 13;
-            set_env_slot w_71 10
-              (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_71 2; get_env_slot w_71 5 ]);
-            assert_env_length w_71 13;
-            set_env_slot w_71 11
-              (Memo.appends [ Memo.from_constructor tag_Pick; get_env_slot w_71 4; get_env_slot w_71 10 ]);
-            trim_resolved w_71 10;
-            return_value w_71 (get_env_slot w_71 11) (pc_to_exp (int_to_pc 0)))
+            set_env_slot w_71 1 part0_32;
+            set_env_slot w_71 2 part1_18;
+            assert_env_length w_71 6;
+            set_env_slot w_71 4
+              (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_71 0; get_env_slot w_71 2 ]);
+            assert_env_length w_71 6;
+            set_env_slot w_71 5
+              (Memo.appends [ Memo.from_constructor tag_Pick; get_env_slot w_71 1; get_env_slot w_71 4 ]);
+            trim_resolved w_71 4;
+            return_value w_71 (get_env_slot w_71 5) (pc_to_exp (int_to_pc 0)))
           else failwith "unreachable (105)"
       | _ -> failwith "unreachable (105)")
     105;
   add_exp
     (fun w_73 ->
-      assert_env_length w_73 5;
-      resize_frame w_73 6 (Memo.from_int 0);
-      let arg0_66 = get_env_slot w_73 3 in
-      let arg1_26 = get_env_slot w_73 4 in
-      assert_env_length w_73 6;
-      trim_resolved w_73 5;
+      assert_env_length w_73 2;
+      let arg0_66 = get_env_slot w_73 0 in
+      let arg1_26 = get_env_slot w_73 1 in
+      assert_env_length w_73 2;
       init_frame w_73 2 (Memo.from_int 0);
       set_env_slot w_73 0 arg0_66;
       set_env_slot w_73 1 arg1_26;
@@ -4015,45 +3963,43 @@ let populate_state () =
     106;
   add_exp
     (fun w_75 ->
+      assert_env_length w_75 2;
+      resize_frame w_75 4 (Memo.from_int 0);
       assert_env_length w_75 4;
-      resize_frame w_75 6 (Memo.from_int 0);
-      assert_env_length w_75 6;
-      let resolved_73 = resolve w_75 (Source.E 3) in
+      let resolved_73 = resolve w_75 (Source.E 1) in
       let tag_23 = Word.get_value (fst resolved_73) in
       match tag_23 with
       | 5 (* tag_Const *) ->
           let parts_34 = Memo.splits (snd resolved_73) in
           if List.length parts_34 = 1 then (
             let part0_34 = List.nth parts_34 0 in
-            trim_resolved w_75 4;
-            shuffle_frame w_75 [| NewValue part0_34; Blank; OldSlot 2; OldSlot 3 |] (Memo.from_int 0);
+            trim_resolved w_75 2;
+            shuffle_frame w_75 [| NewValue part0_34; OldSlot 0; OldSlot 1 |] (Memo.from_int 0);
             w_75.state.c <- pc_to_exp (int_to_pc 33))
           else
-            let arg0_69 = get_env_slot w_75 2 in
-            assert_env_length w_75 6;
+            let arg0_69 = get_env_slot w_75 0 in
+            assert_env_length w_75 4;
             w_75.state.k <-
-              Memo.appends [ Memo.from_constructor tag_cont_49; collect_env_slots w_75 [ 3 ]; w_75.state.k ];
-            trim_resolved w_75 4;
+              Memo.appends [ Memo.from_constructor tag_cont_49; collect_env_slots w_75 [ 1 ]; w_75.state.k ];
+            trim_resolved w_75 2;
             init_frame w_75 1 (Memo.from_int 0);
             set_env_slot w_75 0 arg0_69;
             w_75.state.c <- pc_to_exp (int_to_pc 34)
       | _ ->
-          let arg0_69 = get_env_slot w_75 2 in
-          assert_env_length w_75 6;
-          w_75.state.k <- Memo.appends [ Memo.from_constructor tag_cont_49; collect_env_slots w_75 [ 3 ]; w_75.state.k ];
-          trim_resolved w_75 4;
+          let arg0_69 = get_env_slot w_75 0 in
+          assert_env_length w_75 4;
+          w_75.state.k <- Memo.appends [ Memo.from_constructor tag_cont_49; collect_env_slots w_75 [ 1 ]; w_75.state.k ];
+          trim_resolved w_75 2;
           init_frame w_75 1 (Memo.from_int 0);
           set_env_slot w_75 0 arg0_69;
           w_75.state.c <- pc_to_exp (int_to_pc 34))
     107;
   add_exp
     (fun w_76 ->
-      assert_env_length w_76 5;
-      resize_frame w_76 6 (Memo.from_int 0);
-      let arg0_70 = get_env_slot w_76 3 in
-      let arg1_27 = get_env_slot w_76 4 in
-      assert_env_length w_76 6;
-      trim_resolved w_76 5;
+      assert_env_length w_76 2;
+      let arg0_70 = get_env_slot w_76 0 in
+      let arg1_27 = get_env_slot w_76 1 in
+      assert_env_length w_76 2;
       init_frame w_76 2 (Memo.from_int 0);
       set_env_slot w_76 0 arg0_70;
       set_env_slot w_76 1 arg1_27;
@@ -4061,37 +4007,33 @@ let populate_state () =
     108;
   add_exp
     (fun w_79 ->
-      assert_env_length w_79 14;
-      resize_frame w_79 22 (Memo.from_int 0);
-      let arg0_72 = get_env_slot w_79 4 in
-      assert_env_length w_79 22;
-      w_79.state.k <- Memo.appends [ Memo.from_constructor tag_cont_51; collect_env_slots w_79 [ 13 ]; w_79.state.k ];
-      trim_resolved w_79 14;
+      assert_env_length w_79 2;
+      let arg0_72 = get_env_slot w_79 0 in
+      assert_env_length w_79 2;
+      w_79.state.k <- Memo.appends [ Memo.from_constructor tag_cont_51; collect_env_slots w_79 [ 1 ]; w_79.state.k ];
       init_frame w_79 1 (Memo.from_int 0);
       set_env_slot w_79 0 arg0_72;
       w_79.state.c <- pc_to_exp (int_to_pc 1))
     109;
   add_exp
     (fun w_80 ->
-      assert_env_length w_80 15;
-      resize_frame w_80 22 (Memo.from_int 0);
-      assert_env_length w_80 22;
-      let resolved_79 = resolve w_80 (Source.E 13) in
-      let resolved_80 = resolve w_80 (Source.E 14) in
-      set_env_slot w_80 15
+      assert_env_length w_80 2;
+      resize_frame w_80 3 (Memo.from_int 0);
+      assert_env_length w_80 3;
+      let resolved_79 = resolve w_80 (Source.E 0) in
+      let resolved_80 = resolve w_80 (Source.E 1) in
+      set_env_slot w_80 2
         (Memo.from_int (if Word.get_value (fst resolved_79) = Word.get_value (fst resolved_80) then 1 else 0));
-      trim_resolved w_80 15;
-      return_value w_80 (get_env_slot w_80 15) (pc_to_exp (int_to_pc 0)))
+      trim_resolved w_80 2;
+      return_value w_80 (get_env_slot w_80 2) (pc_to_exp (int_to_pc 0)))
     110;
   add_exp
     (fun w_81 ->
-      assert_env_length w_81 17;
-      resize_frame w_81 22 (Memo.from_int 0);
-      let arg0_74 = get_env_slot w_81 6 in
-      let arg1_29 = get_env_slot w_81 8 in
-      assert_env_length w_81 22;
-      w_81.state.k <- Memo.appends [ Memo.from_constructor tag_cont_53; collect_env_slots w_81 [ 16 ]; w_81.state.k ];
-      trim_resolved w_81 17;
+      assert_env_length w_81 3;
+      let arg0_74 = get_env_slot w_81 0 in
+      let arg1_29 = get_env_slot w_81 1 in
+      assert_env_length w_81 3;
+      w_81.state.k <- Memo.appends [ Memo.from_constructor tag_cont_53; collect_env_slots w_81 [ 2 ]; w_81.state.k ];
       init_frame w_81 2 (Memo.from_int 0);
       set_env_slot w_81 0 arg0_74;
       set_env_slot w_81 1 arg1_29;
@@ -4099,26 +4041,24 @@ let populate_state () =
     111;
   add_exp
     (fun w_82 ->
-      assert_env_length w_82 18;
-      resize_frame w_82 22 (Memo.from_int 0);
-      assert_env_length w_82 22;
-      let resolved_82 = resolve w_82 (Source.E 16) in
-      let resolved_83 = resolve w_82 (Source.E 17) in
-      set_env_slot w_82 18
+      assert_env_length w_82 2;
+      resize_frame w_82 3 (Memo.from_int 0);
+      assert_env_length w_82 3;
+      let resolved_82 = resolve w_82 (Source.E 0) in
+      let resolved_83 = resolve w_82 (Source.E 1) in
+      set_env_slot w_82 2
         (Memo.from_int
            (if Word.get_value (fst resolved_82) <> 0 && Word.get_value (fst resolved_83) <> 0 then 1 else 0));
-      trim_resolved w_82 18;
-      return_value w_82 (get_env_slot w_82 18) (pc_to_exp (int_to_pc 0)))
+      trim_resolved w_82 2;
+      return_value w_82 (get_env_slot w_82 2) (pc_to_exp (int_to_pc 0)))
     112;
   add_exp
     (fun w_83 ->
-      assert_env_length w_83 20;
-      resize_frame w_83 22 (Memo.from_int 0);
-      let arg0_76 = get_env_slot w_83 10 in
-      let arg1_31 = get_env_slot w_83 12 in
-      assert_env_length w_83 22;
-      w_83.state.k <- Memo.appends [ Memo.from_constructor tag_cont_55; collect_env_slots w_83 [ 19 ]; w_83.state.k ];
-      trim_resolved w_83 20;
+      assert_env_length w_83 3;
+      let arg0_76 = get_env_slot w_83 0 in
+      let arg1_31 = get_env_slot w_83 1 in
+      assert_env_length w_83 3;
+      w_83.state.k <- Memo.appends [ Memo.from_constructor tag_cont_55; collect_env_slots w_83 [ 2 ]; w_83.state.k ];
       init_frame w_83 2 (Memo.from_int 0);
       set_env_slot w_83 0 arg0_76;
       set_env_slot w_83 1 arg1_31;
@@ -4126,27 +4066,25 @@ let populate_state () =
     113;
   add_exp
     (fun w_84 ->
-      assert_env_length w_84 21;
-      resize_frame w_84 22 (Memo.from_int 0);
-      assert_env_length w_84 22;
-      let resolved_85 = resolve w_84 (Source.E 19) in
-      let resolved_86 = resolve w_84 (Source.E 20) in
-      set_env_slot w_84 21
+      assert_env_length w_84 2;
+      resize_frame w_84 3 (Memo.from_int 0);
+      assert_env_length w_84 3;
+      let resolved_85 = resolve w_84 (Source.E 0) in
+      let resolved_86 = resolve w_84 (Source.E 1) in
+      set_env_slot w_84 2
         (Memo.from_int
            (if Word.get_value (fst resolved_85) <> 0 && Word.get_value (fst resolved_86) <> 0 then 1 else 0));
-      trim_resolved w_84 21;
-      return_value w_84 (get_env_slot w_84 21) (pc_to_exp (int_to_pc 0)))
+      trim_resolved w_84 2;
+      return_value w_84 (get_env_slot w_84 2) (pc_to_exp (int_to_pc 0)))
     114;
   add_exp
     (fun w_87 ->
-      assert_env_length w_87 9;
-      resize_frame w_87 14 (Memo.from_int 0);
-      let arg0_78 = get_env_slot w_87 5 in
-      let arg1_33 = get_env_slot w_87 1 in
-      let arg2_2 = get_env_slot w_87 2 in
-      assert_env_length w_87 14;
-      w_87.state.k <- Memo.appends [ Memo.from_constructor tag_cont_57; collect_env_slots w_87 [ 8 ]; w_87.state.k ];
-      trim_resolved w_87 9;
+      assert_env_length w_87 4;
+      let arg0_78 = get_env_slot w_87 2 in
+      let arg1_33 = get_env_slot w_87 0 in
+      let arg2_2 = get_env_slot w_87 1 in
+      assert_env_length w_87 4;
+      w_87.state.k <- Memo.appends [ Memo.from_constructor tag_cont_57; collect_env_slots w_87 [ 3 ]; w_87.state.k ];
       init_frame w_87 3 (Memo.from_int 0);
       set_env_slot w_87 0 arg0_78;
       set_env_slot w_87 1 arg1_33;
@@ -4155,25 +4093,23 @@ let populate_state () =
     115;
   add_exp
     (fun w_88 ->
-      assert_env_length w_88 10;
-      resize_frame w_88 14 (Memo.from_int 0);
-      assert_env_length w_88 14;
-      let resolved_89 = resolve w_88 (Source.E 8) in
-      let resolved_90 = resolve w_88 (Source.E 9) in
-      set_env_slot w_88 10 (Memo.from_int (Word.get_value (fst resolved_89) + Word.get_value (fst resolved_90)));
-      trim_resolved w_88 10;
-      return_value w_88 (get_env_slot w_88 10) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_88 2;
+      resize_frame w_88 3 (Memo.from_int 0);
+      assert_env_length w_88 3;
+      let resolved_89 = resolve w_88 (Source.E 0) in
+      let resolved_90 = resolve w_88 (Source.E 1) in
+      set_env_slot w_88 2 (Memo.from_int (Word.get_value (fst resolved_89) + Word.get_value (fst resolved_90)));
+      trim_resolved w_88 2;
+      return_value w_88 (get_env_slot w_88 2) (pc_to_exp (int_to_pc 0)))
     116;
   add_exp
     (fun w_89 ->
-      assert_env_length w_89 12;
-      resize_frame w_89 14 (Memo.from_int 0);
-      let arg0_80 = get_env_slot w_89 7 in
-      let arg1_35 = get_env_slot w_89 1 in
-      let arg2_4 = get_env_slot w_89 2 in
-      assert_env_length w_89 14;
-      w_89.state.k <- Memo.appends [ Memo.from_constructor tag_cont_59; collect_env_slots w_89 [ 11 ]; w_89.state.k ];
-      trim_resolved w_89 12;
+      assert_env_length w_89 4;
+      let arg0_80 = get_env_slot w_89 2 in
+      let arg1_35 = get_env_slot w_89 0 in
+      let arg2_4 = get_env_slot w_89 1 in
+      assert_env_length w_89 4;
+      w_89.state.k <- Memo.appends [ Memo.from_constructor tag_cont_59; collect_env_slots w_89 [ 3 ]; w_89.state.k ];
       init_frame w_89 3 (Memo.from_int 0);
       set_env_slot w_89 0 arg0_80;
       set_env_slot w_89 1 arg1_35;
@@ -4182,20 +4118,20 @@ let populate_state () =
     117;
   add_exp
     (fun w_90 ->
-      assert_env_length w_90 13;
-      resize_frame w_90 14 (Memo.from_int 0);
-      assert_env_length w_90 14;
-      let resolved_91 = resolve w_90 (Source.E 11) in
-      let resolved_92 = resolve w_90 (Source.E 12) in
-      set_env_slot w_90 13 (Memo.from_int (Word.get_value (fst resolved_91) * Word.get_value (fst resolved_92)));
-      trim_resolved w_90 13;
-      return_value w_90 (get_env_slot w_90 13) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_90 2;
+      resize_frame w_90 3 (Memo.from_int 0);
+      assert_env_length w_90 3;
+      let resolved_91 = resolve w_90 (Source.E 0) in
+      let resolved_92 = resolve w_90 (Source.E 1) in
+      set_env_slot w_90 2 (Memo.from_int (Word.get_value (fst resolved_91) * Word.get_value (fst resolved_92)));
+      trim_resolved w_90 2;
+      return_value w_90 (get_env_slot w_90 2) (pc_to_exp (int_to_pc 0)))
     118;
   add_exp
     (fun w_94 ->
       assert_env_length w_94 7;
-      resize_frame w_94 14 (Memo.from_int 0);
-      assert_env_length w_94 14;
+      resize_frame w_94 13 (Memo.from_int 0);
+      assert_env_length w_94 13;
       let resolved_96 = resolve w_94 (Source.E 6) in
       let tag_34 = Word.get_value (fst resolved_96) in
       match tag_34 with
@@ -4204,10 +4140,10 @@ let populate_state () =
           if List.length parts_51 = 1 then (
             let part0_51 = List.nth parts_51 0 in
             set_env_slot w_94 4 part0_51;
-            assert_env_length w_94 14;
+            assert_env_length w_94 13;
             set_env_slot w_94 7
               (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_94 3; get_env_slot w_94 4 ]);
-            assert_env_length w_94 14;
+            assert_env_length w_94 13;
             set_env_slot w_94 8
               (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_94 2; get_env_slot w_94 7 ]);
             trim_resolved w_94 7;
@@ -4216,7 +4152,7 @@ let populate_state () =
       | 9 (* tag_Missing *) ->
           let arg0_82 = get_env_slot w_94 3 in
           let arg1_37 = get_env_slot w_94 1 in
-          assert_env_length w_94 14;
+          assert_env_length w_94 13;
           w_94.state.k <-
             Memo.appends [ Memo.from_constructor tag_cont_61; collect_env_slots w_94 [ 0; 1; 2; 3; 5 ]; w_94.state.k ];
           trim_resolved w_94 7;
@@ -4228,42 +4164,39 @@ let populate_state () =
     119;
   add_exp
     (fun w_95 ->
-      assert_env_length w_95 10;
-      resize_frame w_95 14 (Memo.from_int 0);
-      assert_env_length w_95 14;
-      let resolved_97 = resolve w_95 (Source.E 9) in
+      assert_env_length w_95 6;
+      resize_frame w_95 9 (Memo.from_int 0);
+      assert_env_length w_95 9;
+      let resolved_97 = resolve w_95 (Source.E 5) in
       let tag_35 = Word.get_value (fst resolved_97) in
       match tag_35 with
       | 10 (* tag_Found *) ->
           let parts_52 = Memo.splits (snd resolved_97) in
           if List.length parts_52 = 1 then (
             let part0_52 = List.nth parts_52 0 in
-            set_env_slot w_95 5 part0_52;
-            assert_env_length w_95 14;
-            set_env_slot w_95 10
-              (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_95 2; get_env_slot w_95 5 ]);
-            assert_env_length w_95 14;
-            set_env_slot w_95 11
-              (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_95 3; get_env_slot w_95 10 ]);
-            trim_resolved w_95 10;
-            return_value w_95 (get_env_slot w_95 11) (pc_to_exp (int_to_pc 0)))
+            set_env_slot w_95 4 part0_52;
+            assert_env_length w_95 9;
+            set_env_slot w_95 6
+              (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_95 2; get_env_slot w_95 4 ]);
+            assert_env_length w_95 9;
+            set_env_slot w_95 7
+              (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_95 3; get_env_slot w_95 6 ]);
+            trim_resolved w_95 6;
+            return_value w_95 (get_env_slot w_95 7) (pc_to_exp (int_to_pc 0)))
           else failwith "unreachable (120)"
       | 9 (* tag_Missing *) ->
-          assert_env_length w_95 14;
-          set_env_slot w_95 12
-            (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_95 0; get_env_slot w_95 1 ]);
-          trim_resolved w_95 10;
-          return_value w_95 (get_env_slot w_95 12) (pc_to_exp (int_to_pc 0))
+          assert_env_length w_95 9;
+          set_env_slot w_95 8 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_95 0; get_env_slot w_95 1 ]);
+          trim_resolved w_95 6;
+          return_value w_95 (get_env_slot w_95 8) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (120)")
     120;
   add_exp
     (fun w_97 ->
-      assert_env_length w_97 4;
-      resize_frame w_97 5 (Memo.from_int 0);
-      let arg0_84 = get_env_slot w_97 1 in
-      let arg1_38 = get_env_slot w_97 3 in
-      assert_env_length w_97 5;
-      trim_resolved w_97 4;
+      assert_env_length w_97 2;
+      let arg0_84 = get_env_slot w_97 0 in
+      let arg1_38 = get_env_slot w_97 1 in
+      assert_env_length w_97 2;
       init_frame w_97 2 (Memo.from_int 0);
       set_env_slot w_97 0 arg0_84;
       set_env_slot w_97 1 arg1_38;
@@ -4301,11 +4234,9 @@ let populate_state () =
   add_exp
     (fun w_105 ->
       assert_env_length w_105 2;
-      resize_frame w_105 8 (Memo.from_int 0);
       let arg0_90 = get_env_slot w_105 0 in
-      assert_env_length w_105 8;
+      assert_env_length w_105 2;
       w_105.state.k <- Memo.appends [ Memo.from_constructor tag_cont_71; collect_env_slots w_105 [ 1 ]; w_105.state.k ];
-      trim_resolved w_105 2;
       init_frame w_105 1 (Memo.from_int 0);
       set_env_slot w_105 0 arg0_90;
       w_105.state.c <- pc_to_exp (int_to_pc 27))
@@ -4313,12 +4244,10 @@ let populate_state () =
   add_exp
     (fun w_106 ->
       assert_env_length w_106 2;
-      resize_frame w_106 8 (Memo.from_int 0);
       let arg0_91 = get_env_slot w_106 1 in
       let arg1_39 = get_env_slot w_106 0 in
-      assert_env_length w_106 8;
+      assert_env_length w_106 2;
       w_106.state.k <- Memo.appends [ Memo.from_constructor tag_cont_70; collect_env_slots w_106 []; w_106.state.k ];
-      trim_resolved w_106 2;
       init_frame w_106 2 (Memo.from_int 0);
       set_env_slot w_106 0 arg0_91;
       set_env_slot w_106 1 arg1_39;
@@ -4327,11 +4256,9 @@ let populate_state () =
   add_exp
     (fun w_107 ->
       assert_env_length w_107 1;
-      resize_frame w_107 8 (Memo.from_int 0);
       let arg0_92 = get_env_slot w_107 0 in
-      assert_env_length w_107 8;
+      assert_env_length w_107 1;
       w_107.state.k <- Memo.appends [ Memo.from_constructor tag_cont_69; collect_env_slots w_107 [ 0 ]; w_107.state.k ];
-      trim_resolved w_107 1;
       init_frame w_107 1 (Memo.from_int 0);
       set_env_slot w_107 0 arg0_92;
       w_107.state.c <- pc_to_exp (int_to_pc 32))
@@ -4363,34 +4290,32 @@ let populate_state () =
     128;
   add_exp
     (fun w_109 ->
-      assert_env_length w_109 5;
-      resize_frame w_109 8 (Memo.from_int 0);
-      let arg0_94 = get_env_slot w_109 4 in
-      assert_env_length w_109 8;
-      w_109.state.k <- Memo.appends [ Memo.from_constructor tag_cont_67; collect_env_slots w_109 [ 1 ]; w_109.state.k ];
-      trim_resolved w_109 5;
+      assert_env_length w_109 2;
+      let arg0_94 = get_env_slot w_109 1 in
+      assert_env_length w_109 2;
+      w_109.state.k <- Memo.appends [ Memo.from_constructor tag_cont_67; collect_env_slots w_109 [ 0 ]; w_109.state.k ];
       init_frame w_109 1 (Memo.from_int 0);
       set_env_slot w_109 0 arg0_94;
       w_109.state.c <- pc_to_exp (int_to_pc 36))
     129;
   add_exp
     (fun w_110 ->
-      assert_env_length w_110 6;
-      resize_frame w_110 8 (Memo.from_int 0);
-      assert_env_length w_110 8;
-      let resolved_103 = resolve w_110 (Source.E 1) in
-      set_env_slot w_110 6
+      assert_env_length w_110 2;
+      resize_frame w_110 4 (Memo.from_int 0);
+      assert_env_length w_110 4;
+      let resolved_103 = resolve w_110 (Source.E 0) in
+      set_env_slot w_110 2
         (Memo.from_int
            (if Word.get_value (fst resolved_103) = Word.get_value (Memo.to_word (Memo.from_int 1)) then 1 else 0));
-      let resolved_104 = resolve w_110 (Source.E 6) in
+      let resolved_104 = resolve w_110 (Source.E 2) in
       if Word.get_value (fst resolved_104) <> 0 then (
-        trim_resolved w_110 6;
-        return_value w_110 (get_env_slot w_110 5) (pc_to_exp (int_to_pc 0)))
+        trim_resolved w_110 2;
+        return_value w_110 (get_env_slot w_110 1) (pc_to_exp (int_to_pc 0)))
       else
-        let arg0_95 = get_env_slot w_110 1 in
-        let arg1_40 = get_env_slot w_110 5 in
-        assert_env_length w_110 8;
-        trim_resolved w_110 6;
+        let arg0_95 = get_env_slot w_110 0 in
+        let arg1_40 = get_env_slot w_110 1 in
+        assert_env_length w_110 4;
+        trim_resolved w_110 2;
         init_frame w_110 2 (Memo.from_int 0);
         set_env_slot w_110 0 arg0_95;
         set_env_slot w_110 1 arg1_40;
@@ -4398,48 +4323,46 @@ let populate_state () =
     130;
   add_exp
     (fun w_112 ->
-      assert_env_length w_112 4;
-      resize_frame w_112 6 (Memo.from_int 0);
-      let arg0_97 = get_env_slot w_112 2 in
-      assert_env_length w_112 6;
-      w_112.state.k <- Memo.appends [ Memo.from_constructor tag_cont_73; collect_env_slots w_112 [ 3 ]; w_112.state.k ];
-      trim_resolved w_112 4;
+      assert_env_length w_112 2;
+      let arg0_97 = get_env_slot w_112 0 in
+      assert_env_length w_112 2;
+      w_112.state.k <- Memo.appends [ Memo.from_constructor tag_cont_73; collect_env_slots w_112 [ 1 ]; w_112.state.k ];
       init_frame w_112 1 (Memo.from_int 0);
       set_env_slot w_112 0 arg0_97;
       w_112.state.c <- pc_to_exp (int_to_pc 32))
     131;
   add_exp
     (fun w_113 ->
-      assert_env_length w_113 5;
-      resize_frame w_113 6 (Memo.from_int 0);
-      assert_env_length w_113 6;
-      let resolved_106 = resolve w_113 (Source.E 3) in
-      let resolved_107 = resolve w_113 (Source.E 4) in
-      set_env_slot w_113 5 (Memo.from_int (Word.get_value (fst resolved_106) * Word.get_value (fst resolved_107)));
-      trim_resolved w_113 5;
-      return_value w_113 (get_env_slot w_113 5) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_113 2;
+      resize_frame w_113 3 (Memo.from_int 0);
+      assert_env_length w_113 3;
+      let resolved_106 = resolve w_113 (Source.E 0) in
+      let resolved_107 = resolve w_113 (Source.E 1) in
+      set_env_slot w_113 2 (Memo.from_int (Word.get_value (fst resolved_106) * Word.get_value (fst resolved_107)));
+      trim_resolved w_113 2;
+      return_value w_113 (get_env_slot w_113 2) (pc_to_exp (int_to_pc 0)))
     132;
   add_exp
     (fun w_115 ->
+      assert_env_length w_115 2;
+      resize_frame w_115 3 (Memo.from_int 0);
       assert_env_length w_115 3;
-      resize_frame w_115 4 (Memo.from_int 0);
-      assert_env_length w_115 4;
-      set_env_slot w_115 3 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_115 0; get_env_slot w_115 2 ]);
-      trim_resolved w_115 3;
-      return_value w_115 (get_env_slot w_115 3) (pc_to_exp (int_to_pc 0)))
+      set_env_slot w_115 2 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_115 0; get_env_slot w_115 1 ]);
+      trim_resolved w_115 2;
+      return_value w_115 (get_env_slot w_115 2) (pc_to_exp (int_to_pc 0)))
     133;
   add_exp
     (fun w_118 ->
-      assert_env_length w_118 6;
-      resize_frame w_118 12 (Memo.from_int 0);
-      assert_env_length w_118 12;
-      set_env_slot w_118 6 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_118 0; get_env_slot w_118 2 ]);
-      let arg0_100 = get_env_slot w_118 5 in
-      let arg1_42 = get_env_slot w_118 6 in
-      assert_env_length w_118 12;
+      assert_env_length w_118 5;
+      resize_frame w_118 11 (Memo.from_int 0);
+      assert_env_length w_118 11;
+      set_env_slot w_118 5 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_118 0; get_env_slot w_118 2 ]);
+      let arg0_100 = get_env_slot w_118 4 in
+      let arg1_42 = get_env_slot w_118 5 in
+      assert_env_length w_118 11;
       w_118.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_78; collect_env_slots w_118 [ 0; 1; 3; 5 ]; w_118.state.k ];
-      trim_resolved w_118 6;
+        Memo.appends [ Memo.from_constructor tag_cont_78; collect_env_slots w_118 [ 0; 1; 3; 4 ]; w_118.state.k ];
+      trim_resolved w_118 5;
       init_frame w_118 2 (Memo.from_int 0);
       set_env_slot w_118 0 arg0_100;
       set_env_slot w_118 1 arg1_42;
@@ -4447,24 +4370,24 @@ let populate_state () =
     134;
   add_exp
     (fun w_119 ->
-      assert_env_length w_119 8;
-      resize_frame w_119 12 (Memo.from_int 0);
-      let resolved_111 = resolve w_119 (Source.E 7) in
+      assert_env_length w_119 5;
+      resize_frame w_119 9 (Memo.from_int 0);
+      let resolved_111 = resolve w_119 (Source.E 4) in
       if Word.get_value (fst resolved_111) <> 0 then (
         let arg0_103 = get_env_slot w_119 1 in
-        assert_env_length w_119 12;
+        assert_env_length w_119 9;
         w_119.state.k <-
           Memo.appends [ Memo.from_constructor tag_cont_77; collect_env_slots w_119 [ 0 ]; w_119.state.k ];
-        trim_resolved w_119 8;
+        trim_resolved w_119 5;
         init_frame w_119 1 (Memo.from_int 0);
         set_env_slot w_119 0 arg0_103;
         w_119.state.c <- pc_to_exp (int_to_pc 41))
       else
-        let arg0_101 = get_env_slot w_119 5 in
-        let arg1_43 = get_env_slot w_119 3 in
-        assert_env_length w_119 12;
+        let arg0_101 = get_env_slot w_119 3 in
+        let arg1_43 = get_env_slot w_119 2 in
+        assert_env_length w_119 9;
         w_119.state.k <- Memo.appends [ Memo.from_constructor tag_cont_76; collect_env_slots w_119 []; w_119.state.k ];
-        trim_resolved w_119 8;
+        trim_resolved w_119 5;
         init_frame w_119 2 (Memo.from_int 0);
         set_env_slot w_119 0 arg0_101;
         set_env_slot w_119 1 arg1_43;
@@ -4472,58 +4395,52 @@ let populate_state () =
     135;
   add_exp
     (fun w_120 ->
-      assert_env_length w_120 11;
-      resize_frame w_120 12 (Memo.from_int 0);
-      let arg0_102 = get_env_slot w_120 10 in
-      assert_env_length w_120 12;
-      trim_resolved w_120 11;
+      assert_env_length w_120 1;
+      let arg0_102 = get_env_slot w_120 0 in
+      assert_env_length w_120 1;
       init_frame w_120 1 (Memo.from_int 0);
       set_env_slot w_120 0 arg0_102;
       w_120.state.c <- pc_to_exp (int_to_pc 41))
     136;
   add_exp
     (fun w_121 ->
-      assert_env_length w_121 9;
-      resize_frame w_121 12 (Memo.from_int 0);
-      assert_env_length w_121 12;
-      set_env_slot w_121 9
-        (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_121 0; get_env_slot w_121 8 ]);
-      trim_resolved w_121 9;
-      return_value w_121 (get_env_slot w_121 9) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_121 2;
+      resize_frame w_121 3 (Memo.from_int 0);
+      assert_env_length w_121 3;
+      set_env_slot w_121 2
+        (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_121 0; get_env_slot w_121 1 ]);
+      trim_resolved w_121 2;
+      return_value w_121 (get_env_slot w_121 2) (pc_to_exp (int_to_pc 0)))
     137;
   add_exp
     (fun w_124 ->
-      assert_env_length w_124 7;
-      resize_frame w_124 17 (Memo.from_int 0);
-      assert_env_length w_124 17;
-      set_env_slot w_124 7
-        (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_124 6; Memo.from_constructor tag_ENil ]);
-      trim_resolved w_124 7;
-      return_value w_124 (get_env_slot w_124 7) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_124 1;
+      resize_frame w_124 2 (Memo.from_int 0);
+      assert_env_length w_124 2;
+      set_env_slot w_124 1
+        (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_124 0; Memo.from_constructor tag_ENil ]);
+      trim_resolved w_124 1;
+      return_value w_124 (get_env_slot w_124 1) (pc_to_exp (int_to_pc 0)))
     138;
   add_exp
     (fun w_125 ->
-      assert_env_length w_125 9;
-      resize_frame w_125 17 (Memo.from_int 0);
-      let arg0_106 = get_env_slot w_125 3 in
-      assert_env_length w_125 17;
+      assert_env_length w_125 5;
+      let arg0_106 = get_env_slot w_125 2 in
+      assert_env_length w_125 5;
       w_125.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_84; collect_env_slots w_125 [ 0; 1; 4; 8 ]; w_125.state.k ];
-      trim_resolved w_125 9;
+        Memo.appends [ Memo.from_constructor tag_cont_84; collect_env_slots w_125 [ 0; 1; 3; 4 ]; w_125.state.k ];
       init_frame w_125 1 (Memo.from_int 0);
       set_env_slot w_125 0 arg0_106;
       w_125.state.c <- pc_to_exp (int_to_pc 12))
     139;
   add_exp
     (fun w_126 ->
-      assert_env_length w_126 10;
-      resize_frame w_126 17 (Memo.from_int 0);
+      assert_env_length w_126 5;
       let arg0_107 = get_env_slot w_126 0 in
-      let arg1_45 = get_env_slot w_126 8 in
-      assert_env_length w_126 17;
+      let arg1_45 = get_env_slot w_126 3 in
+      assert_env_length w_126 5;
       w_126.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_83; collect_env_slots w_126 [ 0; 1; 4; 8; 9 ]; w_126.state.k ];
-      trim_resolved w_126 10;
+        Memo.appends [ Memo.from_constructor tag_cont_83; collect_env_slots w_126 [ 0; 1; 2; 3; 4 ]; w_126.state.k ];
       init_frame w_126 2 (Memo.from_int 0);
       set_env_slot w_126 0 arg0_107;
       set_env_slot w_126 1 arg1_45;
@@ -4531,32 +4448,32 @@ let populate_state () =
     140;
   add_exp
     (fun w_127 ->
-      assert_env_length w_127 11;
-      resize_frame w_127 17 (Memo.from_int 0);
-      let resolved_116 = resolve w_127 (Source.E 10) in
+      assert_env_length w_127 6;
+      resize_frame w_127 12 (Memo.from_int 0);
+      let resolved_116 = resolve w_127 (Source.E 5) in
       if Word.get_value (fst resolved_116) <> 0 then (
-        assert_env_length w_127 17;
+        assert_env_length w_127 12;
         let resolved_119 = resolve w_127 (Source.E 1) in
-        let resolved_120 = resolve w_127 (Source.E 9) in
-        set_env_slot w_127 11 (Memo.from_int (Word.get_value (fst resolved_119) + Word.get_value (fst resolved_120)));
+        let resolved_120 = resolve w_127 (Source.E 4) in
+        set_env_slot w_127 6 (Memo.from_int (Word.get_value (fst resolved_119) + Word.get_value (fst resolved_120)));
         let arg0_111 = get_env_slot w_127 0 in
-        let arg1_49 = get_env_slot w_127 11 in
-        let arg2_6 = get_env_slot w_127 4 in
-        assert_env_length w_127 17;
-        trim_resolved w_127 11;
+        let arg1_49 = get_env_slot w_127 6 in
+        let arg2_6 = get_env_slot w_127 2 in
+        assert_env_length w_127 12;
+        trim_resolved w_127 6;
         init_frame w_127 3 (Memo.from_int 0);
         set_env_slot w_127 0 arg0_111;
         set_env_slot w_127 1 arg1_49;
         set_env_slot w_127 2 arg2_6;
         w_127.state.c <- pc_to_exp (int_to_pc 38))
       else
-        let arg0_108 = get_env_slot w_127 8 in
-        let arg1_46 = get_env_slot w_127 9 in
-        let arg2_5 = get_env_slot w_127 4 in
-        assert_env_length w_127 17;
+        let arg0_108 = get_env_slot w_127 3 in
+        let arg1_46 = get_env_slot w_127 4 in
+        let arg2_5 = get_env_slot w_127 2 in
+        assert_env_length w_127 12;
         w_127.state.k <-
           Memo.appends [ Memo.from_constructor tag_cont_82; collect_env_slots w_127 [ 0; 1 ]; w_127.state.k ];
-        trim_resolved w_127 11;
+        trim_resolved w_127 6;
         init_frame w_127 3 (Memo.from_int 0);
         set_env_slot w_127 0 arg0_108;
         set_env_slot w_127 1 arg1_46;
@@ -4565,24 +4482,24 @@ let populate_state () =
     141;
   add_exp
     (fun w_128 ->
-      assert_env_length w_128 14;
-      resize_frame w_128 17 (Memo.from_int 0);
-      assert_env_length w_128 17;
+      assert_env_length w_128 3;
+      resize_frame w_128 6 (Memo.from_int 0);
+      assert_env_length w_128 6;
       let resolved_117 = resolve w_128 (Source.E 1) in
-      set_env_slot w_128 14
+      set_env_slot w_128 3
         (Memo.from_int
            (if Word.get_value (fst resolved_117) = Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
-      let resolved_118 = resolve w_128 (Source.E 14) in
+      let resolved_118 = resolve w_128 (Source.E 3) in
       if Word.get_value (fst resolved_118) <> 0 then (
-        trim_resolved w_128 14;
-        return_value w_128 (get_env_slot w_128 13) (pc_to_exp (int_to_pc 0)))
+        trim_resolved w_128 3;
+        return_value w_128 (get_env_slot w_128 2) (pc_to_exp (int_to_pc 0)))
       else
         let arg0_109 = get_env_slot w_128 1 in
         let arg1_47 = get_env_slot w_128 0 in
-        assert_env_length w_128 17;
+        assert_env_length w_128 6;
         w_128.state.k <-
-          Memo.appends [ Memo.from_constructor tag_cont_81; collect_env_slots w_128 [ 13 ]; w_128.state.k ];
-        trim_resolved w_128 14;
+          Memo.appends [ Memo.from_constructor tag_cont_81; collect_env_slots w_128 [ 2 ]; w_128.state.k ];
+        trim_resolved w_128 3;
         init_frame w_128 2 (Memo.from_int 0);
         set_env_slot w_128 0 arg0_109;
         set_env_slot w_128 1 arg1_47;
@@ -4590,12 +4507,10 @@ let populate_state () =
     142;
   add_exp
     (fun w_129 ->
-      assert_env_length w_129 16;
-      resize_frame w_129 17 (Memo.from_int 0);
-      let arg0_110 = get_env_slot w_129 15 in
-      let arg1_48 = get_env_slot w_129 13 in
-      assert_env_length w_129 17;
-      trim_resolved w_129 16;
+      assert_env_length w_129 2;
+      let arg0_110 = get_env_slot w_129 1 in
+      let arg1_48 = get_env_slot w_129 0 in
+      assert_env_length w_129 2;
       init_frame w_129 2 (Memo.from_int 0);
       set_env_slot w_129 0 arg0_110;
       set_env_slot w_129 1 arg1_48;
@@ -4603,25 +4518,25 @@ let populate_state () =
     143;
   add_exp
     (fun w_131 ->
-      assert_env_length w_131 5;
-      resize_frame w_131 6 (Memo.from_int 0);
-      assert_env_length w_131 6;
-      set_env_slot w_131 5
-        (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_131 2; get_env_slot w_131 4 ]);
-      trim_resolved w_131 5;
-      return_value w_131 (get_env_slot w_131 5) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_131 2;
+      resize_frame w_131 3 (Memo.from_int 0);
+      assert_env_length w_131 3;
+      set_env_slot w_131 2
+        (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_131 0; get_env_slot w_131 1 ]);
+      trim_resolved w_131 2;
+      return_value w_131 (get_env_slot w_131 2) (pc_to_exp (int_to_pc 0)))
     144;
   add_exp
     (fun w_133 ->
-      assert_env_length w_133 7;
+      assert_env_length w_133 3;
       resize_frame w_133 15 (Memo.from_int 0);
-      let resolved_122 = resolve w_133 (Source.E 6) in
+      let resolved_122 = resolve w_133 (Source.E 2) in
       if Word.get_value (fst resolved_122) <> 0 then (
         assert_env_length w_133 15;
         set_env_slot w_133 7 (Memo.appends [ Memo.from_constructor tag_Const; Memo.from_int 1 ]);
         assert_env_length w_133 15;
         set_env_slot w_133 8 (Memo.appends [ Memo.from_constructor tag_Found; get_env_slot w_133 7 ]);
-        trim_resolved w_133 7;
+        trim_resolved w_133 3;
         return_value w_133 (get_env_slot w_133 8) (pc_to_exp (int_to_pc 0)))
       else (
         assert_env_length w_133 15;
@@ -4633,54 +4548,54 @@ let populate_state () =
             if List.length parts_63 = 2 then (
               let part0_63 = List.nth parts_63 0 in
               let part1_36 = List.nth parts_63 1 in
-              set_env_slot w_133 2 part0_63;
-              set_env_slot w_133 3 part1_36;
+              set_env_slot w_133 3 part0_63;
+              set_env_slot w_133 4 part1_36;
               let arg0_114 = get_env_slot w_133 0 in
-              let arg1_52 = get_env_slot w_133 2 in
+              let arg1_52 = get_env_slot w_133 3 in
               assert_env_length w_133 15;
               w_133.state.k <-
                 Memo.appends
-                  [ Memo.from_constructor tag_cont_88; collect_env_slots w_133 [ 0; 2; 3; 4; 5 ]; w_133.state.k ];
-              trim_resolved w_133 7;
+                  [ Memo.from_constructor tag_cont_88; collect_env_slots w_133 [ 0; 3; 4; 5; 6 ]; w_133.state.k ];
+              trim_resolved w_133 3;
               init_frame w_133 2 (Memo.from_int 0);
               set_env_slot w_133 0 arg0_114;
               set_env_slot w_133 1 arg1_52;
               w_133.state.c <- pc_to_exp (int_to_pc 15))
             else (
-              trim_resolved w_133 7;
+              trim_resolved w_133 3;
               return_value w_133 (Memo.from_constructor tag_Missing) (pc_to_exp (int_to_pc 0)))
         | _ ->
-            trim_resolved w_133 7;
+            trim_resolved w_133 3;
             return_value w_133 (Memo.from_constructor tag_Missing) (pc_to_exp (int_to_pc 0))))
     145;
   add_exp
     (fun w_134 ->
-      assert_env_length w_134 10;
-      resize_frame w_134 15 (Memo.from_int 0);
-      assert_env_length w_134 15;
-      let resolved_124 = resolve w_134 (Source.E 9) in
+      assert_env_length w_134 6;
+      resize_frame w_134 11 (Memo.from_int 0);
+      assert_env_length w_134 11;
+      let resolved_124 = resolve w_134 (Source.E 5) in
       let tag_47 = Word.get_value (fst resolved_124) in
       match tag_47 with
       | 10 (* tag_Found *) ->
           let parts_64 = Memo.splits (snd resolved_124) in
           if List.length parts_64 = 1 then (
             let part0_64 = List.nth parts_64 0 in
-            set_env_slot w_134 4 part0_64;
-            assert_env_length w_134 15;
-            set_env_slot w_134 10
-              (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_134 4; get_env_slot w_134 3 ]);
-            assert_env_length w_134 15;
-            set_env_slot w_134 11 (Memo.appends [ Memo.from_constructor tag_Found; get_env_slot w_134 10 ]);
-            trim_resolved w_134 10;
-            return_value w_134 (get_env_slot w_134 11) (pc_to_exp (int_to_pc 0)))
+            set_env_slot w_134 3 part0_64;
+            assert_env_length w_134 11;
+            set_env_slot w_134 6
+              (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_134 3; get_env_slot w_134 2 ]);
+            assert_env_length w_134 11;
+            set_env_slot w_134 7 (Memo.appends [ Memo.from_constructor tag_Found; get_env_slot w_134 6 ]);
+            trim_resolved w_134 6;
+            return_value w_134 (get_env_slot w_134 7) (pc_to_exp (int_to_pc 0)))
           else failwith "unreachable (146)"
       | 9 (* tag_Missing *) ->
           let arg0_115 = get_env_slot w_134 0 in
-          let arg1_53 = get_env_slot w_134 3 in
-          assert_env_length w_134 15;
+          let arg1_53 = get_env_slot w_134 2 in
+          assert_env_length w_134 11;
           w_134.state.k <-
-            Memo.appends [ Memo.from_constructor tag_cont_87; collect_env_slots w_134 [ 2; 5 ]; w_134.state.k ];
-          trim_resolved w_134 10;
+            Memo.appends [ Memo.from_constructor tag_cont_87; collect_env_slots w_134 [ 1; 4 ]; w_134.state.k ];
+          trim_resolved w_134 6;
           init_frame w_134 2 (Memo.from_int 0);
           set_env_slot w_134 0 arg0_115;
           set_env_slot w_134 1 arg1_53;
@@ -4689,142 +4604,136 @@ let populate_state () =
     146;
   add_exp
     (fun w_135 ->
-      assert_env_length w_135 13;
-      resize_frame w_135 15 (Memo.from_int 0);
-      assert_env_length w_135 15;
-      let resolved_125 = resolve w_135 (Source.E 12) in
+      assert_env_length w_135 3;
+      resize_frame w_135 5 (Memo.from_int 0);
+      assert_env_length w_135 5;
+      let resolved_125 = resolve w_135 (Source.E 2) in
       let tag_48 = Word.get_value (fst resolved_125) in
       match tag_48 with
       | 10 (* tag_Found *) ->
           let parts_65 = Memo.splits (snd resolved_125) in
           if List.length parts_65 = 1 then (
             let part0_65 = List.nth parts_65 0 in
-            set_env_slot w_135 5 part0_65;
-            assert_env_length w_135 15;
-            set_env_slot w_135 13
-              (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_135 2; get_env_slot w_135 5 ]);
-            assert_env_length w_135 15;
-            set_env_slot w_135 14 (Memo.appends [ Memo.from_constructor tag_Found; get_env_slot w_135 13 ]);
-            trim_resolved w_135 13;
-            return_value w_135 (get_env_slot w_135 14) (pc_to_exp (int_to_pc 0)))
+            set_env_slot w_135 1 part0_65;
+            assert_env_length w_135 5;
+            set_env_slot w_135 3
+              (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_135 0; get_env_slot w_135 1 ]);
+            assert_env_length w_135 5;
+            set_env_slot w_135 4 (Memo.appends [ Memo.from_constructor tag_Found; get_env_slot w_135 3 ]);
+            trim_resolved w_135 3;
+            return_value w_135 (get_env_slot w_135 4) (pc_to_exp (int_to_pc 0)))
           else failwith "unreachable (147)"
       | 9 (* tag_Missing *) ->
-          trim_resolved w_135 13;
+          trim_resolved w_135 3;
           return_value w_135 (Memo.from_constructor tag_Missing) (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (147)")
     147;
   add_exp
     (fun w_138 ->
-      assert_env_length w_138 7;
-      resize_frame w_138 14 (Memo.from_int 0);
-      let arg0_117 = get_env_slot w_138 2 in
-      assert_env_length w_138 14;
-      w_138.state.k <- Memo.appends [ Memo.from_constructor tag_cont_90; collect_env_slots w_138 [ 6 ]; w_138.state.k ];
-      trim_resolved w_138 7;
+      assert_env_length w_138 2;
+      let arg0_117 = get_env_slot w_138 0 in
+      assert_env_length w_138 2;
+      w_138.state.k <- Memo.appends [ Memo.from_constructor tag_cont_90; collect_env_slots w_138 [ 1 ]; w_138.state.k ];
       init_frame w_138 1 (Memo.from_int 0);
       set_env_slot w_138 0 arg0_117;
       w_138.state.c <- pc_to_exp (int_to_pc 54))
     148;
   add_exp
     (fun w_139 ->
-      assert_env_length w_139 8;
-      resize_frame w_139 14 (Memo.from_int 0);
-      assert_env_length w_139 14;
-      set_env_slot w_139 8 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_139 6; get_env_slot w_139 7 ]);
-      trim_resolved w_139 8;
-      return_value w_139 (get_env_slot w_139 8) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_139 2;
+      resize_frame w_139 3 (Memo.from_int 0);
+      assert_env_length w_139 3;
+      set_env_slot w_139 2 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_139 0; get_env_slot w_139 1 ]);
+      trim_resolved w_139 2;
+      return_value w_139 (get_env_slot w_139 2) (pc_to_exp (int_to_pc 0)))
     149;
   add_exp
     (fun w_140 ->
-      assert_env_length w_140 10;
-      resize_frame w_140 14 (Memo.from_int 0);
-      assert_env_length w_140 14;
-      set_env_slot w_140 10 (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_140 9; get_env_slot w_140 4 ]);
-      let arg0_119 = get_env_slot w_140 4 in
-      assert_env_length w_140 14;
+      assert_env_length w_140 3;
+      resize_frame w_140 7 (Memo.from_int 0);
+      assert_env_length w_140 7;
+      set_env_slot w_140 3 (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_140 2; get_env_slot w_140 1 ]);
+      let arg0_119 = get_env_slot w_140 1 in
+      assert_env_length w_140 7;
       w_140.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_92; collect_env_slots w_140 [ 3; 10 ]; w_140.state.k ];
-      trim_resolved w_140 10;
+        Memo.appends [ Memo.from_constructor tag_cont_92; collect_env_slots w_140 [ 0; 3 ]; w_140.state.k ];
+      trim_resolved w_140 3;
       init_frame w_140 1 (Memo.from_int 0);
       set_env_slot w_140 0 arg0_119;
       w_140.state.c <- pc_to_exp (int_to_pc 54))
     150;
   add_exp
     (fun w_141 ->
-      assert_env_length w_141 12;
-      resize_frame w_141 14 (Memo.from_int 0);
-      assert_env_length w_141 14;
-      set_env_slot w_141 12
-        (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_141 3; get_env_slot w_141 11 ]);
-      assert_env_length w_141 14;
-      set_env_slot w_141 13
-        (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_141 10; get_env_slot w_141 12 ]);
-      trim_resolved w_141 12;
-      return_value w_141 (get_env_slot w_141 13) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_141 3;
+      resize_frame w_141 5 (Memo.from_int 0);
+      assert_env_length w_141 5;
+      set_env_slot w_141 3 (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_141 0; get_env_slot w_141 2 ]);
+      assert_env_length w_141 5;
+      set_env_slot w_141 4 (Memo.appends [ Memo.from_constructor tag_Add; get_env_slot w_141 1; get_env_slot w_141 3 ]);
+      trim_resolved w_141 3;
+      return_value w_141 (get_env_slot w_141 4) (pc_to_exp (int_to_pc 0)))
     151;
   add_exp
     (fun w_146 ->
-      assert_env_length w_146 6;
-      resize_frame w_146 13 (Memo.from_int 0);
-      assert_env_length w_146 13;
-      let resolved_132 = resolve w_146 (Source.E 5) in
-      set_env_slot w_146 6
+      assert_env_length w_146 2;
+      resize_frame w_146 5 (Memo.from_int 0);
+      assert_env_length w_146 5;
+      let resolved_132 = resolve w_146 (Source.E 1) in
+      set_env_slot w_146 2
         (Memo.from_int (Word.get_value (Memo.to_word (Memo.from_int 1)) + Word.get_value (fst resolved_132)));
-      let arg0_121 = get_env_slot w_146 2 in
-      assert_env_length w_146 13;
-      w_146.state.k <- Memo.appends [ Memo.from_constructor tag_cont_94; collect_env_slots w_146 [ 6 ]; w_146.state.k ];
-      trim_resolved w_146 6;
+      let arg0_121 = get_env_slot w_146 0 in
+      assert_env_length w_146 5;
+      w_146.state.k <- Memo.appends [ Memo.from_constructor tag_cont_94; collect_env_slots w_146 [ 2 ]; w_146.state.k ];
+      trim_resolved w_146 2;
       init_frame w_146 1 (Memo.from_int 0);
       set_env_slot w_146 0 arg0_121;
       w_146.state.c <- pc_to_exp (int_to_pc 7))
     152;
   add_exp
     (fun w_147 ->
-      assert_env_length w_147 8;
-      resize_frame w_147 13 (Memo.from_int 0);
-      assert_env_length w_147 13;
-      let resolved_133 = resolve w_147 (Source.E 6) in
-      let resolved_134 = resolve w_147 (Source.E 7) in
-      set_env_slot w_147 8 (Memo.from_int (Word.get_value (fst resolved_133) + Word.get_value (fst resolved_134)));
-      trim_resolved w_147 8;
-      return_value w_147 (get_env_slot w_147 8) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_147 2;
+      resize_frame w_147 3 (Memo.from_int 0);
+      assert_env_length w_147 3;
+      let resolved_133 = resolve w_147 (Source.E 0) in
+      let resolved_134 = resolve w_147 (Source.E 1) in
+      set_env_slot w_147 2 (Memo.from_int (Word.get_value (fst resolved_133) + Word.get_value (fst resolved_134)));
+      trim_resolved w_147 2;
+      return_value w_147 (get_env_slot w_147 2) (pc_to_exp (int_to_pc 0)))
     153;
   add_exp
     (fun w_148 ->
-      assert_env_length w_148 10;
-      resize_frame w_148 13 (Memo.from_int 0);
-      assert_env_length w_148 13;
-      let resolved_135 = resolve w_148 (Source.E 9) in
-      set_env_slot w_148 10
+      assert_env_length w_148 2;
+      resize_frame w_148 5 (Memo.from_int 0);
+      assert_env_length w_148 5;
+      let resolved_135 = resolve w_148 (Source.E 1) in
+      set_env_slot w_148 2
         (Memo.from_int (Word.get_value (Memo.to_word (Memo.from_int 1)) + Word.get_value (fst resolved_135)));
-      let arg0_123 = get_env_slot w_148 4 in
-      assert_env_length w_148 13;
-      w_148.state.k <- Memo.appends [ Memo.from_constructor tag_cont_96; collect_env_slots w_148 [ 10 ]; w_148.state.k ];
-      trim_resolved w_148 10;
+      let arg0_123 = get_env_slot w_148 0 in
+      assert_env_length w_148 5;
+      w_148.state.k <- Memo.appends [ Memo.from_constructor tag_cont_96; collect_env_slots w_148 [ 2 ]; w_148.state.k ];
+      trim_resolved w_148 2;
       init_frame w_148 1 (Memo.from_int 0);
       set_env_slot w_148 0 arg0_123;
       w_148.state.c <- pc_to_exp (int_to_pc 7))
     154;
   add_exp
     (fun w_149 ->
-      assert_env_length w_149 12;
-      resize_frame w_149 13 (Memo.from_int 0);
-      assert_env_length w_149 13;
-      let resolved_136 = resolve w_149 (Source.E 10) in
-      let resolved_137 = resolve w_149 (Source.E 11) in
-      set_env_slot w_149 12 (Memo.from_int (Word.get_value (fst resolved_136) + Word.get_value (fst resolved_137)));
-      trim_resolved w_149 12;
-      return_value w_149 (get_env_slot w_149 12) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_149 2;
+      resize_frame w_149 3 (Memo.from_int 0);
+      assert_env_length w_149 3;
+      let resolved_136 = resolve w_149 (Source.E 0) in
+      let resolved_137 = resolve w_149 (Source.E 1) in
+      set_env_slot w_149 2 (Memo.from_int (Word.get_value (fst resolved_136) + Word.get_value (fst resolved_137)));
+      trim_resolved w_149 2;
+      return_value w_149 (get_env_slot w_149 2) (pc_to_exp (int_to_pc 0)))
     155;
   add_exp
     (fun w_151 ->
       assert_env_length w_151 3;
-      resize_frame w_151 8 (Memo.from_int 0);
       let arg0_125 = get_env_slot w_151 1 in
-      assert_env_length w_151 8;
+      assert_env_length w_151 3;
       w_151.state.k <-
         Memo.appends [ Memo.from_constructor tag_cont_99; collect_env_slots w_151 [ 0; 1; 2 ]; w_151.state.k ];
-      trim_resolved w_151 3;
       init_frame w_151 1 (Memo.from_int 0);
       set_env_slot w_151 0 arg0_125;
       w_151.state.c <- pc_to_exp (int_to_pc 7))
@@ -4866,31 +4775,29 @@ let populate_state () =
     157;
   add_exp
     (fun w_153 ->
-      assert_env_length w_153 7;
-      resize_frame w_153 8 (Memo.from_int 0);
-      assert_env_length w_153 8;
-      let resolved_144 = resolve w_153 (Source.E 6) in
-      set_env_slot w_153 7
+      assert_env_length w_153 3;
+      resize_frame w_153 4 (Memo.from_int 0);
+      assert_env_length w_153 4;
+      let resolved_144 = resolve w_153 (Source.E 2) in
+      set_env_slot w_153 3
         (Memo.from_int
            (if Word.get_value (fst resolved_144) <= Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
-      let resolved_145 = resolve w_153 (Source.E 7) in
+      let resolved_145 = resolve w_153 (Source.E 3) in
       if Word.get_value (fst resolved_145) <> 0 then (
-        trim_resolved w_153 7;
+        trim_resolved w_153 3;
         return_value w_153 (get_env_slot w_153 0) (pc_to_exp (int_to_pc 0)))
       else (
-        trim_resolved w_153 7;
+        trim_resolved w_153 3;
         return_value w_153 (get_env_slot w_153 1) (pc_to_exp (int_to_pc 0))))
     158;
   add_exp
     (fun w_155 ->
-      assert_env_length w_155 8;
-      resize_frame w_155 23 (Memo.from_int 0);
-      let arg0_128 = get_env_slot w_155 2 in
-      let arg1_56 = get_env_slot w_155 4 in
-      assert_env_length w_155 23;
+      assert_env_length w_155 3;
+      let arg0_128 = get_env_slot w_155 0 in
+      let arg1_56 = get_env_slot w_155 1 in
+      assert_env_length w_155 3;
       w_155.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_106; collect_env_slots w_155 [ 2; 7 ]; w_155.state.k ];
-      trim_resolved w_155 8;
+        Memo.appends [ Memo.from_constructor tag_cont_106; collect_env_slots w_155 [ 0; 2 ]; w_155.state.k ];
       init_frame w_155 2 (Memo.from_int 0);
       set_env_slot w_155 0 arg0_128;
       set_env_slot w_155 1 arg1_56;
@@ -4898,14 +4805,12 @@ let populate_state () =
     159;
   add_exp
     (fun w_156 ->
-      assert_env_length w_156 9;
-      resize_frame w_156 23 (Memo.from_int 0);
-      let arg0_129 = get_env_slot w_156 7 in
-      let arg1_57 = get_env_slot w_156 8 in
-      assert_env_length w_156 23;
+      assert_env_length w_156 3;
+      let arg0_129 = get_env_slot w_156 1 in
+      let arg1_57 = get_env_slot w_156 2 in
+      assert_env_length w_156 3;
       w_156.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_105; collect_env_slots w_156 [ 2; 7; 8 ]; w_156.state.k ];
-      trim_resolved w_156 9;
+        Memo.appends [ Memo.from_constructor tag_cont_105; collect_env_slots w_156 [ 0; 1; 2 ]; w_156.state.k ];
       init_frame w_156 2 (Memo.from_int 0);
       set_env_slot w_156 1 arg0_129;
       set_env_slot w_156 0 arg1_57;
@@ -4913,14 +4818,12 @@ let populate_state () =
     160;
   add_exp
     (fun w_157 ->
-      assert_env_length w_157 10;
-      resize_frame w_157 23 (Memo.from_int 0);
-      let arg0_130 = get_env_slot w_157 8 in
-      let arg1_58 = get_env_slot w_157 7 in
-      assert_env_length w_157 23;
+      assert_env_length w_157 4;
+      let arg0_130 = get_env_slot w_157 2 in
+      let arg1_58 = get_env_slot w_157 1 in
+      assert_env_length w_157 4;
       w_157.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_104; collect_env_slots w_157 [ 2; 9 ]; w_157.state.k ];
-      trim_resolved w_157 10;
+        Memo.appends [ Memo.from_constructor tag_cont_104; collect_env_slots w_157 [ 0; 3 ]; w_157.state.k ];
       init_frame w_157 2 (Memo.from_int 0);
       set_env_slot w_157 1 arg0_130;
       set_env_slot w_157 0 arg1_58;
@@ -4928,14 +4831,12 @@ let populate_state () =
     161;
   add_exp
     (fun w_158 ->
-      assert_env_length w_158 11;
-      resize_frame w_158 23 (Memo.from_int 0);
-      let arg0_131 = get_env_slot w_158 9 in
-      let arg1_59 = get_env_slot w_158 10 in
-      assert_env_length w_158 23;
+      assert_env_length w_158 3;
+      let arg0_131 = get_env_slot w_158 1 in
+      let arg1_59 = get_env_slot w_158 2 in
+      assert_env_length w_158 3;
       w_158.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_103; collect_env_slots w_158 [ 2; 9 ]; w_158.state.k ];
-      trim_resolved w_158 11;
+        Memo.appends [ Memo.from_constructor tag_cont_103; collect_env_slots w_158 [ 0; 1 ]; w_158.state.k ];
       init_frame w_158 2 (Memo.from_int 0);
       set_env_slot w_158 1 arg0_131;
       set_env_slot w_158 0 arg1_59;
@@ -4943,14 +4844,12 @@ let populate_state () =
     162;
   add_exp
     (fun w_159 ->
-      assert_env_length w_159 12;
-      resize_frame w_159 23 (Memo.from_int 0);
-      let arg0_132 = get_env_slot w_159 11 in
-      let arg1_60 = get_env_slot w_159 9 in
-      assert_env_length w_159 23;
+      assert_env_length w_159 3;
+      let arg0_132 = get_env_slot w_159 2 in
+      let arg1_60 = get_env_slot w_159 1 in
+      assert_env_length w_159 3;
       w_159.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_102; collect_env_slots w_159 [ 2; 9 ]; w_159.state.k ];
-      trim_resolved w_159 12;
+        Memo.appends [ Memo.from_constructor tag_cont_102; collect_env_slots w_159 [ 0; 1 ]; w_159.state.k ];
       init_frame w_159 2 (Memo.from_int 0);
       set_env_slot w_159 1 arg0_132;
       set_env_slot w_159 0 arg1_60;
@@ -4958,14 +4857,12 @@ let populate_state () =
     163;
   add_exp
     (fun w_160 ->
-      assert_env_length w_160 13;
-      resize_frame w_160 23 (Memo.from_int 0);
-      let arg0_133 = get_env_slot w_160 12 in
-      let arg1_61 = get_env_slot w_160 9 in
-      assert_env_length w_160 23;
+      assert_env_length w_160 3;
+      let arg0_133 = get_env_slot w_160 2 in
+      let arg1_61 = get_env_slot w_160 1 in
+      assert_env_length w_160 3;
       w_160.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_101; collect_env_slots w_160 [ 2; 9; 12 ]; w_160.state.k ];
-      trim_resolved w_160 13;
+        Memo.appends [ Memo.from_constructor tag_cont_101; collect_env_slots w_160 [ 0; 1; 2 ]; w_160.state.k ];
       init_frame w_160 2 (Memo.from_int 0);
       set_env_slot w_160 0 arg0_133;
       set_env_slot w_160 1 arg1_61;
@@ -4973,17 +4870,17 @@ let populate_state () =
     164;
   add_exp
     (fun w_161 ->
-      assert_env_length w_161 14;
-      resize_frame w_161 23 (Memo.from_int 0);
-      let resolved_148 = resolve w_161 (Source.E 13) in
+      assert_env_length w_161 4;
+      resize_frame w_161 5 (Memo.from_int 0);
+      let resolved_148 = resolve w_161 (Source.E 3) in
       if Word.get_value (fst resolved_148) <> 0 then (
-        trim_resolved w_161 14;
-        return_value w_161 (get_env_slot w_161 9) (pc_to_exp (int_to_pc 0)))
+        trim_resolved w_161 4;
+        return_value w_161 (get_env_slot w_161 1) (pc_to_exp (int_to_pc 0)))
       else
-        let arg0_134 = get_env_slot w_161 2 in
-        let arg1_62 = get_env_slot w_161 12 in
-        assert_env_length w_161 23;
-        trim_resolved w_161 14;
+        let arg0_134 = get_env_slot w_161 0 in
+        let arg1_62 = get_env_slot w_161 2 in
+        assert_env_length w_161 5;
+        trim_resolved w_161 4;
         init_frame w_161 2 (Memo.from_int 0);
         set_env_slot w_161 0 arg0_134;
         set_env_slot w_161 1 arg1_62;
@@ -4991,14 +4888,12 @@ let populate_state () =
     165;
   add_exp
     (fun w_162 ->
-      assert_env_length w_162 16;
-      resize_frame w_162 23 (Memo.from_int 0);
-      let arg0_136 = get_env_slot w_162 2 in
-      let arg1_64 = get_env_slot w_162 6 in
-      assert_env_length w_162 23;
+      assert_env_length w_162 3;
+      let arg0_136 = get_env_slot w_162 0 in
+      let arg1_64 = get_env_slot w_162 1 in
+      assert_env_length w_162 3;
       w_162.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_113; collect_env_slots w_162 [ 2; 15 ]; w_162.state.k ];
-      trim_resolved w_162 16;
+        Memo.appends [ Memo.from_constructor tag_cont_113; collect_env_slots w_162 [ 0; 2 ]; w_162.state.k ];
       init_frame w_162 2 (Memo.from_int 0);
       set_env_slot w_162 0 arg0_136;
       set_env_slot w_162 1 arg1_64;
@@ -5006,14 +4901,12 @@ let populate_state () =
     166;
   add_exp
     (fun w_163 ->
-      assert_env_length w_163 17;
-      resize_frame w_163 23 (Memo.from_int 0);
-      let arg0_137 = get_env_slot w_163 15 in
-      let arg1_65 = get_env_slot w_163 16 in
-      assert_env_length w_163 23;
+      assert_env_length w_163 3;
+      let arg0_137 = get_env_slot w_163 1 in
+      let arg1_65 = get_env_slot w_163 2 in
+      assert_env_length w_163 3;
       w_163.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_112; collect_env_slots w_163 [ 2; 15; 16 ]; w_163.state.k ];
-      trim_resolved w_163 17;
+        Memo.appends [ Memo.from_constructor tag_cont_112; collect_env_slots w_163 [ 0; 1; 2 ]; w_163.state.k ];
       init_frame w_163 2 (Memo.from_int 0);
       set_env_slot w_163 1 arg0_137;
       set_env_slot w_163 0 arg1_65;
@@ -5021,14 +4914,12 @@ let populate_state () =
     167;
   add_exp
     (fun w_164 ->
-      assert_env_length w_164 18;
-      resize_frame w_164 23 (Memo.from_int 0);
-      let arg0_138 = get_env_slot w_164 16 in
-      let arg1_66 = get_env_slot w_164 15 in
-      assert_env_length w_164 23;
+      assert_env_length w_164 4;
+      let arg0_138 = get_env_slot w_164 2 in
+      let arg1_66 = get_env_slot w_164 1 in
+      assert_env_length w_164 4;
       w_164.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_111; collect_env_slots w_164 [ 2; 17 ]; w_164.state.k ];
-      trim_resolved w_164 18;
+        Memo.appends [ Memo.from_constructor tag_cont_111; collect_env_slots w_164 [ 0; 3 ]; w_164.state.k ];
       init_frame w_164 2 (Memo.from_int 0);
       set_env_slot w_164 1 arg0_138;
       set_env_slot w_164 0 arg1_66;
@@ -5036,14 +4927,12 @@ let populate_state () =
     168;
   add_exp
     (fun w_165 ->
-      assert_env_length w_165 19;
-      resize_frame w_165 23 (Memo.from_int 0);
-      let arg0_139 = get_env_slot w_165 17 in
-      let arg1_67 = get_env_slot w_165 18 in
-      assert_env_length w_165 23;
+      assert_env_length w_165 3;
+      let arg0_139 = get_env_slot w_165 1 in
+      let arg1_67 = get_env_slot w_165 2 in
+      assert_env_length w_165 3;
       w_165.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_110; collect_env_slots w_165 [ 2; 17 ]; w_165.state.k ];
-      trim_resolved w_165 19;
+        Memo.appends [ Memo.from_constructor tag_cont_110; collect_env_slots w_165 [ 0; 1 ]; w_165.state.k ];
       init_frame w_165 2 (Memo.from_int 0);
       set_env_slot w_165 1 arg0_139;
       set_env_slot w_165 0 arg1_67;
@@ -5051,14 +4940,12 @@ let populate_state () =
     169;
   add_exp
     (fun w_166 ->
-      assert_env_length w_166 20;
-      resize_frame w_166 23 (Memo.from_int 0);
-      let arg0_140 = get_env_slot w_166 19 in
-      let arg1_68 = get_env_slot w_166 17 in
-      assert_env_length w_166 23;
+      assert_env_length w_166 3;
+      let arg0_140 = get_env_slot w_166 2 in
+      let arg1_68 = get_env_slot w_166 1 in
+      assert_env_length w_166 3;
       w_166.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_109; collect_env_slots w_166 [ 2; 17 ]; w_166.state.k ];
-      trim_resolved w_166 20;
+        Memo.appends [ Memo.from_constructor tag_cont_109; collect_env_slots w_166 [ 0; 1 ]; w_166.state.k ];
       init_frame w_166 2 (Memo.from_int 0);
       set_env_slot w_166 1 arg0_140;
       set_env_slot w_166 0 arg1_68;
@@ -5066,14 +4953,12 @@ let populate_state () =
     170;
   add_exp
     (fun w_167 ->
-      assert_env_length w_167 21;
-      resize_frame w_167 23 (Memo.from_int 0);
-      let arg0_141 = get_env_slot w_167 20 in
-      let arg1_69 = get_env_slot w_167 17 in
-      assert_env_length w_167 23;
+      assert_env_length w_167 3;
+      let arg0_141 = get_env_slot w_167 2 in
+      let arg1_69 = get_env_slot w_167 1 in
+      assert_env_length w_167 3;
       w_167.state.k <-
-        Memo.appends [ Memo.from_constructor tag_cont_108; collect_env_slots w_167 [ 2; 17; 20 ]; w_167.state.k ];
-      trim_resolved w_167 21;
+        Memo.appends [ Memo.from_constructor tag_cont_108; collect_env_slots w_167 [ 0; 1; 2 ]; w_167.state.k ];
       init_frame w_167 2 (Memo.from_int 0);
       set_env_slot w_167 0 arg0_141;
       set_env_slot w_167 1 arg1_69;
@@ -5081,17 +4966,17 @@ let populate_state () =
     171;
   add_exp
     (fun w_168 ->
-      assert_env_length w_168 22;
-      resize_frame w_168 23 (Memo.from_int 0);
-      let resolved_149 = resolve w_168 (Source.E 21) in
+      assert_env_length w_168 4;
+      resize_frame w_168 5 (Memo.from_int 0);
+      let resolved_149 = resolve w_168 (Source.E 3) in
       if Word.get_value (fst resolved_149) <> 0 then (
-        trim_resolved w_168 22;
-        return_value w_168 (get_env_slot w_168 17) (pc_to_exp (int_to_pc 0)))
+        trim_resolved w_168 4;
+        return_value w_168 (get_env_slot w_168 1) (pc_to_exp (int_to_pc 0)))
       else
-        let arg0_142 = get_env_slot w_168 2 in
-        let arg1_70 = get_env_slot w_168 20 in
-        assert_env_length w_168 23;
-        trim_resolved w_168 22;
+        let arg0_142 = get_env_slot w_168 0 in
+        let arg1_70 = get_env_slot w_168 2 in
+        assert_env_length w_168 5;
+        trim_resolved w_168 4;
         init_frame w_168 2 (Memo.from_int 0);
         set_env_slot w_168 0 arg0_142;
         set_env_slot w_168 1 arg1_70;
@@ -5099,36 +4984,36 @@ let populate_state () =
     172;
   add_exp
     (fun w_170 ->
+      assert_env_length w_170 2;
+      resize_frame w_170 3 (Memo.from_int 0);
       assert_env_length w_170 3;
-      resize_frame w_170 4 (Memo.from_int 0);
-      assert_env_length w_170 4;
-      set_env_slot w_170 3 (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_170 0; get_env_slot w_170 2 ]);
-      trim_resolved w_170 3;
-      return_value w_170 (get_env_slot w_170 3) (pc_to_exp (int_to_pc 0)))
+      set_env_slot w_170 2 (Memo.appends [ Memo.from_constructor tag_Mul; get_env_slot w_170 0; get_env_slot w_170 1 ]);
+      trim_resolved w_170 2;
+      return_value w_170 (get_env_slot w_170 2) (pc_to_exp (int_to_pc 0)))
     173;
   add_exp
     (fun w_173 ->
-      assert_env_length w_173 6;
-      resize_frame w_173 10 (Memo.from_int 0);
-      assert_env_length w_173 10;
-      let resolved_153 = resolve w_173 (Source.E 5) in
-      set_env_slot w_173 6
+      assert_env_length w_173 5;
+      resize_frame w_173 9 (Memo.from_int 0);
+      assert_env_length w_173 9;
+      let resolved_153 = resolve w_173 (Source.E 4) in
+      set_env_slot w_173 5
         (Memo.from_int
            (if Word.get_value (fst resolved_153) <= Word.get_value (Memo.to_word (Memo.from_int 0)) then 1 else 0));
-      let resolved_154 = resolve w_173 (Source.E 6) in
+      let resolved_154 = resolve w_173 (Source.E 5) in
       if Word.get_value (fst resolved_154) <> 0 then (
-        assert_env_length w_173 10;
-        set_env_slot w_173 7
+        assert_env_length w_173 9;
+        set_env_slot w_173 6
           (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_173 0; get_env_slot w_173 1 ]);
-        trim_resolved w_173 6;
-        return_value w_173 (get_env_slot w_173 7) (pc_to_exp (int_to_pc 0)))
+        trim_resolved w_173 5;
+        return_value w_173 (get_env_slot w_173 6) (pc_to_exp (int_to_pc 0)))
       else
         let arg0_145 = get_env_slot w_173 0 in
         let arg1_72 = get_env_slot w_173 3 in
-        assert_env_length w_173 10;
+        assert_env_length w_173 9;
         w_173.state.k <-
           Memo.appends [ Memo.from_constructor tag_cont_116; collect_env_slots w_173 [ 2 ]; w_173.state.k ];
-        trim_resolved w_173 6;
+        trim_resolved w_173 5;
         init_frame w_173 2 (Memo.from_int 0);
         set_env_slot w_173 0 arg0_145;
         set_env_slot w_173 1 arg1_72;
@@ -5136,13 +5021,13 @@ let populate_state () =
     174;
   add_exp
     (fun w_174 ->
-      assert_env_length w_174 9;
-      resize_frame w_174 10 (Memo.from_int 0);
-      assert_env_length w_174 10;
-      set_env_slot w_174 9
-        (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_174 2; get_env_slot w_174 8 ]);
-      trim_resolved w_174 9;
-      return_value w_174 (get_env_slot w_174 9) (pc_to_exp (int_to_pc 0)))
+      assert_env_length w_174 2;
+      resize_frame w_174 3 (Memo.from_int 0);
+      assert_env_length w_174 3;
+      set_env_slot w_174 2
+        (Memo.appends [ Memo.from_constructor tag_ECons; get_env_slot w_174 0; get_env_slot w_174 1 ]);
+      trim_resolved w_174 2;
+      return_value w_174 (get_env_slot w_174 2) (pc_to_exp (int_to_pc 0)))
     175;
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;

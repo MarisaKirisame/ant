@@ -1,16 +1,11 @@
+module Hasher = Hash.MCRC32C
 open BatFingerTree
 open Word
-module Hasher = Hash.MCRC32C
-open Base
-module Dynarray = Stdlib.Dynarray
-
-(*module Hasher = Hash.MCRC32*)
-(*module Hasher = Hash.SL2*)
-(*module Hasher = Hash.DebugHash*)
 open Value
 open State
 open Common
 open Core
+module Dynarray = Stdlib.Dynarray
 module Hashtbl = AntHashtbl
 
 let log x = print_endline x
@@ -242,7 +237,7 @@ let trim_resolved (w : world) (size : int) : unit =
     Dynarray.remove_last w.resolved.e
   done
 
-type frame_source = OldSlot of int | NewValue of value | Blank
+type frame_source = OldSlot of int | NewValue of value
 
 let shuffle_frame (w : world) (mapping : frame_source array) (fill : value) : unit =
   let old_size = Dynarray.length w.state.e in
@@ -255,8 +250,7 @@ let shuffle_frame (w : world) (mapping : frame_source array) (fill : value) : un
             if j < 0 || j >= old_size then
               failwith (Printf.sprintf "shuffle_frame: source slot %d out of bounds (old frame size %d)" j old_size);
             old.(j)
-        | NewValue v -> v
-        | Blank -> fill)
+        | NewValue v -> v)
 
 let collect_env_slots (w : world) (slots : int list) : seq =
   appends (List.map slots ~f:(fun slot -> get_env_slot w slot))

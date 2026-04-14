@@ -265,6 +265,41 @@ let colour_values (value_infos : value_info list) (interference : IntSet.t IntMa
       IntMap.add info.id slot slot_of_value)
     existing sorted
 
+let compact_slot_assignment ~(entry_ids : IntSet.t) (slot_of_value : slot IntMap.t) =
+  let add_old_slot ids acc =
+    IntSet.fold
+      (fun value_id acc ->
+        match IntMap.find_opt value_id slot_of_value with Some slot -> IntSet.add slot acc | None -> acc)
+      ids acc
+  in
+  let entry_slots = add_old_slot entry_ids IntSet.empty in
+  let all_slots = IntMap.fold (fun _ slot acc -> IntSet.add slot acc) slot_of_value IntSet.empty in
+  let remap = ref IntMap.empty in
+  let next_slot = ref 0 in
+  let assign old_slot =
+    if not (IntMap.mem old_slot !remap) then (
+      remap := IntMap.add old_slot !next_slot !remap;
+      incr next_slot)
+  in
+  List.iter assign (IntSet.elements entry_slots);
+  List.iter assign (IntSet.elements all_slots);
+  let slot_of_value =
+    IntMap.fold
+      (fun value_id old_slot acc ->
+        match IntMap.find_opt old_slot !remap with
+        | Some new_slot -> IntMap.add value_id new_slot acc
+        | None -> failf "RegAlloc: missing compacted slot for old slot %d" old_slot)
+      slot_of_value IntMap.empty
+  in
+  let entry_size =
+    IntSet.fold
+      (fun value_id acc ->
+        match IntMap.find_opt value_id slot_of_value with Some slot -> Int.max acc (slot + 1) | None -> acc)
+      entry_ids 0
+  in
+  let frame_size = !next_slot in
+  (slot_of_value, entry_size, frame_size)
+
 let allocate_block_with_affinities (value_map : value_info IntMap.t) (block : block) (info : CfgLiveness.block_liveness)
     (affinities : affinity list) : block_layout =
   let residents = block_resident_values block info in
@@ -286,10 +321,9 @@ let allocate_block_with_affinities (value_map : value_info IntMap.t) (block : bl
   let body_infos = IntSet.elements body_ids |> List.filter_map (fun id -> IntMap.find_opt id value_map) in
   (* Phase 1: colour entry values first — they get dense low slots. *)
   let slot_of_value = colour_values entry_infos interference affinities IntMap.empty in
-  let entry_size = IntMap.fold (fun _ slot acc -> Int.max acc (slot + 1)) slot_of_value 0 in
   (* Phase 2: colour body-only values — may reuse dead entry slots or extend. *)
   let slot_of_value = colour_values body_infos interference affinities slot_of_value in
-  let frame_size = IntMap.fold (fun _ slot acc -> Int.max acc (slot + 1)) slot_of_value 0 in
+  let slot_of_value, entry_size, frame_size = compact_slot_assignment ~entry_ids slot_of_value in
   let param_slots =
     List.map
       (fun param_id ->

@@ -162,7 +162,6 @@ let resize_frame_ (w : world code) (new_size : int code) (fill : Value.seq code)
 
 let old_slot_ (i : int) : 'a code = ctor_ "OldSlot" (int_ i)
 let new_value_ (v : Value.seq code) : 'a code = ctor_ "NewValue" v
-let blank_ : 'a code = ctor'_ "Blank"
 
 let frame_mapping_ (entries : 'a code list) : 'b code =
   code $ string "[|" ^^ separate (string "; ") (Stdlib.List.map uncode entries) ^^ string "|]"
