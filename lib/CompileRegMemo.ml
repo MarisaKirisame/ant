@@ -983,27 +983,17 @@ let compile_unit_wrapper (ctx : cg_ctx) (unit_cg : unit_codegen) =
   if List.length entry_layout.param_slots <> arg_count then
     failf "CompileRegMemo: wrapper for `%s` expects %d args, got %d slots" unit_cg.unit_ir.name arg_count
       (List.length entry_layout.param_slots);
-  let arg_inits =
-    List.map2
-      (fun slot i ->
-        string "Dynarray.set initial_env "
-        ^^ string (string_of_int slot)
-        ^^ space
-        ^^ string ("x" ^ string_of_int i)
-        ^^ semi)
-      entry_layout.param_slots (List.init arg_count Fun.id)
-  in
+  let slot_to_arg = Array.make entry_layout.entry_size (uncode dummy_value_) in
+  List.iteri (fun i slot -> slot_to_arg.(slot) <- string ("x" ^ string_of_int i)) entry_layout.param_slots;
+  let env_elems = Array.to_list slot_to_arg in
   let name = unit_cg.unit_ir.name in
   string "let " ^^ string name ^^ space ^^ string "memo"
   ^^ (if args = [] then empty else space ^^ separate space args)
-  ^^ string " : exec_result =" ^^ hardline
-  ^^ string "  let initial_env = Dynarray.init "
-  ^^ string (string_of_int entry_layout.entry_size)
-  ^^ string " (fun _ -> " ^^ uncode dummy_value_ ^^ string ") in"
-  ^^ (if arg_inits = [] then empty else hardline ^^ separate_map hardline (fun doc -> string "  " ^^ doc) arg_inits)
-  ^^ hardline ^^ string "  exec_cek "
+  ^^ string " : exec_result =" ^^ hardline ^^ string "  exec_cek "
   ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int unit_cg.entry_pc) ^ "))")
-  ^^ string " initial_env ("
+  ^^ string " (Dynarray.of_list [ "
+  ^^ separate (string "; ") env_elems
+  ^^ string " ]) ("
   ^^ uncode (from_constructor_ (ctor_tag_name ctx "cont_done"))
   ^^ string ") memo"
 

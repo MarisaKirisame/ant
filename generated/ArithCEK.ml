@@ -238,228 +238,127 @@ let rec to_ocaml_pick_result x =
   | _ -> failwith "unreachable"
 
 let var_rank memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 1)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let expr_rank memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 2)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 2)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let compare_expr memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 3)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 3)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let expr_equal memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 6)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 6)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let expr_size memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 7)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 7)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let better_expr memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 8)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 8)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let scale memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 9)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 9)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let coeff_value memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 12)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 12)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let coeff_base memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 14)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 14)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let extract_factor memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 15)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 15)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let search_factor memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 16)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 16)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let append_exprs memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 17)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 17)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let insert_expr memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 18)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 18)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let sort_exprs memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 19)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 19)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let compare_add_term memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 20)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 20)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let insert_add_term memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 21)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 21)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let sort_add_terms memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 22)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 22)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let reverse_exprs_aux memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 23)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 23)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let reverse_exprs memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 24)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 24)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let flatten_add memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 26)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 26)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let flatten_mul memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 27)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 27)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let mul_coeff memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 29)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 29)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let mul_base memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 31)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 31)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let mul_total_coeff memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 32)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 32)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let mul_bases memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 34)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 34)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let build_mul memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 36)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 36)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let normalize_mul_flat memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 1 x0;
-  Dynarray.set initial_env 0 x1;
-  exec_cek (pc_to_exp (int_to_pc 37)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 37)) (Dynarray.of_list [ x1; x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let combine_like_terms_acc memo (x0 : Value.seq) (x1 : Value.seq) (x2 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 3 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  Dynarray.set initial_env 2 x2;
-  exec_cek (pc_to_exp (int_to_pc 38)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 38)) (Dynarray.of_list [ x0; x1; x2 ]) (Memo.from_constructor tag_cont_done) memo
 
 let combine_like_terms memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 39)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 39)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let factor_adjacent memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 41)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 41)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let pick_factored memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 42)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 42)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let search_terms memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 43)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 43)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let build_add memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 45)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 45)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let search_round memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 46)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 46)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let normalize_add_flat memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 1 x0;
-  Dynarray.set initial_env 0 x1;
-  exec_cek (pc_to_exp (int_to_pc 47)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 47)) (Dynarray.of_list [ x1; x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let search_opt memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 2 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  exec_cek (pc_to_exp (int_to_pc 48)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 48)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
 
 let normalize memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 51)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 51)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let simplify_aux memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 52)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 52)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let diffx memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 54)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 54)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let eval memo (x0 : Value.seq) (x1 : Value.seq) (x2 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 3 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  Dynarray.set initial_env 1 x1;
-  Dynarray.set initial_env 2 x2;
-  exec_cek (pc_to_exp (int_to_pc 56)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 56)) (Dynarray.of_list [ x0; x1; x2 ]) (Memo.from_constructor tag_cont_done) memo
 
 let main memo (x0 : Value.seq) : exec_result =
-  let initial_env = Dynarray.init 1 (fun _ -> Memo.from_int 0) in
-  Dynarray.set initial_env 0 x0;
-  exec_cek (pc_to_exp (int_to_pc 57)) initial_env (Memo.from_constructor tag_cont_done) memo
+  exec_cek (pc_to_exp (int_to_pc 57)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
 
 let populate_state () =
   Memo.reset ();
