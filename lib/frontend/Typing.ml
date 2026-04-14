@@ -33,6 +33,7 @@ module ResolveGlobal = struct
         let new_env = { env with locals = new_locals } in
         Lam (ps, resolve_expr new_env body, info)
     | App (f, xs, info) -> App (recurse f, List.map ~f:recurse xs, info)
+    | Jump _ -> failwith "Jump not supported"
     | Op (op, l, r, info) -> Op (op, recurse l, recurse r, info)
     | If (c, t, e, info) -> If (recurse c, recurse t, recurse e, info)
     | Tup (es, info) -> Tup (List.map ~f:recurse es, info)
@@ -131,6 +132,7 @@ let rec unify ty1 ty2 =
         let min_level = TyLevel.min ll.level_new lr.level_new in
         ll.level_new <- TyLevel.marker_level;
         lr.level_new <- TyLevel.marker_level;
+        if List.length tyl1 <> List.length tyr1 then elab_error "unify: arrows has different numbers of arguments";
         List.iter2_exn ~f:(unify_lev min_level) tyl1 tyr1;
         unify_lev min_level tyl2 tyr2;
         ll.level_new <- min_level;
@@ -413,6 +415,7 @@ let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
         let tyr = new_tvar () in
         unify tyf (new_arrow ty_args tyr);
         (App (f, args, { info with ty = Some tyr }), tyr)
+    | Jump _ -> elab_error "Jump not supported"
     | If (c, t, f, info) ->
         let c, tyc = type_of ctx c in
         let t, tyt = type_of ctx t in

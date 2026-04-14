@@ -13,7 +13,7 @@ For deeper dives, see `internal.md` (architecture) and `motivation.md` (why this
 ## Architecture at a Glance
 - **Front-end.** `Lexer.mll`, `Parser.mly`, and `Syntax.ml` define the surface language; `Typing.ResolveGlobal` upgrades known names to globals so typing can treat them specially.
 - **Type inference.** `Typing.ml` implements a constraint-based Hindley–Milner engine over the `Type`/`SynInfo` representations.
-- **Normalisation.** `Transform.ml` performs CPS and defunctionalisation; `Pat.ml` lowers pattern matches into decision trees.
+- **Normalisation.** `Transform.ml` lowers typed programs into ANF and introduces join points; `Pat.ml` lowers pattern matches into decision trees.
 - **Backends.** `CompileMemo.ml` emits the memoising CEK VM, `CompileSeq.ml` emits a pure interpreter, and `CompilePlain.ml` produces direct OCaml for quick inspection. All three share the IR helpers in `Code.ml`/`Ir.ml`; `CompileType.ml` generates OCaml converters for user-defined ADTs.
 - **Runtime core.** Finger-tree values live in `Value.ml`/`Words.ml`; memo storage and step composition are implemented in `Memo.ml`, `Dependency.ml`, `Pattern.ml`, and `State.ml`.
 
@@ -46,9 +46,7 @@ Run `dune exec ant -- INPUT OUTPUT [flags]` to compile or inspect a program. The
 - `--compile` – emit backend output (`CompileMemo` by default) to the output file.
 - `-b`, `--backend memo|seq|plain` – pick the backend for `--compile`.
 - `-t`, `--typing` – print inferred types from `Typing`; combine with `-L` to show levels.
-- `-c`, `--print-cps` – show the CPS-transformed AST.
-- `-d`, `--print-defunc` – show the defunctionalised AST.
-- `-D`, `--print-cps-defunc` – run CPS then defunctionalise before printing.
+- `-a`, `--print-anf` – show the typed AST after ANF transformation with join points.
 
 All CLI wiring lives in `bin/main.ml`.
 

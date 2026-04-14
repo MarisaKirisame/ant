@@ -1,16 +1,11 @@
+module Hasher = Hash.MCRC32C
 open BatFingerTree
 open Word
-module Hasher = Hash.MCRC32C
-open Base
-module Dynarray = Stdlib.Dynarray
-
-(*module Hasher = Hash.MCRC32*)
-(*module Hasher = Hash.SL2*)
-(*module Hasher = Hash.DebugHash*)
 open Value
 open State
 open Common
 open Core
+module Dynarray = Stdlib.Dynarray
 module Hashtbl = AntHashtbl
 
 let log x = print_endline x
@@ -202,6 +197,77 @@ let assert_env_length (w : world) (e : int) : unit =
   let l = Dynarray.length w.state.e in
   if l <> e then print_endline ("env_length should be " ^ string_of_int e ^ " but is " ^ string_of_int l);
   assert (l = e)
+
+let get_env_slot (w : world) (slot : int) : value =
+  if slot < 0 || slot >= Dynarray.length w.state.e then
+    failwith (Printf.sprintf "get_env_slot: slot %d out of bounds for frame size %d" slot (Dynarray.length w.state.e));
+  Dynarray.get w.state.e slot
+
+let set_env_slot (w : world) (slot : int) (v : value) : unit =
+  if slot < 0 || slot >= Dynarray.length w.state.e then
+    failwith (Printf.sprintf "set_env_slot: slot %d out of bounds for frame size %d" slot (Dynarray.length w.state.e));
+  assert ((Generic.measure ~monoid ~measure v).degree = 1);
+  assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
+  Dynarray.set w.state.e slot v
+
+let init_frame (w : world) (frame_size : int) (fill : value) : unit =
+  if frame_size < 0 then failwith (Printf.sprintf "init_frame: negative frame size %d" frame_size);
+  w.state.e <- Dynarray.init frame_size (fun _ -> fill)
+
+let resize_frame (w : world) (new_size : int) (fill : value) : unit =
+  let old_size = Dynarray.length w.state.e in
+  if new_size > old_size then (
+    for _ = old_size to new_size - 1 do
+      Dynarray.add_last w.state.e fill
+    done;
+    (* Grow resolved env in sync so that resolve calls on body slots work. *)
+    for _ = Dynarray.length w.resolved.e to new_size - 1 do
+      Dynarray.add_last w.resolved.e false
+    done)
+  else if new_size < old_size then
+    for _ = new_size to old_size - 1 do
+      Dynarray.remove_last w.state.e
+    done
+
+(* Trim resolved env back to a given size.  Called by generated code before
+   step exits (edge transitions, calls, returns) to restore the resolved env
+   to the canonical entry size that make_step expects. *)
+let trim_resolved (w : world) (size : int) : unit =
+  while Dynarray.length w.resolved.e > size do
+    Dynarray.remove_last w.resolved.e
+  done
+
+type frame_source = OldSlot of int | NewValue of value
+
+let shuffle_frame (w : world) (mapping : frame_source array) (fill : value) : unit =
+  let old_size = Dynarray.length w.state.e in
+  let old = Array.init old_size (Dynarray.get w.state.e) in
+  let new_size = Array.length mapping in
+  w.state.e <-
+    Dynarray.init new_size (fun i ->
+        match mapping.(i) with
+        | OldSlot j ->
+            if j < 0 || j >= old_size then
+              failwith (Printf.sprintf "shuffle_frame: source slot %d out of bounds (old frame size %d)" j old_size);
+            old.(j)
+        | NewValue v -> v)
+
+let collect_env_slots (w : world) (slots : int list) : seq =
+  appends (List.map slots ~f:(fun slot -> get_env_slot w slot))
+
+let restore_env_slots (w : world) (slots : int list) (seqs : seq) : unit =
+  let saved_slots = List.rev (List.tl_exn (List.rev (splits seqs))) in
+  if List.length saved_slots <> List.length slots then
+    failwith
+      (Printf.sprintf "restore_env_slots: expected %d saved values, got %d" (List.length slots)
+         (List.length saved_slots));
+  List.iter2_exn slots saved_slots ~f:(fun slot value -> set_env_slot w slot value)
+
+let return_value (w : world) (v : value) (return_exp : exp) : unit =
+  assert ((Generic.measure ~monoid ~measure v).degree = 1);
+  assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
+  w.state.e <- Dynarray.of_list [ v ];
+  w.state.c <- return_exp
 
 let init_memo () : memo = Array.create ~len:(Dynarray.length pc_map) None
 let string_of_trie (t : trie) : string = match t with Leaf _ -> "Leaf" | Branch _ -> "Branch"

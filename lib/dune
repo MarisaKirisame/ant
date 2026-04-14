@@ -25,6 +25,12 @@
   Hash
   Intmap
   Common
+  Liveness
+  CfgLiveness
+  ControlFlowGraph
+  AnfToCfg
+  BlockInlining
+  RegAlloc
   AntHashtbl
   Profile
   batFingerTree
@@ -37,6 +43,7 @@
   CompileFfi
   CompileType
   CompileSeq
+  CompileRegMemo
   CompileMemo
   CompilePlain)
  (preprocess

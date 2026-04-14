@@ -32,6 +32,7 @@ and 'a expr =
   | GVar of string * 'a
   | Ctor of string * 'a
   | App of 'a expr * 'a expr list * 'a
+  | Jump of 'a expr * 'a expr list * 'a
   | Op of string * 'a expr * 'a expr * 'a
   | Tup of 'a expr list * 'a
   | Arr of 'a expr list * 'a
@@ -89,13 +90,11 @@ let pp_expr =
   in
   let fm ef e inf = group @@ align @@ string "match" ^^ space ^^ ef false e ^^ space ^^ string "with" ^^ inf in
   let fsb pro lhs rhs = group @@ align @@ pro ^^ space ^^ lhs ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ rhs in
-  let fl lhs rhs tail =
-    align @@ group @@ group (fsb (string "let") lhs rhs ^^ break 1 ^^ string "in") ^^ break 1 ^^ tail
-  in
-  let flr lhs rhs others tail =
+  let fl kw lhs rhs tail = align @@ group @@ group (fsb kw lhs rhs ^^ break 1 ^^ string "in") ^^ break 1 ^^ tail in
+  let flr kw lhs rhs others tail =
     align @@ group
     @@ group
-         ((fsb (string "let rec") lhs rhs ^^ concat_map (fun (lhs, rhs) -> break 1 ^^ fsb (string "and") lhs rhs) others)
+         ((fsb kw lhs rhs ^^ concat_map (fun (lhs, rhs) -> break 1 ^^ fsb (string "and") lhs rhs) others)
          ^^ break 1 ^^ string "in")
     ^^ break 1 ^^ tail
   in
@@ -115,6 +114,8 @@ let pp_expr =
         f c (App (Var (ct, aux1), [ Tup (xs, aux2) ], aux2))
     | App (fn, [], _) -> f c fn
     | App (fn, xs, _) -> f true fn ^^ space ^^ separate_map space (f true) xs |> pp
+    | Jump (fn, [], _) -> string "jump" ^^ space ^^ f true fn |> pp
+    | Jump (fn, xs, _) -> string "jump" ^^ space ^^ f true fn ^^ space ^^ separate_map space (f true) xs |> pp
     | Op (op, lhs, rhs, _) -> f true lhs ^^ space ^^ string op ^^ space ^^ f true rhs |> pp
     | Tup (xs, _) -> separate_map (comma ^^ space) (f true) xs |> parens
     | Lam (xs, e, _) ->
@@ -122,10 +123,11 @@ let pp_expr =
         @@ break 1 ^^ f true e
         |> pp
     | Arr (xs, _) -> separate_map (semi ^^ space) (f true) xs |> brackets
-    | Let ((BOne (x, e1, _) | BCont (x, e1, _)), e2, _) -> fl (pp_pattern x) (f false e1) (f false e2)
+    | Let (BOne (x, e1, _), e2, _) -> fl (string "let") (pp_pattern x) (f false e1) (f false e2)
+    | Let (BCont (x, e1, _), e2, _) -> fl (string "letcont") (pp_pattern x) (f false e1) (f false e2)
     | Let (BSeq (e1, _), e2, _) -> align @@ f false e1 ^^ semi ^^ break 1 ^^ f false e2
     | Let ((BRec [] | BRecC []), _, _) -> failwith "Empty recursive group"
-    | Let ((BRec xs | BRecC xs), e2, _) ->
+    | Let (BRec xs, e2, _) ->
         let lhs, rhs, _ = List.hd xs in
         let tail_lhs_rhs = List.tl xs in
         let lhs = pp_pattern lhs in
@@ -138,8 +140,22 @@ let pp_expr =
               (lhs, rhs))
             tail_lhs_rhs
         in
-        flr lhs rhs others (f false e2)
-    | GVar (x, _) -> string ("global:" ^ x)
+        flr (string "let rec") lhs rhs others (f false e2)
+    | Let (BRecC xs, e2, _) ->
+        let lhs, rhs, _ = List.hd xs in
+        let tail_lhs_rhs = List.tl xs in
+        let lhs = pp_pattern lhs in
+        let rhs = f false rhs in
+        let others =
+          List.map
+            (fun (lhs, rhs, _) ->
+              let lhs = pp_pattern lhs in
+              let rhs = f false rhs in
+              (lhs, rhs))
+            tail_lhs_rhs
+        in
+        flr (string "letcont rec") lhs rhs others (f false e2)
+    | GVar (x, _) -> string x
     | If (e, e1, e2, _) ->
         group @@ align
         @@ (group @@ string "if" ^^ nest 2 @@ break 1 ^^ f true e)
@@ -200,11 +216,21 @@ let pp_stmt =
     | Term (BSeq (tm, _)) ->
         string "let" ^^ space ^^ underscore ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm
         ^^ string ";;"
-    | Term (BOne (x, tm, _) | BCont (x, tm, _)) ->
+    | Term (BOne (x, tm, _)) ->
         string "let" ^^ space ^^ pp_pattern x ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm
         ^^ string ";;"
-    | Term (BRec xs | BRecC xs) ->
+    | Term (BCont (x, tm, _)) ->
+        string "letcont" ^^ space ^^ pp_pattern x ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm
+        ^^ string ";;"
+    | Term (BRec xs) ->
         string "let rec" ^^ space
+        ^^ separate_map
+             (space ^^ string "and" ^^ space)
+             (fun (x, tm, _) -> pp_pattern x ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm)
+             xs
+        ^^ string ";;"
+    | Term (BRecC xs) ->
+        string "letcont rec" ^^ space
         ^^ separate_map
              (space ^^ string "and" ^^ space)
              (fun (x, tm, _) -> pp_pattern x ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm)
@@ -227,6 +253,7 @@ let expr_tag (expr : 'a expr) : 'a option =
   | GVar (_, tag)
   | Ctor (_, tag)
   | App (_, _, tag)
+  | Jump (_, _, tag)
   | Op (_, _, _, tag)
   | Tup (_, tag)
   | Arr (_, tag)
@@ -274,6 +301,7 @@ let rec expr_tag_map (f : 'a -> 'b) (expr : 'a expr) : 'b expr =
   | GVar (name, tag) -> GVar (name, f tag)
   | Ctor (ctor, tag) -> Ctor (ctor, f tag)
   | App (fn, args, tag) -> App (expr_tag_map f fn, List.map (expr_tag_map f) args, f tag)
+  | Jump (fn, args, tag) -> Jump (expr_tag_map f fn, List.map (expr_tag_map f) args, f tag)
   | Op (op, lhs, rhs, tag) -> Op (op, expr_tag_map f lhs, expr_tag_map f rhs, f tag)
   | Tup (values, tag) -> Tup (List.map (expr_tag_map f) values, f tag)
   | Arr (values, tag) -> Arr (List.map (expr_tag_map f) values, f tag)

@@ -370,11 +370,9 @@ let eval_plain (expr : LC.expr) : LC.value * int =
   let _, cek_heap_stats =
     measure_memory_consumption (fun () ->
         Profile.with_slot eval_cek_slot (fun () ->
+            let memo = Memo.init_memo () in
             LC.to_ocaml_value
-              (Memo.exec_cek_raw
-                 (Memo.pc_to_exp (Common.int_to_pc 4))
-                 (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
-                 (Memo.from_constructor LC.tag_cont_done))))
+              (LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value env)).words))
   in
   Gc.full_major ();
   (Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env), cek_heap_stats.peak_heap_words)
@@ -397,11 +395,9 @@ let eval_expression_baseline_only expr : baseline_run_result =
   let _, cek_heap_stats =
     measure_memory_consumption (fun () ->
         Profile.with_slot eval_cek_slot (fun () ->
+            let memo = Memo.init_memo () in
             LC.to_ocaml_value
-              (Memo.exec_cek_raw
-                 (Memo.pc_to_exp (Common.int_to_pc 4))
-                 (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
-                 (Memo.from_constructor LC.tag_cont_done))))
+              (LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value env)).words))
   in
   Gc.full_major ();
   let _ = Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env) in

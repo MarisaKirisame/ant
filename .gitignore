@@ -38,3 +38,6 @@ setup.log
 _opam/
 
 *.trace/
+
+__pycache__
+

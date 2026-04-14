@@ -15,7 +15,7 @@ type option 'a =
 
 let rec index = fun x n ->
   match x with
-  | Cons (xh, xt) -> 
+  | Cons xh xt -> 
     (match n with
     | Z -> Some xh
     | S m -> index xt m)

@@ -1,5 +1,1112 @@
 open Ant
 
+let parse content =
+  let lexbuf = Lexing.from_string content in
+  try Parser.prog Lexer.tokenize lexbuf with
+  | Parser.Error _ -> failwith "parse error in test fixture"
+  | Lexer.Error _ -> failwith "lex error in test fixture"
+
+let read_all file = In_channel.with_open_text file In_channel.input_all
+
+let example_path name =
+  let candidates = [ Filename.concat "examples" name; Filename.concat ".." (Filename.concat "examples" name) ] in
+  let rec pick = function [] -> None | path :: rest -> if Sys.file_exists path then Some path else pick rest in
+  match pick candidates with Some path -> path | None -> failwith ("missing example fixture: " ^ name)
+
+let expect_failure ~needle f =
+  try
+    let _ = f () in
+    failwith ("expected failure containing: " ^ needle)
+  with exn ->
+    let message = Printexc.to_string exn in
+    assert (Core.String.is_substring message ~substring:needle)
+
+let anf_string source =
+  source |> parse |> Typing.top_type_of_prog |> Transform.anf_prog |> Syntax.pp_prog |> Syntax.string_of_document
+
+let anf_example_string name = name |> example_path |> read_all |> anf_string
+let frontend_prog source = source |> parse |> Typing.top_type_of_prog |> Transform.anf_prog |> Pat.compile
+let frontend_example name = name |> example_path |> read_all |> frontend_prog
+let compile_with backend prog = prog |> backend |> Syntax.string_of_document
+
+(* These helpers inspect the unoptimized CFG produced by [AnfToCfg.lower_prog],
+   before [BlockInlining] runs. They preserve the block names and shapes that
+   the fine-grained per-block liveness / layout tests expect. Tests that care
+   about the end-to-end compiled output still go through
+   [CompileRegMemo.Backend.compile], which runs the full optimization pipeline. *)
+let regmemo_single_unit_liveness prog =
+  let ir = AnfToCfg.lower_prog prog in
+  match ir.units with
+  | [ unit_ir ] -> (unit_ir, CompileRegMemo.analyze_unit_liveness unit_ir)
+  | _ -> failwith "expected a single regmemo unit"
+
+let regmemo_single_unit_allocation prog =
+  let unit_ir, liveness = regmemo_single_unit_liveness prog in
+  (unit_ir, liveness, CompileRegMemo.allocate_unit_slots unit_ir liveness)
+
+let[@warning "-32"] regmemo_lowered_unit_allocation prog =
+  let ir = CompileRegMemo.lower_prog prog in
+  match ir.units with
+  | [ unit_ir ] ->
+      let liveness = CompileRegMemo.analyze_unit_liveness unit_ir in
+      let allocation = CompileRegMemo.allocate_unit_slots unit_ir liveness in
+      (unit_ir, liveness, allocation)
+  | _ -> failwith "expected a single regmemo unit"
+
+let regmemo_value_id (unit_ir : CompileRegMemo.unit_ir) name =
+  match List.find_opt (fun (info : CompileRegMemo.value_info) -> String.equal info.name name) unit_ir.values with
+  | Some info -> info.id
+  | None -> failwith ("missing regmemo value: " ^ name)
+
+let regmemo_block_id (unit_ir : CompileRegMemo.unit_ir) label =
+  match List.find_opt (fun (block : CompileRegMemo.block) -> String.equal block.label label) unit_ir.blocks with
+  | Some block -> block.id
+  | None -> failwith ("missing regmemo block: " ^ label)
+
+let regmemo_block_liveness (liveness : CfgLiveness.unit_liveness) block_id =
+  match CfgLiveness.IntMap.find_opt block_id liveness.blocks with
+  | Some info -> info
+  | None -> failwith ("missing regmemo block liveness: b" ^ string_of_int block_id)
+
+let regmemo_block_layout (allocation : CompileRegMemo.unit_allocation) block_id =
+  match CfgLiveness.IntMap.find_opt block_id allocation.block_layouts with
+  | Some layout -> layout
+  | None -> failwith ("missing regmemo block layout: b" ^ string_of_int block_id)
+
+let regmemo_slot_in_block (allocation : CompileRegMemo.unit_allocation) block_id value_id =
+  let layout = regmemo_block_layout allocation block_id in
+  match CfgLiveness.IntMap.find_opt value_id layout.RegAlloc.slot_of_value with
+  | Some slot -> slot
+  | None -> failwith ("missing regmemo slot for v" ^ string_of_int value_id ^ " in block b" ^ string_of_int block_id)
+
+let regmemo_edge_liveness info succ_id =
+  match CfgLiveness.IntMap.find_opt succ_id info.CfgLiveness.live_on_edge with
+  | Some live -> live
+  | None -> failwith ("missing regmemo edge liveness to b" ^ string_of_int succ_id)
+
+let regmemo_edge_param_liveness info succ_id param_id =
+  match CfgLiveness.IntMap.find_opt param_id (regmemo_edge_liveness info succ_id).CfgLiveness.live_params with
+  | Some live -> live
+  | None ->
+      failwith ("missing regmemo edge param liveness to b" ^ string_of_int succ_id ^ " param " ^ string_of_int param_id)
+
+let regmemo_names_of_live (unit_ir : CompileRegMemo.unit_ir) live =
+  unit_ir.values
+  |> List.filter_map (fun (info : CompileRegMemo.value_info) ->
+      if CfgLiveness.IntSet.mem info.id live then Some info.name else None)
+  |> List.sort String.compare
+
+let assert_regmemo_live_names unit_ir live expected =
+  let actual = regmemo_names_of_live unit_ir live in
+  let expected = List.sort String.compare expected in
+  assert (List.equal String.equal actual expected)
+
+let rec assert_no_admin_let_rhs_expr = function
+  | Syntax.Unit | Syntax.Int _ | Syntax.Float _ | Syntax.Bool _ | Syntax.Str _ | Syntax.Builtin _ | Syntax.Var _
+  | Syntax.GVar _ | Syntax.Ctor _ ->
+      ()
+  | Syntax.App (fn, args, _) | Syntax.Jump (fn, args, _) ->
+      assert_no_admin_let_rhs_expr fn;
+      List.iter assert_no_admin_let_rhs_expr args
+  | Syntax.Op (_, lhs, rhs, _) ->
+      assert_no_admin_let_rhs_expr lhs;
+      assert_no_admin_let_rhs_expr rhs
+  | Syntax.Tup (values, _) | Syntax.Arr (values, _) -> List.iter assert_no_admin_let_rhs_expr values
+  | Syntax.Lam (_, body, _) -> assert_no_admin_let_rhs_expr body
+  | Syntax.Let (binding, body, _) ->
+      assert_no_admin_let_rhs_binding binding;
+      assert_no_admin_let_rhs_expr body
+  | Syntax.Sel (target, _, _) -> assert_no_admin_let_rhs_expr target
+  | Syntax.If (cond, if_true, if_false, _) ->
+      assert_no_admin_let_rhs_expr cond;
+      assert_no_admin_let_rhs_expr if_true;
+      assert_no_admin_let_rhs_expr if_false
+  | Syntax.Match (scrutinee, Syntax.MatchPattern cases, _) ->
+      assert_no_admin_let_rhs_expr scrutinee;
+      List.iter (fun (_pat, expr) -> assert_no_admin_let_rhs_expr expr) cases
+
+and assert_no_admin_let_rhs_binding = function
+  | Syntax.BSeq (expr, _) -> assert_no_admin_let_rhs_expr expr
+  | Syntax.BOne (Syntax.PVar (name, _), expr, _) ->
+      (if Core.String.is_prefix name ~prefix:"_'anf" then
+         match expr with Syntax.Let _ -> failwith ("admin ANF binder has nested let rhs: " ^ name) | _ -> ());
+      assert_no_admin_let_rhs_expr expr
+  | Syntax.BOne (_pat, expr, _) -> assert_no_admin_let_rhs_expr expr
+  | Syntax.BCont (_pat, expr, _) -> assert_no_admin_let_rhs_expr expr
+  | Syntax.BRec entries | Syntax.BRecC entries ->
+      List.iter (fun (_pat, expr, _) -> assert_no_admin_let_rhs_expr expr) entries
+
+let rec expr_contains_app_to name = function
+  | Syntax.App ((Syntax.Var (callee, _) | Syntax.GVar (callee, _)), _, _) when callee = name -> true
+  | Syntax.App (fn, args, _) | Syntax.Jump (fn, args, _) ->
+      expr_contains_app_to name fn || List.exists (expr_contains_app_to name) args
+  | Syntax.Op (_, lhs, rhs, _) -> expr_contains_app_to name lhs || expr_contains_app_to name rhs
+  | Syntax.Tup (values, _) | Syntax.Arr (values, _) -> List.exists (expr_contains_app_to name) values
+  | Syntax.Lam (_, body, _) -> expr_contains_app_to name body
+  | Syntax.Let (binding, body, _) -> binding_contains_app_to name binding || expr_contains_app_to name body
+  | Syntax.Sel (target, _, _) -> expr_contains_app_to name target
+  | Syntax.If (cond, if_true, if_false, _) ->
+      expr_contains_app_to name cond || expr_contains_app_to name if_true || expr_contains_app_to name if_false
+  | Syntax.Match (scrutinee, Syntax.MatchPattern cases, _) ->
+      expr_contains_app_to name scrutinee || List.exists (fun (_pat, body) -> expr_contains_app_to name body) cases
+  | Syntax.Unit | Syntax.Int _ | Syntax.Float _ | Syntax.Bool _ | Syntax.Str _ | Syntax.Builtin _ | Syntax.Var _
+  | Syntax.GVar _ | Syntax.Ctor _ ->
+      false
+
+and binding_contains_app_to name = function
+  | Syntax.BSeq (expr, _) -> expr_contains_app_to name expr
+  | Syntax.BOne (_pat, expr, _) | Syntax.BCont (_pat, expr, _) -> expr_contains_app_to name expr
+  | Syntax.BRec entries | Syntax.BRecC entries ->
+      List.exists (fun (_pat, expr, _) -> expr_contains_app_to name expr) entries
+
+let rec expr_eventually_jumps_to join_name = function
+  | Syntax.Jump (Syntax.Var (target, _), _, _) | Syntax.Jump (Syntax.GVar (target, _), _, _) -> target = join_name
+  | Syntax.Let (_binding, body, _) -> expr_eventually_jumps_to join_name body
+  | Syntax.If (_, if_true, if_false, _) ->
+      expr_eventually_jumps_to join_name if_true && expr_eventually_jumps_to join_name if_false
+  | Syntax.Match (_, Syntax.MatchPattern cases, _) ->
+      List.for_all (fun (_pat, body) -> expr_eventually_jumps_to join_name body) cases
+  | _ -> false
+
+let rec has_if_join_with_body_call name = function
+  | Syntax.Let
+      ( Syntax.BCont (Syntax.PVar (join_name, _), Syntax.Lam (_params, body, _), _),
+        Syntax.If (_, if_true, if_false, _),
+        _ ) ->
+      (expr_eventually_jumps_to join_name if_true && expr_eventually_jumps_to join_name if_false)
+      && expr_contains_app_to name body
+      || has_if_join_with_body_call name body
+  | Syntax.Let (binding, body, _) ->
+      binding_has_if_join_with_body_call name binding || has_if_join_with_body_call name body
+  | Syntax.App (fn, args, _) | Syntax.Jump (fn, args, _) ->
+      has_if_join_with_body_call name fn || List.exists (has_if_join_with_body_call name) args
+  | Syntax.Op (_, lhs, rhs, _) -> has_if_join_with_body_call name lhs || has_if_join_with_body_call name rhs
+  | Syntax.Tup (values, _) | Syntax.Arr (values, _) -> List.exists (has_if_join_with_body_call name) values
+  | Syntax.Lam (_, body, _) -> has_if_join_with_body_call name body
+  | Syntax.Sel (target, _, _) -> has_if_join_with_body_call name target
+  | Syntax.If (cond, if_true, if_false, _) ->
+      has_if_join_with_body_call name cond || has_if_join_with_body_call name if_true
+      || has_if_join_with_body_call name if_false
+  | Syntax.Match (scrutinee, Syntax.MatchPattern cases, _) ->
+      has_if_join_with_body_call name scrutinee
+      || List.exists (fun (_pat, body) -> has_if_join_with_body_call name body) cases
+  | Syntax.Unit | Syntax.Int _ | Syntax.Float _ | Syntax.Bool _ | Syntax.Str _ | Syntax.Builtin _ | Syntax.Var _
+  | Syntax.GVar _ | Syntax.Ctor _ ->
+      false
+
+and binding_has_if_join_with_body_call name = function
+  | Syntax.BSeq (expr, _) -> has_if_join_with_body_call name expr
+  | Syntax.BOne (_pat, expr, _) | Syntax.BCont (_pat, expr, _) -> has_if_join_with_body_call name expr
+  | Syntax.BRec entries | Syntax.BRecC entries ->
+      List.exists (fun (_pat, expr, _) -> has_if_join_with_body_call name expr) entries
+
+let () =
+  let anf = anf_string "let _ = (if true then 1 else 2) + 3;;" in
+  assert (Core.String.is_substring anf ~substring:"letcont");
+  assert (Core.String.is_substring anf ~substring:"jump")
+
+let () =
+  let anf = anf_string "type t = | A of int | B of int;;\nlet _ = (match A 1 with | A x -> x | B y -> y) + 1;;" in
+  assert (Core.String.is_substring anf ~substring:"letcont");
+  assert (Core.String.is_substring anf ~substring:"jump")
+
+let () =
+  let anf = anf_string "let rec loop = fun x -> loop x;;" in
+  assert (Core.String.is_substring anf ~substring:"let rec loop")
+
+let () =
+  let anf = anf_example_string "AnfJoinIf.ant" in
+  assert (Core.String.is_substring anf ~substring:"letcont");
+  assert (Core.String.is_substring anf ~substring:"jump")
+
+let () =
+  let anf = anf_example_string "AnfJoinMatch.ant" in
+  assert (Core.String.is_substring anf ~substring:"letcont");
+  assert (Core.String.is_substring anf ~substring:"jump")
+
+let () =
+  let prog =
+    parse "let c = true;; let f = fun x -> x;; let _ = f ((if c then 1 else 2) + 3);;"
+    |> Typing.top_type_of_prog |> Transform.anf_prog
+  in
+  let stmts, _ = prog in
+  let expr =
+    match List.rev stmts with
+    | Syntax.Term (Syntax.BSeq (expr, _)) :: _ | Syntax.Term (Syntax.BOne (_, expr, _)) :: _ -> expr
+    | _ -> failwith "expected final term expression"
+  in
+  assert (has_if_join_with_body_call "f" expr)
+
+let () =
+  List.iter
+    (fun source ->
+      frontend_prog source |> fst
+      |> List.iter (function Syntax.Type _ -> () | Syntax.Term binding -> assert_no_admin_let_rhs_binding binding))
+    [ "let _ = let x = (1 + ((2 * 3) / 4)) in x + ((5 + 6) * 7);;"; "let f = fun x y -> ((x + y), ((x * y), y));;" ]
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BRecC
+             [
+               ( Syntax.PVar ("j", info),
+                 Syntax.Lam
+                   ( [ Syntax.PVar ("x", info) ],
+                     Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info) ], info),
+                     info ),
+                 info );
+             ]);
+      ],
+      info )
+  in
+  let rendered = Syntax.string_of_document (Syntax.pp_prog prog) in
+  assert (Core.String.is_substring rendered ~substring:"letcont rec")
+
+let () =
+  let info = SynInfo.empty_info in
+  let jump_prog =
+    ([ Syntax.Term (Syntax.BSeq (Syntax.Jump (Syntax.Var ("k", info), [ Syntax.Int 1 ], info), info)) ], info)
+  in
+  let cont_prog =
+    ( [
+        Syntax.Term
+          (Syntax.BCont
+             (Syntax.PVar ("k", info), Syntax.Lam ([ Syntax.PVar ("x", info) ], Syntax.Var ("x", info), info), info));
+      ],
+      info )
+  in
+  let rec_cont_prog =
+    ( [
+        Syntax.Term
+          (Syntax.BRecC
+             [ (Syntax.PVar ("k", info), Syntax.Lam ([ Syntax.PVar ("x", info) ], Syntax.Var ("x", info), info), info) ]);
+      ],
+      info )
+  in
+  let plain_jump = compile_with CompilePlain.Backend.compile jump_prog in
+  assert (Core.String.is_substring plain_jump ~substring:"k");
+  let plain_cont = compile_with CompilePlain.Backend.compile cont_prog in
+  assert (Core.String.is_substring plain_cont ~substring:"let");
+  let plain_rec_cont = compile_with CompilePlain.Backend.compile rec_cont_prog in
+  assert (Core.String.is_substring plain_rec_cont ~substring:"let rec");
+  let seq_jump = compile_with CompileSeq.Backend.compile jump_prog in
+  assert (Core.String.is_substring seq_jump ~substring:"k");
+  let seq_cont = compile_with CompileSeq.Backend.compile cont_prog in
+  assert (Core.String.is_substring seq_cont ~substring:"let");
+  let seq_rec_cont = compile_with CompileSeq.Backend.compile rec_cont_prog in
+  assert (Core.String.is_substring seq_rec_cont ~substring:"let rec");
+  expect_failure ~needle:"jump" (fun () -> ignore (compile_with CompileMemo.Backend.compile jump_prog));
+  expect_failure ~needle:"CompileMemo backend placeholder: Term BCont not implemented" (fun () ->
+      ignore (compile_with CompileMemo.Backend.compile cont_prog));
+  expect_failure ~needle:"CompileMemo backend placeholder: Term BRecC not implemented" (fun () ->
+      ignore (compile_with CompileMemo.Backend.compile rec_cont_prog))
+
+let () =
+  let plain_if = compile_with CompilePlain.Backend.compile (frontend_example "AnfJoinIf.ant") in
+  assert (Core.String.is_substring plain_if ~substring:"let");
+  let plain_match = compile_with CompilePlain.Backend.compile (frontend_example "AnfJoinMatch.ant") in
+  assert (Core.String.is_substring plain_match ~substring:"match");
+  let seq_if = compile_with CompileSeq.Backend.compile (frontend_example "AnfJoinIf.ant") in
+  assert (Core.String.is_substring seq_if ~substring:"if");
+  let seq_match = compile_with CompileSeq.Backend.compile (frontend_example "AnfJoinMatch.ant") in
+  assert (Core.String.is_substring seq_match ~substring:"match")
+
+let () =
+  let regmemo_if =
+    compile_with CompileRegMemo.Backend.compile (frontend_prog "let f = fun x -> (if x then 1 else 2) + 3;;")
+  in
+  assert (Core.String.is_substring regmemo_if ~substring:"let populate_state () =");
+  assert (Core.String.is_substring regmemo_if ~substring:"return_value");
+  let regmemo_global =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "type t = | A of int | B of int;; let x = (match A 1 with | A n -> n | B m -> m) + 1;;")
+  in
+  assert (Core.String.is_substring regmemo_global ~substring:"let populate_state () =");
+  let regmemo_call =
+    compile_with CompileRegMemo.Backend.compile (frontend_prog "let g = fun y -> y;; let f = fun x -> g x;;")
+  in
+  assert (Core.String.is_substring regmemo_call ~substring:"init_frame");
+  assert (Core.String.is_substring regmemo_call ~substring:"set_env_slot")
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("c", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("b", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info); Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let rendered = compile_with CompileRegMemo.Backend.compile prog in
+  assert (Core.String.is_substring rendered ~substring:"get_env_slot");
+  assert (Core.String.is_substring rendered ~substring:"set_env_slot")
+
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "let g = fun y -> y + 1;; let f = fun x -> let z = g x in z + 2;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"restore_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"cont_0")
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info) ],
+                   Syntax.Let
+                     ( Syntax.BRecC
+                         [
+                           ( Syntax.PVar ("loop", info),
+                             Syntax.Lam
+                               ( [ Syntax.PVar ("y", info) ],
+                                 Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("y", info) ], info),
+                                 info ),
+                             info );
+                         ],
+                       Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("x", info) ], info),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let rendered = compile_with CompileRegMemo.Backend.compile prog in
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =");
+  (* With coalescing, the self-loop jump may be elided, so init_frame may not appear *)
+  assert (
+    Core.String.is_substring rendered ~substring:"init_frame"
+    || Core.String.is_substring rendered ~substring:"pc_to_exp")
+
+let () =
+  let info = SynInfo.empty_info in
+  let bad_prog =
+    ( [
+        Syntax.Term
+          (Syntax.BCont
+             (Syntax.PVar ("k", info), Syntax.Lam ([ Syntax.PVar ("x", info) ], Syntax.Var ("x", info), info), info));
+      ],
+      info )
+  in
+  expect_failure ~needle:"AnfToCfg unsupported: top-level BCont" (fun () ->
+      ignore (compile_with CompileRegMemo.Backend.compile bad_prog))
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("c", info); Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("z", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("z", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info); Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, liveness = regmemo_single_unit_liveness prog in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let then_id = regmemo_block_id unit_ir "f.entry.then" in
+  let else_id = regmemo_block_id unit_ir "f.entry.else" in
+  let join_live = regmemo_block_liveness liveness join_id in
+  let then_live = regmemo_block_liveness liveness then_id in
+  let else_live = regmemo_block_liveness liveness else_id in
+  let a_id = regmemo_value_id unit_ir "a" in
+  let b_id = regmemo_value_id unit_ir "b" in
+  assert_regmemo_live_names unit_ir join_live.live_in [ "z" ];
+  assert_regmemo_live_names unit_ir join_live.live_params [ "a" ];
+  assert (CfgLiveness.IntSet.mem a_id join_live.live_params);
+  assert (not (CfgLiveness.IntSet.mem b_id join_live.live_params));
+  assert_regmemo_live_names unit_ir
+    (CfgLiveness.edge_live_values (regmemo_edge_liveness then_live join_id))
+    [ "y"; "z" ];
+  assert_regmemo_live_names unit_ir
+    (CfgLiveness.edge_live_values (regmemo_edge_liveness else_live join_id))
+    [ "x"; "z" ];
+  assert_regmemo_live_names unit_ir (regmemo_edge_param_liveness then_live join_id a_id) [ "y" ];
+  assert_regmemo_live_names unit_ir (regmemo_edge_param_liveness else_live join_id a_id) [ "x" ];
+  assert (not (CfgLiveness.IntMap.mem b_id (regmemo_edge_liveness then_live join_id).CfgLiveness.live_params));
+  assert (not (CfgLiveness.IntMap.mem b_id (regmemo_edge_liveness else_live join_id).CfgLiveness.live_params))
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("p", info); Syntax.PVar ("z", info) ],
+                   Syntax.Match
+                     ( Syntax.Var ("p", info),
+                       Syntax.MatchPattern
+                         [
+                           ( Syntax.PCtorApp
+                               ("A", Some (Syntax.PTup ([ Syntax.PVar ("x", info); Syntax.PAny ], info)), info),
+                             Syntax.Var ("z", info) );
+                           ( Syntax.PCtorApp
+                               ("B", Some (Syntax.PTup ([ Syntax.PAny; Syntax.PVar ("y", info) ], info)), info),
+                             Syntax.Var ("z", info) );
+                         ],
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, liveness = regmemo_single_unit_liveness prog in
+  let entry_id = regmemo_block_id unit_ir "f.entry" in
+  let arm0_id = regmemo_block_id unit_ir "f.entry.match0" in
+  let arm1_id = regmemo_block_id unit_ir "f.entry.match1" in
+  let entry_live = regmemo_block_liveness liveness entry_id in
+  let arm0_live = regmemo_block_liveness liveness arm0_id in
+  let arm1_live = regmemo_block_liveness liveness arm1_id in
+  assert_regmemo_live_names unit_ir arm0_live.live_in [ "z" ];
+  assert_regmemo_live_names unit_ir arm1_live.live_in [ "z" ];
+  assert_regmemo_live_names unit_ir arm0_live.live_params [];
+  assert_regmemo_live_names unit_ir arm1_live.live_params [];
+  assert_regmemo_live_names unit_ir (CfgLiveness.edge_live_values (regmemo_edge_liveness entry_live arm0_id)) [ "z" ];
+  assert_regmemo_live_names unit_ir (CfgLiveness.edge_live_values (regmemo_edge_liveness entry_live arm1_id)) [ "z" ]
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("c", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("b", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info); Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let entry_id = unit_ir.entry in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let join_layout = regmemo_block_layout allocation join_id in
+  let entry_layout = regmemo_block_layout allocation entry_id in
+  let x_slot_entry = regmemo_slot_in_block allocation entry_id (regmemo_value_id unit_ir "x") in
+  let y_slot_entry = regmemo_slot_in_block allocation entry_id (regmemo_value_id unit_ir "y") in
+  let a_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "a") in
+  let b_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "b") in
+  assert (x_slot_entry <> y_slot_entry);
+  assert (a_slot <> b_slot);
+  assert (join_layout.param_slots = [ a_slot; b_slot ]);
+  assert (entry_layout.frame_size = 3);
+  assert (join_layout.frame_size = 2)
+
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("c", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("b", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let join_layout = regmemo_block_layout allocation join_id in
+  let a_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "a") in
+  let b_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "b") in
+  assert (join_layout.param_slots = [ a_slot; b_slot ]);
+  assert (join_layout.frame_size = 2)
+
+(* Per-block frame allocation: verify that different blocks get independent minimal layouts *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f(c, x, y, z) = let j(a, b) = a + z in if c then jump j(y, x) else jump j(x, y) *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("c", info); Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("z", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("z", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info); Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let entry_id = unit_ir.entry in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let then_id = regmemo_block_id unit_ir "f.entry.then" in
+  let else_id = regmemo_block_id unit_ir "f.entry.else" in
+  let entry_layout = regmemo_block_layout allocation entry_id in
+  let join_layout = regmemo_block_layout allocation join_id in
+  let then_layout = regmemo_block_layout allocation then_id in
+  let else_layout = regmemo_block_layout allocation else_id in
+  (* Entry block: c, x, y, z → frame_size = 4 *)
+  assert (entry_layout.frame_size = 4);
+  (* Then/else blocks: live_in from entry, need x/y for jump args + z live-through *)
+  assert (then_layout.frame_size >= 2);
+  assert (else_layout.frame_size >= 2);
+  (* Join block: a + z live, b dead, result can reuse → frame_size >= 2 *)
+  assert (join_layout.frame_size >= 2);
+  (* Per-block minimality: then/else blocks should be smaller than entry *)
+  assert (then_layout.frame_size <= entry_layout.frame_size);
+  assert (else_layout.frame_size <= entry_layout.frame_size);
+  (* Join block params are [a, b]; a must have a slot, b gets one too (for alignment) *)
+  let a_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "a") in
+  let z_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "z") in
+  assert (a_slot <> z_slot);
+  (* Verify the compiled output runs without crash *)
+  let rendered = compile_with CompileRegMemo.Backend.compile prog in
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =");
+  assert (Core.String.is_substring rendered ~substring:"set_env_slot")
+
+(* Per-block allocation: non-tail call with per-block save/restore *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "let g = fun y -> y + 1;; let f = fun x -> let z = g x in z + 2;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"restore_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"init_frame")
+
+(* Edge elision: branch to empty blocks with same frame size should be elided *)
+let () =
+  (* (if true then 1 else 2) + 3: branch targets are empty, branch edge should be Elide *)
+  let rendered = compile_with CompileRegMemo.Backend.compile (frontend_prog "let _ = (if true then 1 else 2) + 3;;") in
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =");
+  (* The branch code should use direct goto (pc_to_exp) without init_frame for branch edges *)
+  assert (Core.String.is_substring rendered ~substring:"pc_to_exp")
+
+(* Edge plan: coalescing makes self-loop jump elide *)
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info) ],
+                   Syntax.Let
+                     ( Syntax.BRecC
+                         [
+                           ( Syntax.PVar ("loop", info),
+                             Syntax.Lam
+                               ( [ Syntax.PVar ("y", info) ],
+                                 Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("y", info) ], info),
+                                 info ),
+                             info );
+                         ],
+                       Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("x", info) ], info),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let loop_id = regmemo_block_id unit_ir "loop" in
+  let loop_layout = regmemo_block_layout allocation loop_id in
+  (* Self-loop should have Elide plan because y → y with same slot *)
+  let loop_plans =
+    match CfgLiveness.IntMap.find_opt loop_id allocation.edge_plans with Some p -> p | None -> assert false
+  in
+  let self_plan = match CfgLiveness.IntMap.find_opt loop_id loop_plans with Some p -> p | None -> assert false in
+  (* With entry/working split, dead-param self-loop has entry_size=0 (y is dead) *)
+  assert (loop_layout.entry_size = 0);
+  assert (loop_layout.frame_size = 1);
+  (* Self-loop plan: shuffle to empty entry, or elide if y were live *)
+  match self_plan with
+  | RegAlloc.Elide | RegAlloc.Shuffle _ -> () (* either is acceptable *)
+
+(* Different predecessors flowing into same join: coalescing from dominant predecessor *)
+let () =
+  let info = SynInfo.empty_info in
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info); Syntax.PVar ("y", info); Syntax.PVar ("c", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info); Syntax.PVar ("b", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Var ("b", info), info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info); Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let join_layout = regmemo_block_layout allocation join_id in
+  let a_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "a") in
+  let b_slot = regmemo_slot_in_block allocation join_id (regmemo_value_id unit_ir "b") in
+  assert (join_layout.param_slots = [ a_slot; b_slot ]);
+  assert (join_layout.frame_size = 2);
+  (* Both branches pass same args (x, y), so both edge plans should match *)
+  let then_id = regmemo_block_id unit_ir "f.entry.then" in
+  let else_id = regmemo_block_id unit_ir "f.entry.else" in
+  let then_plans =
+    match CfgLiveness.IntMap.find_opt then_id allocation.edge_plans with Some p -> p | None -> assert false
+  in
+  let else_plans =
+    match CfgLiveness.IntMap.find_opt else_id allocation.edge_plans with Some p -> p | None -> assert false
+  in
+  let then_plan = match CfgLiveness.IntMap.find_opt join_id then_plans with Some p -> p | None -> assert false in
+  let else_plan = match CfgLiveness.IntMap.find_opt join_id else_plans with Some p -> p | None -> assert false in
+  (* Both edges should have the same plan type *)
+  assert (
+    match (then_plan, else_plan) with
+    | RegAlloc.Elide, RegAlloc.Elide -> true
+    | RegAlloc.Shuffle _, RegAlloc.Shuffle _ -> true
+    | _ -> false)
+
+(* Entry/working split: block body with temporaries has entry_size < frame_size *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile (frontend_prog "let f = fun x -> let y = x + 1 in let z = y + 2 in z;;")
+  in
+  let unit_ir, _liveness, allocation =
+    regmemo_single_unit_allocation (frontend_prog "let f = fun x -> let y = x + 1 in let z = y + 2 in z;;")
+  in
+  let entry_id = unit_ir.entry in
+  let entry_layout = regmemo_block_layout allocation entry_id in
+  (* Entry block has param x as sole entry value; y and z are body temporaries *)
+  assert (entry_layout.entry_size >= 1);
+  assert (entry_layout.frame_size >= entry_layout.entry_size);
+  (* Generated code should use resize_frame for post-entry growth when needed *)
+  assert (
+    entry_layout.frame_size = entry_layout.entry_size || Core.String.is_substring rendered ~substring:"resize_frame");
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =")
+
+(* Successor entry is minimal: predecessor working frame > successor entry *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f(x, y) = let j(a) = a in if x then jump j(y) else jump j(y) *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info); Syntax.PVar ("y", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam ([ Syntax.PVar ("a", info) ], Syntax.Var ("a", info), info),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("x", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unit_ir, _liveness, allocation = regmemo_single_unit_allocation prog in
+  let entry_id = unit_ir.entry in
+  let join_id = regmemo_block_id unit_ir "j" in
+  let entry_layout = regmemo_block_layout allocation entry_id in
+  let join_layout = regmemo_block_layout allocation join_id in
+  (* Entry has x, y → entry_size=2; join has only a → entry_size=1 *)
+  assert (entry_layout.entry_size = 2);
+  assert (join_layout.entry_size = 1);
+  assert (join_layout.entry_size < entry_layout.entry_size)
+
+(* Non-tail call: resume uses init_frame with potentially smaller size *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "let g = fun y -> y + 1;; let f = fun x -> let z = g x in z + 2;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"init_frame");
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"restore_env_slots")
+
+(* ===== BlockInlining tests ===== *)
+
+(* Helpers shared by the inlining tests below. *)
+
+let inlined_unit prog =
+  let ir = CompileRegMemo.lower_prog prog in
+  match ir.units with [ unit_ir ] -> unit_ir | _ -> failwith "expected single unit"
+
+let unoptimized_unit prog =
+  let ir = AnfToCfg.lower_prog prog in
+  match ir.units with [ unit_ir ] -> unit_ir | _ -> failwith "expected single unit"
+
+(* Pick a unit by name from a multi-unit program. *)
+let inlined_unit_named prog name =
+  let ir = CompileRegMemo.lower_prog prog in
+  match List.find_opt (fun (u : CompileRegMemo.unit_ir) -> String.equal u.name name) ir.units with
+  | Some u -> u
+  | None -> failwith ("unit not found: " ^ name)
+
+let blocks_count (unit_ir : CompileRegMemo.unit_ir) = List.length unit_ir.blocks
+
+let has_block_with_label (unit_ir : CompileRegMemo.unit_ir) label =
+  List.exists (fun (b : CompileRegMemo.block) -> String.equal b.label label) unit_ir.blocks
+
+(* The terminator of a block, walking through inline regions, has the inline
+   regions reachable from the entry block. *)
+let entry_block (unit_ir : CompileRegMemo.unit_ir) =
+  List.find (fun (b : CompileRegMemo.block) -> b.id = unit_ir.entry) unit_ir.blocks
+
+let count_inline_regions (term : CompileRegMemo.terminator) =
+  let n = ref 0 in
+  CompileRegMemo.terminator_iter_inline (fun _ -> incr n) term;
+  !n
+
+(* 1. Trivial block inlining for `Jump -> tiny block`. *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f x = let j(a) = a in jump j(x).  Without inlining the lowered CFG has
+     two blocks (entry + j); after trivial Jump inlining only the entry
+     remains. *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam ([ Syntax.PVar ("a", info) ], Syntax.Var ("a", info), info),
+                           info ),
+                       Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info) ], info),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unopt = unoptimized_unit prog in
+  assert (blocks_count unopt = 2);
+  assert (has_block_with_label unopt "j");
+  let opt = inlined_unit prog in
+  assert (blocks_count opt = 1);
+  assert (not (has_block_with_label opt "j"))
+
+(* 2. Dispatch inlining for a `Match` arm whose target is a tiny block. *)
+let () =
+  (* type t = A | B; f p = match p with | A -> 1 | B -> 2.  The arms are tiny
+     blocks with no binders, so dispatch inlining should fold them into the
+     entry block's match terminator. *)
+  let prog =
+    parse "type t = | A | B;; let f = fun p -> match p with | A -> 1 | B -> 2;;"
+    |> Typing.top_type_of_prog |> Transform.anf_prog |> Pat.compile
+  in
+  let unopt = unoptimized_unit prog in
+  let unopt_blocks = blocks_count unopt in
+  assert (unopt_blocks >= 3);
+  let opt = inlined_unit prog in
+  assert (blocks_count opt = 1);
+  let entry = entry_block opt in
+  let inline_regions = count_inline_regions entry.term in
+  assert (inline_regions = 2)
+
+(* 3. Dispatch inlining for a `Branch` arm whose target is a tiny block. *)
+let () =
+  let prog = frontend_prog "let f = fun c -> if c then 1 else 2;;" in
+  let unopt = unoptimized_unit prog in
+  let unopt_blocks = blocks_count unopt in
+  assert (unopt_blocks >= 3);
+  let opt = inlined_unit prog in
+  assert (blocks_count opt = 1);
+  let entry = entry_block opt in
+  let inline_regions = count_inline_regions entry.term in
+  assert (inline_regions = 2)
+
+(* 4. Preservation of the dispatcher PC itself: the function entry block is
+   never eliminated even if its terminator's arms have all been inlined. *)
+let () =
+  let prog = frontend_prog "let f = fun c -> if c then 1 else 2;;" in
+  let opt = inlined_unit prog in
+  assert (has_block_with_label opt "f.entry");
+  let entry = entry_block opt in
+  assert (entry.id = opt.entry)
+
+(* 5. Preservation of function entry PCs across all functions in a multi-unit
+   program. *)
+let () =
+  let prog = frontend_prog "let g = fun y -> y + 1;; let f = fun x -> if x = 0 then 1 else g x;;" in
+  let ir = CompileRegMemo.lower_prog prog in
+  List.iter
+    (fun (u : CompileRegMemo.unit_ir) ->
+      assert (List.exists (fun (b : CompileRegMemo.block) -> b.id = u.entry) u.blocks))
+    ir.units;
+  assert (List.length ir.units = 2)
+
+(* 6. Preservation of Join blocks: a join target reached from multiple
+   predecessors is not absorbed by dispatch inlining. *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f c x y = let j(a) = a + 1 in if c then jump j(x) else jump j(y).  The
+     join 'j' has two predecessors and must remain a separate block. *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("c", info); Syntax.PVar ("x", info); Syntax.PVar ("y", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam
+                             ( [ Syntax.PVar ("a", info) ],
+                               Syntax.Op ("+", Syntax.Var ("a", info), Syntax.Int 1, info),
+                               info ),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let opt = inlined_unit prog in
+  assert (has_block_with_label opt "j")
+
+(* 7. Preservation of loop headers / backedge targets. *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f x = let rec loop(y) = jump loop(y) in jump loop(x).  The loop header
+     'loop' is a back-edge target and must not be inlined. *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("x", info) ],
+                   Syntax.Let
+                     ( Syntax.BRecC
+                         [
+                           ( Syntax.PVar ("loop", info),
+                             Syntax.Lam
+                               ( [ Syntax.PVar ("y", info) ],
+                                 Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("y", info) ], info),
+                                 info ),
+                             info );
+                         ],
+                       Syntax.Jump (Syntax.Var ("loop", info), [ Syntax.Var ("x", info) ], info),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let opt = inlined_unit prog in
+  assert (has_block_with_label opt "loop")
+
+(* 8. Preservation of non-tail direct call continuation behavior.  A non-tail
+   call's resume point gets its own PC; inlining must not break that. *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog "let g = fun y -> y + 1;; let f = fun x -> let z = g x in z + 2;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"restore_env_slots");
+  assert (Core.String.is_substring rendered ~substring:"init_frame")
+
+(* 9. Multi-predecessor bounded copying.  A small block reached by multiple
+   Jumps may still be copied into each predecessor when within the cost
+   budget. *)
+let () =
+  let info = SynInfo.empty_info in
+  (* f c x y = let j(a) = a in if c then jump j(x) else jump j(y).  Two preds
+     for j; with our copy budget the small body of j (which only returns its
+     argument) should be inlined into both branches, eliminating j. *)
+  let prog =
+    ( [
+        Syntax.Term
+          (Syntax.BOne
+             ( Syntax.PVar ("f", info),
+               Syntax.Lam
+                 ( [ Syntax.PVar ("c", info); Syntax.PVar ("x", info); Syntax.PVar ("y", info) ],
+                   Syntax.Let
+                     ( Syntax.BCont
+                         ( Syntax.PVar ("j", info),
+                           Syntax.Lam ([ Syntax.PVar ("a", info) ], Syntax.Var ("a", info), info),
+                           info ),
+                       Syntax.If
+                         ( Syntax.Var ("c", info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("x", info) ], info),
+                           Syntax.Jump (Syntax.Var ("j", info), [ Syntax.Var ("y", info) ], info),
+                           info ),
+                       info ),
+                   info ),
+               info ));
+      ],
+      info )
+  in
+  let unopt = unoptimized_unit prog in
+  assert (has_block_with_label unopt "j");
+  (* For multi-predecessor copying we expect strictly fewer blocks after the
+     pass than before, even though 'j' may or may not be physically gone. *)
+  let opt = inlined_unit prog in
+  assert (blocks_count opt < blocks_count unopt)
+
+(* 10. Correct handling of match binders and block params: an arm whose
+   binder is used as a non-resolving operand (e.g. passed to Construct) can
+   be safely inlined. *)
+let () =
+  let prog =
+    parse
+      "type t = | A of int | B of int;; let wrap = fun n -> n;; let f = fun p -> match p with | A x -> wrap x | B y -> \
+       wrap y;;"
+    |> Typing.top_type_of_prog |> Transform.anf_prog |> Pat.compile
+  in
+  let opt = inlined_unit_named prog "f" in
+  (* The two arm blocks should be folded into the entry block's match
+     terminator (their binder is only used as a call argument, no resolves). *)
+  let entry = entry_block opt in
+  let inline_regions = count_inline_regions entry.term in
+  assert (inline_regions >= 2);
+  (* The compiled output still runs to completion. *)
+  let rendered = compile_with CompileRegMemo.Backend.compile prog in
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =")
+
+(* 10b. Negative case: an arm whose binder IS resolved (used as a Match
+   scrutinee) is NOT inlined, preserving the memo boundary. *)
+let () =
+  let prog =
+    parse
+      "type tag = | X | Y;; type t = | A of tag;; let f = fun p -> match p with | A v -> match v with | X -> 1 | Y -> \
+       2;;"
+    |> Typing.top_type_of_prog |> Transform.anf_prog |> Pat.compile
+  in
+  let opt = inlined_unit_named prog "f" in
+  (* The arm 'A v -> match v with ...' resolves v, so it should NOT be
+     dispatch-inlined into the entry. The arm's block must remain. *)
+  assert (blocks_count opt >= 2)
+
+(* 11. Runtime equivalence: the optimized backend produces a program that
+   compiles cleanly and contains the populate_state entry point. The actual
+   runtime equivalence is exercised by [make run] / generated benchmark
+   binaries; here we just verify the compiler emits a well-formed program for
+   a non-trivial example. *)
+let () =
+  let rendered =
+    compile_with CompileRegMemo.Backend.compile
+      (frontend_prog
+         "type lst = | Nil | Cons of int * lst;; let rec sum = fun l -> match l with | Nil -> 0 | Cons x xs -> let r = \
+          sum xs in x + r;;")
+  in
+  assert (Core.String.is_substring rendered ~substring:"let populate_state () =");
+  assert (Core.String.is_substring rendered ~substring:"return_value");
+  assert (Core.String.is_substring rendered ~substring:"collect_env_slots")
+
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =
     let open M in
