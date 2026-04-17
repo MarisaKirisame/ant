@@ -113,6 +113,9 @@ let rec compile_pp_expr (e : 'a expr) : document =
   | App (f, xs, _) -> string "(" ^^ separate_map space compile_pp_expr (f :: xs) ^^ string ")"
   | Op (op, l, r, _) -> string "(" ^^ compile_pp_expr l ^^ string op ^^ compile_pp_expr r ^^ string ")"
   | Int i -> string "(" ^^ string (string_of_int i) ^^ string ")"
+  | Let (BOne (x, e1, _), e2, _) ->
+      string "(let " ^^ pp_pattern x ^^ string " = " ^^ compile_pp_expr e1 ^^ string " in " ^^ compile_pp_expr e2
+      ^^ string ")"
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_expr e)
 
 let compile_pp_stmt (e : env) (s : 'a stmt) : document =

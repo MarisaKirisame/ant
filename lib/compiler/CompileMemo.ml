@@ -6,10 +6,6 @@ open State
 open Code
 module Hashtbl = AntHashtbl
 
-(* Backend overview moved to docs/internal.md#compilememo-backend. *)
-
-(*todo: do not do a stack machine*)
-
 (* Stack usage rationale is documented in docs/internal.md#compilememo-backend. *)
 
 exception DupKey

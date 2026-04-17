@@ -4,6 +4,12 @@ module Ctx = Map.Make (String)
 module SSet = Set.Make (String)
 module Fresh = Fresh.Make ()
 
+let is_atomic = function
+  | Unit | Int _ | Float _ | Bool _ | Str _ | Builtin _ | Var _ | Ctor _ | Lam _ | GVar _ -> true
+  | _ -> false
+
+let ( let* ) a b = a b
+
 (* NOTE: this file requires refactoring, given the AST has been typed *)
 
 let free, free_p =
@@ -58,11 +64,6 @@ let cps ctx expr =
     let l1, l2 = aux [] [] n in
     (List.rev l1, List.rev l2)
   in
-  let is_atomic = function
-    | Unit | Int _ | Float _ | Bool _ | Str _ | Builtin _ | Var _ | Ctor _ | Lam _ -> true
-    | _ -> false
-  in
-  let ( let* ) e f = e f in
   let rec atom = function
     | Unit -> Unit
     | Int i -> Int i
@@ -369,3 +370,81 @@ let defunc_prog (prog : 'a prog) =
            empty_info ))
   in
   (defunc_apply :: prog, empty_info)
+
+let empty_info = SynInfo.empty_info
+
+let mk_fresh_pat prefix =
+  let name = Fresh.next_fresh prefix in
+  (PVar (name, empty_info), Var (name, empty_info))
+
+let rec anf_stmt stmt =
+  match stmt with
+  | Type _ -> stmt
+  | Term binding -> Term (anf_binding binding)
+  | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt stmt)
+
+and anf_binding = function
+  | BSeq (expr, info) -> BSeq (anf_tail expr, info)
+  | BOne (pattern, expr, info) -> BOne (pattern, anf_tail expr, info)
+  | BRec entries -> BRec (List.map (fun (pattern, expr, info) -> (pattern, anf_tail expr, info)) entries)
+  | BCont (pattern, expr, info) -> BCont (pattern, anf_tail expr, info)
+  | BRecC entries -> BRecC (List.map (fun (pattern, expr, info) -> (pattern, anf_tail expr, info)) entries)
+
+and anf_atom expr =
+  match expr with
+  | Lam (params, body, info) -> Lam (params, anf_tail body, info)
+  | Var _ | Ctor _ | GVar _ | Int _ | Bool _ -> expr
+  | expr -> failwith ("unknown case in anf_atom: " ^ string_of_document @@ pp_expr expr)
+
+and bind_value expr k =
+  match expr with
+  | Op (op, lhs, rhs, info) ->
+      let* lhs' = bind_value lhs in
+      let* rhs' = bind_value rhs in
+      bind_computation (Op (op, lhs', rhs', info)) k
+  | App (GVar (x, gv_info), args, app_info) ->
+      let* args' = bind_values args in
+      bind_computation (App (GVar (x, gv_info), args', app_info)) k
+  | App (Ctor (x, ctor_info), args, app_info) ->
+      let* args' = bind_values args in
+      bind_computation (App (Ctor (x, ctor_info), args', app_info)) k
+  | _ when is_atomic expr -> k (anf_atom expr)
+  | _ -> failwith ("unknown case in bind_value: " ^ string_of_document @@ Syntax.pp_expr expr)
+
+and bind_values exprs k =
+  match exprs with
+  | [] -> k []
+  | expr :: rest ->
+      let* expr' = bind_value expr in
+      let* rest' = bind_values rest in
+      k (expr' :: rest')
+
+and bind_computation expr k =
+  let binding_pat, binding_var = mk_fresh_pat "_" in
+  Let (BOne (binding_pat, expr, empty_info), k binding_var, empty_info)
+
+and anf_tail expr =
+  match expr with
+  | _ when is_atomic expr -> anf_atom expr
+  | Match (scrutinee, MatchPattern cases, info) ->
+      let* scrutinee' = bind_value scrutinee in
+      Match (scrutinee', MatchPattern (List.map (fun (pattern, body) -> (pattern, anf_tail body)) cases), info)
+  | App (Ctor (ctor_name, info), args, app_info) ->
+      let* args' = bind_values args in
+      App (Ctor (ctor_name, info), args', app_info)
+  | App (GVar (func_name, info), args, app_info) ->
+      let* args' = bind_values args in
+      App (GVar (func_name, info), args', app_info)
+  | Let (binding, body, info) -> Let (anf_binding binding, anf_tail body, info)
+  | If (cond, then_branch, else_branch, info) ->
+      let* cond' = bind_value cond in
+      If (cond', anf_tail then_branch, anf_tail else_branch, info)
+  | Op (op, lhs, rhs, info) ->
+      let* lhs' = bind_value lhs in
+      let* rhs' = bind_value rhs in
+      Op (op, lhs', rhs', info)
+  | _ -> failwith ("anf_tail not implemented: " ^ string_of_document @@ Syntax.pp_expr expr)
+
+let anf_prog ((stmts, info) : 'a prog) : 'a prog =
+  Fresh.reset ();
+  (List.map anf_stmt stmts, info)
