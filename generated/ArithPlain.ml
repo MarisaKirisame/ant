@@ -1,9 +1,11 @@
-type nat = Z | S of nat
-type var = X | Y
-type expr = Const of int | Var of var | Add of expr * expr | Mul of expr * expr
-type factor_result = Missing | Found of expr
-type expr_list = ENil | ECons of expr * expr_list
-type pick_result = NoPick | Pick of expr * expr_list
+open ArithCEK
+
+type nat = ArithCEK.nat
+type var = ArithCEK.var
+type expr = ArithCEK.expr
+type factor_result = ArithCEK.factor_result
+type expr_list = ArithCEK.expr_list
+type pick_result = ArithCEK.pick_result
 
 let rec var_rank = fun v -> match v with X -> 0 | Y -> 1
 let rec expr_rank = fun e -> match e with Const _ -> 0 | Var _ -> 1 | Add (_, _) -> 2 | Mul (_, _) -> 3

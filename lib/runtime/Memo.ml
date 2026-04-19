@@ -508,7 +508,7 @@ let instantiate (step : step) (state : state) : step =
       let pvar_count = Pattern.pattern_pvar_count p in
       if pvar_count <= keep_last_count then p else keep_last_aux p v (pvar_count - keep_last_count)
     in
-    (instantiate_small p)
+    instantiate_small p
   in
   let src = zipwith_ek join step.src state in
   let dst : state = Dependency.step_through step (Dependency.pattern_to_value src) in

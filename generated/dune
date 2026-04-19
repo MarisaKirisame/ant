@@ -1,8 +1,6 @@
 (library
  (name runmodes)
  (modules
-  AppendCEK
-  AppendPlain
   FromHazel
   HazelAppend
   HazelExperiment
@@ -14,37 +12,22 @@
   HazelQS
   HazelRev
   HazelIsSorted
-  InsertionSortCEK
-  InsertionSortPlain
   LiveCEK
   LivePlain
   LiveLexer
   LiveParser
-  MergeSortCEK
-  MergeSortPlain
   NamedExpr
-  PairCEK
-  PairPlain
-  QuickSortCEK
-  QuickSortPlain
-  ReverseCEK
-  ReversePlain
   RunLiveCommon
   RunLiveSimple
   RunLiveLeftToRight
   RunLiveListExtend
   RunLiveDemandDriven
   RunTestAsymptotics
-  SimpleFilterCEK
-  SimpleFilterPlain
-  TailRecCEK
-  TestCEK
-  TestPlain
-  RunTailRec
+  ListCEK
+  ListPlain
   ArithCEK
   ArithPlain
-  RunArith
-  RunTest)
+  RunArith)
  (libraries ant yojson sexplib)
  (wrapped false)
  (preprocess
