@@ -22,12 +22,12 @@
   RunLiveLeftToRight
   RunLiveListExtend
   RunLiveDemandDriven
-  TailRecCEK
-  RunTailRec
+  RunTestAsymptotics
+  ListCEK
+  ListPlain
   ArithCEK
   ArithPlain
-  RunArith
-  RunTest)
+  RunArith)
  (libraries ant yojson sexplib)
  (wrapped false)
  (preprocess

@@ -152,134 +152,25 @@ def build_project() -> None:
 
 def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
     ensure_switch()
-    opam_exec(
-        [
-            "dune",
-            "exec",
-            "ant",
-            "--",
-            "examples/Test.ant",
-            "generated/TestSeq.ml",
-            "--compile",
-            "--backend",
-            "seq",
-        ],
-        env=env,
-    )
-    opam_exec(
-        [
-            "dune",
-            "exec",
-            "ant",
-            "--",
-            "examples/Test.ant",
-            "generated/TestCEK.ml",
-            "--compile",
-            "--backend",
-            "memo",
-        ],
-        env=env,
-    )
-    opam_exec(
-        [
-            "dune",
-            "exec",
-            "ant",
-            "--",
-            "examples/Test.ant",
-            "generated/TestPlain.ml",
-            "--compile",
-            "--backend",
-            "plain",
-        ],
-        env=env,
-    )
-    #opam_exec(
-    #    [
-    #        "dune",
-    #        "exec",
-    #        "ant",
-    #        "--",
-    #        "examples/Live.ant",
-    #        "generated/LiveSeq.ml",
-    #        "--compile",
-    #        "--backend",
-    #        "seq",
-    #    ],
-    #    env=env,
-    #)
-    opam_exec(
-        [
-            "dune",
-            "exec",
-            "ant",
-            "--",
-            "examples/Live.ant",
-            "generated/LiveCEK.ml",
-            "--compile",
-            "--backend",
-            "memo",
-        ],
-        env=env,
-    )
-    opam_exec(
-        [
-            "dune",
-            "exec",
-            "ant",
-            "--",
-            "examples/Live.ant",
-            "generated/LivePlain.ml",
-            "--compile",
-            "--backend",
-            "plain",
-            "--type-alias",
-            "LiveCEK",
-        ],
-        env=env,
-    )
-    opam_exec(
-        [
-            "dune",
-            "exec",
-            "ant",
-            "--",
-            "examples/TailRec.ant",
-            "generated/TailRecCEK.ml",
-            "--compile",
-            "--backend",
-            "memo",
-        ],
-        env=env,
-    )
-    opam_exec(
-        [
-            "dune",
-            "exec",
-            "ant",
-            "--",
-            "examples/Arith.ant",
-            "generated/ArithCEK.ml",
-            "--compile",
-            "--backend",
-            "memo",
-        ],
-        env=env,
-    )
-    opam_exec(
-        [
-            "dune",
-            "exec",
-            "ant",
-            "--",
-            "examples/Arith.ant",
-            "generated/ArithPlain.ml",
-            "--compile",
-            "--backend",
-            "plain",
-        ],
-        env=env,
-    )
+    files = ("Live", "Arith", "List")
+    backends = (("memo", "CEK"), ("plain", "Plain"))
+
+    for file in files:
+        for backend, suffix in backends:
+            command = [
+                "dune",
+                "exec",
+                "ant",
+                "--",
+                f"examples/{file}.ant",
+                f"generated/{file}{suffix}.ml",
+                "--compile",
+                "--backend",
+                backend,
+            ]
+            if backend == "plain":
+                command.extend(["--type-alias", f"{file}CEK"])
+            opam_exec(command, env=env)
 
 base_modes = ("append", "filter", "map", "qs", "is", "ms", "pair", "rev")
 variant_prefixes = ("", "th_", "at_")
@@ -292,7 +183,6 @@ bad = set(["th_ms", "th_pair"])
 hazel_modes = tuple(m for m in hazel_modes if m not in bad)
 arith_modes = ("arith",)
 modes = arith_modes + hazel_modes
-
 
 def _remove_eval_steps_files_for_modes(selected_modes: Iterable[str]) -> None:
     for mode in selected_modes:
@@ -368,8 +258,6 @@ def hazel_tex_project() -> None:
 
 def arith_tex_project() -> None:
     report_module.generate_arith_tex(output_path=Path("output/arith/arith_result.tex"))
-
-
 
 
 def compile_generated() -> None:

@@ -24,14 +24,6 @@ let with_outchannel steps_path f =
   let oc = open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_path in
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 
-let plain_var_of_lc = function LC.X -> Plain.X | LC.Y -> Plain.Y
-
-let rec plain_expr_of_lc = function
-  | LC.Const n -> Plain.Const n
-  | LC.Var v -> Plain.Var (plain_var_of_lc v)
-  | LC.Add (a, b) -> Plain.Add (plain_expr_of_lc a, plain_expr_of_lc b)
-  | LC.Mul (a, b) -> Plain.Mul (plain_expr_of_lc a, plain_expr_of_lc b)
-
 let rec string_of_expr = function
   | LC.Const n -> string_of_int n
   | LC.Var LC.X -> "X"
@@ -137,8 +129,7 @@ let eval_main_expr_with_details expr =
   in
   Gc.full_major ();
   let stop = Unix.gettimeofday () in
-  let plain_expr = plain_expr_of_lc expr in
-  let _ = Ant.Profile.with_slot main_plain_slot (fun () -> Plain.main plain_expr) in
+  let _ = Ant.Profile.with_slot main_plain_slot (fun () -> Plain.main expr) in
   Option.iter (fun write_steps -> write_steps res) !current_write_steps;
   { value = 0; runtime_seconds = stop -. start; steps_with_memo = res.step; steps_without_memo = res.without_memo_step }
 
