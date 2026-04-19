@@ -1,0 +1,47 @@
+name: Autofix
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ocamlformat:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+
+      - name: Cache opam switch
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.opam
+            ~/.cache/opam
+          key: ${{ runner.os }}-ocaml-5.2-${{ hashFiles('dune-project', 'dune.lock/**', '**/*.opam', 'nightly.py') }}
+          restore-keys: |
+            ${{ runner.os }}-ocaml-5.2-
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.2
+          opam-pin: false
+
+      - name: Reset dune state
+        run: rm -rf ~/.cache/dune/toolchains _build
+
+      - name: Install formatter
+        run: opam install -y dune ocamlformat
+
+      - name: Format OCaml sources
+        run: opam exec -- dune fmt
+
+      - uses: autofix-ci/action@v1
+        with:
+          commit-message: "Apply OCaml formatting"
