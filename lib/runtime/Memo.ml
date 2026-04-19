@@ -526,7 +526,6 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
       s.c.step w;
       w.state
     in
-    let rec _raw_step_n s n = if n = 0 then s else _raw_step_n (raw_step s) (n - 1) in
     let dbg_step_through step state =
       assert (step.sc > 0);
       step.hit <- step.hit + 1;
