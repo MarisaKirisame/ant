@@ -1,15 +1,14 @@
-name: Autofix
+name: autofix.ci
 
 on:
   pull_request:
-  workflow_dispatch:
-
+  push:
+    branches: [ "main" ]
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   ocamlformat:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
 
     steps:
@@ -37,7 +36,7 @@ jobs:
         run: rm -rf ~/.cache/dune/toolchains _build
 
       - name: Install formatter
-        run: opam install -y dune ocamlformat
+        run: opam install -y dune ocamlformat.0.28.1
 
       - name: Format OCaml sources
         run: opam exec -- dune fmt
