@@ -407,181 +407,180 @@ let populate_state () =
     (fun w_5 ->
       assert_env_length w_5 1;
       let hd_0, tl_0 = resolve w_5 K in
-      match Word.get_value hd_0 with
-      | 0 (* tag_cont_done *) -> exec_done w_5
-      | 56 (* tag_cont_1 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 6)
-      | 57 (* tag_cont_2 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 7)
-      | 58 (* tag_cont_3 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 8)
-      | 59 (* tag_cont_4 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 9)
-      | 60 (* tag_cont_5 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 10)
-      | 61 (* tag_cont_6 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 0 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 11)
-      | 62 (* tag_cont_7 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 0);
-          assert_env_length w_5 4;
-          let ctor_arg_39 = pop_env w_5 in
-          let ctor_arg_40 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_40; ctor_arg_39 ]);
-          assert_env_length w_5 3;
-          ignore (env_call w_5 [] 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | 63 (* tag_cont_8 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 12)
-      | 64 (* tag_cont_9 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 3 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 13)
-      | 65 (* tag_cont_10 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 1);
-          assert_env_length w_5 4;
-          push_env w_5 (Dynarray.get w_5.state.e 0);
-          assert_env_length w_5 5;
-          let keep_21 = env_call w_5 [ 2 ] 2 in
-          w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_21; w_5.state.k ];
-          w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | 66 (* tag_cont_11 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 1);
-          assert_env_length w_5 4;
-          push_env w_5 (Dynarray.get w_5.state.e 0);
-          assert_env_length w_5 5;
-          let keep_22 = env_call w_5 [ 2 ] 2 in
-          w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; keep_22; w_5.state.k ];
-          w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | 67 (* tag_cont_12 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 0 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 14)
-      | 68 (* tag_cont_13 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 0 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 15)
-      | 69 (* tag_cont_14 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 3 tl_0;
-          w_5.state.c <- pc_to_exp (int_to_pc 16)
-      | 70 (* tag_cont_15 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 18)
-      | 71 (* tag_cont_16 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 21)
-      | 72 (* tag_cont_17 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 24)
-      | 73 (* tag_cont_18 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 27)
-      | 74 (* tag_cont_19 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 30)
-      | 75 (* tag_cont_20 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 2 tl_0;
-          assert_env_length w_5 3;
-          push_env w_5 (Dynarray.get w_5.state.e 0);
-          assert_env_length w_5 4;
-          let ctor_arg_106 = pop_env w_5 in
-          let ctor_arg_107 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_107; ctor_arg_106 ]);
-          assert_env_length w_5 3;
-          ignore (env_call w_5 [] 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | 76 (* tag_cont_21 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 3 tl_0;
-          assert_env_length w_5 4;
-          push_env w_5 (Dynarray.get w_5.state.e 0);
-          assert_env_length w_5 5;
-          push_env w_5 (Dynarray.get w_5.state.e 1);
-          assert_env_length w_5 6;
-          let ctor_arg_108 = pop_env w_5 in
-          let ctor_arg_109 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_109; ctor_arg_108 ]);
-          assert_env_length w_5 5;
-          let ctor_arg_110 = pop_env w_5 in
-          let ctor_arg_111 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_111; ctor_arg_110 ]);
-          assert_env_length w_5 4;
-          ignore (env_call w_5 [] 2);
-          w_5.state.c <- pc_to_exp (int_to_pc 4)
-      | 77 (* tag_cont_22 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 1 tl_0;
-          assert_env_length w_5 2;
-          let ctor_arg_112 = pop_env w_5 in
-          let ctor_arg_113 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_VCons; ctor_arg_113; ctor_arg_112 ]);
-          assert_env_length w_5 1;
-          drop_n w_5 1 0;
-          assert_env_length w_5 1;
-          return_n w_5 1 (pc_to_exp (int_to_pc 0))
-      | 78 (* tag_cont_23 *) ->
-          w_5.state.k <- get_next_cont tl_0;
-          restore_env w_5 1 tl_0;
-          assert_env_length w_5 2;
-          let ctor_arg_114 = pop_env w_5 in
-          let ctor_arg_115 = pop_env w_5 in
-          push_env w_5 (Memo.appends [ Memo.from_constructor tag_VPair; ctor_arg_115; ctor_arg_114 ]);
-          assert_env_length w_5 1;
-          drop_n w_5 1 0;
-          assert_env_length w_5 1;
-          return_n w_5 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (0)")
+      if Word.get_value hd_0 = 0 then exec_done w_5
+      else if Word.get_value hd_0 = 56 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 6))
+      else if Word.get_value hd_0 = 57 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 7))
+      else if Word.get_value hd_0 = 58 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 8))
+      else if Word.get_value hd_0 = 59 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 9))
+      else if Word.get_value hd_0 = 60 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 10))
+      else if Word.get_value hd_0 = 61 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 0 tl_0;
+        w_5.state.c <- pc_to_exp (int_to_pc 11))
+      else if Word.get_value hd_0 = 62 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 0);
+        assert_env_length w_5 4;
+        let ctor_arg_39 = pop_env w_5 in
+        let ctor_arg_40 = pop_env w_5 in
+        push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_40; ctor_arg_39 ]);
+        assert_env_length w_5 3;
+        ignore (env_call w_5 [] 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 4))
+      else if Word.get_value hd_0 = 63 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 12))
+      else if Word.get_value hd_0 = 64 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 3 tl_0;
+        w_5.state.c <- pc_to_exp (int_to_pc 13))
+      else if Word.get_value hd_0 = 65 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 1);
+        assert_env_length w_5 4;
+        push_env w_5 (Dynarray.get w_5.state.e 0);
+        assert_env_length w_5 5;
+        let keep_21 = env_call w_5 [ 2 ] 2 in
+        w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_21; w_5.state.k ];
+        w_5.state.c <- pc_to_exp (int_to_pc 4))
+      else if Word.get_value hd_0 = 66 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 1);
+        assert_env_length w_5 4;
+        push_env w_5 (Dynarray.get w_5.state.e 0);
+        assert_env_length w_5 5;
+        let keep_22 = env_call w_5 [ 2 ] 2 in
+        w_5.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; keep_22; w_5.state.k ];
+        w_5.state.c <- pc_to_exp (int_to_pc 4))
+      else if Word.get_value hd_0 = 67 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 0 tl_0;
+        w_5.state.c <- pc_to_exp (int_to_pc 14))
+      else if Word.get_value hd_0 = 68 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 0 tl_0;
+        w_5.state.c <- pc_to_exp (int_to_pc 15))
+      else if Word.get_value hd_0 = 69 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 3 tl_0;
+        w_5.state.c <- pc_to_exp (int_to_pc 16))
+      else if Word.get_value hd_0 = 70 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 18))
+      else if Word.get_value hd_0 = 71 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 21))
+      else if Word.get_value hd_0 = 72 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 24))
+      else if Word.get_value hd_0 = 73 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 27))
+      else if Word.get_value hd_0 = 74 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 30))
+      else if Word.get_value hd_0 = 75 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 2 tl_0;
+        assert_env_length w_5 3;
+        push_env w_5 (Dynarray.get w_5.state.e 0);
+        assert_env_length w_5 4;
+        let ctor_arg_106 = pop_env w_5 in
+        let ctor_arg_107 = pop_env w_5 in
+        push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_107; ctor_arg_106 ]);
+        assert_env_length w_5 3;
+        ignore (env_call w_5 [] 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 4))
+      else if Word.get_value hd_0 = 76 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 3 tl_0;
+        assert_env_length w_5 4;
+        push_env w_5 (Dynarray.get w_5.state.e 0);
+        assert_env_length w_5 5;
+        push_env w_5 (Dynarray.get w_5.state.e 1);
+        assert_env_length w_5 6;
+        let ctor_arg_108 = pop_env w_5 in
+        let ctor_arg_109 = pop_env w_5 in
+        push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_109; ctor_arg_108 ]);
+        assert_env_length w_5 5;
+        let ctor_arg_110 = pop_env w_5 in
+        let ctor_arg_111 = pop_env w_5 in
+        push_env w_5 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_111; ctor_arg_110 ]);
+        assert_env_length w_5 4;
+        ignore (env_call w_5 [] 2);
+        w_5.state.c <- pc_to_exp (int_to_pc 4))
+      else if Word.get_value hd_0 = 77 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 1 tl_0;
+        assert_env_length w_5 2;
+        let ctor_arg_112 = pop_env w_5 in
+        let ctor_arg_113 = pop_env w_5 in
+        push_env w_5 (Memo.appends [ Memo.from_constructor tag_VCons; ctor_arg_113; ctor_arg_112 ]);
+        assert_env_length w_5 1;
+        drop_n w_5 1 0;
+        assert_env_length w_5 1;
+        return_n w_5 1 (pc_to_exp (int_to_pc 0)))
+      else if Word.get_value hd_0 = 78 then (
+        w_5.state.k <- get_next_cont tl_0;
+        restore_env w_5 1 tl_0;
+        assert_env_length w_5 2;
+        let ctor_arg_114 = pop_env w_5 in
+        let ctor_arg_115 = pop_env w_5 in
+        push_env w_5 (Memo.appends [ Memo.from_constructor tag_VPair; ctor_arg_115; ctor_arg_114 ]);
+        assert_env_length w_5 1;
+        drop_n w_5 1 0;
+        assert_env_length w_5 1;
+        return_n w_5 1 (pc_to_exp (int_to_pc 0)))
+      else failwith "unreachable (0)")
     0;
   add_exp
     (fun w_0 ->
@@ -641,8 +640,7 @@ let populate_state () =
           assert_env_length w_1 2;
           push_env w_1 (Memo.from_constructor tag_None);
           assert_env_length w_1 3;
-          return_n w_1 3 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (3)")
+          return_n w_1 3 (pc_to_exp (int_to_pc 0)))
     3;
   add_exp
     (fun w_3 ->
@@ -1018,8 +1016,7 @@ let populate_state () =
           assert_env_length w_6 3;
           drop_n w_6 3 1;
           assert_env_length w_6 2;
-          return_n w_6 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (6)")
+          return_n w_6 2 (pc_to_exp (int_to_pc 0)))
     6;
   add_exp
     (fun w_7 ->
@@ -1082,8 +1079,7 @@ let populate_state () =
           assert_env_length w_7 3;
           drop_n w_7 3 1;
           assert_env_length w_7 2;
-          return_n w_7 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (7)")
+          return_n w_7 2 (pc_to_exp (int_to_pc 0)))
     7;
   add_exp
     (fun w_8 ->
@@ -1146,8 +1142,7 @@ let populate_state () =
           assert_env_length w_8 3;
           drop_n w_8 3 1;
           assert_env_length w_8 2;
-          return_n w_8 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (8)")
+          return_n w_8 2 (pc_to_exp (int_to_pc 0)))
     8;
   add_exp
     (fun w_9 ->
@@ -1210,8 +1205,7 @@ let populate_state () =
           assert_env_length w_9 3;
           drop_n w_9 3 1;
           assert_env_length w_9 2;
-          return_n w_9 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (9)")
+          return_n w_9 2 (pc_to_exp (int_to_pc 0)))
     9;
   add_exp
     (fun w_10 ->
@@ -1274,8 +1268,7 @@ let populate_state () =
           assert_env_length w_10 3;
           drop_n w_10 3 1;
           assert_env_length w_10 2;
-          return_n w_10 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (10)")
+          return_n w_10 2 (pc_to_exp (int_to_pc 0)))
     10;
   add_exp
     (fun w_11 ->
@@ -1391,8 +1384,7 @@ let populate_state () =
           assert_env_length w_12 3;
           drop_n w_12 3 1;
           assert_env_length w_12 2;
-          return_n w_12 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (12)")
+          return_n w_12 2 (pc_to_exp (int_to_pc 0)))
     12;
   add_exp
     (fun w_13 ->
@@ -1462,8 +1454,7 @@ let populate_state () =
           assert_env_length w_13 4;
           drop_n w_13 4 2;
           assert_env_length w_13 2;
-          return_n w_13 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (13)")
+          return_n w_13 2 (pc_to_exp (int_to_pc 0)))
     13;
   add_exp
     (fun w_14 ->
@@ -1524,8 +1515,7 @@ let populate_state () =
           assert_env_length w_14 1;
           drop_n w_14 1 0;
           assert_env_length w_14 1;
-          return_n w_14 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (14)")
+          return_n w_14 1 (pc_to_exp (int_to_pc 0)))
     14;
   add_exp
     (fun w_15 ->
@@ -1586,8 +1576,7 @@ let populate_state () =
           assert_env_length w_15 1;
           drop_n w_15 1 0;
           assert_env_length w_15 1;
-          return_n w_15 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (15)")
+          return_n w_15 1 (pc_to_exp (int_to_pc 0)))
     15;
   add_exp
     (fun w_16 ->
@@ -1674,8 +1663,7 @@ let populate_state () =
           assert_env_length w_16 4;
           drop_n w_16 4 2;
           assert_env_length w_16 2;
-          return_n w_16 2 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (16)")
+          return_n w_16 2 (pc_to_exp (int_to_pc 0)))
     16;
   add_exp
     (fun w_18 ->
@@ -1767,8 +1755,7 @@ let populate_state () =
           assert_env_length w_17 1;
           drop_n w_17 1 0;
           assert_env_length w_17 1;
-          return_n w_17 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (18)")
+          return_n w_17 1 (pc_to_exp (int_to_pc 0)))
     18;
   add_exp
     (fun w_21 ->
@@ -1882,8 +1869,7 @@ let populate_state () =
           assert_env_length w_19 1;
           drop_n w_19 1 0;
           assert_env_length w_19 1;
-          return_n w_19 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (21)")
+          return_n w_19 1 (pc_to_exp (int_to_pc 0)))
     21;
   add_exp
     (fun w_24 ->
@@ -1997,8 +1983,7 @@ let populate_state () =
           assert_env_length w_22 1;
           drop_n w_22 1 0;
           assert_env_length w_22 1;
-          return_n w_22 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (24)")
+          return_n w_22 1 (pc_to_exp (int_to_pc 0)))
     24;
   add_exp
     (fun w_27 ->
@@ -2112,8 +2097,7 @@ let populate_state () =
           assert_env_length w_25 1;
           drop_n w_25 1 0;
           assert_env_length w_25 1;
-          return_n w_25 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (27)")
+          return_n w_25 1 (pc_to_exp (int_to_pc 0)))
     27;
   add_exp
     (fun w_30 ->
@@ -2227,8 +2211,7 @@ let populate_state () =
           assert_env_length w_28 1;
           drop_n w_28 1 0;
           assert_env_length w_28 1;
-          return_n w_28 1 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (30)")
+          return_n w_28 1 (pc_to_exp (int_to_pc 0)))
     30;
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;

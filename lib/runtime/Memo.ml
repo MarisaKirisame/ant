@@ -417,14 +417,18 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.val
                       Some (var, (vt, Rev.snoc acc vh))
                 in
                 let const_child =
-                  let Words vh, vt = Value.front_exn value in
-                  let vhh, vht = Words.words_front_exn vh in
-                  let key = Word.hash vhh in
-                  match Children.find br.const key with
-                  | None -> None
-                  | Some const ->
-                      let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
-                      Some (const, (vt, acc))
+                  match Value.front_exn value with
+                  | Words vh, vt -> (
+                      let vhh, vht = Words.words_front_exn vh in
+                      let key = Word.hash vhh in
+                      match Children.find br.const key with
+                      | None -> None
+                      | Some const ->
+                          let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in
+                          Some (const, (vt, acc)))
+                  | Reference _, _ ->
+                      failwith
+                        ("lookup_step_aux: expected Words at trie const edge, found " ^ Value.string_of_value value)
                 in
                 let var_max = match var_child with None -> 0 | Some (var, _) -> max_sc_of_trie var in
                 let const_max = match const_child with None -> 0 | Some (const, _) -> max_sc_of_trie const in
@@ -472,7 +476,6 @@ let insert_step_slot = Profile.register_slot Profile.memo_profile "insert_step"
 let lookup_step_slot = Profile.register_slot Profile.memo_profile "lookup_step"
 
 let instantiate (step : step) (state : state) : step =
-  let keep_last_count = 10 in
   let minimum_size_for_instantiation = 5 in
   let join p v : Pattern.pattern =
     let rec instantiate_small_aux p v =
@@ -490,25 +493,7 @@ let instantiate (step : step) (state : state) : step =
               Pattern.pattern_cons (PVar ph) (instantiate_small_aux pt vt)
             else Pattern.pattern_cons (PCon words) (instantiate_small_aux pt vt)
     in
-    let instantiate_small p = instantiate_small_aux p v in
-    let rec keep_last_aux p v (count : int) =
-      assert (count >= 0);
-      if count = 0 then p
-      else
-        let ph, pt = Pattern.pattern_front_exn p in
-        match ph with
-        | Pattern.PCon ph ->
-            let v = Option.value_exn (Value.unwords v ph) in
-            Pattern.pattern_cons (PCon ph) (keep_last_aux pt v count)
-        | Pattern.PVar ph ->
-            let vh, vt = Value.pop_n v ph in
-            Pattern.pattern_cons (PCon (Value.value_to_words vh)) (keep_last_aux pt vt (count - 1))
-    in
-    let keep_last p =
-      let pvar_count = Pattern.pattern_pvar_count p in
-      if pvar_count <= keep_last_count then p else keep_last_aux p v (pvar_count - keep_last_count)
-    in
-    instantiate_small p
+    instantiate_small_aux p v
   in
   let src = zipwith_ek join step.src state in
   let dst : state = Dependency.step_through step (Dependency.pattern_to_value src) in
@@ -519,12 +504,6 @@ let instantiate_slot = Profile.register_slot Profile.memo_profile "instantiate"
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
   let run () =
-    let raw_step s =
-      let w = make_world (copy_state s) m in
-      s.c.step w;
-      w.state
-    in
-    let rec raw_step_n s n = if n = 0 then s else raw_step_n (raw_step s) (n - 1) in
     let dbg_step_through step state =
       assert (step.sc > 0);
       step.hit <- step.hit + 1;

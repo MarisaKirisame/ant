@@ -10,7 +10,7 @@ let left_to_right (expr : LC.expr) : LC.expr list =
   let rec build e =
     match e with
     | LC.EHole x -> [ LC.EHole x ]
-    | LC.EInt _ | LC.EVar _ | LC.ETrue | LC.EFalse | LC.ENil -> [ LC.EHole None; e ]
+    | LC.EInt _ | LC.EVar _ | LC.ETrue | LC.EFalse | LC.ENil | LC.EUnit -> [ LC.EHole None; e ]
     | LC.EAbs body ->
         let steps_body = build body in
         LC.EHole None :: LC.EAbs (LC.EHole None) :: List.map (fun s -> LC.EAbs s) (tail steps_body)
@@ -91,6 +91,19 @@ let left_to_right (expr : LC.expr) : LC.expr list =
         :: List.map (fun s -> LC.EMatchList (s, LC.EHole None, LC.EHole None)) (tail starget)
         @ List.map (fun s -> LC.EMatchList (target, s, LC.EHole None)) (tail snil)
         @ List.map (fun s -> LC.EMatchList (target, nil_case, s)) (tail scons)
+    | LC.EPair (l, r) ->
+        let sl = build l in
+        let sr = build r in
+        LC.EHole None
+        :: LC.EPair (LC.EHole None, LC.EHole None)
+        :: List.map (fun s -> LC.EPair (s, LC.EHole None)) (tail sl)
+        @ List.map (fun s -> LC.EPair (l, s)) (tail sr)
+    | LC.EZro inner ->
+        let sinner = build inner in
+        LC.EHole None :: LC.EZro (LC.EHole None) :: List.map (fun s -> LC.EZro s) (tail sinner)
+    | LC.EFst inner ->
+        let sinner = build inner in
+        LC.EHole None :: LC.EFst (LC.EHole None) :: List.map (fun s -> LC.EFst s) (tail sinner)
   in
   build expr
 

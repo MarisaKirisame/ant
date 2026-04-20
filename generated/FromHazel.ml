@@ -190,7 +190,6 @@ let rec subst (lhs : string) (rhs : nexpr) (expr : nexpr) =
       NEMatchList (subst lhs rhs l, subst lhs rhs nil_case, x, xs, subst lhs rhs cons_case)
   | NEZro x -> NEZro (subst lhs rhs x)
   | NEFst x -> NEFst (subst lhs rhs x)
-  | _ -> failwith ("subst not implemented for: " ^ Format.asprintf "%a" pp_nexpr expr)
 
 let rec substs (bindings : (string * nexpr) list) (expr : nexpr) : nexpr =
   List.fold_right (fun (l, r) acc -> subst l r acc) bindings expr
@@ -297,7 +296,7 @@ let rec bound_vars pat acc =
   | ConsPat (h, t) -> bound_vars t (bound_vars h acc)
   | Wild | PMultiHole -> acc
   | TupLabelPat _ -> acc
-  | PEmptyHole _ -> acc
+  | PEmptyHole -> acc
   | _ -> failwith ("bound_vars not implemented for pattern: " ^ Format.asprintf "%a" pp_expr pat)
 
 let rec free_vars_aux (x : expr) bound acc =
@@ -460,7 +459,6 @@ let rec clean_aux x (seen : string list) =
   | NEFix (name, param, body) -> NEFix (name, param, clean_aux body (param :: name :: seen))
   | NEZro x -> NEZro (clean_aux x seen)
   | NEFst x -> NEFst (clean_aux x seen)
-  | _ -> failwith ("clean not implemented for expr: " ^ Format.asprintf "%a" pp_nexpr x)
 
 let clean x = clean_aux x []
 
