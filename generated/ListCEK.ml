@@ -67,35 +67,25 @@ let rec to_ocaml_int_pair_list x =
   | _ -> failwith "unreachable"
 
 let rec pair ?config (x0 : Value.seq) : exec_result =
-  exec_cek_with_config ?config (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
 let rec list_incr ?config (x0 : Value.seq) : exec_result =
-  exec_cek_with_config ?config (pc_to_exp (int_to_pc 4)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 4)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
 let rec filter_pos ?config (x0 : Value.seq) : exec_result =
-  exec_cek_with_config ?config (pc_to_exp (int_to_pc 7)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 7)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
 let rec append ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 11))
-    (Dynarray.of_list [ x0; x1 ])
-    (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 11)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done)
 
 let rec reverse ?config (x0 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 13))
-    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 13)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
 let rec insert ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 15))
-    (Dynarray.of_list [ x0; x1 ])
-    (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 15)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done)
 
 let rec insertion_sort ?config (x0 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 19))
-    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 19)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
 type pair_int_lists = P of int_list * int_list
 
@@ -112,49 +102,28 @@ let rec to_ocaml_pair_int_lists x =
   | _ -> failwith "unreachable"
 
 let rec my_split_aux ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 21))
-    (Dynarray.of_list [ x0; x1 ])
-    (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 21)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done)
 
 let rec my_split ?config (x0 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 25))
-    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 25)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
 let rec my_merge ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 26))
-    (Dynarray.of_list [ x0; x1 ])
-    (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 26)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done)
 
 let rec mergesort ?config (x0 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 31))
-    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 31)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
 let rec filter_gt ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 34))
-    (Dynarray.of_list [ x0; x1 ])
-    (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 34)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done)
 
 let rec filter_eq ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 38))
-    (Dynarray.of_list [ x0; x1 ])
-    (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 38)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done)
 
 let rec filter_lt ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 42))
-    (Dynarray.of_list [ x0; x1 ])
-    (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 42)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done)
 
 let rec quicksort ?config (x0 : Value.seq) : exec_result =
-  exec_cek_with_config ?config
-    (pc_to_exp (int_to_pc 46))
-    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
+  exec_cek ?config (pc_to_exp (int_to_pc 46)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
 let populate_state () =
   Memo.reset ();

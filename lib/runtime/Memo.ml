@@ -19,8 +19,7 @@ let log x = ignore x
 (* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
 type words = seq
 type exec_result = { words : words; step : int; without_memo_step : int }
-type exec_mode = Memoized | Cek
-type exec_config = { mode : exec_mode; memo : memo option }
+type exec_config = Cek | Memoized of memo
 
 let source_to_string (src : source) = match src with E i -> "E" ^ string_of_int i | K -> "K"
 
@@ -504,7 +503,7 @@ let instantiate (step : step) (state : state) : step =
 
 let instantiate_slot = Profile.register_slot Profile.memo_profile "instantiate"
 
-let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
+let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
   let run () =
     let dbg_step_through step state =
       assert (step.sc > 0);
@@ -595,16 +594,15 @@ let exec_cek_without_memo (c : exp) (e : words Dynarray.t) (k : words) : exec_re
   let steps = !step_count in
   { words = Dynarray.get_last state.e; step = steps; without_memo_step = steps }
 
-let memo_config (memo : memo) : exec_config = { mode = Memoized; memo = Some memo }
-let cek_config : exec_config = { mode = Cek; memo = None }
+let memo_config (memo : memo) : exec_config = Memoized memo
+let cek_config : exec_config = Cek
 let default_exec_config () : exec_config = memo_config (init_memo ())
 
-let exec_cek_with_config ?config (c : exp) (e : words Dynarray.t) (k : words) : exec_result =
+let exec_cek ?config (c : exp) (e : words Dynarray.t) (k : words) : exec_result =
   match config with
-  | Some { mode = Cek; _ } -> exec_cek_without_memo c e k
-  | Some { mode = Memoized; memo = Some memo } -> exec_cek c e k memo
-  | Some { mode = Memoized; memo = None } -> exec_cek c e k (init_memo ())
-  | None -> exec_cek c e k (init_memo ())
+  | Some Cek -> exec_cek_without_memo c e k
+  | Some (Memoized memo) -> exec_cek_memoized c e k memo
+  | None -> exec_cek_memoized c e k (init_memo ())
 
 let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) = (exec_cek_without_memo c e k).words
 let exec_done _ = failwith "exec is done, should not call step anymore"

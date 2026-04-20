@@ -641,7 +641,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
             ( lam_ "w" (fun w -> compile_pp_expr ctx s term (fun s w -> return s w) w),
               string "let rec" ^^ space ^^ string name ^^ space ^^ string "?config" ^^ space
               ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
-              ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek_with_config ?config "
+              ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek ?config "
               ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
               ^^ string "(Dynarray.of_list" ^^ string "["
               ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
