@@ -1,7 +1,43 @@
 (executable
+ (name GeneratedMain)
+ (public_name GeneratedMain)
+ (modules
+  GeneratedMain
+  FromHazel
+  HazelAppend
+  HazelExperiment
+  HazelFilter
+  HazelIS
+  HazelIsSorted
+  HazelMS
+  HazelMap
+  HazelPair
+  HazelQS
+  HazelRev
+  LiveLexer
+  LiveParser
+  NamedExpr
+  RunArith
+  RunLiveCommon
+  RunLiveDemandDriven
+  RunLiveLeftToRight
+  RunLiveListExtend
+  RunLiveSimple
+  RunTestAsymptotics)
+ (libraries ant cmdliner core batteries yojson sexplib unix runmodes)
+ (preprocess
+  (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))
+
+(executable
  (public_name ant)
  (name main)
+ (modules main)
  (libraries ant cmdliner core batteries))
+
+(ocamllex LiveLexer)
+
+(menhir
+ (modules LiveParser))
 
 (env
  (dev

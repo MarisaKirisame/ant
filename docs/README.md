@@ -33,6 +33,7 @@ you may need `git submodule update --init`
 
 ## Repository Layout
 - `lib/` – OCaml sources (front-end, backends, memo/runtime infrastructure).
+- `bin/` – CLI entrypoints plus hand-written experiment runners used by `GeneratedMain`.
 - `generated/` – Auto-generated OCaml modules (rebuilt by `make`).
 - `examples/` – Sample `.ant` programs; `examples/Test.ant` is the default demo.
 - `bench/` – Benchmarks.
