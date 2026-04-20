@@ -186,7 +186,6 @@ let run () =
         ~cek_args:[ cek_list ]
         ~run_memo:(fun memo -> ListCEK.quicksort memo cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.quicksort plain_list)));*)
-
   run_all_cases ~length:1024 ~program_name:"reverse" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in

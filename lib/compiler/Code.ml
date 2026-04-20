@@ -247,20 +247,20 @@ let match_int_default_ (x : int code) (fs : (int * 'a code) list) (dflt : 'a cod
 let unreachable_ : int -> 'a code = fun pc -> code $ string ("failwith \"unreachable (" ^ string_of_int pc ^ ")\"")
 
 let match_ctor_tag_default_ (x : int code) (fs : (string * 'a code) list) (dflt : 'a code) : 'a code =
-  let dummy_name = string (gensym "c") in
-  let alts =
-    Stdlib.List.map
-      (fun (tag_name, body) ->
-        (Raw (dummy_name ^^ string " when " ^^ dummy_name ^^ string " = " ^^ string tag_name), to_ir body))
-      fs
-  in
-  from_ir (Match (to_ir x, alts @ [ (Raw (string "_"), to_ir dflt) ]))
+  Stdlib.List.fold_right
+    (fun (tag_name, body) acc ->
+      code
+      $ group
+          (string "if " ^^ uncode x ^^ string " = " ^^ string tag_name ^^ string " then " ^^ uncode body
+         ^^ string " else " ^^ uncode acc))
+    fs dflt
 
 let match_ctor_tag_literal_default_ (x : int code) (fs : (int * string * 'a code) list) (dflt : 'a code) : 'a code =
-  let alts =
-    Stdlib.List.map
-      (fun (tag, tag_name, body) ->
-        (Raw (string (string_of_int tag) ^^ string " (* " ^^ string tag_name ^^ string " *)"), to_ir body))
-      fs
-  in
-  from_ir (Match (to_ir x, alts @ [ (Raw (string "_"), to_ir dflt) ]))
+  Stdlib.List.fold_right
+    (fun (tag, _tag_name, body) acc ->
+      code
+      $ group
+          (string "if " ^^ uncode x ^^ string " = "
+          ^^ string (string_of_int tag)
+          ^^ string " then " ^^ uncode body ^^ string " else " ^^ uncode acc))
+    fs dflt

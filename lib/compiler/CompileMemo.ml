@@ -606,8 +606,14 @@ and compile_pp_cases (ctx : ctx) (s : scope) (MatchPattern c : 'a cases) (k : ko
           | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
         c
     in
-    let default_case = (string "_", unreachable_ (Dynarray.length codes)) in
-    paren $ match_raw_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])]
+    let has_catch_all_case = List.exists (fun (pat, _) -> match pat with PAny | PVar _ -> true | _ -> false) c in
+    let cases =
+      if has_catch_all_case then t
+      else
+        let default_case = (string "_", unreachable_ (Dynarray.length codes)) in
+        List.append t [ default_case ]
+    in
+    paren $ match_raw_ (word_get_value_ (zro_ x)) cases]
 
 let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with

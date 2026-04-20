@@ -506,10 +506,6 @@ let instantiate (step : step) (state : state) : step =
             let vh, vt = Value.pop_n v ph in
             Pattern.pattern_cons (PCon (Value.value_to_words vh)) (keep_last_aux pt vt (count - 1))
     in
-    let keep_last p =
-      let pvar_count = Pattern.pattern_pvar_count p in
-      if pvar_count <= keep_last_count then p else keep_last_aux p v (pvar_count - keep_last_count)
-    in
     instantiate_small p
   in
   let src = zipwith_ek join step.src state in
@@ -521,11 +517,6 @@ let instantiate_slot = Profile.register_slot Profile.memo_profile "instantiate"
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
   let run () =
-    let raw_step s =
-      let w = make_world (copy_state s) m in
-      s.c.step w;
-      w.state
-    in
     let dbg_step_through step state =
       assert (step.sc > 0);
       step.hit <- step.hit + 1;
