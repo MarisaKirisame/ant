@@ -1,50 +1,16 @@
 (library
  (name runmodes)
  (modules
-  FromHazel
-  HazelAppend
-  HazelExperiment
-  HazelFilter
-  HazelIS
-  HazelMap
-  HazelMS
-  HazelPair
-  HazelQS
-  HazelRev
-  HazelIsSorted
   LiveCEK
   LivePlain
-  LiveLexer
-  LiveParser
-  NamedExpr
-  RunLiveCommon
-  RunLiveSimple
-  RunLiveLeftToRight
-  RunLiveListExtend
-  RunLiveDemandDriven
-  RunTestAsymptotics
   ListCEK
   ListPlain
   ArithCEK
-  ArithPlain
-  RunArith)
- (libraries ant yojson sexplib)
+  ArithPlain)
+ (libraries ant)
  (wrapped false)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))
-
-(executable
- (name GeneratedMain)
- (public_name GeneratedMain)
- (modules GeneratedMain)
- (libraries runmodes)
- (preprocess
-  (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))
-
-(ocamllex LiveLexer)
-
-(menhir
- (modules LiveParser))
 
 (env
  (dev

@@ -131,11 +131,12 @@ generalise reuse across different concrete inputs.
 
 ## Generated Modules
 
-- `generated/TestSeq.ml`, `generated/TestCEK.ml`, and `generated/TestPlain.ml`
-  come from `examples/Test.ant` and mirror the outputs of the CLI backends.
-- `generated/Live*.ml` host hand-written CEK demos (live editing, tail recursion
-  examples) used by `GeneratedMain`.
-- All files under `generated/` are overwritten by `make run`.
+- `generated/*.ml` hosts the backend outputs rebuilt from `examples/*.ant` by
+  `make run`.
+- The hand-written experiment runners, Hazel adapters, and `GeneratedMain`
+  entrypoint now live under `bin/`.
+- Files under `generated/` are rebuild artifacts and should not be edited
+  manually.
 
 ## Testing & Benchmarking
 

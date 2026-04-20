@@ -219,8 +219,8 @@ def profile_project() -> None:
     ensure_switch()
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
-    opam_exec(["dune", "build", "generated/GeneratedMain.exe"], env=env)
-    binary = os.path.join("_build", "default", "generated", "GeneratedMain.exe")
+    opam_exec(["dune", "build", "bin/GeneratedMain.exe"], env=env)
+    binary = os.path.join("_build", "default", "bin", "GeneratedMain.exe")
     for mode in modes:
         if sys.platform == "darwin":
             # On macOS, use xctrace (modern replacement for instruments CLI)
