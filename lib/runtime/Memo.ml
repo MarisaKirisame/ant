@@ -19,6 +19,8 @@ let log x = ignore x
 (* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
 type words = seq
 type exec_result = { words : words; step : int; without_memo_step : int }
+type exec_mode = Memoized | Cek
+type exec_config = { mode : exec_mode; memo : memo option }
 
 let source_to_string (src : source) = match src with E i -> "E" ^ string_of_int i | K -> "K"
 
@@ -576,18 +578,35 @@ let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_resu
   let result = Profile.with_slot exec_cek_slot run in
   result
 
-let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) =
+let exec_cek_without_memo (c : exp) (e : words Dynarray.t) (k : words) : exec_result =
   let state = { c; e; k } in
   let m = init_memo () in
+  let step_count = ref 0 in
   let rec exec state =
     if is_done state then state
-    else
+    else (
+      incr step_count;
       let w = make_world state m in
       state.c.step w;
-      exec w.state
+      exec w.state)
   in
-  Dynarray.get_last (exec state).e
+  let state = exec state in
+  assert (Dynarray.length state.e = 1);
+  let steps = !step_count in
+  { words = Dynarray.get_last state.e; step = steps; without_memo_step = steps }
 
+let memo_config (memo : memo) : exec_config = { mode = Memoized; memo = Some memo }
+let cek_config : exec_config = { mode = Cek; memo = None }
+let default_exec_config () : exec_config = memo_config (init_memo ())
+
+let exec_cek_with_config ?config (c : exp) (e : words Dynarray.t) (k : words) : exec_result =
+  match config with
+  | Some { mode = Cek; _ } -> exec_cek_without_memo c e k
+  | Some { mode = Memoized; memo = Some memo } -> exec_cek c e k memo
+  | Some { mode = Memoized; memo = None } -> exec_cek c e k (init_memo ())
+  | None -> exec_cek c e k (init_memo ())
+
+let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) = (exec_cek_without_memo c e k).words
 let exec_done _ = failwith "exec is done, should not call step anymore"
 
 type node_state = Stem_node | Branch_node

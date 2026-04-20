@@ -42,19 +42,14 @@ let low_entropy_input length =
 
 let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries)
 
-let run_case ~(memo : State.memo) ~(label : string) ~(entry_pc : int) ~(cek_args : Value.value list)
-    ~(tag_cont_done : int) ~(run_memo : State.memo -> Memo.exec_result) ~(run_plain : unit -> 'a) =
+let run_case ~(memo : State.memo) ~(label : string) ~(run_memo : State.memo -> Memo.exec_result)
+    ~(run_cek : unit -> Memo.exec_result) ~(run_plain : unit -> 'a) =
   (* Memo *)
   Gc.full_major ();
   let result_memo = run_memo memo in
   (* CEK *)
   Gc.full_major ();
-  let _ =
-    Profile.with_slot RunLiveCommon.eval_cek_slot (fun () ->
-        Memo.exec_cek_raw
-          (Memo.pc_to_exp (Common.int_to_pc entry_pc))
-          (Dynarray.of_list cek_args) (Memo.from_constructor tag_cont_done))
-  in
+  let _ = Profile.with_slot RunLiveCommon.eval_cek_slot run_cek in
   (* Plain *)
   Gc.full_major ();
   let _ = Profile.with_slot RunLiveCommon.eval_plain_slot (fun () -> run_plain ()) in
@@ -95,9 +90,9 @@ let write_steps_json oc memo_step without_memo_step memo_json cek_json plain_jso
   output_char oc '\n';
   flush oc
 
-let run_case_then_write ~memo ~label ~filename ~entry_pc ~tag_cont_done ~cek_args ~run_memo ~run_plain =
+let run_case_then_write ~memo ~label ~filename ~run_memo ~run_cek ~run_plain =
   let memo_steps, without_memo_steps, memo_json, cek_json, plain_json =
-    run_case ~memo ~label ~entry_pc ~tag_cont_done ~cek_args ~run_memo ~run_plain
+    run_case ~memo ~label ~run_memo ~run_cek ~run_plain
   in
   RunLiveCommon.with_outchannel filename (fun oc ->
       write_steps_json oc memo_steps without_memo_steps memo_json cek_json plain_json;
@@ -147,67 +142,70 @@ let run () =
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename ~entry_pc:4 ~tag_cont_done:ListCEK.tag_cont_done ~cek_args:[ cek_list ]
-        ~run_memo:(fun memo -> ListCEK.list_incr memo cek_list)
+      run_case_then_write ~memo ~label ~filename
+        ~run_memo:(fun memo -> ListCEK.list_incr ~config:(Memo.memo_config memo) cek_list)
+        ~run_cek:(fun () -> ListCEK.list_incr ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.list_incr plain_list)));
 
   run_all_cases ~length:65536 ~program_name:"append" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename ~entry_pc:11 ~tag_cont_done:ListCEK.tag_cont_done
-        ~cek_args:[ cek_list; cek_list ]
-        ~run_memo:(fun memo -> ListCEK.append memo cek_list cek_list)
+      run_case_then_write ~memo ~label ~filename
+        ~run_memo:(fun memo -> ListCEK.append ~config:(Memo.memo_config memo) cek_list cek_list)
+        ~run_cek:(fun () -> ListCEK.append ~config:Memo.cek_config cek_list cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.append plain_list plain_list)));
 
   run_all_cases ~length:1024 ~program_name:"insertion_sort" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename ~entry_pc:19 ~tag_cont_done:ListCEK.tag_cont_done
-        ~cek_args:[ cek_list ]
-        ~run_memo:(fun memo -> ListCEK.insertion_sort memo cek_list)
+      run_case_then_write ~memo ~label ~filename
+        ~run_memo:(fun memo -> ListCEK.insertion_sort ~config:(Memo.memo_config memo) cek_list)
+        ~run_cek:(fun () -> ListCEK.insertion_sort ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.insertion_sort plain_list)));
 
   run_all_cases ~length:8192 ~program_name:"merge_sort" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename ~entry_pc:31 ~tag_cont_done:ListCEK.tag_cont_done
-        ~cek_args:[ cek_list ]
-        ~run_memo:(fun memo -> ListCEK.mergesort memo cek_list)
+      run_case_then_write ~memo ~label ~filename
+        ~run_memo:(fun memo -> ListCEK.mergesort ~config:(Memo.memo_config memo) cek_list)
+        ~run_cek:(fun () -> ListCEK.mergesort ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.mergesort plain_list)));
 
   (*run_all_cases ~length:8192 ~program_name:"quick_sort" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename ~entry_pc:15 ~tag_cont_done:ListCEK.tag_cont_done
-        ~cek_args:[ cek_list ]
-        ~run_memo:(fun memo -> ListCEK.quicksort memo cek_list)
+      run_case_then_write ~memo ~label ~filename
+        ~run_memo:(fun memo -> ListCEK.quicksort ~config:(Memo.memo_config memo) cek_list)
+        ~run_cek:(fun () -> ListCEK.quicksort ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.quicksort plain_list)));*)
   run_all_cases ~length:1024 ~program_name:"reverse" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename ~entry_pc:13 ~tag_cont_done:ListCEK.tag_cont_done
-        ~cek_args:[ cek_list ]
-        ~run_memo:(fun memo -> ListCEK.reverse memo cek_list)
+      run_case_then_write ~memo ~label ~filename
+        ~run_memo:(fun memo -> ListCEK.reverse ~config:(Memo.memo_config memo) cek_list)
+        ~run_cek:(fun () -> ListCEK.reverse ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.reverse plain_list)));
 
   run_all_cases ~length:65536 ~program_name:"simple_filter" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename ~entry_pc:7 ~tag_cont_done:ListCEK.tag_cont_done ~cek_args:[ cek_list ]
-        ~run_memo:(fun memo -> ListCEK.filter_pos memo cek_list)
+      run_case_then_write ~memo ~label ~filename
+        ~run_memo:(fun memo -> ListCEK.filter_pos ~config:(Memo.memo_config memo) cek_list)
+        ~run_cek:(fun () -> ListCEK.filter_pos ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.filter_pos plain_list)));
 
   run_all_cases ~length:65536 ~program_name:"pair" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename ~entry_pc:1 ~tag_cont_done:ListCEK.tag_cont_done ~cek_args:[ cek_list ]
-        ~run_memo:(fun memo -> ListCEK.pair memo cek_list)
+      run_case_then_write ~memo ~label ~filename
+        ~run_memo:(fun memo -> ListCEK.pair ~config:(Memo.memo_config memo) cek_list)
+        ~run_cek:(fun () -> ListCEK.pair ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.pair plain_list)));
   ()

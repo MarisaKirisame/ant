@@ -237,128 +237,223 @@ let rec to_ocaml_pick_result x =
       Pick (to_ocaml_expr x0, to_ocaml_expr_list x1)
   | _ -> failwith "unreachable"
 
-let rec var_rank memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec var_rank ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec expr_rank memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 3)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec expr_rank ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config (pc_to_exp (int_to_pc 3)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec compare_expr memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 5)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec compare_expr ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 5))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec expr_equal memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 6)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec expr_equal ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 6))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec expr_size memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 13)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec expr_size ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 13))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec better_expr memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 15)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec better_expr ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 15))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec scale memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 16)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec scale ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 16))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec coeff_value memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 23)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec coeff_value ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 23))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec coeff_base memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 26)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec coeff_base ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 26))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec extract_factor memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 29)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec extract_factor ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 29))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec search_factor memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 30)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec search_factor ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 30))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec append_exprs memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 32)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec append_exprs ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 32))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec insert_expr memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 34)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec insert_expr ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 34))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec sort_exprs memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 36)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec sort_exprs ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 36))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec compare_add_term memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 38)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec compare_add_term ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 38))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec insert_add_term memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 39)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec insert_add_term ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 39))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec sort_add_terms memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 41)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec sort_add_terms ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 41))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec reverse_exprs_aux memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 43)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec reverse_exprs_aux ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 43))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec reverse_exprs memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 45)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec reverse_exprs ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 45))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec flatten_add memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 46)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec flatten_add ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 46))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec flatten_mul memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 50)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec flatten_mul ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 50))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec mul_coeff memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 52)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec mul_coeff ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 52))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec mul_base memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 55)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec mul_base ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 55))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec mul_total_coeff memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 58)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec mul_total_coeff ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 58))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec mul_bases memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 60)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec mul_bases ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 60))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec build_mul memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 62)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec build_mul ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 62))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec normalize_mul_flat memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 65)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec normalize_mul_flat ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 65))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec combine_like_terms_acc memo (x0 : Value.seq) (x1 : Value.seq) (x2 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 66)) (Dynarray.of_list [ x0; x1; x2 ]) (Memo.from_constructor tag_cont_done) memo
+let rec combine_like_terms_acc ?config (x0 : Value.seq) (x1 : Value.seq) (x2 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 66))
+    (Dynarray.of_list [ x0; x1; x2 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec combine_like_terms memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 70)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec combine_like_terms ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 70))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec factor_adjacent memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 72)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec factor_adjacent ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 72))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec pick_factored memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 75)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec pick_factored ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 75))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec search_terms memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 77)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec search_terms ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 77))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec build_add memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 79)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec build_add ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 79))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec search_round memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 82)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec search_round ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 82))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec normalize_add_flat memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 83)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec normalize_add_flat ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 83))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec search_opt memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 84)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec search_opt ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 84))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec normalize memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 87)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec normalize ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 87))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec simplify_aux memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 89)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec simplify_aux ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 89))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec diffx memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 90)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec diffx ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 90))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
-let rec eval memo (x0 : Value.seq) (x1 : Value.seq) (x2 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 93)) (Dynarray.of_list [ x0; x1; x2 ]) (Memo.from_constructor tag_cont_done) memo
+let rec eval ?config (x0 : Value.seq) (x1 : Value.seq) (x2 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 93))
+    (Dynarray.of_list [ x0; x1; x2 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec main memo (x0 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 96)) (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done) memo
+let rec main ?config (x0 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 96))
+    (Dynarray.of_list [ x0 ]) (Memo.from_constructor tag_cont_done)
 
 let populate_state () =
   Memo.reset ();

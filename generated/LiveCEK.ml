@@ -394,11 +394,17 @@ and to_ocaml_stuck x =
       SFst (to_ocaml_stuck x0)
   | _ -> failwith "unreachable"
 
-let rec index memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec index ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 1))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
-let rec eval memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 4)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec eval ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek_with_config ?config
+    (pc_to_exp (int_to_pc 4))
+    (Dynarray.of_list [ x0; x1 ])
+    (Memo.from_constructor tag_cont_done)
 
 let populate_state () =
   Memo.reset ();

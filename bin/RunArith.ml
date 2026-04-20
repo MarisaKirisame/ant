@@ -117,15 +117,10 @@ type eval_details = { value : int; runtime_seconds : float; steps_with_memo : in
 let eval_main_expr_with_details expr =
   let seq_expr = LC.from_ocaml_expr expr in
   let start = Unix.gettimeofday () in
-  let res = with_memo (fun memo -> LC.main memo seq_expr) in
+  let res = with_memo (fun memo -> LC.main ~config:(Memo.memo_config memo) seq_expr) in
   Gc.full_major ();
   let _ =
-    Ant.Profile.with_slot main_cek_slot (fun () ->
-        LC.to_ocaml_expr
-          (Memo.exec_cek_raw
-             (Memo.pc_to_exp (Ant.Common.int_to_pc 96))
-             (Dynarray.of_list [ seq_expr ])
-             (Memo.from_constructor LC.tag_cont_done)))
+    Ant.Profile.with_slot main_cek_slot (fun () -> LC.to_ocaml_expr (LC.main ~config:Memo.cek_config seq_expr).words)
   in
   Gc.full_major ();
   let stop = Unix.gettimeofday () in
