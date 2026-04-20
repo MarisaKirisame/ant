@@ -135,7 +135,7 @@ generalise reuse across different concrete inputs.
   `make run`.
 - The hand-written experiment runners, Hazel adapters, and `GeneratedMain`
   entrypoint now live under `bin/`.
-- Files under `generated/` are rebuild artifacts and should not be edited
+- Files under `generated/` are build artifacts and should not be edited
   manually.
 
 ## Testing & Benchmarking
