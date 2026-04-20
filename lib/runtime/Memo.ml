@@ -418,10 +418,10 @@ let rec lookup_step_aux (x : trie option) (value : Value.value) (acc : Value.val
                 in
                 let const_child =
                   match Value.front_exn value with
-                  | Words vh, vt ->
+                  | Words vh, vt -> (
                       let vhh, vht = Words.words_front_exn vh in
                       let key = Word.hash vhh in
-                      (match Children.find br.const key with
+                      match Children.find br.const key with
                       | None -> None
                       | Some const ->
                           let vt = if Generic.is_empty vht then vt else Value.value_cons (Words vht) vt in

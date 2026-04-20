@@ -17,19 +17,24 @@ let rec compare_expr =
   if ra < rb then 0 - 1
   else if ra > rb then 1
   else
-    match (a, b) with
-    | Const x, Const y -> if x < y then 0 - 1 else if x > y then 1 else 0
-    | Var va, Var vb ->
-        let rva = var_rank va in
-        let rvb = var_rank vb in
-        if rva < rvb then 0 - 1 else if rva > rvb then 1 else 0
-    | Add (a1, a2), Add (b1, b2) ->
-        let c1 = compare_expr a1 b1 in
-        if c1 = 0 then compare_expr a2 b2 else c1
-    | Mul (a1, a2), Mul (b1, b2) ->
-        let c1 = compare_expr a1 b1 in
-        if c1 = 0 then compare_expr a2 b2 else c1
-    | _ -> assert false
+    match a with
+    | Const x -> ( match b with Const y -> if x < y then 0 - 1 else if x > y then 1 else 0)
+    | Var va -> (
+        match b with
+        | Var vb ->
+            let rva = var_rank va in
+            let rvb = var_rank vb in
+            if rva < rvb then 0 - 1 else if rva > rvb then 1 else 0)
+    | Add (a1, a2) -> (
+        match b with
+        | Add (b1, b2) ->
+            let c1 = compare_expr a1 b1 in
+            if c1 = 0 then compare_expr a2 b2 else c1)
+    | Mul (a1, a2) -> (
+        match b with
+        | Mul (b1, b2) ->
+            let c1 = compare_expr a1 b1 in
+            if c1 = 0 then compare_expr a2 b2 else c1)
 
 let rec expr_equal =
  fun a b ->
