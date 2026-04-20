@@ -639,15 +639,15 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
           let r =
             ( lam_ "w" (fun w -> compile_pp_expr ctx s term (fun s w -> return s w) w),
-              string "let rec" ^^ space ^^ string name ^^ space ^^ string "memo" ^^ space
+              string "let rec" ^^ space ^^ string name ^^ space ^^ string "?config" ^^ space
               ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
-              ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
+              ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek ?config "
               ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
               ^^ string "(Dynarray.of_list" ^^ string "["
               ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
               ^^ string "]" ^^ string ")" ^^ string "("
               ^^ uncode (from_constructor_ cont_done_tag)
-              ^^ string ")" ^^ string " memo)" )
+              ^^ string ")" ^^ string ")" )
           in
           r)
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
