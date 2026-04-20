@@ -158,7 +158,7 @@ let rec make_term size =
       let rsize = size - lsize - 1 in
       f (make_term lsize) (make_term rsize)
     in
-    if Random.bool () then split (fun x y -> LC.Add (x, y)) else split (fun x y -> LC.Mul (x, y))
+    match Random.int 2 with 0 -> split (fun x y -> LC.Add (x, y)) | 1 -> split (fun x y -> LC.Mul (x, y))
 
 let run_bench_cases () =
   let cases =
