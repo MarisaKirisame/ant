@@ -1,0 +1,16 @@
+services:
+  ant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - ant-build:/workspace/_build
+      - ant-dune-cache:/home/opam/.cache/dune
+    stdin_open: true
+    tty: true
+
+volumes:
+  ant-build:
+  ant-dune-cache:

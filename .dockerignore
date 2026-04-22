@@ -1,0 +1,9 @@
+.git
+.gitmodules
+_build
+.venv
+output
+*.log
+*.tmp
+__pycache__/
+*.pyc
