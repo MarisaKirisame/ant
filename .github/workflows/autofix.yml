@@ -39,6 +39,7 @@ jobs:
         run: opam install -y dune ocamlformat.0.28.1
 
       - name: Format OCaml sources
+        continue-on-error: true
         run: opam exec -- dune fmt
 
       - uses: autofix-ci/action@v1
