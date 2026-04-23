@@ -1,12 +1,6 @@
 (library
  (name runmodes)
- (modules
-  LiveCEK
-  LivePlain
-  ListCEK
-  ListPlain
-  ArithCEK
-  ArithPlain)
+ (modules LiveCEK LivePlain ListCEK ListPlain ArithCEK ArithPlain)
  (libraries ant)
  (wrapped false)
  (preprocess
