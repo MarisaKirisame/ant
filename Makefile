@@ -1,12 +1,18 @@
 .DEFAULT_GOAL := all
 
-.PHONY: dependency build run profile compile-generated nightly all report experiment hazel-tex arith-tex hazel hazel-report arith arith-report
+.PHONY: dependency build coverage run profile compile-generated nightly all report experiment hazel-tex arith-tex hazel hazel-report arith arith-report
 
 dependency:
 	uv run ./nightly.py dependency
 
 build:
 	uv run ./nightly.py build
+
+coverage:
+	rm -rf _coverage
+	mkdir -p _coverage
+	BISECT_FILE=_coverage/bisect dune runtest --instrument-with bisect_ppx --force
+	bisect-ppx-report html --coverage-path _coverage
 
 compile-generated:
 	uv run ./nightly.py compile-generated
