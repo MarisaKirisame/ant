@@ -1,0 +1,14 @@
+(version 2.8.3)
+
+(build
+ (all_platforms ((action (run dune build -p %{pkg-self:name} -j %{jobs})))))
+
+(depends
+ (all_platforms
+  (base-unix cmdliner dune ocaml ppxlib)))
+
+(source
+ (fetch
+  (url https://github.com/aantron/bisect_ppx/archive/2.8.3.tar.gz)
+  (checksum
+   sha256=27ddeb2f60fbae50dc504e63e63cd5f012689084a76d5fdd4d1371d5341ff8db)))

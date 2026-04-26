@@ -23,6 +23,7 @@ depends: [
   "yojson"
   "ppx_deriving"
   "ppxlib"
+  "bisect_ppx" {with-test}
   "odoc" {with-doc}
 ]
 build: [

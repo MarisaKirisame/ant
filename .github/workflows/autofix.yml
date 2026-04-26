@@ -38,6 +38,9 @@ jobs:
       - name: Install formatter
         run: opam install -y dune ocamlformat.0.28.1
 
+      - name: lock
+        run: opam exec -- dune pkg lock
+
       - name: Format OCaml sources
         continue-on-error: true
         run: opam exec -- dune fmt

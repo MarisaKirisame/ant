@@ -1,4 +1,4 @@
-(version v0.17.1)
+(version v0.17.0)
 
 (build
  (all_platforms ((action (run dune build -p %{pkg-self:name} -j %{jobs})))))
@@ -10,5 +10,6 @@
 (source
  (fetch
   (url
-   https://github.com/janestreet/ppx_diff/archive/refs/tags/v0.17.1.tar.gz)
-  (checksum md5=cfec5d638a1bf1ea77707d10eed5d2d7)))
+   https://github.com/janestreet/ppx_diff/archive/refs/tags/v0.17.0.tar.gz)
+  (checksum
+   sha256=5e817094edf127d384110227ecfdc3e23f0f130266d48d1f326a03f6f58a2609)))
