@@ -11,7 +11,7 @@ build:
 coverage:
 	rm -rf _coverage
 	mkdir -p _coverage
-	opam exec -- env BISECT_FILE=_coverage/bisect dune runtest --instrument-with bisect_ppx --force
+	opam exec -- env BISECT_FILE="$$(pwd)/_coverage/bisect" dune runtest --ignore-lock-dir --instrument-with bisect_ppx --force
 	opam exec -- bisect-ppx-report html --coverage-path _coverage
 
 compile-generated:
