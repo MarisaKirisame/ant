@@ -4,6 +4,8 @@
  (name ant)
  (public_name ant)
  (libraries pprint batteries core core_unix.time_stamp_counter)
+ (instrumentation
+  (backend bisect_ppx))
  (modules
   Lexer
   Tokens

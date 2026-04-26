@@ -1,3 +1,4 @@
 (test
  (name test_ant)
- (libraries ant))
+ (libraries ant)
+ (link_flags -linkall))

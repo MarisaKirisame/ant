@@ -33,6 +33,7 @@ setup.log
 
 # Dune generated files
 *.install
+_coverage/
 
 # Local OPAM switch
 _opam/
