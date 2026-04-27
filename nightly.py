@@ -52,6 +52,7 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 import generate_report as report_module  # noqa: E402
+import coverage_comment  # noqa: E402
 
 
 def run(
@@ -129,10 +130,10 @@ def ensure_switch() -> None:
 
 def opam_exec(
     args: Iterable[str], *, env: Optional[Mapping[str, str]] = None, **kwargs
-) -> None:
+) -> subprocess.CompletedProcess[str]:
     """Run a command inside the configured opam switch."""
 
-    run(["opam", "exec", "--switch", SWITCH, "--", *args], env=env, **kwargs)
+    return run(["opam", "exec", "--switch", SWITCH, "--", *args], env=env, **kwargs)
 
 
 def install_dependencies() -> None:
@@ -266,6 +267,46 @@ def compile_generated() -> None:
     generate_ml_files(env=env)
 
 
+def coverage_project() -> None:
+    ensure_switch()
+    coverage_dir = REPO_ROOT / "_coverage"
+    shutil.rmtree(coverage_dir, ignore_errors=True)
+    coverage_dir.mkdir(parents=True, exist_ok=True)
+
+    env = os.environ.copy()
+    env["BISECT_FILE"] = str(coverage_dir / "bisect")
+
+    opam_exec(
+        [
+            "dune",
+            "runtest",
+            "--instrument-with",
+            "bisect_ppx",
+            "--force",
+        ],
+        env=env,
+    )
+
+    summary = opam_exec(
+        ["bisect-ppx-report", "summary", "--coverage-path", str(coverage_dir)],
+        capture=True,
+    ).stdout
+    per_file = opam_exec(
+        ["bisect-ppx-report", "summary", "--coverage-path", str(coverage_dir), "--per-file"],
+        capture=True,
+    ).stdout
+
+    summary_path = coverage_dir / "coverage-summary.txt"
+    per_file_path = coverage_dir / "coverage-per-file.txt"
+    comment_path = coverage_dir / "coverage-comment.md"
+    summary_path.write_text(summary, encoding="utf-8")
+    per_file_path.write_text(per_file, encoding="utf-8")
+    comment_path.write_text(
+        coverage_comment.render_comment(summary, per_file),
+        encoding="utf-8",
+    )
+
+
 def _opam_env_with_ocamlrunparam() -> MutableMapping[str, str]:
     env: MutableMapping[str, str] = os.environ.copy()
     env["OCAMLRUNPARAM"] = "b"
@@ -295,12 +336,14 @@ def _remove_eval_steps_files() -> None:
 
 def main(argv: Iterable[str]) -> int:
     args = list(argv)
+    usage = (
+        "Usage: nightly.py "
+        "[dependency|build|coverage|run|profile|hazel|hazel-report|arith|arith-report|"
+        "report|experiment|hazel-tex|arith-tex|compile-generated|all]"
+    )
     if len(args) > 1:
         print("Only a single stage argument is supported.", file=sys.stderr)
-        print(
-            "Usage: nightly.py [dependency|build|run|profile|hazel|hazel-report|arith|arith-report|report|experiment|hazel-tex|arith-tex|compile-generated|all]",
-            file=sys.stderr,
-        )
+        print(usage, file=sys.stderr)
         return 1
 
     stage = args[0] if args else "all"
@@ -309,6 +352,8 @@ def main(argv: Iterable[str]) -> int:
         install_dependencies()
     elif stage == "build":
         build_project()
+    elif stage == "coverage":
+        coverage_project()
     elif stage == "run":
         run_project()
     elif stage == "profile":
@@ -338,10 +383,7 @@ def main(argv: Iterable[str]) -> int:
         report_module.generate_reports()
     else:
         print(f"Unknown stage: {stage}", file=sys.stderr)
-        print(
-            "Usage: nightly.py [dependency|build|run|profile|hazel|hazel-report|arith|arith-report|report|experiment|hazel-tex|arith-tex|compile-generated|all]",
-            file=sys.stderr,
-        )
+        print(usage, file=sys.stderr)
         return 1
 
     return 0

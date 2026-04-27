@@ -34,7 +34,8 @@
   sexplib
   yojson
   ppx_deriving
-  ppxlib)
+  ppxlib
+  (bisect_ppx :with-test))
  (tags
   (topics "to describe" your project)))
 

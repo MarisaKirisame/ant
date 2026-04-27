@@ -4,6 +4,11 @@ on:
   pull_request:
   push:
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,5 +34,49 @@ jobs:
       - run: git submodule update --init
       - name: Reset dune state
         run: rm -rf ~/.cache/dune/toolchains _build
+      - name: Install coverage tools
+        if: github.event_name == 'pull_request'
+        run: opam install -y bisect_ppx
       - name: Run pipeline
         run: make all
+      - name: Run coverage
+        if: github.event_name == 'pull_request'
+        run: make coverage
+      - name: Comment coverage
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+
+            const marker = "<!-- ant-coverage-report -->";
+            const body = fs.readFileSync("_coverage/coverage-comment.md", "utf8");
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
+      - name: Write coverage summary
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: cat _coverage/coverage-comment.md >> "$GITHUB_STEP_SUMMARY"
