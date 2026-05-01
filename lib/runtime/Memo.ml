@@ -33,6 +33,8 @@ let get_value (state : 'a cek) (src : source) : 'a =
 let set_value (state : 'a cek) (src : source) (v : 'a) : unit =
   match src with
   | E i ->
+      if i >= Dynarray.length state.e then
+        print_endline ("index out of bounds: " ^ string_of_int i ^ " >= " ^ string_of_int (Dynarray.length state.e));
       assert (i < Dynarray.length state.e);
       Dynarray.set state.e i v
   | K -> state.k <- v
@@ -162,10 +164,10 @@ let pop_env (w : world) : value =
   assert ((Generic.measure ~monoid ~measure v).max_degree = 1);
   v
 
-let env_call (w : world) (keep : int list) (nargs : int) : seq =
+let env_call (w : world) (keep : int list) (args : int list) : seq =
   let l = Dynarray.length w.state.e in
   let ret = appends (List.map keep ~f:(fun i -> Dynarray.get w.state.e i)) in
-  w.state.e <- Dynarray.init nargs (fun i -> Dynarray.get w.state.e (l - nargs + i));
+  w.state.e <- Dynarray.init (List.length args) (fun i -> Dynarray.get w.state.e i);
   assert ((Generic.measure ~monoid ~measure ret).degree = List.length keep);
   assert ((Generic.measure ~monoid ~measure ret).max_degree = List.length keep);
   ret
@@ -183,8 +185,7 @@ let get_next_cont (seqs : seq) : seq =
   List.hd_exn (List.rev splitted)
 
 let return_n (w : world) (n : int) (return_exp : exp) : unit =
-  assert (Dynarray.length w.state.e = n);
-  w.state.e <- Dynarray.of_list [ Dynarray.get_last w.state.e ];
+  w.state.e <- Dynarray.of_list [ Dynarray.get w.state.e n ];
   w.state.c <- return_exp
 
 let drop_n (w : world) (e : int) (n : int) : unit =

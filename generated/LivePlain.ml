@@ -10,201 +10,322 @@ and vtype = LiveCEK.vtype
 and stuck = LiveCEK.stuck
 
 let rec index =
- fun x n -> match x with Cons (xh, xt) -> ( match n with Z -> Some xh | S m -> index xt m) | _ -> None
+ fun x n ->
+  match x with
+  | Cons (xh, xt) -> (
+      match n with
+      | Z ->
+          let _0 = Some xh in
+          _0
+      | S m ->
+          let _1 = index xt m in
+          _1)
+  | _ ->
+      let _2 = None in
+      _2
 
 let rec eval =
  fun expr env ->
   match expr with
-  | EInt i -> VInt i
+  | EInt i ->
+      let _3 = VInt i in
+      _3
   | EPlus (x, y) -> (
-      let xv = eval x env in
+      let _4 = eval x env in
+      let xv = _4 in
       match xv with
       | VInt xi -> (
-          let yv = eval y env in
+          let _5 = eval y env in
+          let yv = _5 in
           match yv with
           | VInt yi ->
-              let _0 = xi + yi in
-              VInt _0
+              let _6 = xi + yi in
+              let _7 = VInt _6 in
+              _7
           | VStuck ys ->
-              let _1 = SAdd1 (xv, ys) in
-              VStuck _1
+              let _8 = SAdd1 (xv, ys) in
+              let _9 = VStuck _8 in
+              _9
           | _ ->
-              let _2 = STypeError (yv, VTInt) in
-              VStuck _2)
+              let _10 = VTInt in
+              let _11 = STypeError (yv, _10) in
+              let _12 = VStuck _11 in
+              _12)
       | VStuck xs ->
-          let _3 = SAdd0 (xs, y) in
-          VStuck _3
+          let _13 = SAdd0 (xs, y) in
+          let _14 = VStuck _13 in
+          _14
       | _ ->
-          let _4 = STypeError (xv, VTInt) in
-          VStuck _4)
+          let _15 = VTInt in
+          let _16 = STypeError (xv, _15) in
+          let _17 = VStuck _16 in
+          _17)
   | ELt (x, y) -> (
-      let xv = eval x env in
+      let _18 = eval x env in
+      let xv = _18 in
       match xv with
       | VInt xi -> (
-          let yv = eval y env in
+          let _19 = eval y env in
+          let yv = _19 in
           match yv with
           | VInt yi ->
-              let _5 = xi < yi in
-              if _5 then VTrue else VFalse
+              let _20 = xi < yi in
+              if _20 then
+                let _22 = VTrue in
+                _22
+              else
+                let _21 = VFalse in
+                _21
           | VStuck ys ->
-              let _6 = SGt1 (xv, ys) in
-              VStuck _6
+              let _23 = SGt1 (xv, ys) in
+              let _24 = VStuck _23 in
+              _24
           | _ ->
-              let _7 = STypeError (yv, VTInt) in
-              VStuck _7)
+              let _25 = VTInt in
+              let _26 = STypeError (yv, _25) in
+              let _27 = VStuck _26 in
+              _27)
       | VStuck xs ->
-          let _8 = SGt0 (xs, y) in
-          VStuck _8
+          let _28 = SGt0 (xs, y) in
+          let _29 = VStuck _28 in
+          _29
       | _ ->
-          let _9 = STypeError (xv, VTInt) in
-          VStuck _9)
+          let _30 = VTInt in
+          let _31 = STypeError (xv, _30) in
+          let _32 = VStuck _31 in
+          _32)
   | ELe (x, y) -> (
-      let xv = eval x env in
+      let _33 = eval x env in
+      let xv = _33 in
       match xv with
       | VInt xi -> (
-          let yv = eval y env in
+          let _34 = eval y env in
+          let yv = _34 in
           match yv with
           | VInt yi ->
-              let _10 = xi <= yi in
-              if _10 then VTrue else VFalse
+              let _35 = xi <= yi in
+              if _35 then
+                let _37 = VTrue in
+                _37
+              else
+                let _36 = VFalse in
+                _36
           | VStuck ys ->
-              let _11 = SGt1 (xv, ys) in
-              VStuck _11
+              let _38 = SGt1 (xv, ys) in
+              let _39 = VStuck _38 in
+              _39
           | _ ->
-              let _12 = STypeError (yv, VTInt) in
-              VStuck _12)
+              let _40 = VTInt in
+              let _41 = STypeError (yv, _40) in
+              let _42 = VStuck _41 in
+              _42)
       | VStuck xs ->
-          let _13 = SGt0 (xs, y) in
-          VStuck _13
+          let _43 = SGt0 (xs, y) in
+          let _44 = VStuck _43 in
+          _44
       | _ ->
-          let _14 = STypeError (xv, VTInt) in
-          VStuck _14)
+          let _45 = VTInt in
+          let _46 = STypeError (xv, _45) in
+          let _47 = VStuck _46 in
+          _47)
   | EGt (x, y) -> (
-      let xv = eval x env in
+      let _48 = eval x env in
+      let xv = _48 in
       match xv with
       | VInt xi -> (
-          let yv = eval y env in
+          let _49 = eval y env in
+          let yv = _49 in
           match yv with
           | VInt yi ->
-              let _15 = xi > yi in
-              if _15 then VTrue else VFalse
+              let _50 = xi > yi in
+              if _50 then
+                let _52 = VTrue in
+                _52
+              else
+                let _51 = VFalse in
+                _51
           | VStuck ys ->
-              let _16 = SGt1 (xv, ys) in
-              VStuck _16
+              let _53 = SGt1 (xv, ys) in
+              let _54 = VStuck _53 in
+              _54
           | _ ->
-              let _17 = STypeError (yv, VTInt) in
-              VStuck _17)
+              let _55 = VTInt in
+              let _56 = STypeError (yv, _55) in
+              let _57 = VStuck _56 in
+              _57)
       | VStuck xs ->
-          let _18 = SGt0 (xs, y) in
-          VStuck _18
+          let _58 = SGt0 (xs, y) in
+          let _59 = VStuck _58 in
+          _59
       | _ ->
-          let _19 = STypeError (xv, VTInt) in
-          VStuck _19)
+          let _60 = VTInt in
+          let _61 = STypeError (xv, _60) in
+          let _62 = VStuck _61 in
+          _62)
   | EGe (x, y) -> (
-      let xv = eval x env in
+      let _63 = eval x env in
+      let xv = _63 in
       match xv with
       | VInt xi -> (
-          let yv = eval y env in
+          let _64 = eval y env in
+          let yv = _64 in
           match yv with
           | VInt yi ->
-              let _20 = xi >= yi in
-              if _20 then VTrue else VFalse
+              let _65 = xi >= yi in
+              if _65 then
+                let _67 = VTrue in
+                _67
+              else
+                let _66 = VFalse in
+                _66
           | VStuck ys ->
-              let _21 = SGt1 (xv, ys) in
-              VStuck _21
+              let _68 = SGt1 (xv, ys) in
+              let _69 = VStuck _68 in
+              _69
           | _ ->
-              let _22 = STypeError (yv, VTInt) in
-              VStuck _22)
+              let _70 = VTInt in
+              let _71 = STypeError (yv, _70) in
+              let _72 = VStuck _71 in
+              _72)
       | VStuck xs ->
-          let _23 = SGt0 (xs, y) in
-          VStuck _23
+          let _73 = SGt0 (xs, y) in
+          let _74 = VStuck _73 in
+          _74
       | _ ->
-          let _24 = STypeError (xv, VTInt) in
-          VStuck _24)
+          let _75 = VTInt in
+          let _76 = STypeError (xv, _75) in
+          let _77 = VStuck _76 in
+          _77)
   | EVar idx -> (
-      let _25 = index env idx in
-      match _25 with Some v -> v | None -> VStuck SIndexError)
-  | EAbs e -> VAbs (e, env)
+      let _78 = index env idx in
+      match _78 with
+      | Some v -> v
+      | None ->
+          let _79 = SIndexError in
+          let _80 = VStuck _79 in
+          _80)
+  | EAbs e ->
+      let _81 = VAbs (e, env) in
+      _81
   | ELet (lhs, rhs) ->
-      let _26 = eval lhs env in
-      let _27 = Cons (_26, env) in
-      eval rhs _27
-  | EFix e -> VFix (e, env)
+      let _82 = eval lhs env in
+      let _83 = Cons (_82, env) in
+      let _84 = eval rhs _83 in
+      _84
+  | EFix e ->
+      let _85 = VFix (e, env) in
+      _85
   | EApp (f, x) -> (
-      let fv = eval f env in
+      let _86 = eval f env in
+      let fv = _86 in
       match fv with
       | VAbs (e, env_) ->
-          let _28 = eval x env in
-          let _29 = Cons (_28, env_) in
-          eval e _29
+          let _87 = eval x env in
+          let _88 = Cons (_87, env_) in
+          let _89 = eval e _88 in
+          _89
       | VFix (e, env_) ->
-          let _30 = eval x env in
-          let _31 = Cons (fv, env_) in
-          let _32 = Cons (_30, _31) in
-          eval e _32
+          let _90 = eval x env in
+          let _91 = Cons (fv, env_) in
+          let _92 = Cons (_90, _91) in
+          let _93 = eval e _92 in
+          _93
       | VStuck fs ->
-          let _33 = SApp (fs, x) in
-          VStuck _33
+          let _94 = SApp (fs, x) in
+          let _95 = VStuck _94 in
+          _95
       | _ ->
-          let _34 = STypeError (fv, VTFunc) in
-          VStuck _34)
+          let _96 = VTFunc in
+          let _97 = STypeError (fv, _96) in
+          let _98 = VStuck _97 in
+          _98)
   | EHole x ->
-      let _35 = SHole x in
-      VStuck _35
-  | ETrue -> VTrue
-  | EFalse -> VFalse
+      let _99 = SHole x in
+      let _100 = VStuck _99 in
+      _100
+  | ETrue ->
+      let _101 = VTrue in
+      _101
+  | EFalse ->
+      let _102 = VFalse in
+      _102
   | EIf (i, t, e) -> (
-      let _36 = eval i env in
-      match _36 with
-      | VTrue -> eval t env
-      | VFalse -> eval e env
+      let _103 = eval i env in
+      match _103 with
+      | VTrue ->
+          let _104 = eval t env in
+          _104
+      | VFalse ->
+          let _105 = eval e env in
+          _105
       | VStuck is ->
-          let _37 = SIf (is, t, e) in
-          VStuck _37
+          let _106 = SIf (is, t, e) in
+          let _107 = VStuck _106 in
+          _107
       | iv ->
-          let _38 = STypeError (iv, VTBool) in
-          VStuck _38)
-  | ENil -> VNil
+          let _108 = VTBool in
+          let _109 = STypeError (iv, _108) in
+          let _110 = VStuck _109 in
+          _110)
+  | ENil ->
+      let _111 = VNil in
+      _111
   | ECons (x, xs) ->
-      let _39 = eval x env in
-      let _40 = eval xs env in
-      VCons (_39, _40)
+      let _112 = eval x env in
+      let _113 = eval xs env in
+      let _114 = VCons (_112, _113) in
+      _114
   | EPair (x, y) ->
-      let _41 = eval x env in
-      let _42 = eval y env in
-      VPair (_41, _42)
+      let _115 = eval x env in
+      let _116 = eval y env in
+      let _117 = VPair (_115, _116) in
+      _117
   | EZro p -> (
-      let _43 = eval p env in
-      match _43 with
+      let _118 = eval p env in
+      match _118 with
       | VPair (a, b) -> a
       | VStuck ps ->
-          let _44 = SZro ps in
-          VStuck _44
+          let _119 = SZro ps in
+          let _120 = VStuck _119 in
+          _120
       | pv ->
-          let _45 = STypeError (pv, VTPair) in
-          VStuck _45)
+          let _121 = VTPair in
+          let _122 = STypeError (pv, _121) in
+          let _123 = VStuck _122 in
+          _123)
   | EFst p -> (
-      let _46 = eval p env in
-      match _46 with
+      let _124 = eval p env in
+      match _124 with
       | VPair (a, b) -> b
       | VStuck ps ->
-          let _47 = SFst ps in
-          VStuck _47
+          let _125 = SFst ps in
+          let _126 = VStuck _125 in
+          _126
       | pv ->
-          let _48 = STypeError (pv, VTPair) in
-          VStuck _48)
+          let _127 = VTPair in
+          let _128 = STypeError (pv, _127) in
+          let _129 = VStuck _128 in
+          _129)
   | EMatchList (v, n, c) -> (
-      let _49 = eval v env in
-      match _49 with
-      | VNil -> eval n env
+      let _130 = eval v env in
+      match _130 with
+      | VNil ->
+          let _131 = eval n env in
+          _131
       | VCons (x, xs) ->
-          let _50 = Cons (x, env) in
-          let _51 = Cons (xs, _50) in
-          eval c _51
+          let _132 = Cons (x, env) in
+          let _133 = Cons (xs, _132) in
+          let _134 = eval c _133 in
+          _134
       | VStuck vs ->
-          let _52 = SMatchList (vs, n, c) in
-          VStuck _52
+          let _135 = SMatchList (vs, n, c) in
+          let _136 = VStuck _135 in
+          _136
       | vv ->
-          let _53 = STypeError (vv, VTList) in
-          VStuck _53)
-  | EUnit -> VUnit
+          let _137 = VTList in
+          let _138 = STypeError (vv, _137) in
+          let _139 = VStuck _138 in
+          _139)
+  | EUnit ->
+      let _140 = VUnit in
+      _140

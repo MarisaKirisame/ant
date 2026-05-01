@@ -102,6 +102,7 @@ let[@warning "-32"] expr_of_nexpr ?(ctx = []) nexpr =
     | NEZro x -> LC.EZro (aux ctx x)
     | NEFst x -> LC.EFst (aux ctx x)
     | NESeq (x, y) -> LC.EPair (aux ctx x, aux ctx y)
+    | x -> failwith ("expr_of_nexpr not implemente for expr: " ^ Format.asprintf "%a" pp_nexpr x)
   in
   aux ctx nexpr
 
@@ -208,15 +209,12 @@ and pp_stuck fmt = function
   | LC.SIf (stuck, thn, els) -> Format.fprintf fmt "<stuck if %a %a %a>" pp_stuck stuck pp_expr thn pp_expr els
   | LC.SMatchList (stuck, nil_case, cons_case) ->
       Format.fprintf fmt "<stuck match %a %a %a>" pp_stuck stuck pp_expr nil_case pp_expr cons_case
-  | LC.SZro stuck -> Format.fprintf fmt "<stuck zro %a>" pp_stuck stuck
-  | LC.SFst stuck -> Format.fprintf fmt "<stuck fst %a>" pp_stuck stuck
 
 and pp_vtype fmt = function
   | LC.VTInt -> Format.pp_print_string fmt "int"
   | LC.VTFunc -> Format.pp_print_string fmt "func"
   | LC.VTBool -> Format.pp_print_string fmt "bool"
   | LC.VTList -> Format.pp_print_string fmt "list"
-  | LC.VTPair -> Format.pp_print_string fmt "pair"
 
 let value_to_string value = Format.asprintf "%a" pp_value value
 
@@ -373,8 +371,10 @@ let eval_plain (expr : LC.expr) : LC.value * int =
     measure_memory_consumption (fun () ->
         Profile.with_slot eval_cek_slot (fun () ->
             LC.to_ocaml_value
-              (LC.eval ~config:Memo.cek_config (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value env))
-                .words))
+              (Memo.exec_cek_raw
+                 (Memo.pc_to_exp (Common.int_to_pc 4))
+                 (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
+                 (Memo.from_constructor LC.tag_cont_done))))
   in
   Gc.full_major ();
   (Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env), cek_heap_stats.peak_heap_words)
@@ -382,8 +382,7 @@ let eval_plain (expr : LC.expr) : LC.value * int =
 let eval_expression_memo_only ~memo expr : memo_run_result =
   let exec_res, memo_heap_stats =
     measure_memory_consumption (fun () ->
-        LC.eval ~config:(Memo.memo_config memo) (LC.from_ocaml_expr expr)
-          (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
+        LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
   in
   let memo_profile = Profile.dump_profile Profile.memo_profile in
   {
@@ -399,8 +398,10 @@ let eval_expression_baseline_only expr : baseline_run_result =
     measure_memory_consumption (fun () ->
         Profile.with_slot eval_cek_slot (fun () ->
             LC.to_ocaml_value
-              (LC.eval ~config:Memo.cek_config (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value env))
-                .words))
+              (Memo.exec_cek_raw
+                 (Memo.pc_to_exp (Common.int_to_pc 3))
+                 (Dynarray.of_list [ LC.from_ocaml_expr expr; LC.from_ocaml_list LC.from_ocaml_value env ])
+                 (Memo.from_constructor LC.tag_cont_done))))
   in
   Gc.full_major ();
   let _ = Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env) in
@@ -413,8 +414,7 @@ let eval_expression_baseline_only expr : baseline_run_result =
 let eval_expression ~memo ~write_steps expr =
   let exec_res, memo_heap_stats =
     measure_memory_consumption (fun () ->
-        LC.eval ~config:(Memo.memo_config memo) (LC.from_ocaml_expr expr)
-          (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
+        LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
   in
   let _, cek_heap_words = eval_plain expr in
   write_steps exec_res ~memo_heap_words:memo_heap_stats.peak_heap_words ~cek_heap_words;

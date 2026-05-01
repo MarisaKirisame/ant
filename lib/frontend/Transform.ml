@@ -4,209 +4,42 @@ module Ctx = Map.Make (String)
 module SSet = Set.Make (String)
 module Fresh = Fresh.Make ()
 
-let is_atomic = function
-  | Unit | Int _ | Float _ | Bool _ | Str _ | Builtin _ | Var _ | Ctor _ | Lam _ | GVar _ -> true
-  | _ -> false
-
 let ( let* ) a b = a b
 
 (* NOTE: this file requires refactoring, given the AST has been typed *)
 
 let free, free_p =
   let rec do_expr s = function
-    | Unit | Int _ | Float _ | Bool _ | Str _ | Builtin _ -> s
+    | Unit _ | Int _ | Float _ | Bool _ | Str _ | Builtin _ -> s
     | Var (x, _) -> SSet.add x s
     | GVar (x, _) -> SSet.add x s
     | Ctor _ -> s
     | Lam (ps, e, _) -> SSet.diff (do_expr s e) (List.fold_left do_pattern SSet.empty ps)
     | App (f, xs, _) -> List.fold_left do_expr s (f :: xs)
     | Op (_, e1, e2, _) -> do_expr (do_expr s e1) e2
-    | Tup (es, _) | Arr (es, _) -> List.fold_left do_expr s es
-    | Let ((BOne (x, e1, _) | BCont (x, e1, _)), e2, _) ->
+    | Tup (es, _) -> List.fold_left do_expr s es
+    | Let (BOne (x, e1, _), e2, _) ->
         SSet.union (do_expr s e1) (SSet.diff (do_expr SSet.empty e2) (do_pattern SSet.empty x))
-    | Let ((BRec xs | BRecC xs), e2, _) ->
+    | Let (BRec xs, e2, _) ->
         SSet.union
           (List.fold_left do_expr s (List.map (fun (_, e, _) -> e) xs))
           (SSet.diff (do_expr SSet.empty e2) (List.fold_left do_pattern SSet.empty (List.map (fun (p, _, _) -> p) xs)))
     | Let (BSeq (e1, _), e2, _) -> do_expr (do_expr s e1) e2
-    | Sel (e, _, _) -> do_expr s e
     | If (e1, e2, e3, _) -> do_expr (do_expr (do_expr s e1) e2) e3
-    | Match (cond, MatchPattern cases, _) ->
+    | Match (cond, MatchPattern (cases, _), _) ->
         List.fold_left
           (fun s (p, e) -> SSet.union s @@ SSet.diff (do_expr SSet.empty e) (do_pattern SSet.empty p))
           (do_expr s cond) cases
   and do_pattern s = function
-    | PAny | PInt _ | PBool _ -> s
+    | PAny _ | PInt (_, _) | PBool (_, _) | PUnit _ -> s
     | PVar (x, _) -> SSet.add x s
-    | PUnit -> s
     | PTup (ps, _) -> List.fold_left do_pattern s ps
     | PCtorApp (_, None, _) -> s
     | PCtorApp (_, Some p, _) -> do_pattern s p
   in
   ((fun e -> do_expr SSet.empty e), fun p -> do_pattern SSet.empty p)
 
-type cps_ctx = int Ctx.t
-
 let empty_info = SynInfo.empty_info
-
-let cps ctx expr =
-  let mk_fresh prefix =
-    let k = Fresh.next_fresh prefix in
-    (PVar (k, empty_info), Var (k, empty_info))
-  in
-  let mk_fresh_params n prefix =
-    let rec aux acc acc2 n =
-      if n = 0 then (acc, acc2)
-      else
-        let x = Fresh.next_fresh prefix in
-        aux (PVar (x, empty_info) :: acc) (Var (x, empty_info) :: acc2) (n - 1)
-    in
-    let l1, l2 = aux [] [] n in
-    (List.rev l1, List.rev l2)
-  in
-  let rec atom = function
-    | Unit -> Unit
-    | Int i -> Int i
-    | Float f -> Float f
-    | Bool b -> Bool b
-    | Str s -> Str s
-    | Builtin (b, _) -> Builtin (b, empty_info)
-    | Var (x, _) -> Var (x, empty_info)
-    | Ctor (x, _) ->
-        let n = Ctx.find x ctx in
-        if n = 0 then Ctor (x, empty_info)
-        else
-          let pas, vas = mk_fresh_params n "_'a" in
-          let pks, vks = mk_fresh_params n "_'k" in
-          List.fold_right2
-            (fun (pa, _) (pk, vk) acc -> Lam ([ pa; pk ], App (vk, [ acc ], empty_info), empty_info))
-            (List.combine pas vas) (List.combine pks vks)
-            (App (Ctor (x, empty_info), vas, empty_info))
-    | Lam (xs, e, _) ->
-        let pk, vk = mk_fresh "_'k" in
-        Lam (xs @ [ pk ], cps'' e vk, empty_info)
-    | e -> failwith ("not an atom: " ^ string_of_document @@ pp_expr e)
-  and cps' e k =
-    match e with
-    | x when is_atomic x -> k (atom x)
-    | App (f, xs, i) ->
-        assert (List.length xs <= 1);
-        let* f = cps' f in
-        let* xs = cps_l' xs in
-        let pa, va = mk_fresh "_'a" in
-        let pc, vc = mk_fresh "_'cont" in
-        Let (BCont (pc, Lam ([ pa ], k va, empty_info), empty_info), App (f, xs @ [ vc ], i), empty_info)
-    | Op (op, e1, e2, i) ->
-        let* e1 = cps' e1 in
-        let* e2 = cps' e2 in
-        k (Op (op, e1, e2, i))
-    | Tup (es, i) ->
-        let* es = cps_l' es in
-        k (Tup (es, i))
-    | Arr (es, i) ->
-        let* es = cps_l' es in
-        k (Arr (es, i))
-    | Let (BOne (x, e1, b_i), e2, l_i) ->
-        let* e1 = cps' e1 in
-        let e2 = cps' e2 k in
-        Let (BOne (x, e1, b_i), e2, l_i)
-    | Let (BRec xs, e2, l_i) ->
-        let rhs = List.map (fun (_, e, _) -> e) xs in
-        let* rhs = cps_l' rhs in
-        let e2 = cps' e2 k in
-        Let (BRec (List.map2 (fun (p, _, i) r -> (p, r, i)) xs rhs), e2, l_i)
-    | Sel (e, x, i) ->
-        let* e = cps' e in
-        k (Sel (e, x, i))
-    | If (e1, e2, e3, i) ->
-        let pk, vk = mk_fresh "_'k" in
-        let pa, va = mk_fresh "_'a" in
-        let pc, vc = mk_fresh "_'cont" in
-        let* e1 = cps' e1 in
-        Let
-          ( BCont (pc, Lam ([ pa ], k va, empty_info), empty_info),
-            App (Lam ([ pk ], If (e1, cps'' e2 vk, cps'' e3 vk, i), empty_info), [ vc ], empty_info),
-            empty_info )
-    | Match (cond, MatchPattern cases, i) ->
-        let* cond = cps' cond in
-        let pats = List.map fst cases in
-        let arms = List.map snd cases in
-        let* arms = cps_l' arms in
-        k (Match (cond, MatchPattern (List.combine pats arms), i))
-    | e -> failwith ("not an valid expr in cps': " ^ string_of_document @@ pp_expr e)
-  and cps_l' es k = match es with [] -> k [] | e :: es' -> cps' e (fun e' -> cps_l' es' (fun es' -> k (e' :: es')))
-  and cps'' e cont =
-    match e with
-    | x when is_atomic x -> App (cont, [ atom x ], empty_info)
-    | App (f, xs, i) ->
-        assert (List.length xs <= 1);
-        let* f = cps' f in
-        let* xs = cps_l' xs in
-        App (f, xs @ [ cont ], i)
-    | Op (op, e1, e2, i) ->
-        let* e1 = cps' e1 in
-        let* e2 = cps' e2 in
-        App (cont, [ Op (op, e1, e2, i) ], empty_info)
-    | Tup (es, i) ->
-        let* es = cps_l' es in
-        App (cont, [ Tup (es, i) ], empty_info)
-    | Arr (es, i) ->
-        let* es = cps_l' es in
-        App (cont, [ Arr (es, i) ], empty_info)
-    | Let (BOne (x, e1, b_i), e2, l_i) ->
-        let* e1 = cps' e1 in
-        let e2 = cps' e2 (fun x -> App (cont, [ x ], empty_info)) in
-        Let (BOne (x, e1, b_i), e2, l_i)
-    | Let (BRec xs, e2, l_i) ->
-        let rhs = List.map (fun (_, e, _) -> e) xs in
-        let* rhs = cps_l' rhs in
-        let e2 = cps' e2 (fun x -> App (cont, [ x ], empty_info)) in
-        Let (BRec (List.map2 (fun (p, _, i) r -> (p, r, i)) xs rhs), e2, l_i)
-    | Sel (e, x, i) ->
-        let* e = cps' e in
-        App (cont, [ Sel (e, x, i) ], empty_info)
-    | If (e1, e2, e3, i) ->
-        let* e1 = cps' e1 in
-        If (e1, cps'' e2 cont, cps'' e3 cont, i)
-    | Match (cond, MatchPattern cases, i) ->
-        let* cond = cps' cond in
-        let pats = List.map fst cases in
-        let arms = List.map snd cases in
-        let arms = List.map (fun e -> cps'' e cont) arms in
-        Match (cond, MatchPattern (List.combine pats arms), i)
-    | e -> failwith ("not an valid expr in cps'': " ^ string_of_document @@ pp_expr e)
-  in
-  cps' expr (fun x -> x)
-
-let cps_prog (prog : 'a prog) =
-  let scan_ctors_arity ctx =
-    let aux ctx (kind : 'a ty_kind) =
-      match kind with
-      | Enum { ctors; _ } ->
-          List.fold_left
-            (fun ctx (name, params, _) ->
-              assert (not @@ Ctx.mem name ctx);
-              Ctx.add name (List.length params) ctx)
-            ctx ctors
-    in
-    function
-    | TBOne (_, kind) -> aux ctx kind
-    | TBRec kinds -> List.fold_left (fun ctx (_, kind) -> aux ctx kind) ctx kinds
-  in
-  let _, prog =
-    List.fold_left_map
-      (fun ctx item ->
-        match item with
-        | Type tb -> (scan_ctors_arity ctx tb, item)
-        | Term (BOne (p, e, i)) -> (ctx, Term (BOne (p, cps ctx e, i)))
-        | Term (BRec xs) ->
-            let ys = List.map (fun (p, e, i) -> (p, cps ctx e, i)) xs in
-            (ctx, Term (BRec ys))
-        | Term (BSeq (e, i)) -> (ctx, Term (BSeq (cps ctx e, i)))
-        | _ -> failwith "Unsuppored item")
-      Ctx.empty (fst prog)
-  in
-  (prog, empty_info)
 
 type defunc_ctx = string Ctx.t
 
@@ -214,13 +47,13 @@ let defunc ctx expr =
   (* this is too restrictive *)
   (* https://ocaml.org/manual/5.0/letrecvalues.html *)
   let allowed_rhs_for_let_rec expr = match expr with Lam _ -> true | _ -> false in
-  let rec aux (ctx : defunc_ctx) (expr : 'a expr) =
+  let rec aux (ctx : defunc_ctx) (expr : 'a expr) : 'a expr * _ list =
     match expr with
-    | Unit -> (Unit, [])
-    | Int i -> (Int i, [])
-    | Float f -> (Float f, [])
-    | Bool b -> (Bool b, [])
-    | Str s -> (Str s, [])
+    | Unit tag -> (Unit tag, [])
+    | Int (i, tag) -> (Int (i, tag), [])
+    | Float (f, tag) -> (Float (f, tag), [])
+    | Bool (b, tag) -> (Bool (b, tag), [])
+    | Str (s, tag) -> (Str (s, tag), [])
     | Builtin (b, i) -> (Builtin (b, i), [])
     | Var (x, i) -> ( match Ctx.find_opt x ctx with Some c -> (Ctor (c, i), []) | None -> (Var (x, i), []))
     | GVar (x, i) -> (GVar (x, i), [])
@@ -232,9 +65,6 @@ let defunc ctx expr =
     | Tup (es, i) ->
         let es, ls = List.split @@ List.map (aux ctx) es in
         (Tup (es, i), List.concat ls)
-    | Arr (es, i) ->
-        let es, ls = List.split @@ List.map (aux ctx) es in
-        (Arr (es, i), List.concat ls)
     | Let (BSeq (e1, i1), e2, i2) ->
         let e1, l1 = aux ctx e1 in
         let e2, l2 = aux ctx e2 in
@@ -242,26 +72,16 @@ let defunc ctx expr =
     | Let (BOne (x, e1, i1), e2, i2) ->
         let x, e1, e2, l = de_single_binding ctx x e1 e2 i1 i2 in
         (Let (BOne (x, e1, i1), e2, i2), l)
-    | Let (BCont (x, e1, i1), e2, i2) ->
-        let x, e1, e2, l = de_single_binding ctx x e1 e2 i1 i2 in
-        (Let (BCont (x, e1, i1), e2, i2), l)
     | Let (BRec xs, e2, i) ->
         let xs, ls = de_rec_bindings ctx xs in
         let e2, l = aux ctx e2 in
         (Let (BRec xs, e2, i), List.concat ls @ l)
-    | Let (BRecC xs, e2, i) ->
-        let xs, ls = de_rec_bindings ctx xs in
-        let e2, l = aux ctx e2 in
-        (Let (BRecC xs, e2, i), List.concat ls @ l)
-    | Sel (e, x, i) ->
-        let e, l = aux ctx e in
-        (Sel (e, x, i), l)
     | If (e1, e2, e3, i) ->
         let e1, l1 = aux ctx e1 in
         let e2, l2 = aux ctx e2 in
         let e3, l3 = aux ctx e3 in
         (If (e1, e2, e3, i), l1 @ l2 @ l3)
-    | Match (cond, MatchPattern cases, i) ->
+    | Match (cond, MatchPattern (cases, info0), info1) ->
         let cond, l = aux ctx cond in
         let ls, cases =
           List.fold_left_map
@@ -270,7 +90,7 @@ let defunc ctx expr =
               (l :: acc, (p, e)))
             [] cases
         in
-        (Match (cond, MatchPattern cases, i), l @ List.concat ls)
+        (Match (cond, MatchPattern (cases, info0), info1), l @ List.concat ls)
     | App _ -> de_app ctx expr
     | Lam _ -> de_lam ctx (Fresh.next_fresh "`C_'lam") expr
   and de_lam ctx ct (expr : 'a expr) =
@@ -341,7 +161,7 @@ let defunc_prog (prog : 'a prog) =
             ((ctx, its @ cases), Term (BOne (p, e, i)))
         | Term (BRec xs) ->
             let e, ls = defunc ctx (Let (BRec xs, Tup ([], empty_info), empty_info)) in
-            ((ctx, ls @ cases), Term (BOne (PUnit, e, empty_info)))
+            ((ctx, ls @ cases), Term (BOne (PUnit empty_info, e, empty_info)))
         | Term (BSeq (e, i)) ->
             let e, its = defunc ctx e in
             ((ctx, its @ cases), Term (BSeq (e, i)))
@@ -360,7 +180,7 @@ let defunc_prog (prog : 'a prog) =
                        ( [ PVar ("_'f", empty_info); PVar ("_'a", empty_info) ],
                          Match
                            ( Tup ([ Var ("_'f", empty_info); Var ("_'a", empty_info) ], empty_info),
-                             MatchPattern cases,
+                             MatchPattern (cases, empty_info),
                              empty_info ),
                          empty_info ),
                      empty_info );
@@ -384,17 +204,22 @@ let rec anf_stmt stmt =
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt stmt)
 
 and anf_binding = function
-  | BSeq (expr, info) -> BSeq (anf_tail expr, info)
-  | BOne (pattern, expr, info) -> BOne (pattern, anf_tail expr, info)
-  | BRec entries -> BRec (List.map (fun (pattern, expr, info) -> (pattern, anf_tail expr, info)) entries)
-  | BCont (pattern, expr, info) -> BCont (pattern, anf_tail expr, info)
-  | BRecC entries -> BRecC (List.map (fun (pattern, expr, info) -> (pattern, anf_tail expr, info)) entries)
+  | BSeq (expr, info) -> BSeq (anf_entry expr, info)
+  | BOne (pattern, expr, info) -> BOne (pattern, anf_entry expr, info)
+  | BRec entries -> BRec (List.map (fun (pattern, expr, info) -> (pattern, anf_entry expr, info)) entries)
 
-and anf_atom expr =
+and anf_entry expr =
   match expr with
   | Lam (params, body, info) -> Lam (params, anf_tail body, info)
-  | Var _ | Ctor _ | GVar _ | Int _ | Bool _ -> expr
-  | expr -> failwith ("unknown case in anf_atom: " ^ string_of_document @@ pp_expr expr)
+  | _ -> failwith ("unknown case in anf_entry: " ^ string_of_document @@ Syntax.pp_expr expr)
+
+and is_simple = function Lam _ | Ctor _ | GVar _ | Int _ | Bool _ -> true | _ -> false
+
+and anf_simple expr =
+  match expr with
+  | Lam (params, body, info) -> Lam (params, anf_tail body, info)
+  | Ctor _ | GVar _ | Int _ | Bool _ -> expr
+  | expr -> failwith ("unknown case in anf_simple: " ^ string_of_document @@ pp_expr expr)
 
 and bind_value expr k =
   match expr with
@@ -408,7 +233,8 @@ and bind_value expr k =
   | App (Ctor (x, ctor_info), args, app_info) ->
       let* args' = bind_values args in
       bind_computation (App (Ctor (x, ctor_info), args', app_info)) k
-  | _ when is_atomic expr -> k (anf_atom expr)
+  | Var _ -> k expr
+  | _ when is_simple expr -> bind_computation (anf_simple expr) k
   | _ -> failwith ("unknown case in bind_value: " ^ string_of_document @@ Syntax.pp_expr expr)
 
 and bind_values exprs k =
@@ -425,24 +251,27 @@ and bind_computation expr k =
 
 and anf_tail expr =
   match expr with
-  | _ when is_atomic expr -> anf_atom expr
-  | Match (scrutinee, MatchPattern cases, info) ->
+  | Var _ -> expr
+  | _ when is_simple expr ->
+      let* expr = bind_value expr in
+      expr
+  | App _ | Op _ ->
+      let* expr = bind_value expr in
+      expr
+  | Match (scrutinee, MatchPattern (cases, info0), info1) ->
       let* scrutinee' = bind_value scrutinee in
-      Match (scrutinee', MatchPattern (List.map (fun (pattern, body) -> (pattern, anf_tail body)) cases), info)
-  | App (Ctor (ctor_name, info), args, app_info) ->
-      let* args' = bind_values args in
-      App (Ctor (ctor_name, info), args', app_info)
+      Match (scrutinee', MatchPattern (List.map (fun (pattern, body) -> (pattern, anf_tail body)) cases, info0), info1)
   | App (GVar (func_name, info), args, app_info) ->
-      let* args' = bind_values args in
-      App (GVar (func_name, info), args', app_info)
-  | Let (binding, body, info) -> Let (anf_binding binding, anf_tail body, info)
+      let* args = bind_values args in
+      App (GVar (func_name, info), args, app_info)
+  | Let (BOne (pattern, expr, info0), body, info1) ->
+      (*this is not right. we have to collapse let of let, but the current implementation doesn't.
+    we have to rewrite this in future *)
+      let* expr = bind_value expr in
+      Let (BOne (pattern, expr, info0), anf_tail body, info1)
   | If (cond, then_branch, else_branch, info) ->
       let* cond' = bind_value cond in
       If (cond', anf_tail then_branch, anf_tail else_branch, info)
-  | Op (op, lhs, rhs, info) ->
-      let* lhs' = bind_value lhs in
-      let* rhs' = bind_value rhs in
-      Op (op, lhs', rhs', info)
   | _ -> failwith ("anf_tail not implemented: " ^ string_of_document @@ Syntax.pp_expr expr)
 
 let anf_prog ((stmts, info) : 'a prog) : 'a prog =

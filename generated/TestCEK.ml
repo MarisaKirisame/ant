@@ -32,79 +32,50 @@ let populate_state () =
   Memo.reset ();
   Words.reset ();
   add_exp
-    (fun w_3 ->
-      assert_env_length w_3 1;
-      let hd_0, tl_0 = resolve w_3 K in
+    (fun w_2 ->
+      assert_env_length w_2 1;
+      let hd_0, tl_0 = resolve w_2 K in
       match Word.get_value hd_0 with
-      | 0 (* tag_cont_done *) -> exec_done w_3
+      | 0 (* tag_cont_done *) -> exec_done w_2
       | 3 (* tag_cont_1 *) ->
-          w_3.state.k <- get_next_cont tl_0;
-          restore_env w_3 1 tl_0;
-          assert_env_length w_3 2;
-          push_env w_3 (Dynarray.get w_3.state.e 0);
-          assert_env_length w_3 3;
-          push_env w_3 (Dynarray.get w_3.state.e 1);
-          assert_env_length w_3 4;
-          let ctor_arg_0 = pop_env w_3 in
-          let ctor_arg_1 = pop_env w_3 in
-          push_env w_3 (Memo.appends [ Memo.from_constructor tag_Cons; ctor_arg_1; ctor_arg_0 ]);
-          assert_env_length w_3 3;
-          drop_n w_3 3 1;
-          assert_env_length w_3 2;
-          drop_n w_3 2 1;
-          assert_env_length w_3 1;
-          drop_n w_3 1 0;
-          assert_env_length w_3 1;
-          return_n w_3 1 (pc_to_exp (int_to_pc 0))
+          w_2.state.k <- get_next_cont tl_0;
+          restore_env w_2 1 tl_0;
+          Dynarray.set w_2.state.e 0
+            (Memo.appends [ Memo.from_constructor tag_Cons; Dynarray.get w_2.state.e 0; Dynarray.get w_2.state.e 1 ]);
+          assert_env_length w_2 2;
+          return_n w_2 0 (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (0)")
     0;
   add_exp
     (fun w_0 ->
       assert_env_length w_0 1;
-      push_env w_0 (Dynarray.get w_0.state.e 0);
-      w_0.state.c <- pc_to_exp (int_to_pc 3))
-    1;
-  add_exp
-    (fun w_2 ->
-      assert_env_length w_2 5;
-      let x0_0 = resolve w_2 (Source.E 3) in
-      let x1_0 = resolve w_2 (Source.E 4) in
-      ignore (pop_env w_2);
-      ignore (pop_env w_2);
-      push_env w_2 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
-      assert_env_length w_2 4;
-      push_env w_2 (Dynarray.get w_2.state.e 2);
-      assert_env_length w_2 5;
-      let keep_0 = env_call w_2 [ 3 ] 1 in
-      w_2.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_0; w_2.state.k ];
-      w_2.state.c <- pc_to_exp (int_to_pc 1))
-    2;
-  add_exp
-    (fun w_1 ->
-      assert_env_length w_1 2;
-      let last_0 = Source.E 1 in
-      let x_0 = resolve w_1 last_0 in
+      let x_0 = resolve w_0 (Source.E 0) in
       match Word.get_value (fst x_0) with
       | 1 (* tag_Nil *) ->
-          ignore (pop_env w_1);
-          assert_env_length w_1 1;
-          push_env w_1 (Memo.from_constructor tag_Nil);
-          assert_env_length w_1 2;
-          return_n w_1 2 (pc_to_exp (int_to_pc 0))
+          Dynarray.set w_0.state.e 0 (Memo.from_constructor tag_Nil);
+          assert_env_length w_0 1;
+          return_n w_0 0 (pc_to_exp (int_to_pc 0))
       | 2 (* tag_Cons *) ->
           let splits_0 = Memo.splits (snd x_0) in
           let split0_0 = List.nth splits_0 0 in
           let split1_0 = List.nth splits_0 1 in
-          ignore (pop_env w_1);
-          push_env w_1 split0_0;
-          push_env w_1 split1_0;
-          assert_env_length w_1 3;
-          push_env w_1 (Dynarray.get w_1.state.e 1);
-          assert_env_length w_1 4;
-          push_env w_1 (Memo.from_int 1);
-          w_1.state.c <- pc_to_exp (int_to_pc 2)
+          Dynarray.set w_0.state.e 0 split0_0;
+          push_env w_0 split1_0;
+          push_env w_0 (Memo.from_int 1);
+          w_0.state.c <- pc_to_exp (int_to_pc 2)
       | _ -> failwith "unreachable (3)")
-    3;
+    1;
+  add_exp
+    (fun w_1 ->
+      assert_env_length w_1 3;
+      let x0_0 = resolve w_1 (Source.E 0) in
+      let x1_0 = resolve w_1 (Source.E 2) in
+      Dynarray.set w_1.state.e 0 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
+      assert_env_length w_1 3;
+      let keep_0 = env_call w_1 [ 0 ] [ 1 ] in
+      w_1.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_0; w_1.state.k ];
+      w_1.state.c <- pc_to_exp (int_to_pc 1))
+    2;
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;
   Words.set_constructor_degree 2 (-1);

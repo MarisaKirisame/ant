@@ -1,477 +1,729 @@
-open ArithCEK
+type nat = Z | S of nat
+type var = X | Y
+type expr = Const of int | Var of var | Add of expr * expr | Mul of expr * expr
+type factor_result = Missing | Found of expr
+type expr_list = ENil | ECons of expr * expr_list
+type pick_result = NoPick | Pick of expr * expr_list
 
-type nat = ArithCEK.nat
-type var = ArithCEK.var
-type expr = ArithCEK.expr
-type factor_result = ArithCEK.factor_result
-type expr_list = ArithCEK.expr_list
-type pick_result = ArithCEK.pick_result
+let rec var_rank =
+ fun v ->
+  match v with
+  | X ->
+      let _0 = 0 in
+      _0
+  | Y ->
+      let _1 = 1 in
+      _1
 
-let rec var_rank = fun v -> match v with X -> 0 | Y -> 1
-let rec expr_rank = fun e -> match e with Const _ -> 0 | Var _ -> 1 | Add (_, _) -> 2 | Mul (_, _) -> 3
+let rec expr_rank =
+ fun e ->
+  match e with
+  | Const _ ->
+      let _2 = 0 in
+      _2
+  | Var _ ->
+      let _3 = 1 in
+      _3
+  | Add (_, _) ->
+      let _4 = 2 in
+      _4
+  | Mul (_, _) ->
+      let _5 = 3 in
+      _5
 
 let rec compare_expr =
  fun a b ->
-  let ra = expr_rank a in
-  let rb = expr_rank b in
-  let _0 = ra < rb in
-  if _0 then 0 - 1
+  let _6 = expr_rank a in
+  let ra = _6 in
+  let _7 = expr_rank b in
+  let rb = _7 in
+  let _8 = ra < rb in
+  if _8 then
+    let _35 = 0 in
+    let _36 = 1 in
+    let _37 = _35 - _36 in
+    _37
   else
-<<<<<<< HEAD
-    match a with
-    | Const x -> ( match b with Const y -> if x < y then 0 - 1 else if x > y then 1 else 0 | _ -> 0)
-    | Var va -> (
-        match b with
-        | Var vb ->
-            let rva = var_rank va in
-            let rvb = var_rank vb in
-            if rva < rvb then 0 - 1 else if rva > rvb then 1 else 0
-        | _ -> 0)
-    | Add (a1, a2) -> (
-        match b with
-        | Add (b1, b2) ->
-            let c1 = compare_expr a1 b1 in
-            if c1 = 0 then compare_expr a2 b2 else c1
-        | _ -> 0)
-    | Mul (a1, a2) -> (
-        match b with
-        | Mul (b1, b2) ->
-            let c1 = compare_expr a1 b1 in
-            if c1 = 0 then compare_expr a2 b2 else c1
-        | _ -> 0)
-=======
-    let _1 = ra > rb in
-    if _1 then 1
+    let _9 = ra > rb in
+    if _9 then
+      let _34 = 1 in
+      _34
     else
       match a with
       | Const x -> (
           match b with
           | Const y ->
-              let _2 = x < y in
-              if _2 then 0 - 1
+              let _10 = x < y in
+              if _10 then
+                let _14 = 0 in
+                let _15 = 1 in
+                let _16 = _14 - _15 in
+                _16
               else
-                let _3 = x > y in
-                if _3 then 1 else 0)
+                let _11 = x > y in
+                if _11 then
+                  let _13 = 1 in
+                  _13
+                else
+                  let _12 = 0 in
+                  _12)
       | Var va -> (
           match b with
           | Var vb ->
-              let rva = var_rank va in
-              let rvb = var_rank vb in
-              let _4 = rva < rvb in
-              if _4 then 0 - 1
+              let _17 = var_rank va in
+              let rva = _17 in
+              let _18 = var_rank vb in
+              let rvb = _18 in
+              let _19 = rva < rvb in
+              if _19 then
+                let _23 = 0 in
+                let _24 = 1 in
+                let _25 = _23 - _24 in
+                _25
               else
-                let _5 = rva > rvb in
-                if _5 then 1 else 0)
+                let _20 = rva > rvb in
+                if _20 then
+                  let _22 = 1 in
+                  _22
+                else
+                  let _21 = 0 in
+                  _21)
       | Add (a1, a2) -> (
           match b with
           | Add (b1, b2) ->
-              let c1 = compare_expr a1 b1 in
-              let _6 = c1 = 0 in
-              if _6 then compare_expr a2 b2 else c1)
+              let _26 = compare_expr a1 b1 in
+              let c1 = _26 in
+              let _27 = 0 in
+              let _28 = c1 = _27 in
+              if _28 then
+                let _29 = compare_expr a2 b2 in
+                _29
+              else c1)
       | Mul (a1, a2) -> (
           match b with
           | Mul (b1, b2) ->
-              let c1 = compare_expr a1 b1 in
-              let _7 = c1 = 0 in
-              if _7 then compare_expr a2 b2 else c1)
->>>>>>> 6910b6d (save)
+              let _30 = compare_expr a1 b1 in
+              let c1 = _30 in
+              let _31 = 0 in
+              let _32 = c1 = _31 in
+              if _32 then
+                let _33 = compare_expr a2 b2 in
+                _33
+              else c1)
 
 let rec expr_equal =
  fun a b ->
   match a with
-  | Const x -> ( match b with Const y -> x = y | _ -> false)
+  | Const x -> (
+      match b with
+      | Const y ->
+          let _38 = x = y in
+          _38
+      | _ ->
+          let _39 = false in
+          _39)
   | Var va -> (
       match b with
       | Var vb ->
-          let _8 = var_rank va in
-          let _9 = var_rank vb in
-          _8 = _9
-      | _ -> false)
+          let _40 = var_rank va in
+          let _41 = var_rank vb in
+          let _42 = _40 = _41 in
+          _42
+      | _ ->
+          let _43 = false in
+          _43)
   | Add (a1, a2) -> (
       match b with
       | Add (b1, b2) ->
-          let _10 = expr_equal a1 b1 in
-          let _11 = expr_equal a2 b2 in
-          _10 && _11
-      | _ -> false)
+          let _44 = expr_equal a1 b1 in
+          let _45 = expr_equal a2 b2 in
+          let _46 = _44 && _45 in
+          _46
+      | _ ->
+          let _47 = false in
+          _47)
   | Mul (a1, a2) -> (
       match b with
       | Mul (b1, b2) ->
-          let _12 = expr_equal a1 b1 in
-          let _13 = expr_equal a2 b2 in
-          _12 && _13
-      | _ -> false)
+          let _48 = expr_equal a1 b1 in
+          let _49 = expr_equal a2 b2 in
+          let _50 = _48 && _49 in
+          _50
+      | _ ->
+          let _51 = false in
+          _51)
 
 let rec expr_size =
  fun e ->
   match e with
-  | Const _ -> 1
-  | Var _ -> 1
+  | Const _ ->
+      let _52 = 1 in
+      _52
+  | Var _ ->
+      let _53 = 1 in
+      _53
   | Add (a, b) ->
-      let _14 = expr_size a in
-      let _15 = 1 + _14 in
-      let _16 = expr_size b in
-      _15 + _16
+      let _54 = 1 in
+      let _55 = expr_size a in
+      let _56 = _54 + _55 in
+      let _57 = expr_size b in
+      let _58 = _56 + _57 in
+      _58
   | Mul (a, b) ->
-      let _17 = expr_size a in
-      let _18 = 1 + _17 in
-      let _19 = expr_size b in
-      _18 + _19
+      let _59 = 1 in
+      let _60 = expr_size a in
+      let _61 = _59 + _60 in
+      let _62 = expr_size b in
+      let _63 = _61 + _62 in
+      _63
 
 let rec better_expr =
  fun a b ->
-  let sa = expr_size a in
-  let sb = expr_size b in
-  let _20 = sa < sb in
-  if _20 then a
+  let _64 = expr_size a in
+  let sa = _64 in
+  let _65 = expr_size b in
+  let sb = _65 in
+  let _66 = sa < sb in
+  if _66 then a
   else
-    let _21 = sb < sa in
-    if _21 then b
+    let _67 = sb < sa in
+    if _67 then b
     else
-      let _22 = compare_expr a b in
-      let _23 = _22 <= 0 in
-      if _23 then a else b
+      let _68 = compare_expr a b in
+      let _69 = 0 in
+      let _70 = _68 <= _69 in
+      if _70 then a else b
 
 let rec scale =
  fun c e ->
-  let _24 = c = 0 in
-  if _24 then Const 0
+  let _71 = 0 in
+  let _72 = c = _71 in
+  if _72 then
+    let _79 = 0 in
+    let _80 = Const _79 in
+    _80
   else
     match e with
     | Const x ->
-        let _25 = c * x in
-        Const _25
+        let _73 = c * x in
+        let _74 = Const _73 in
+        _74
     | _ ->
-        let _26 = c = 1 in
-        if _26 then e
+        let _75 = 1 in
+        let _76 = c = _75 in
+        if _76 then e
         else
-          let _27 = Const c in
-          Mul (_27, e)
+          let _77 = Const c in
+          let _78 = Mul (_77, e) in
+          _78
 
 let rec coeff_value =
- fun e -> match e with Const x -> x | Mul (lhs, rhs) -> ( match lhs with Const c -> c | _ -> 1) | _ -> 1
+ fun e ->
+  match e with
+  | Const x -> x
+  | Mul (lhs, rhs) -> (
+      match lhs with
+      | Const c -> c
+      | _ ->
+          let _81 = 1 in
+          _81)
+  | _ ->
+      let _82 = 1 in
+      _82
 
 let rec coeff_base =
- fun e -> match e with Const _ -> Const 1 | Mul (lhs, rhs) -> ( match lhs with Const _ -> rhs | _ -> e) | _ -> e
+ fun e ->
+  match e with
+  | Const _ ->
+      let _83 = 1 in
+      let _84 = Const _83 in
+      _84
+  | Mul (lhs, rhs) -> ( match lhs with Const _ -> rhs | _ -> e)
+  | _ -> e
 
 let rec extract_factor =
  fun needle e ->
-  let _28 = expr_equal needle e in
-  if _28 then
-    let _31 = Const 1 in
-    Found _31
+  let _85 = expr_equal needle e in
+  if _85 then
+    let _94 = 1 in
+    let _95 = Const _94 in
+    let _96 = Found _95 in
+    _96
   else
     match e with
     | Mul (a, b) -> (
-        let left = extract_factor needle a in
+        let _86 = extract_factor needle a in
+        let left = _86 in
         match left with
         | Found rest ->
-            let _29 = Mul (rest, b) in
-            Found _29
+            let _87 = Mul (rest, b) in
+            let _88 = Found _87 in
+            _88
         | Missing -> (
-            let right = extract_factor needle b in
+            let _89 = extract_factor needle b in
+            let right = _89 in
             match right with
             | Found rest ->
-                let _30 = Mul (a, rest) in
-                Found _30
-            | Missing -> Missing))
-    | _ -> Missing
+                let _90 = Mul (a, rest) in
+                let _91 = Found _90 in
+                _91
+            | Missing ->
+                let _92 = Missing in
+                _92))
+    | _ ->
+        let _93 = Missing in
+        _93
 
 let rec search_factor =
  fun left right ->
   match left with
   | Mul (a, b) -> (
-      let fa = extract_factor a right in
+      let _97 = extract_factor a right in
+      let fa = _97 in
       match fa with
       | Found rest ->
-          let _32 = Add (b, rest) in
-          Mul (a, _32)
+          let _98 = Add (b, rest) in
+          let _99 = Mul (a, _98) in
+          _99
       | Missing -> (
-          let fb = extract_factor b right in
+          let _100 = extract_factor b right in
+          let fb = _100 in
           match fb with
           | Found rest ->
-              let _33 = Add (a, rest) in
-              Mul (b, _33)
-          | Missing -> Add (left, right)))
-  | _ -> Add (left, right)
+              let _101 = Add (a, rest) in
+              let _102 = Mul (b, _101) in
+              _102
+          | Missing ->
+              let _103 = Add (left, right) in
+              _103))
+  | _ ->
+      let _104 = Add (left, right) in
+      _104
 
 let rec append_exprs =
  fun xs ys ->
   match xs with
   | ENil -> ys
   | ECons (x, rest) ->
-      let _34 = append_exprs rest ys in
-      ECons (x, _34)
+      let _105 = append_exprs rest ys in
+      let _106 = ECons (x, _105) in
+      _106
 
 let rec insert_expr =
  fun e xs ->
   match xs with
-  | ENil -> ECons (e, ENil)
+  | ENil ->
+      let _107 = ENil in
+      let _108 = ECons (e, _107) in
+      _108
   | ECons (x, rest) ->
-      let _35 = compare_expr e x in
-      let _36 = _35 <= 0 in
-      if _36 then ECons (e, xs)
+      let _109 = compare_expr e x in
+      let _110 = 0 in
+      let _111 = _109 <= _110 in
+      if _111 then
+        let _114 = ECons (e, xs) in
+        _114
       else
-        let _37 = insert_expr e rest in
-        ECons (x, _37)
+        let _112 = insert_expr e rest in
+        let _113 = ECons (x, _112) in
+        _113
 
 let rec sort_exprs =
  fun xs ->
   match xs with
-  | ENil -> ENil
+  | ENil ->
+      let _115 = ENil in
+      _115
   | ECons (x, rest) ->
-      let _38 = sort_exprs rest in
-      insert_expr x _38
+      let _116 = sort_exprs rest in
+      let _117 = insert_expr x _116 in
+      _117
 
 let rec compare_add_term =
  fun a b ->
-  let abase = coeff_base a in
-  let bbase = coeff_base b in
-  let cbase = compare_expr abase bbase in
-  let _39 = cbase = 0 in
-  if _39 then
-    let acoeff = coeff_value a in
-    let bcoeff = coeff_value b in
-    let _40 = acoeff < bcoeff in
-    if _40 then 0 - 1
+  let _118 = coeff_base a in
+  let abase = _118 in
+  let _119 = coeff_base b in
+  let bbase = _119 in
+  let _120 = compare_expr abase bbase in
+  let cbase = _120 in
+  let _121 = 0 in
+  let _122 = cbase = _121 in
+  if _122 then
+    let _123 = coeff_value a in
+    let acoeff = _123 in
+    let _124 = coeff_value b in
+    let bcoeff = _124 in
+    let _125 = acoeff < bcoeff in
+    if _125 then
+      let _129 = 0 in
+      let _130 = 1 in
+      let _131 = _129 - _130 in
+      _131
     else
-      let _41 = acoeff > bcoeff in
-      if _41 then 1 else compare_expr a b
+      let _126 = acoeff > bcoeff in
+      if _126 then
+        let _128 = 1 in
+        _128
+      else
+        let _127 = compare_expr a b in
+        _127
   else cbase
 
 let rec insert_add_term =
  fun e xs ->
   match xs with
-  | ENil -> ECons (e, ENil)
+  | ENil ->
+      let _132 = ENil in
+      let _133 = ECons (e, _132) in
+      _133
   | ECons (x, rest) ->
-      let _42 = compare_add_term e x in
-      let _43 = _42 <= 0 in
-      if _43 then ECons (e, xs)
+      let _134 = compare_add_term e x in
+      let _135 = 0 in
+      let _136 = _134 <= _135 in
+      if _136 then
+        let _139 = ECons (e, xs) in
+        _139
       else
-        let _44 = insert_add_term e rest in
-        ECons (x, _44)
+        let _137 = insert_add_term e rest in
+        let _138 = ECons (x, _137) in
+        _138
 
 let rec sort_add_terms =
  fun xs ->
   match xs with
-  | ENil -> ENil
+  | ENil ->
+      let _140 = ENil in
+      _140
   | ECons (x, rest) ->
-      let _45 = sort_add_terms rest in
-      insert_add_term x _45
+      let _141 = sort_add_terms rest in
+      let _142 = insert_add_term x _141 in
+      _142
 
 let rec reverse_exprs_aux =
  fun xs acc ->
   match xs with
   | ENil -> acc
   | ECons (x, rest) ->
-      let _46 = ECons (x, acc) in
-      reverse_exprs_aux rest _46
+      let _143 = ECons (x, acc) in
+      let _144 = reverse_exprs_aux rest _143 in
+      _144
 
-let rec reverse_exprs = fun xs -> reverse_exprs_aux xs ENil
+let rec reverse_exprs =
+ fun xs ->
+  let _145 = ENil in
+  let _146 = reverse_exprs_aux xs _145 in
+  _146
 
 let rec flatten_add =
  fun e ->
   match e with
   | Add (a, b) ->
-      let _47 = flatten_add a in
-      let _48 = flatten_add b in
-      append_exprs _47 _48
+      let _147 = flatten_add a in
+      let _148 = flatten_add b in
+      let _149 = append_exprs _147 _148 in
+      _149
   | Const x ->
-      let _49 = x = 0 in
-      if _49 then ENil else ECons (e, ENil)
-  | _ -> ECons (e, ENil)
+      let _150 = 0 in
+      let _151 = x = _150 in
+      if _151 then
+        let _154 = ENil in
+        _154
+      else
+        let _152 = ENil in
+        let _153 = ECons (e, _152) in
+        _153
+  | _ ->
+      let _155 = ENil in
+      let _156 = ECons (e, _155) in
+      _156
 
 let rec flatten_mul =
  fun e ->
   match e with
   | Mul (a, b) ->
-      let _50 = flatten_mul a in
-      let _51 = flatten_mul b in
-      append_exprs _50 _51
-  | _ -> ECons (e, ENil)
+      let _157 = flatten_mul a in
+      let _158 = flatten_mul b in
+      let _159 = append_exprs _157 _158 in
+      _159
+  | _ ->
+      let _160 = ENil in
+      let _161 = ECons (e, _160) in
+      _161
 
 let rec mul_coeff =
- fun e -> match e with Const x -> x | Mul (lhs, rhs) -> ( match lhs with Const c -> c | _ -> 1) | _ -> 1
+ fun e ->
+  match e with
+  | Const x -> x
+  | Mul (lhs, rhs) -> (
+      match lhs with
+      | Const c -> c
+      | _ ->
+          let _162 = 1 in
+          _162)
+  | _ ->
+      let _163 = 1 in
+      _163
 
 let rec mul_base =
- fun e -> match e with Const _ -> Const 1 | Mul (lhs, rhs) -> ( match lhs with Const _ -> rhs | _ -> e) | _ -> e
+ fun e ->
+  match e with
+  | Const _ ->
+      let _164 = 1 in
+      let _165 = Const _164 in
+      _165
+  | Mul (lhs, rhs) -> ( match lhs with Const _ -> rhs | _ -> e)
+  | _ -> e
 
 let rec mul_total_coeff =
  fun xs ->
   match xs with
-  | ENil -> 1
+  | ENil ->
+      let _166 = 1 in
+      _166
   | ECons (x, rest) ->
-      let _52 = mul_coeff x in
-      let _53 = mul_total_coeff rest in
-      _52 * _53
+      let _167 = mul_coeff x in
+      let _168 = mul_total_coeff rest in
+      let _169 = _167 * _168 in
+      _169
 
 let rec mul_bases =
  fun xs ->
   match xs with
-  | ENil -> ENil
+  | ENil ->
+      let _170 = ENil in
+      _170
   | ECons (x, rest) -> (
-      let base = mul_base x in
+      let _171 = mul_base x in
+      let base = _171 in
       match base with
       | Const one ->
-          let _54 = one = 1 in
-          if _54 then mul_bases rest
+          let _172 = 1 in
+          let _173 = one = _172 in
+          if _173 then
+            let _176 = mul_bases rest in
+            _176
           else
-            let _55 = mul_bases rest in
-            insert_expr base _55
+            let _174 = mul_bases rest in
+            let _175 = insert_expr base _174 in
+            _175
       | _ ->
-          let _56 = mul_bases rest in
-          insert_expr base _56)
+          let _177 = mul_bases rest in
+          let _178 = insert_expr base _177 in
+          _178)
 
 let rec build_mul =
  fun xs ->
   match xs with
-  | ENil -> Const 1
+  | ENil ->
+      let _179 = 1 in
+      let _180 = Const _179 in
+      _180
   | ECons (x, rest) -> (
       match rest with
       | ENil -> x
       | _ ->
-          let _57 = build_mul rest in
-          Mul (x, _57))
+          let _181 = build_mul rest in
+          let _182 = Mul (x, _181) in
+          _182)
 
 let rec normalize_mul_flat =
  fun left right ->
-  let factors =
-    let _60 = flatten_mul left in
-    let _61 = flatten_mul right in
-    append_exprs _60 _61
-  in
-  let coeff = mul_total_coeff factors in
-  let _58 = coeff = 0 in
-  if _58 then Const 0
+  let _183 = flatten_mul left in
+  let _184 = flatten_mul right in
+  let _185 = append_exprs _183 _184 in
+  let factors = _185 in
+  let _186 = mul_total_coeff factors in
+  let coeff = _186 in
+  let _187 = 0 in
+  let _188 = coeff = _187 in
+  if _188 then
+    let _194 = 0 in
+    let _195 = Const _194 in
+    _195
   else
-    let bases = mul_bases factors in
-    let base_expr = build_mul bases in
-    let _59 = coeff = 1 in
-    if _59 then base_expr else scale coeff base_expr
+    let _189 = mul_bases factors in
+    let bases = _189 in
+    let _190 = build_mul bases in
+    let base_expr = _190 in
+    let _191 = 1 in
+    let _192 = coeff = _191 in
+    if _192 then base_expr
+    else
+      let _193 = scale coeff base_expr in
+      _193
 
 let rec combine_like_terms_acc =
  fun base coeff xs ->
   match xs with
   | ENil ->
-      let _62 = coeff = 0 in
-      if _62 then ENil
+      let _196 = 0 in
+      let _197 = coeff = _196 in
+      if _197 then
+        let _201 = ENil in
+        _201
       else
-        let _63 = scale coeff base in
-        ECons (_63, ENil)
+        let _198 = scale coeff base in
+        let _199 = ENil in
+        let _200 = ECons (_198, _199) in
+        _200
   | ECons (x, rest) ->
-      let xbase = coeff_base x in
-      let xcoeff = coeff_value x in
-      let _64 = expr_equal base xbase in
-      if _64 then
-        let _67 = coeff + xcoeff in
-        combine_like_terms_acc base _67 rest
+      let _202 = coeff_base x in
+      let xbase = _202 in
+      let _203 = coeff_value x in
+      let xcoeff = _203 in
+      let _204 = expr_equal base xbase in
+      if _204 then
+        let _210 = coeff + xcoeff in
+        let _211 = combine_like_terms_acc base _210 rest in
+        _211
       else
-        let tail = combine_like_terms_acc xbase xcoeff rest in
-        let _65 = coeff = 0 in
-        if _65 then tail
+        let _205 = combine_like_terms_acc xbase xcoeff rest in
+        let tail = _205 in
+        let _206 = 0 in
+        let _207 = coeff = _206 in
+        if _207 then tail
         else
-          let _66 = scale coeff base in
-          insert_add_term _66 tail
+          let _208 = scale coeff base in
+          let _209 = insert_add_term _208 tail in
+          _209
 
 let rec combine_like_terms =
  fun xs ->
   match xs with
-  | ENil -> ENil
+  | ENil ->
+      let _212 = ENil in
+      _212
   | ECons (x, rest) ->
-      let base = coeff_base x in
-      let coeff = coeff_value x in
-      combine_like_terms_acc base coeff rest
+      let _213 = coeff_base x in
+      let base = _213 in
+      let _214 = coeff_value x in
+      let coeff = _214 in
+      let _215 = combine_like_terms_acc base coeff rest in
+      _215
 
 let rec factor_adjacent =
  fun xs ->
   match xs with
-  | ENil -> ENil
+  | ENil ->
+      let _216 = ENil in
+      _216
   | ECons (x, rest) -> (
       match rest with
-      | ENil -> ECons (x, ENil)
+      | ENil ->
+          let _217 = ENil in
+          let _218 = ECons (x, _217) in
+          _218
       | ECons (y, ys) ->
-          let merged = search_factor x y in
-          let _68 = Add (x, y) in
-          let _69 = expr_equal merged _68 in
-          if _69 then
-            let _71 = factor_adjacent rest in
-            ECons (x, _71)
+          let _219 = search_factor x y in
+          let merged = _219 in
+          let _220 = Add (x, y) in
+          let _221 = expr_equal merged _220 in
+          if _221 then
+            let _224 = factor_adjacent rest in
+            let _225 = ECons (x, _224) in
+            _225
           else
-            let _70 = insert_add_term merged ys in
-            factor_adjacent _70)
+            let _222 = insert_add_term merged ys in
+            let _223 = factor_adjacent _222 in
+            _223)
 
 let rec pick_factored =
  fun x xs ->
   match xs with
-  | ENil -> NoPick
+  | ENil ->
+      let _226 = NoPick in
+      _226
   | ECons (y, rest) ->
-      let merged = search_factor x y in
-      let _72 = Add (x, y) in
-      let _73 = expr_equal merged _72 in
-      if _73 then
-        let _74 = pick_factored x rest in
-        match _74 with
-        | NoPick -> NoPick
+      let _227 = search_factor x y in
+      let merged = _227 in
+      let _228 = Add (x, y) in
+      let _229 = expr_equal merged _228 in
+      if _229 then
+        let _231 = pick_factored x rest in
+        match _231 with
+        | NoPick ->
+            let _232 = NoPick in
+            _232
         | Pick (term, remain) ->
-            let _75 = ECons (y, remain) in
-            Pick (term, _75)
-      else Pick (merged, rest)
+            let _233 = ECons (y, remain) in
+            let _234 = Pick (term, _233) in
+            _234
+      else
+        let _230 = Pick (merged, rest) in
+        _230
 
 let rec search_terms =
  fun xs ->
   match xs with
-  | ENil -> ENil
+  | ENil ->
+      let _235 = ENil in
+      _235
   | ECons (x, rest) -> (
-      let _76 = pick_factored x rest in
-      match _76 with
+      let _236 = pick_factored x rest in
+      match _236 with
       | NoPick ->
-          let _77 = search_terms rest in
-          ECons (x, _77)
+          let _237 = search_terms rest in
+          let _238 = ECons (x, _237) in
+          _238
       | Pick (merged, remain) ->
-          let _78 = insert_add_term merged remain in
-          search_terms _78)
+          let _239 = insert_add_term merged remain in
+          let _240 = search_terms _239 in
+          _240)
 
 let rec build_add =
  fun xs ->
   match xs with
-  | ENil -> Const 0
+  | ENil ->
+      let _241 = 0 in
+      let _242 = Const _241 in
+      _242
   | ECons (x, rest) -> (
       match rest with
       | ENil -> x
       | _ ->
-          let _79 = build_add rest in
-          Add (x, _79))
+          let _243 = build_add rest in
+          let _244 = Add (x, _243) in
+          _244)
 
 let rec search_round =
  fun xs ->
-  let factored0 = factor_adjacent xs in
-  let factored1 = search_terms factored0 in
-  let factored2 = factor_adjacent factored1 in
-  search_terms factored2
+  let _245 = factor_adjacent xs in
+  let factored0 = _245 in
+  let _246 = search_terms factored0 in
+  let factored1 = _246 in
+  let _247 = factor_adjacent factored1 in
+  let factored2 = _247 in
+  let _248 = search_terms factored2 in
+  _248
 
 let rec normalize_add_flat =
  fun left right ->
-  let terms =
-    let _83 = flatten_add left in
-    let _84 = flatten_add right in
-    append_exprs _83 _84
-  in
-  let sorted = sort_add_terms terms in
-  let combined = combine_like_terms sorted in
-  let forward = search_round combined in
-  let backward =
-    let _82 = reverse_exprs combined in
-    search_round _82
-  in
-  let forward_expr = build_add forward in
-  let backward_expr = build_add backward in
-  let best = better_expr forward_expr backward_expr in
-  let rescanned =
-    let _80 = flatten_add best in
-    let _81 = sort_add_terms _80 in
-    combine_like_terms _81
-  in
-  build_add rescanned
+  let _249 = flatten_add left in
+  let _250 = flatten_add right in
+  let _251 = append_exprs _249 _250 in
+  let terms = _251 in
+  let _252 = sort_add_terms terms in
+  let sorted = _252 in
+  let _253 = combine_like_terms sorted in
+  let combined = _253 in
+  let _254 = search_round combined in
+  let forward = _254 in
+  let _255 = reverse_exprs combined in
+  let _256 = search_round _255 in
+  let backward = _256 in
+  let _257 = build_add forward in
+  let forward_expr = _257 in
+  let _258 = build_add backward in
+  let backward_expr = _258 in
+  let _259 = better_expr forward_expr backward_expr in
+  let best = _259 in
+  let _260 = flatten_add best in
+  let _261 = sort_add_terms _260 in
+  let _262 = combine_like_terms _261 in
+  let rescanned = _262 in
+  let _263 = build_add rescanned in
+  _263
 
 let rec search_opt =
  fun fuel e ->
@@ -480,23 +732,41 @@ let rec search_opt =
   | S fuel1 -> (
       match e with
       | Add (a, b) ->
-          let sa = search_opt fuel1 a in
-          let sb = search_opt fuel1 b in
-          let merged = normalize_add_flat sa sb in
-          let flipped = normalize_add_flat sb sa in
-          let next = normalize_add_flat merged flipped in
-          let final = normalize_add_flat next merged in
-          let _85 = expr_equal final merged in
-          if _85 then merged else search_opt fuel1 final
+          let _264 = search_opt fuel1 a in
+          let sa = _264 in
+          let _265 = search_opt fuel1 b in
+          let sb = _265 in
+          let _266 = normalize_add_flat sa sb in
+          let merged = _266 in
+          let _267 = normalize_add_flat sb sa in
+          let flipped = _267 in
+          let _268 = normalize_add_flat merged flipped in
+          let next = _268 in
+          let _269 = normalize_add_flat next merged in
+          let final = _269 in
+          let _270 = expr_equal final merged in
+          if _270 then merged
+          else
+            let _271 = search_opt fuel1 final in
+            _271
       | Mul (a, b) ->
-          let sa = search_opt fuel1 a in
-          let sb = search_opt fuel1 b in
-          let merged = normalize_mul_flat sa sb in
-          let flipped = normalize_mul_flat sb sa in
-          let next = normalize_mul_flat merged flipped in
-          let final = normalize_mul_flat next merged in
-          let _86 = expr_equal final merged in
-          if _86 then merged else search_opt fuel1 final
+          let _272 = search_opt fuel1 a in
+          let sa = _272 in
+          let _273 = search_opt fuel1 b in
+          let sb = _273 in
+          let _274 = normalize_mul_flat sa sb in
+          let merged = _274 in
+          let _275 = normalize_mul_flat sb sa in
+          let flipped = _275 in
+          let _276 = normalize_mul_flat merged flipped in
+          let next = _276 in
+          let _277 = normalize_mul_flat next merged in
+          let final = _277 in
+          let _278 = expr_equal final merged in
+          if _278 then merged
+          else
+            let _279 = search_opt fuel1 final in
+            _279
       | _ -> e)
 
 let rec normalize =
@@ -505,46 +775,81 @@ let rec normalize =
   | Const _ -> e
   | Var _ -> e
   | Add (a, b) -> (
-      let na = normalize a in
-      let nb = normalize b in
+      let _280 = normalize a in
+      let na = _280 in
+      let _281 = normalize b in
+      let nb = _281 in
       match na with
       | Const x ->
-          let _87 = x = 0 in
-          if _87 then nb else normalize_add_flat na nb
-      | _ -> normalize_add_flat na nb)
-  | Mul (a, b) -> (
-      let na = normalize a in
-      let nb = normalize b in
-      match na with
-      | Const x ->
-          let _88 = x = 0 in
-          if _88 then na
+          let _282 = 0 in
+          let _283 = x = _282 in
+          if _283 then nb
           else
-            let _89 = x = 1 in
-            if _89 then nb else normalize_mul_flat na nb
-      | _ -> normalize_mul_flat na nb)
+            let _284 = normalize_add_flat na nb in
+            _284
+      | _ ->
+          let _285 = normalize_add_flat na nb in
+          _285)
+  | Mul (a, b) -> (
+      let _286 = normalize a in
+      let na = _286 in
+      let _287 = normalize b in
+      let nb = _287 in
+      match na with
+      | Const x ->
+          let _288 = 0 in
+          let _289 = x = _288 in
+          if _289 then na
+          else
+            let _290 = 1 in
+            let _291 = x = _290 in
+            if _291 then nb
+            else
+              let _292 = normalize_mul_flat na nb in
+              _292
+      | _ ->
+          let _293 = normalize_mul_flat na nb in
+          _293)
 
 let rec simplify_aux =
  fun e ->
-  let next = normalize e in
-  let _90 = expr_equal e next in
-  if _90 then next else simplify_aux next
+  let _294 = normalize e in
+  let next = _294 in
+  let _295 = expr_equal e next in
+  if _295 then next
+  else
+    let _296 = simplify_aux next in
+    _296
 
 let rec diffx =
  fun e ->
   match e with
-  | Const _ -> Const 0
-  | Var v -> ( match v with X -> Const 1 | Y -> Const 0)
+  | Const _ ->
+      let _297 = 0 in
+      let _298 = Const _297 in
+      _298
+  | Var v -> (
+      match v with
+      | X ->
+          let _299 = 1 in
+          let _300 = Const _299 in
+          _300
+      | Y ->
+          let _301 = 0 in
+          let _302 = Const _301 in
+          _302)
   | Add (a, b) ->
-      let _91 = diffx a in
-      let _92 = diffx b in
-      Add (_91, _92)
+      let _303 = diffx a in
+      let _304 = diffx b in
+      let _305 = Add (_303, _304) in
+      _305
   | Mul (a, b) ->
-      let _93 = diffx a in
-      let _94 = Mul (_93, b) in
-      let _95 = diffx b in
-      let _96 = Mul (a, _95) in
-      Add (_94, _96)
+      let _306 = diffx a in
+      let _307 = Mul (_306, b) in
+      let _308 = diffx b in
+      let _309 = Mul (a, _308) in
+      let _310 = Add (_307, _309) in
+      _310
 
 let rec eval =
  fun e x y ->
@@ -552,16 +857,21 @@ let rec eval =
   | Const c -> c
   | Var v -> ( match v with X -> x | Y -> y)
   | Add (a, b) ->
-      let _97 = eval a x y in
-      let _98 = eval b x y in
-      _97 + _98
+      let _311 = eval a x y in
+      let _312 = eval b x y in
+      let _313 = _311 + _312 in
+      _313
   | Mul (a, b) ->
-      let _99 = eval a x y in
-      let _100 = eval b x y in
-      _99 * _100
+      let _314 = eval a x y in
+      let _315 = eval b x y in
+      let _316 = _314 * _315 in
+      _316
 
 let rec main =
  fun e ->
-  let d = diffx e in
-  let f = diffx d in
-  simplify_aux f
+  let _317 = diffx e in
+  let d = _317 in
+  let _318 = diffx d in
+  let f = _318 in
+  let _319 = simplify_aux f in
+  _319

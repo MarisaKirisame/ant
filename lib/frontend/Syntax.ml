@@ -3,30 +3,22 @@ open PPrint
 type builtin = Builtin of string
 
 type 'a pattern =
-  | PAny
-  | PInt of int
-  | PBool of bool
-  | PUnit
+  | PAny of 'a
+  | PInt of int * 'a
+  | PBool of bool * 'a
+  | PUnit of 'a
   | PVar of string * 'a
   | PTup of 'a pattern list * 'a
   | PCtorApp of string * 'a pattern option * 'a
 
-type field = FName of string | FIndex of int
-
-type 'a binding =
-  | BSeq of 'a expr * 'a
-  | BOne of 'a pattern * 'a expr * 'a
-  | BRec of ('a pattern * 'a expr * 'a) list
-  (* the following definitions are not used yet *)
-  | BCont of 'a pattern * 'a expr * 'a
-  | BRecC of ('a pattern * 'a expr * 'a) list
+type 'a binding = BSeq of 'a expr * 'a | BOne of 'a pattern * 'a expr * 'a | BRec of ('a pattern * 'a expr * 'a) list
 
 and 'a expr =
-  | Unit
-  | Int of int
-  | Float of float
-  | Bool of bool
-  | Str of string
+  | Unit of 'a
+  | Int of int * 'a
+  | Float of float * 'a
+  | Bool of bool * 'a
+  | Str of string * 'a
   | Builtin of builtin * 'a
   | Var of string * 'a
   | GVar of string * 'a
@@ -34,14 +26,12 @@ and 'a expr =
   | App of 'a expr * 'a expr list * 'a
   | Op of string * 'a expr * 'a expr * 'a
   | Tup of 'a expr list * 'a
-  | Arr of 'a expr list * 'a
   | Lam of 'a pattern list * 'a expr * 'a
   | Let of 'a binding * 'a expr * 'a
-  | Sel of 'a expr * field * 'a
   | If of 'a expr * 'a expr * 'a expr * 'a
   | Match of 'a expr * 'a cases * 'a
 
-and 'a cases = MatchPattern of ('a pattern * 'a expr) list
+and 'a cases = MatchPattern of ('a pattern * 'a expr) list * 'a
 
 type 'a ty =
   | TUnit
@@ -63,10 +53,10 @@ type 'a prog = 'a stmt list * 'a
 let rec pp_pattern_internal c pat =
   let pp inner = if c then parens inner else inner in
   match pat with
-  | PAny -> underscore
-  | PInt n -> string (string_of_int n)
-  | PBool b -> string (string_of_bool b)
-  | PUnit -> string "()"
+  | PAny _ -> underscore
+  | PInt (n, _) -> string (string_of_int n)
+  | PBool (b, _) -> string (string_of_bool b)
+  | PUnit _ -> string "()"
   | PCtorApp (fn, a, _) -> (
       match a with
       | None -> string fn
@@ -81,7 +71,6 @@ let rec pp_pattern_internal c pat =
 (* pp_pattern' adds explicit parenthesis around the tuple *)
 let pp_pattern pat = pp_pattern_internal false pat
 let pp_pattern' pat = pp_pattern_internal true pat
-let pp_field = function FName name -> string name | FIndex index -> string (string_of_int index)
 
 let pp_expr =
   let fc pf ef (p, e) =
@@ -102,11 +91,11 @@ let pp_expr =
   let rec f c (expr : 'a expr) =
     let pp inner = if c then parens inner else inner in
     match expr with
-    | Unit -> string "()"
-    | Int n -> string (string_of_int n)
-    | Float f -> string (string_of_float f)
-    | Bool b -> string (string_of_bool b)
-    | Str s -> string (String.escaped s) |> dquotes
+    | Unit _ -> string "()"
+    | Int (n, _) -> string (string_of_int n)
+    | Float (f, _) -> string (string_of_float f)
+    | Bool (b, _) -> string (string_of_bool b)
+    | Str (s, _) -> string (String.escaped s) |> dquotes
     | Builtin (Builtin b, _) -> string b
     | Var (x, _) -> string x
     | Ctor (c, _) -> string c
@@ -121,11 +110,10 @@ let pp_expr =
         group @@ align @@ string "fun" ^^ space ^^ separate_map space pp_pattern' xs ^^ space ^^ string "->" ^^ nest 2
         @@ break 1 ^^ f true e
         |> pp
-    | Arr (xs, _) -> separate_map (semi ^^ space) (f true) xs |> brackets
-    | Let ((BOne (x, e1, _) | BCont (x, e1, _)), e2, _) -> fl (pp_pattern x) (f false e1) (f false e2)
+    | Let (BOne (x, e1, _), e2, _) -> fl (pp_pattern x) (f false e1) (f false e2)
     | Let (BSeq (e1, _), e2, _) -> align @@ f false e1 ^^ semi ^^ break 1 ^^ f false e2
-    | Let ((BRec [] | BRecC []), _, _) -> failwith "Empty recursive group"
-    | Let ((BRec xs | BRecC xs), e2, _) ->
+    | Let (BRec [], _, _) -> failwith "Empty recursive group"
+    | Let (BRec xs, e2, _) ->
         let lhs, rhs, _ = List.hd xs in
         let tail_lhs_rhs = List.tl xs in
         let lhs = pp_pattern lhs in
@@ -146,8 +134,7 @@ let pp_expr =
         ^^ break 1 ^^ string "then"
         ^^ (nest 2 @@ break 1 ^^ f true e1)
         ^^ break 1 ^^ string "else" ^^ nest 2 @@ break 1 ^^ f true e2
-    | Sel (e, field, _) -> f true e ^^ dot ^^ pp_field field
-    | Match (e, MatchPattern cases, _) -> fm f e @@ concat_map (fc pp_pattern f) cases
+    | Match (e, MatchPattern (cases, _), _) -> fm f e @@ concat_map (fc pp_pattern f) cases
   in
   fun expr -> f false expr
 
@@ -200,10 +187,10 @@ let pp_stmt =
     | Term (BSeq (tm, _)) ->
         string "let" ^^ space ^^ underscore ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm
         ^^ string ";;"
-    | Term (BOne (x, tm, _) | BCont (x, tm, _)) ->
+    | Term (BOne (x, tm, _)) ->
         string "let" ^^ space ^^ pp_pattern x ^^ space ^^ string "=" ^^ nest 2 @@ break 1 ^^ group @@ pp_expr tm
         ^^ string ";;"
-    | Term (BRec xs | BRecC xs) ->
+    | Term (BRec xs) ->
         string "let rec" ^^ space
         ^^ separate_map
              (space ^^ string "and" ^^ space)
@@ -220,7 +207,7 @@ let string_of_document doc =
   PPrint.ToBuffer.pretty 0.8 80 buf doc;
   Buffer.contents buf
 
-let expr_tag (expr : 'a expr) : 'a option =
+let expr_tag (expr : 'a expr) : 'a =
   match expr with
   | Builtin (_, tag)
   | Var (_, tag)
@@ -229,46 +216,43 @@ let expr_tag (expr : 'a expr) : 'a option =
   | App (_, _, tag)
   | Op (_, _, _, tag)
   | Tup (_, tag)
-  | Arr (_, tag)
   | Lam (_, _, tag)
   | Let (_, _, tag)
-  | Sel (_, _, tag)
   | If (_, _, _, tag)
-  | Match (_, _, tag) ->
-      Some tag
-  | Unit | Int _ | Float _ | Bool _ | Str _ -> None
+  | Match (_, _, tag)
+  | Unit tag
+  | Int (_, tag)
+  | Float (_, tag)
+  | Bool (_, tag)
+  | Str (_, tag) ->
+      tag
 
 let binding_tag (binding : 'a binding) : 'a option =
-  match binding with
-  | BSeq (_, tag) -> Some tag
-  | BOne (_, _, tag) -> Some tag
-  | BCont (_, _, tag) -> Some tag
-  | BRecC _ | BRec _ -> None
+  match binding with BSeq (_, tag) -> Some tag | BOne (_, _, tag) -> Some tag | BRec _ -> None
 
-let pattern_tag (pattern : 'a pattern) : 'a option =
+let pattern_tag (pattern : 'a pattern) : 'a =
   match pattern with
-  | PVar (_, tag) -> Some tag
-  | PTup (_, tag) -> Some tag
-  | PCtorApp (_, _, tag) -> Some tag
-  | PAny | PInt _ | PBool _ | PUnit -> None
+  | PVar (_, tag) | PTup (_, tag) | PCtorApp (_, _, tag) | PAny tag | PInt (_, tag) | PBool (_, tag) | PUnit tag -> tag
+
+let cases_tag (MatchPattern (_, tag) : 'a cases) : 'a = tag
 
 let rec pattern_tag_map (f : 'a -> 'b) (pattern : 'a pattern) : 'b pattern =
   match pattern with
-  | PAny -> PAny
-  | PInt n -> PInt n
-  | PBool b -> PBool b
-  | PUnit -> PUnit
+  | PAny tag -> PAny (f tag)
+  | PInt (n, tag) -> PInt (n, f tag)
+  | PBool (b, tag) -> PBool (b, f tag)
+  | PUnit tag -> PUnit (f tag)
   | PVar (name, tag) -> PVar (name, f tag)
   | PTup (patterns, tag) -> PTup (List.map (pattern_tag_map f) patterns, f tag)
   | PCtorApp (ctor, payload, tag) -> PCtorApp (ctor, Option.map (pattern_tag_map f) payload, f tag)
 
 let rec expr_tag_map (f : 'a -> 'b) (expr : 'a expr) : 'b expr =
   match expr with
-  | Unit -> Unit
-  | Int n -> Int n
-  | Float fl -> Float fl
-  | Bool b -> Bool b
-  | Str s -> Str s
+  | Unit tag -> Unit (f tag)
+  | Int (n, tag) -> Int (n, f tag)
+  | Float (fl, tag) -> Float (fl, f tag)
+  | Bool (b, tag) -> Bool (b, f tag)
+  | Str (s, tag) -> Str (s, f tag)
   | Builtin (Builtin name, tag) -> Builtin (Builtin name, f tag)
   | Var (name, tag) -> Var (name, f tag)
   | GVar (name, tag) -> GVar (name, f tag)
@@ -276,10 +260,8 @@ let rec expr_tag_map (f : 'a -> 'b) (expr : 'a expr) : 'b expr =
   | App (fn, args, tag) -> App (expr_tag_map f fn, List.map (expr_tag_map f) args, f tag)
   | Op (op, lhs, rhs, tag) -> Op (op, expr_tag_map f lhs, expr_tag_map f rhs, f tag)
   | Tup (values, tag) -> Tup (List.map (expr_tag_map f) values, f tag)
-  | Arr (values, tag) -> Arr (List.map (expr_tag_map f) values, f tag)
   | Lam (params, body, tag) -> Lam (List.map (pattern_tag_map f) params, expr_tag_map f body, f tag)
   | Let (binding, body, tag) -> Let (binding_tag_map f binding, expr_tag_map f body, f tag)
-  | Sel (target, field, tag) -> Sel (expr_tag_map f target, field, f tag)
   | If (cond, if_true, if_false, tag) -> If (expr_tag_map f cond, expr_tag_map f if_true, expr_tag_map f if_false, f tag)
   | Match (expr, cases, tag) -> Match (expr_tag_map f expr, cases_tag_map f cases, f tag)
 
@@ -289,12 +271,9 @@ and binding_tag_map (f : 'a -> 'b) (binding : 'a binding) : 'b binding =
   | BOne (pattern, expr, tag) -> BOne (pattern_tag_map f pattern, expr_tag_map f expr, f tag)
   | BRec entries ->
       BRec (List.map (fun (pattern, expr, tag) -> (pattern_tag_map f pattern, expr_tag_map f expr, f tag)) entries)
-  | BCont (pattern, expr, tag) -> BCont (pattern_tag_map f pattern, expr_tag_map f expr, f tag)
-  | BRecC entries ->
-      BRecC (List.map (fun (pattern, expr, tag) -> (pattern_tag_map f pattern, expr_tag_map f expr, f tag)) entries)
 
-and cases_tag_map (f : 'a -> 'b) (MatchPattern cases : 'a cases) : 'b cases =
-  MatchPattern (List.map (fun (pattern, expr) -> (pattern_tag_map f pattern, expr_tag_map f expr)) cases)
+and cases_tag_map (f : 'a -> 'b) (MatchPattern (cases, tag) : 'a cases) : 'b cases =
+  MatchPattern (List.map (fun (pattern, expr) -> (pattern_tag_map f pattern, expr_tag_map f expr)) cases, f tag)
 
 let rec ty_tag_map (f : 'a -> 'b) (ty : 'a ty) : 'b ty =
   match ty with

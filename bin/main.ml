@@ -62,7 +62,7 @@ let backend =
     [
       ("memo", (module CompileMemo.Backend : Compile.Backend));
       ("seq", (module CompileSeq.Backend : Compile.Backend));
-      ("plain", (module CompilePlain.Backend));
+      ("plain", (module CompilePlain.Backend : Compile.Backend));
     ]
   in
   Arg.(value & opt (enum cdds) (module CompileMemo.Backend : Compile.Backend) & info [ "b"; "backend" ] ~doc)

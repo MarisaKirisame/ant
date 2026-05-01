@@ -25,8 +25,12 @@ let rec to_ocaml_int_list x =
 let rec list_incr =
  fun x ->
   match to_ocaml_int_list x with
-  | Nil -> int_list_Nil
+  | Nil ->
+      let _0 = int_list_Nil in
+      _0
   | Cons (xh, xt) ->
-      let _0 = xh + 1 in
-      let _1 = list_incr xt in
-      int_list_Cons (_0, _1)
+      let _1 = 1 in
+      let _2 = xh + _1 in
+      let _3 = list_incr xt in
+      let _4 = int_list_Cons (_2, _3) in
+      _4
