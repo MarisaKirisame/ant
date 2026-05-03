@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := all
 
-.PHONY: dependency build coverage run profile compile-generated nightly all report experiment hazel-tex arith-tex hazel hazel-report arith arith-report
+.PHONY: dependency build coverage run profile compile-generated nightly all report experiment hazel-tex arith-tex hazel hazel-report arith arith-report website website-check website-clean website-serve
 
 dependency:
 	uv run ./nightly.py dependency
@@ -46,6 +46,18 @@ hazel-tex:
 
 arith-tex:
 	uv run ./nightly.py arith-tex
+
+website:
+	uv run python ./website/doc.py build
+
+website-check:
+	uv run python ./website/doc.py check
+
+website-clean:
+	uv run python ./website/doc.py clean
+
+website-serve:
+	uv run python ./website/doc.py serve
 
 # Run the full pipeline and produce the HTML speedup report into output/.
 nightly all:

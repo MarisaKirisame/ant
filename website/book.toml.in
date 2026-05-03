@@ -1,0 +1,17 @@
+[book]
+title = "{{ANT_NAME}} Language"
+description = "A concise guide to the current {{ANT_NAME}} surface language."
+authors = ["Ant contributors"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "{{BUILD_DIR}}"
+create-missing = false
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "ayu"
+additional-css = ["theme/ant.css"]
+git-repository-url = "https://github.com/waterlens/ant"
+edit-url-template = "https://github.com/waterlens/ant/edit/main/website/{path}"
