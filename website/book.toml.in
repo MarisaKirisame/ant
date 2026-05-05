@@ -10,8 +10,9 @@ build-dir = "{{BUILD_DIR}}"
 create-missing = false
 
 [output.html]
+{{SITE_URL}}
 default-theme = "light"
 preferred-dark-theme = "ayu"
 additional-css = ["theme/ant.css"]
-git-repository-url = "https://github.com/waterlens/ant"
-edit-url-template = "https://github.com/waterlens/ant/edit/main/website/{path}"
+{{REPOSITORY_URL}}
+{{EDIT_URL_TEMPLATE}}

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -21,6 +22,9 @@ DEFAULT_OUTPUT = ROOT / "book"
 MACRO = r"\Ant"
 TEMPLATE_NAME = "{{ANT_NAME}}"
 TEMPLATE_BUILD_DIR = "{{BUILD_DIR}}"
+TEMPLATE_SITE_URL = "{{SITE_URL}}"
+TEMPLATE_REPOSITORY_URL = "{{REPOSITORY_URL}}"
+TEMPLATE_EDIT_URL_TEMPLATE = "{{EDIT_URL_TEMPLATE}}"
 
 
 class DocError(RuntimeError):
@@ -35,6 +39,21 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--dest",
         default=str(DEFAULT_OUTPUT),
         help="mdBook output directory. Defaults to website/book.",
+    )
+    parser.add_argument(
+        "--site-url",
+        default=os.environ.get("ANT_DOC_SITE_URL", ""),
+        help="Published site URL path for mdBook, such as /repo-name/. Defaults to ANT_DOC_SITE_URL or unset.",
+    )
+    parser.add_argument(
+        "--repository-url",
+        default=os.environ.get("ANT_DOC_REPOSITORY_URL", ""),
+        help="Repository URL for mdBook's repository link. Defaults to ANT_DOC_REPOSITORY_URL or unset.",
+    )
+    parser.add_argument(
+        "--edit-url-template",
+        default=os.environ.get("ANT_DOC_EDIT_URL_TEMPLATE", ""),
+        help="Edit URL template for mdBook. Defaults to ANT_DOC_EDIT_URL_TEMPLATE or unset.",
     )
     parser.add_argument(
         "--mdbook",
@@ -75,6 +94,18 @@ def destination(args: argparse.Namespace) -> Path:
     return Path(args.dest).expanduser().resolve()
 
 
+def site_url(args: argparse.Namespace) -> str:
+    return args.site_url.strip()
+
+
+def repository_url(args: argparse.Namespace) -> str:
+    return args.repository_url.strip()
+
+
+def edit_url_template(args: argparse.Namespace) -> str:
+    return args.edit_url_template.strip()
+
+
 def render_text(text: str, name: str) -> str:
     return text.replace(MACRO, name)
 
@@ -99,7 +130,19 @@ def copy_rendered_tree(src: Path, dst: Path, name: str) -> None:
             shutil.copy2(path, out)
 
 
-def render_book(name: str, out_dir: Path) -> Path:
+def render_toml_setting(key: str, value: str) -> str:
+    if not value:
+        return ""
+    return f"{key} = {json.dumps(value)}"
+
+
+def render_book(
+    name: str,
+    out_dir: Path,
+    site_url_value: str = "",
+    repository_url_value: str = "",
+    edit_url_template_value: str = "",
+) -> Path:
     if not SRC.exists():
         raise DocError(f"Missing source directory: {SRC}")
     if not TEMPLATE.exists():
@@ -113,6 +156,15 @@ def render_book(name: str, out_dir: Path) -> Path:
     book_toml = TEMPLATE.read_text(encoding="utf-8")
     book_toml = book_toml.replace(TEMPLATE_NAME, name)
     book_toml = book_toml.replace(TEMPLATE_BUILD_DIR, out_dir.as_posix())
+    book_toml = book_toml.replace(TEMPLATE_SITE_URL, render_toml_setting("site-url", site_url_value))
+    book_toml = book_toml.replace(
+        TEMPLATE_REPOSITORY_URL,
+        render_toml_setting("git-repository-url", repository_url_value),
+    )
+    book_toml = book_toml.replace(
+        TEMPLATE_EDIT_URL_TEMPLATE,
+        render_toml_setting("edit-url-template", edit_url_template_value),
+    )
     book_toml = render_text(book_toml, name)
     (RENDERED / "book.toml").write_text(book_toml, encoding="utf-8")
     return RENDERED
@@ -147,7 +199,13 @@ def check_rendered_macros() -> list[str]:
         text = path.read_text(encoding="utf-8")
         if MACRO in text:
             issues.append(f"Unexpanded {MACRO} macro in {path.relative_to(ROOT)}.")
-        if TEMPLATE_NAME in text or TEMPLATE_BUILD_DIR in text:
+        if (
+            TEMPLATE_NAME in text
+            or TEMPLATE_BUILD_DIR in text
+            or TEMPLATE_SITE_URL in text
+            or TEMPLATE_REPOSITORY_URL in text
+            or TEMPLATE_EDIT_URL_TEMPLATE in text
+        ):
             issues.append(f"Unexpanded template placeholder in {path.relative_to(ROOT)}.")
     return issues
 
@@ -214,7 +272,7 @@ def ensure_clean_target(path: Path) -> None:
 def command_build(args: argparse.Namespace) -> None:
     name = display_name(args)
     out_dir = destination(args)
-    render_book(name, out_dir)
+    render_book(name, out_dir, site_url(args), repository_url(args), edit_url_template(args))
     if not args.skip_mdbook:
         run_mdbook(["build"], args.mdbook)
 
@@ -222,7 +280,7 @@ def command_build(args: argparse.Namespace) -> None:
 def command_check(args: argparse.Namespace) -> None:
     name = display_name(args)
     out_dir = destination(args)
-    render_book(name, out_dir)
+    render_book(name, out_dir, site_url(args), repository_url(args), edit_url_template(args))
     run_static_checks()
     if not args.skip_mdbook:
         run_mdbook(["build"], args.mdbook)
@@ -239,7 +297,7 @@ def command_clean(args: argparse.Namespace) -> None:
 def command_serve(args: argparse.Namespace) -> None:
     name = display_name(args)
     out_dir = destination(args)
-    render_book(name, out_dir)
+    render_book(name, out_dir, site_url(args), repository_url(args), edit_url_template(args))
     run_static_checks()
     serve_args = ["serve", "--hostname", args.host, "--port", args.port]
     if args.open:

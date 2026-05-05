@@ -1,0 +1,41 @@
+name: Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: macos-latest
+    concurrency:
+      group: external-pages
+      cancel-in-progress: true
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Setup mdBook
+        uses: peaceiris/actions-mdbook@v2
+        with:
+          mdbook-version: "0.5.2"
+
+      - name: Check website
+        env:
+          ANT_DOC_NAME: Chordata
+          ANT_DOC_SITE_URL: /
+          ANT_DOC_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+          ANT_DOC_EDIT_URL_TEMPLATE: ${{ github.server_url }}/${{ github.repository }}/edit/${{ github.ref_name }}/website/{path}
+        run: make website-check
+
+      - name: Deploy to external Pages repository
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+          external_repository: ant-memo/ant-memo.github.io
+          publish_branch: main
+          publish_dir: website/book
