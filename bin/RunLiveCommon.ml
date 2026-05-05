@@ -382,7 +382,8 @@ let eval_plain (expr : LC.expr) : LC.value * int =
 let eval_expression_memo_only ~memo expr : memo_run_result =
   let exec_res, memo_heap_stats =
     measure_memory_consumption (fun () ->
-        LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
+        LC.eval ~config:(Memo.memo_config memo) (LC.from_ocaml_expr expr)
+          (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
   in
   let memo_profile = Profile.dump_profile Profile.memo_profile in
   {
@@ -414,7 +415,8 @@ let eval_expression_baseline_only expr : baseline_run_result =
 let eval_expression ~memo ~write_steps expr =
   let exec_res, memo_heap_stats =
     measure_memory_consumption (fun () ->
-        LC.eval memo (LC.from_ocaml_expr expr) (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
+        LC.eval ~config:(Memo.memo_config memo) (LC.from_ocaml_expr expr)
+          (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
   in
   let _, cek_heap_words = eval_plain expr in
   write_steps exec_res ~memo_heap_words:memo_heap_stats.peak_heap_words ~cek_heap_words;

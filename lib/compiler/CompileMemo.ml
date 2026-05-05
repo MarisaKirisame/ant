@@ -463,8 +463,14 @@ and compile_pp_cases (ctx : ctx) (env : env) (MatchPattern (c, _) : 'a cases) lo
             | _ -> failwith ("compile_pp_cases: " ^ Syntax.string_of_document @@ Syntax.pp_pattern pat))
           c
       in
-      let default_case = (string "_", unreachable_ (Dynarray.length codes)) in
-      paren $ match_raw_ (word_get_value_ (zro_ x)) (List.append t [ default_case ])]]
+      let has_catch_all_case = List.exists (fun (pat, _) -> match pat with PAny _ | PVar _ -> true | _ -> false) c in
+      let cases =
+        if has_catch_all_case then t
+        else
+          let default_case = (string "_", unreachable_ (Dynarray.length codes)) in
+          List.append t [ default_case ]
+      in
+      paren $ match_raw_ (word_get_value_ (zro_ x)) cases]]
 
 let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   match s with
@@ -492,15 +498,15 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
                   in
                   let env = { env with changed = false } in
                   compile_pp_expr ctx env term return),
-              string "let rec" ^^ space ^^ string name ^^ space ^^ string "memo" ^^ space
+              string "let rec" ^^ space ^^ string name ^^ space ^^ string "?config" ^^ space
               ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
-              ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek "
+              ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek ?config"
               ^^ string ("(pc_to_exp (int_to_pc " ^ string_of_int (pc_to_int entry_code) ^ "))")
               ^^ string "(Dynarray.of_list" ^^ string "["
               ^^ separate (string ";") (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ ")")))
               ^^ string "]" ^^ string ")" ^^ string "("
               ^^ uncode (from_constructor_ cont_done_tag)
-              ^^ string ")" ^^ string " memo)" )
+              ^^ string "))" )
           in
           r)
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)

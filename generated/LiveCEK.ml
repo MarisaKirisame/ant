@@ -402,11 +402,11 @@ and to_ocaml_stuck x =
       SFst (to_ocaml_stuck x0)
   | _ -> failwith "unreachable"
 
-let rec index memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec index ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek ?config (pc_to_exp (int_to_pc 1)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done)
 
-let rec eval memo (x0 : Value.seq) (x1 : Value.seq) : exec_result =
-  exec_cek (pc_to_exp (int_to_pc 3)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done) memo
+let rec eval ?config (x0 : Value.seq) (x1 : Value.seq) : exec_result =
+  exec_cek ?config (pc_to_exp (int_to_pc 3)) (Dynarray.of_list [ x0; x1 ]) (Memo.from_constructor tag_cont_done)
 
 let populate_state () =
   Memo.reset ();
@@ -612,8 +612,7 @@ let populate_state () =
       | _ ->
           Dynarray.set w_0.state.e 0 (Memo.from_constructor tag_None);
           assert_env_length w_0 2;
-          return_n w_0 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (3)")
+          return_n w_0 0 (pc_to_exp (int_to_pc 0)))
     1;
   add_exp
     (fun w_1 ->
@@ -853,8 +852,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_4.state.e 2; Dynarray.get w_4.state.e 0 ]);
           Dynarray.set w_4.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_4.state.e 0 ]);
           assert_env_length w_4 3;
-          return_n w_4 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (4)")
+          return_n w_4 0 (pc_to_exp (int_to_pc 0)))
     4;
   add_exp
     (fun w_5 ->
@@ -884,8 +882,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_5.state.e 2; Dynarray.get w_5.state.e 0 ]);
           Dynarray.set w_5.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_5.state.e 0 ]);
           assert_env_length w_5 3;
-          return_n w_5 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (5)")
+          return_n w_5 0 (pc_to_exp (int_to_pc 0)))
     5;
   add_exp
     (fun w_6 ->
@@ -915,8 +912,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_6.state.e 2; Dynarray.get w_6.state.e 0 ]);
           Dynarray.set w_6.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_6.state.e 0 ]);
           assert_env_length w_6 3;
-          return_n w_6 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (6)")
+          return_n w_6 0 (pc_to_exp (int_to_pc 0)))
     6;
   add_exp
     (fun w_7 ->
@@ -946,8 +942,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_7.state.e 2; Dynarray.get w_7.state.e 0 ]);
           Dynarray.set w_7.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_7.state.e 0 ]);
           assert_env_length w_7 3;
-          return_n w_7 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (7)")
+          return_n w_7 0 (pc_to_exp (int_to_pc 0)))
     7;
   add_exp
     (fun w_8 ->
@@ -977,8 +972,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_8.state.e 2; Dynarray.get w_8.state.e 0 ]);
           Dynarray.set w_8.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_8.state.e 0 ]);
           assert_env_length w_8 3;
-          return_n w_8 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (8)")
+          return_n w_8 0 (pc_to_exp (int_to_pc 0)))
     8;
   add_exp
     (fun w_9 ->
@@ -1037,8 +1031,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_10.state.e 2; Dynarray.get w_10.state.e 0 ]);
           Dynarray.set w_10.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_10.state.e 0 ]);
           assert_env_length w_10 3;
-          return_n w_10 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (10)")
+          return_n w_10 0 (pc_to_exp (int_to_pc 0)))
     10;
   add_exp
     (fun w_11 ->
@@ -1076,8 +1069,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_11.state.e 3; Dynarray.get w_11.state.e 0 ]);
           Dynarray.set w_11.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_11.state.e 0 ]);
           assert_env_length w_11 4;
-          return_n w_11 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (11)")
+          return_n w_11 0 (pc_to_exp (int_to_pc 0)))
     11;
   add_exp
     (fun w_12 ->
@@ -1106,8 +1098,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_12.state.e 0; Dynarray.get w_12.state.e 1 ]);
           Dynarray.set w_12.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_12.state.e 0 ]);
           assert_env_length w_12 2;
-          return_n w_12 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (12)")
+          return_n w_12 0 (pc_to_exp (int_to_pc 0)))
     12;
   add_exp
     (fun w_13 ->
@@ -1136,8 +1127,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_13.state.e 0; Dynarray.get w_13.state.e 1 ]);
           Dynarray.set w_13.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_13.state.e 0 ]);
           assert_env_length w_13 2;
-          return_n w_13 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (13)")
+          return_n w_13 0 (pc_to_exp (int_to_pc 0)))
     13;
   add_exp
     (fun w_14 ->
@@ -1184,8 +1174,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_14.state.e 3; Dynarray.get w_14.state.e 0 ]);
           Dynarray.set w_14.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_14.state.e 0 ]);
           assert_env_length w_14 4;
-          return_n w_14 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (14)")
+          return_n w_14 0 (pc_to_exp (int_to_pc 0)))
     14;
   add_exp
     (fun w_16 ->
@@ -1222,8 +1211,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_15.state.e 2; Dynarray.get w_15.state.e 0 ]);
           Dynarray.set w_15.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_15.state.e 0 ]);
           assert_env_length w_15 3;
-          return_n w_15 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (16)")
+          return_n w_15 0 (pc_to_exp (int_to_pc 0)))
     16;
   add_exp
     (fun w_19 ->
@@ -1272,8 +1260,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_17.state.e 2; Dynarray.get w_17.state.e 0 ]);
           Dynarray.set w_17.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_17.state.e 0 ]);
           assert_env_length w_17 3;
-          return_n w_17 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (19)")
+          return_n w_17 0 (pc_to_exp (int_to_pc 0)))
     19;
   add_exp
     (fun w_22 ->
@@ -1322,8 +1309,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_20.state.e 2; Dynarray.get w_20.state.e 0 ]);
           Dynarray.set w_20.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_20.state.e 0 ]);
           assert_env_length w_20 3;
-          return_n w_20 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (22)")
+          return_n w_20 0 (pc_to_exp (int_to_pc 0)))
     22;
   add_exp
     (fun w_25 ->
@@ -1372,8 +1358,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_23.state.e 2; Dynarray.get w_23.state.e 0 ]);
           Dynarray.set w_23.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_23.state.e 0 ]);
           assert_env_length w_23 3;
-          return_n w_23 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (25)")
+          return_n w_23 0 (pc_to_exp (int_to_pc 0)))
     25;
   add_exp
     (fun w_28 ->
@@ -1422,8 +1407,7 @@ let populate_state () =
                [ Memo.from_constructor tag_STypeError; Dynarray.get w_26.state.e 2; Dynarray.get w_26.state.e 0 ]);
           Dynarray.set w_26.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_26.state.e 0 ]);
           assert_env_length w_26 3;
-          return_n w_26 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (28)")
+          return_n w_26 0 (pc_to_exp (int_to_pc 0)))
     28;
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;
