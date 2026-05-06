@@ -42,62 +42,58 @@ let rec filter_pos =
       let _10 = 50 in
       let _11 = xh > _10 in
       if _11 then
-        let _13 = filter_pos xt in
-        let _14 = Cons (xh, _13) in
-        _14
-      else
         let _12 = filter_pos xt in
-        _12
+        let _13 = Cons (xh, _12) in
+        _13
+      else filter_pos xt
 
 let rec append =
  fun x y ->
   match x with
   | Nil -> y
   | Cons (xh, xt) ->
-      let _15 = append xt y in
-      let _16 = Cons (xh, _15) in
-      _16
+      let _14 = append xt y in
+      let _15 = Cons (xh, _14) in
+      _15
 
 let rec reverse =
  fun x ->
   match x with
   | Nil ->
-      let _17 = Nil in
-      _17
+      let _16 = Nil in
+      _16
   | Cons (xh, xt) ->
-      let _18 = reverse xt in
-      let _19 = Nil in
-      let _20 = Cons (xh, _19) in
-      let _21 = append _18 _20 in
-      _21
+      let _17 = reverse xt in
+      let _18 = Nil in
+      let _19 = Cons (xh, _18) in
+      append _17 _19
 
 let rec insert =
  fun elt x ->
   match x with
   | Nil ->
-      let _22 = Nil in
-      let _23 = Cons (elt, _22) in
-      _23
+      let _20 = Nil in
+      let _21 = Cons (elt, _20) in
+      _21
   | Cons (xh, xt) ->
-      let _24 = elt <= xh in
-      if _24 then
-        let _27 = Cons (elt, x) in
-        _27
+      let _22 = elt <= xh in
+      if _22 then
+        let _25 = Cons (elt, x) in
+        _25
       else
-        let _25 = insert elt xt in
-        let _26 = Cons (xh, _25) in
-        _26
+        let _23 = insert elt xt in
+        let _24 = Cons (xh, _23) in
+        _24
 
 let rec insertion_sort =
  fun x ->
   match x with
   | Nil ->
-      let _28 = Nil in
-      _28
+      let _26 = Nil in
+      _26
   | Cons (xh, xt) ->
-      let _29 = insertion_sort xt in
-      let _30 = insert xh _29 in
-      _30
+      let _27 = insertion_sort xt in
+      insert xh _27
 
 type pair_int_lists = ListCEK.pair_int_lists
 
@@ -105,34 +101,31 @@ let rec my_split_aux =
  fun x y ->
   match y with
   | Nil ->
-      let _31 = Nil in
-      let _32 = P (_31, x) in
-      _32
+      let _28 = Nil in
+      let _29 = P (_28, x) in
+      _29
   | Cons (y0, yt) -> (
       match yt with
       | Nil ->
-          let _33 = Nil in
-          let _34 = P (_33, x) in
-          _34
+          let _30 = Nil in
+          let _31 = P (_30, x) in
+          _31
       | Cons (y1, ys) -> (
           match x with
           | Nil ->
-              let _35 = Nil in
-              let _36 = Nil in
-              let _37 = P (_35, _36) in
-              _37
+              let _32 = Nil in
+              let _33 = Nil in
+              let _34 = P (_32, _33) in
+              _34
           | Cons (xh, xt) -> (
-              let _38 = my_split_aux xt ys in
-              match _38 with
+              let _35 = my_split_aux xt ys in
+              match _35 with
               | P (l, r) ->
-                  let _39 = Cons (xh, l) in
-                  let _40 = P (_39, r) in
-                  _40)))
+                  let _36 = Cons (xh, l) in
+                  let _37 = P (_36, r) in
+                  _37)))
 
-let rec my_split =
- fun x ->
-  let _41 = my_split_aux x x in
-  _41
+let rec my_split = fun x -> my_split_aux x x
 
 let rec my_merge =
  fun x y ->
@@ -142,94 +135,86 @@ let rec my_merge =
       match y with
       | Nil -> x
       | Cons (yh, yt) ->
-          let _42 = xh < yh in
-          if _42 then
-            let _45 = my_merge xt y in
-            let _46 = Cons (xh, _45) in
-            _46
+          let _38 = xh < yh in
+          if _38 then
+            let _41 = my_merge xt y in
+            let _42 = Cons (xh, _41) in
+            _42
           else
-            let _43 = my_merge x yt in
-            let _44 = Cons (yh, _43) in
-            _44)
+            let _39 = my_merge x yt in
+            let _40 = Cons (yh, _39) in
+            _40)
 
 let rec mergesort =
  fun x ->
   match x with
   | Nil ->
-      let _47 = Nil in
-      _47
+      let _43 = Nil in
+      _43
   | Cons (x1, xt) -> (
       match xt with
       | Nil -> x
       | Cons (x2, xt2) -> (
-          let _48 = my_split x in
-          match _48 with
+          let _44 = my_split x in
+          match _44 with
           | P (l, r) ->
-              let _49 = mergesort l in
-              let _50 = mergesort r in
-              let _51 = my_merge _49 _50 in
-              _51))
+              let _45 = mergesort l in
+              let _46 = mergesort r in
+              my_merge _45 _46))
 
 let rec filter_gt =
  fun x pivot ->
   match x with
   | Nil ->
-      let _52 = Nil in
-      _52
+      let _47 = Nil in
+      _47
   | Cons (xh, xt) ->
-      let _53 = xh > pivot in
-      if _53 then
-        let _55 = filter_gt xt pivot in
-        let _56 = Cons (xh, _55) in
-        _56
-      else
-        let _54 = filter_gt xt pivot in
-        _54
+      let _48 = xh > pivot in
+      if _48 then
+        let _49 = filter_gt xt pivot in
+        let _50 = Cons (xh, _49) in
+        _50
+      else filter_gt xt pivot
 
 let rec filter_eq =
  fun x pivot ->
   match x with
   | Nil ->
-      let _57 = Nil in
-      _57
+      let _51 = Nil in
+      _51
   | Cons (xh, xt) ->
-      let _58 = xh = pivot in
-      if _58 then
-        let _60 = filter_eq xt pivot in
-        let _61 = Cons (xh, _60) in
-        _61
-      else
-        let _59 = filter_eq xt pivot in
-        _59
+      let _52 = xh = pivot in
+      if _52 then
+        let _53 = filter_eq xt pivot in
+        let _54 = Cons (xh, _53) in
+        _54
+      else filter_eq xt pivot
 
 let rec filter_lt =
  fun x pivot ->
   match x with
   | Nil ->
-      let _62 = Nil in
-      _62
+      let _55 = Nil in
+      _55
   | Cons (xh, xt) ->
-      let _63 = xh < pivot in
-      if _63 then
-        let _65 = filter_lt xt pivot in
-        let _66 = Cons (xh, _65) in
-        _66
-      else
-        let _64 = filter_lt xt pivot in
-        _64
+      let _56 = xh < pivot in
+      if _56 then
+        let _57 = filter_lt xt pivot in
+        let _58 = Cons (xh, _57) in
+        _58
+      else filter_lt xt pivot
 
 let rec quicksort =
  fun x ->
   match x with
   | Nil ->
-      let _67 = Nil in
-      _67
+      let _59 = Nil in
+      _59
   | Cons (xh, xt) ->
-      let _68 = filter_lt x xh in
-      let _69 = quicksort _68 in
-      let _70 = filter_eq x xh in
-      let _71 = filter_gt x xh in
-      let _72 = quicksort _71 in
-      let _73 = append _70 _72 in
-      let _74 = append _69 _73 in
-      _74
+      let _60 = filter_lt x xh in
+      let _61 = quicksort _60 in
+      let _62 = filter_eq x xh in
+      let _63 = filter_gt x xh in
+      let _64 = quicksort _63 in
+      let _65 = append _62 _64 in
+      append _61 _65

@@ -393,7 +393,13 @@ let rec compile_pp_expr (ctx : ctx) (env : env) (c : fv_t option expr) (k : loca
                 set_k_ w (get_next_cont_ tl);
                 restore_env_ w (int_ keep_length) tl;
                 let env =
-                  { keep_env with values = StrMap.add l keep_length keep_env.values; env_length = keep_length + 1; w }
+                  {
+                    keep_env with
+                    values = StrMap.add l keep_length keep_env.values;
+                    env_length = keep_length + 1;
+                    w;
+                    changed = true;
+                  }
                 in
                 compile_pp_expr ctx env r k]);
           [%seqs

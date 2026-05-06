@@ -167,7 +167,7 @@ let pop_env (w : world) : value =
 let env_call (w : world) (keep : int list) (args : int list) : seq =
   let l = Dynarray.length w.state.e in
   let ret = appends (List.map keep ~f:(fun i -> Dynarray.get w.state.e i)) in
-  w.state.e <- Dynarray.init (List.length args) (fun i -> Dynarray.get w.state.e i);
+  w.state.e <- Dynarray.of_list (List.map args ~f:(fun i -> Dynarray.get w.state.e i));
   assert ((Generic.measure ~monoid ~measure ret).degree = List.length keep);
   assert ((Generic.measure ~monoid ~measure ret).max_degree = List.length keep);
   ret
@@ -585,6 +585,7 @@ let exec_cek_without_memo (c : exp) (e : words Dynarray.t) (k : words) : exec_re
   let rec exec state =
     if is_done state then state
     else (
+      (*print_endline ("cek: " ^ string_of_cek state);*)
       incr step_count;
       let w = make_world state m in
       state.c.step w;

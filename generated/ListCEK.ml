@@ -16,8 +16,8 @@ let tag_cont_4 = 8
 let tag_cont_5 = 9
 let tag_cont_6 = 10
 let tag_cont_7 = 11
-let tag_cont_8 = 12
-let tag_P = 13
+let tag_P = 12
+let tag_cont_8 = 13
 let tag_cont_9 = 14
 let tag_cont_10 = 15
 let tag_cont_11 = 16
@@ -32,15 +32,6 @@ let tag_cont_19 = 24
 let tag_cont_20 = 25
 let tag_cont_21 = 26
 let tag_cont_22 = 27
-let tag_cont_23 = 28
-let tag_cont_24 = 29
-let tag_cont_25 = 30
-let tag_cont_26 = 31
-let tag_cont_27 = 32
-let tag_cont_28 = 33
-let tag_cont_29 = 34
-let tag_cont_30 = 35
-let tag_cont_31 = 36
 
 type int_list = Nil | Cons of int * int_list
 
@@ -105,7 +96,7 @@ let rec from_ocaml_pair_int_lists x =
 let rec to_ocaml_pair_int_lists x =
   let h, t = Option.get (Memo.list_match x) in
   match Word.get_value h with
-  | 13 (* tag_P *) ->
+  | 12 (* tag_P *) ->
       let x0, x1 = Memo.splits_2 t in
       P (to_ocaml_int_list x0, to_ocaml_int_list x1)
   | _ -> failwith "unreachable"
@@ -172,57 +163,57 @@ let populate_state () =
           return_n w_33 0 (pc_to_exp (int_to_pc 0))
       | 8 (* tag_cont_4 *) ->
           w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
-      | 9 (* tag_cont_5 *) ->
-          w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
           Dynarray.set w_33.state.e 0
             (Memo.appends [ Memo.from_constructor tag_Cons; Dynarray.get w_33.state.e 0; Dynarray.get w_33.state.e 1 ]);
           assert_env_length w_33 2;
           return_n w_33 0 (pc_to_exp (int_to_pc 0))
-      | 10 (* tag_cont_6 *) ->
+      | 9 (* tag_cont_5 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
           push_env w_33 (Memo.from_constructor tag_Nil);
           Dynarray.set w_33.state.e 0
             (Memo.appends [ Memo.from_constructor tag_Cons; Dynarray.get w_33.state.e 0; Dynarray.get w_33.state.e 2 ]);
           assert_env_length w_33 3;
-          let keep_20 = env_call w_33 [] [ 1; 0 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; keep_20; w_33.state.k ];
+          ignore (env_call w_33 [] [ 1; 0 ]);
           w_33.state.c <- pc_to_exp (int_to_pc 8)
-      | 11 (* tag_cont_7 *) ->
+      | 10 (* tag_cont_6 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
           Dynarray.set w_33.state.e 0
             (Memo.appends [ Memo.from_constructor tag_Cons; Dynarray.get w_33.state.e 0; Dynarray.get w_33.state.e 1 ]);
           assert_env_length w_33 2;
           return_n w_33 0 (pc_to_exp (int_to_pc 0))
-      | 12 (* tag_cont_8 *) ->
+      | 11 (* tag_cont_7 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
           assert_env_length w_33 2;
-          let keep_21 = env_call w_33 [] [ 0; 1 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_21; w_33.state.k ];
+          ignore (env_call w_33 [] [ 0; 1 ]);
           w_33.state.c <- pc_to_exp (int_to_pc 10)
-      | 14 (* tag_cont_9 *) ->
+      | 13 (* tag_cont_8 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
           assert_env_length w_33 2;
           w_33.state.c <- pc_to_exp (int_to_pc 34)
-      | 15 (* tag_cont_10 *) ->
-          w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
-      | 16 (* tag_cont_11 *) ->
+      | 14 (* tag_cont_9 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
           Dynarray.set w_33.state.e 0
             (Memo.appends [ Memo.from_constructor tag_Cons; Dynarray.get w_33.state.e 0; Dynarray.get w_33.state.e 1 ]);
           assert_env_length w_33 2;
           return_n w_33 0 (pc_to_exp (int_to_pc 0))
+      | 15 (* tag_cont_10 *) ->
+          w_33.state.k <- get_next_cont tl_0;
+          restore_env w_33 1 tl_0;
+          Dynarray.set w_33.state.e 0
+            (Memo.appends [ Memo.from_constructor tag_Cons; Dynarray.get w_33.state.e 0; Dynarray.get w_33.state.e 1 ]);
+          assert_env_length w_33 2;
+          return_n w_33 0 (pc_to_exp (int_to_pc 0))
+      | 16 (* tag_cont_11 *) ->
+          w_33.state.k <- get_next_cont tl_0;
+          restore_env w_33 0 tl_0;
+          assert_env_length w_33 1;
+          w_33.state.c <- pc_to_exp (int_to_pc 35)
       | 17 (* tag_cont_12 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
@@ -232,9 +223,11 @@ let populate_state () =
           return_n w_33 0 (pc_to_exp (int_to_pc 0))
       | 18 (* tag_cont_13 *) ->
           w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          w_33.state.c <- pc_to_exp (int_to_pc 35)
+          restore_env w_33 1 tl_0;
+          Dynarray.set w_33.state.e 0
+            (Memo.appends [ Memo.from_constructor tag_Cons; Dynarray.get w_33.state.e 0; Dynarray.get w_33.state.e 1 ]);
+          assert_env_length w_33 2;
+          return_n w_33 0 (pc_to_exp (int_to_pc 0))
       | 19 (* tag_cont_14 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
@@ -244,109 +237,58 @@ let populate_state () =
           return_n w_33 0 (pc_to_exp (int_to_pc 0))
       | 20 (* tag_cont_15 *) ->
           w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
+          restore_env w_33 2 tl_0;
+          assert_env_length w_33 3;
+          let keep_16 = env_call w_33 [ 0; 1 ] [ 2 ] in
+          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; keep_16; w_33.state.k ];
+          w_33.state.c <- pc_to_exp (int_to_pc 33)
       | 21 (* tag_cont_16 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
-          Dynarray.set w_33.state.e 0
-            (Memo.appends [ Memo.from_constructor tag_Cons; Dynarray.get w_33.state.e 0; Dynarray.get w_33.state.e 1 ]);
           assert_env_length w_33 2;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
+          let keep_17 = env_call w_33 [ 1 ] [ 0 ] in
+          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_18; keep_17; w_33.state.k ];
+          w_33.state.c <- pc_to_exp (int_to_pc 22)
       | 22 (* tag_cont_17 *) ->
           w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
+          restore_env w_33 2 tl_0;
+          assert_env_length w_33 3;
+          let keep_18 = env_call w_33 [ 0; 1; 2 ] [ 0; 1 ] in
+          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_19; keep_18; w_33.state.k ];
+          w_33.state.c <- pc_to_exp (int_to_pc 27)
       | 23 (* tag_cont_18 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
-          Dynarray.set w_33.state.e 0
-            (Memo.appends [ Memo.from_constructor tag_Cons; Dynarray.get w_33.state.e 0; Dynarray.get w_33.state.e 1 ]);
           assert_env_length w_33 2;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
+          ignore (env_call w_33 [] [ 0; 1 ]);
+          w_33.state.c <- pc_to_exp (int_to_pc 18)
       | 24 (* tag_cont_19 *) ->
           w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
+          restore_env w_33 3 tl_0;
+          assert_env_length w_33 4;
+          let keep_19 = env_call w_33 [ 2; 3 ] [ 0; 1 ] in
+          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; keep_19; w_33.state.k ];
+          w_33.state.c <- pc_to_exp (int_to_pc 24)
       | 25 (* tag_cont_20 *) ->
           w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 2 tl_0;
           assert_env_length w_33 3;
-          let keep_23 = env_call w_33 [ 0; 1 ] [ 2 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_24; keep_23; w_33.state.k ];
+          let keep_20 = env_call w_33 [ 0; 1 ] [ 2 ] in
+          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_21; keep_20; w_33.state.k ];
           w_33.state.c <- pc_to_exp (int_to_pc 33)
       | 26 (* tag_cont_21 *) ->
           w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
+          restore_env w_33 2 tl_0;
+          assert_env_length w_33 3;
+          let keep_21 = env_call w_33 [ 0 ] [ 1; 2 ] in
+          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_22; keep_21; w_33.state.k ];
+          w_33.state.c <- pc_to_exp (int_to_pc 8)
       | 27 (* tag_cont_22 *) ->
           w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
-      | 28 (* tag_cont_23 *) ->
-          w_33.state.k <- get_next_cont tl_0;
           restore_env w_33 1 tl_0;
           assert_env_length w_33 2;
-          let keep_24 = env_call w_33 [ 1 ] [ 0 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_25; keep_24; w_33.state.k ];
-          w_33.state.c <- pc_to_exp (int_to_pc 22)
-      | 29 (* tag_cont_24 *) ->
-          w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 2 tl_0;
-          assert_env_length w_33 3;
-          let keep_25 = env_call w_33 [ 0; 1; 2 ] [ 0; 1 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_26; keep_25; w_33.state.k ];
-          w_33.state.c <- pc_to_exp (int_to_pc 27)
-      | 30 (* tag_cont_25 *) ->
-          w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 1 tl_0;
-          assert_env_length w_33 2;
-          let keep_26 = env_call w_33 [] [ 0; 1 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_27; keep_26; w_33.state.k ];
-          w_33.state.c <- pc_to_exp (int_to_pc 18)
-      | 31 (* tag_cont_26 *) ->
-          w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 3 tl_0;
-          assert_env_length w_33 4;
-          let keep_27 = env_call w_33 [ 2; 3 ] [ 0; 1 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_28; keep_27; w_33.state.k ];
-          w_33.state.c <- pc_to_exp (int_to_pc 24)
-      | 32 (* tag_cont_27 *) ->
-          w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
-      | 33 (* tag_cont_28 *) ->
-          w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 2 tl_0;
-          assert_env_length w_33 3;
-          let keep_28 = env_call w_33 [ 0; 1 ] [ 2 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_29; keep_28; w_33.state.k ];
-          w_33.state.c <- pc_to_exp (int_to_pc 33)
-      | 34 (* tag_cont_29 *) ->
-          w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 2 tl_0;
-          assert_env_length w_33 3;
-          let keep_29 = env_call w_33 [ 0 ] [ 1; 2 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_30; keep_29; w_33.state.k ];
+          ignore (env_call w_33 [] [ 0; 1 ]);
           w_33.state.c <- pc_to_exp (int_to_pc 8)
-      | 35 (* tag_cont_30 *) ->
-          w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 1 tl_0;
-          assert_env_length w_33 2;
-          let keep_30 = env_call w_33 [] [ 0; 1 ] in
-          w_33.state.k <- Memo.appends [ Memo.from_constructor tag_cont_31; keep_30; w_33.state.k ];
-          w_33.state.c <- pc_to_exp (int_to_pc 8)
-      | 36 (* tag_cont_31 *) ->
-          w_33.state.k <- get_next_cont tl_0;
-          restore_env w_33 0 tl_0;
-          assert_env_length w_33 1;
-          return_n w_33 0 (pc_to_exp (int_to_pc 0))
       | _ -> failwith "unreachable (0)")
     0;
   add_exp
@@ -448,8 +390,7 @@ let populate_state () =
         w_6.state.c <- pc_to_exp (int_to_pc 5))
       else (
         assert_env_length w_6 3;
-        let keep_3 = env_call w_6 [] [ 1 ] in
-        w_6.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_3; w_6.state.k ];
+        ignore (env_call w_6 [] [ 1 ]);
         w_6.state.c <- pc_to_exp (int_to_pc 5)))
     6;
   add_exp
@@ -476,8 +417,8 @@ let populate_state () =
           Dynarray.set w_7.state.e 0 split0_4;
           push_env w_7 split1_4;
           assert_env_length w_7 3;
-          let keep_4 = env_call w_7 [ 0 ] [ 2; 1 ] in
-          w_7.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_4; w_7.state.k ];
+          let keep_3 = env_call w_7 [ 0 ] [ 2; 1 ] in
+          w_7.state.k <- Memo.appends [ Memo.from_constructor tag_cont_4; keep_3; w_7.state.k ];
           w_7.state.c <- pc_to_exp (int_to_pc 8)
       | _ -> failwith "unreachable (9)")
     8;
@@ -497,8 +438,8 @@ let populate_state () =
           Dynarray.set w_8.state.e 0 split0_5;
           push_env w_8 split1_5;
           assert_env_length w_8 2;
-          let keep_5 = env_call w_8 [ 0 ] [ 1 ] in
-          w_8.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_5; w_8.state.k ];
+          let keep_4 = env_call w_8 [ 0 ] [ 1 ] in
+          w_8.state.k <- Memo.appends [ Memo.from_constructor tag_cont_5; keep_4; w_8.state.k ];
           w_8.state.c <- pc_to_exp (int_to_pc 9)
       | _ -> failwith "unreachable (10)")
     9;
@@ -533,8 +474,8 @@ let populate_state () =
         return_n w_11 0 (pc_to_exp (int_to_pc 0)))
       else (
         assert_env_length w_11 5;
-        let keep_6 = env_call w_11 [ 2 ] [ 0; 3 ] in
-        w_11.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_6; w_11.state.k ];
+        let keep_5 = env_call w_11 [ 2 ] [ 0; 3 ] in
+        w_11.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_5; w_11.state.k ];
         w_11.state.c <- pc_to_exp (int_to_pc 10)))
     11;
   add_exp
@@ -561,8 +502,8 @@ let populate_state () =
           Dynarray.set w_12.state.e 0 split0_7;
           push_env w_12 split1_7;
           assert_env_length w_12 2;
-          let keep_7 = env_call w_12 [ 0 ] [ 1 ] in
-          w_12.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_7; w_12.state.k ];
+          let keep_6 = env_call w_12 [ 0 ] [ 1 ] in
+          w_12.state.k <- Memo.appends [ Memo.from_constructor tag_cont_7; keep_6; w_12.state.k ];
           w_12.state.c <- pc_to_exp (int_to_pc 13)
       | _ -> failwith "unreachable (14)")
     13;
@@ -605,8 +546,8 @@ let populate_state () =
           Dynarray.set w_15.state.e 0 split0_10;
           Dynarray.set w_15.state.e 1 split1_10;
           assert_env_length w_15 3;
-          let keep_8 = env_call w_15 [ 0 ] [ 1; 2 ] in
-          w_15.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_8; w_15.state.k ];
+          let keep_7 = env_call w_15 [ 0 ] [ 1; 2 ] in
+          w_15.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_7; w_15.state.k ];
           w_15.state.c <- pc_to_exp (int_to_pc 14)
       | _ -> failwith "unreachable (15)")
     15;
@@ -633,8 +574,7 @@ let populate_state () =
   add_exp
     (fun w_16 ->
       assert_env_length w_16 1;
-      let keep_9 = env_call w_16 [] [ 0; 0 ] in
-      w_16.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_9; w_16.state.k ];
+      ignore (env_call w_16 [] [ 0; 0 ]);
       w_16.state.c <- pc_to_exp (int_to_pc 14))
     17;
   add_exp
@@ -661,13 +601,13 @@ let populate_state () =
       let cond_2 = resolve w_20 (Source.E 6) in
       if Word.get_value (fst cond_2) <> 0 then (
         assert_env_length w_20 7;
-        let keep_10 = env_call w_20 [ 2 ] [ 3; 1 ] in
-        w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_10; w_20.state.k ];
+        let keep_8 = env_call w_20 [ 2 ] [ 3; 1 ] in
+        w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_8; w_20.state.k ];
         w_20.state.c <- pc_to_exp (int_to_pc 18))
       else (
         assert_env_length w_20 7;
-        let keep_11 = env_call w_20 [ 4 ] [ 0; 5 ] in
-        w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_12; keep_11; w_20.state.k ];
+        let keep_9 = env_call w_20 [ 4 ] [ 0; 5 ] in
+        w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_9; w_20.state.k ];
         w_20.state.c <- pc_to_exp (int_to_pc 18)))
     19;
   add_exp
@@ -727,8 +667,8 @@ let populate_state () =
           Dynarray.set w_22.state.e 1 split0_14;
           Dynarray.set w_22.state.e 2 split1_14;
           assert_env_length w_22 3;
-          let keep_12 = env_call w_22 [] [ 0 ] in
-          w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; keep_12; w_22.state.k ];
+          let keep_10 = env_call w_22 [] [ 0 ] in
+          w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_10; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 17)
       | _ -> failwith "unreachable (23)")
     23;
@@ -756,13 +696,12 @@ let populate_state () =
       let cond_3 = resolve w_25 (Source.E 3) in
       if Word.get_value (fst cond_3) <> 0 then (
         assert_env_length w_25 4;
-        let keep_13 = env_call w_25 [ 0 ] [ 2; 1 ] in
-        w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_13; w_25.state.k ];
+        let keep_11 = env_call w_25 [ 0 ] [ 2; 1 ] in
+        w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_12; keep_11; w_25.state.k ];
         w_25.state.c <- pc_to_exp (int_to_pc 24))
       else (
         assert_env_length w_25 4;
-        let keep_14 = env_call w_25 [] [ 2; 1 ] in
-        w_25.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; keep_14; w_25.state.k ];
+        ignore (env_call w_25 [] [ 2; 1 ]);
         w_25.state.c <- pc_to_exp (int_to_pc 24)))
     25;
   add_exp
@@ -797,13 +736,12 @@ let populate_state () =
       let cond_4 = resolve w_28 (Source.E 3) in
       if Word.get_value (fst cond_4) <> 0 then (
         assert_env_length w_28 4;
-        let keep_15 = env_call w_28 [ 0 ] [ 2; 1 ] in
-        w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; keep_15; w_28.state.k ];
+        let keep_12 = env_call w_28 [ 0 ] [ 2; 1 ] in
+        w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_13; keep_12; w_28.state.k ];
         w_28.state.c <- pc_to_exp (int_to_pc 27))
       else (
         assert_env_length w_28 4;
-        let keep_16 = env_call w_28 [] [ 2; 1 ] in
-        w_28.state.k <- Memo.appends [ Memo.from_constructor tag_cont_17; keep_16; w_28.state.k ];
+        ignore (env_call w_28 [] [ 2; 1 ]);
         w_28.state.c <- pc_to_exp (int_to_pc 27)))
     28;
   add_exp
@@ -838,13 +776,12 @@ let populate_state () =
       let cond_5 = resolve w_31 (Source.E 3) in
       if Word.get_value (fst cond_5) <> 0 then (
         assert_env_length w_31 4;
-        let keep_17 = env_call w_31 [ 0 ] [ 2; 1 ] in
-        w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_18; keep_17; w_31.state.k ];
+        let keep_13 = env_call w_31 [ 0 ] [ 2; 1 ] in
+        w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_14; keep_13; w_31.state.k ];
         w_31.state.c <- pc_to_exp (int_to_pc 30))
       else (
         assert_env_length w_31 4;
-        let keep_18 = env_call w_31 [] [ 2; 1 ] in
-        w_31.state.k <- Memo.appends [ Memo.from_constructor tag_cont_19; keep_18; w_31.state.k ];
+        ignore (env_call w_31 [] [ 2; 1 ]);
         w_31.state.c <- pc_to_exp (int_to_pc 30)))
     31;
   add_exp
@@ -871,8 +808,8 @@ let populate_state () =
           push_env w_32 split0_18;
           push_env w_32 split1_18;
           assert_env_length w_32 3;
-          let keep_19 = env_call w_32 [ 0; 1 ] [ 0; 1 ] in
-          w_32.state.k <- Memo.appends [ Memo.from_constructor tag_cont_20; keep_19; w_32.state.k ];
+          let keep_14 = env_call w_32 [ 0; 1 ] [ 0; 1 ] in
+          w_32.state.k <- Memo.appends [ Memo.from_constructor tag_cont_15; keep_14; w_32.state.k ];
           w_32.state.c <- pc_to_exp (int_to_pc 30)
       | _ -> failwith "unreachable (34)")
     33;
@@ -880,7 +817,7 @@ let populate_state () =
     (fun w_34 ->
       let x_19 = resolve w_34 (Source.E 1) in
       match Word.get_value (fst x_19) with
-      | 13 (* tag_P *) ->
+      | 12 (* tag_P *) ->
           let splits_19 = Memo.splits (snd x_19) in
           let split0_19 = List.nth splits_19 0 in
           let split1_19 = List.nth splits_19 1 in
@@ -898,15 +835,15 @@ let populate_state () =
     (fun w_35 ->
       let x_20 = resolve w_35 (Source.E 0) in
       match Word.get_value (fst x_20) with
-      | 13 (* tag_P *) ->
+      | 12 (* tag_P *) ->
           let splits_20 = Memo.splits (snd x_20) in
           let split0_20 = List.nth splits_20 0 in
           let split1_20 = List.nth splits_20 1 in
           Dynarray.set w_35.state.e 0 split0_20;
           push_env w_35 split1_20;
           assert_env_length w_35 2;
-          let keep_22 = env_call w_35 [ 1 ] [ 0 ] in
-          w_35.state.k <- Memo.appends [ Memo.from_constructor tag_cont_23; keep_22; w_35.state.k ];
+          let keep_15 = env_call w_35 [ 1 ] [ 0 ] in
+          w_35.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; keep_15; w_35.state.k ];
           w_35.state.c <- pc_to_exp (int_to_pc 22)
       | _ -> failwith "unreachable (35)")
     35;
@@ -918,32 +855,23 @@ let populate_state () =
   Words.set_constructor_degree 5 (-2);
   Words.set_constructor_degree 6 (-1);
   Words.set_constructor_degree 7 (-1);
-  Words.set_constructor_degree 8 0;
+  Words.set_constructor_degree 8 (-1);
   Words.set_constructor_degree 9 (-1);
   Words.set_constructor_degree 10 (-1);
   Words.set_constructor_degree 11 (-1);
   Words.set_constructor_degree 12 (-1);
   Words.set_constructor_degree 13 (-1);
   Words.set_constructor_degree 14 (-1);
-  Words.set_constructor_degree 15 0;
-  Words.set_constructor_degree 16 (-1);
+  Words.set_constructor_degree 15 (-1);
+  Words.set_constructor_degree 16 0;
   Words.set_constructor_degree 17 (-1);
-  Words.set_constructor_degree 18 0;
+  Words.set_constructor_degree 18 (-1);
   Words.set_constructor_degree 19 (-1);
-  Words.set_constructor_degree 20 0;
+  Words.set_constructor_degree 20 (-2);
   Words.set_constructor_degree 21 (-1);
-  Words.set_constructor_degree 22 0;
+  Words.set_constructor_degree 22 (-2);
   Words.set_constructor_degree 23 (-1);
-  Words.set_constructor_degree 24 0;
+  Words.set_constructor_degree 24 (-3);
   Words.set_constructor_degree 25 (-2);
-  Words.set_constructor_degree 26 0;
-  Words.set_constructor_degree 27 0;
-  Words.set_constructor_degree 28 (-1);
-  Words.set_constructor_degree 29 (-2);
-  Words.set_constructor_degree 30 (-1);
-  Words.set_constructor_degree 31 (-3);
-  Words.set_constructor_degree 32 0;
-  Words.set_constructor_degree 33 (-2);
-  Words.set_constructor_degree 34 (-2);
-  Words.set_constructor_degree 35 (-1);
-  Words.set_constructor_degree 36 0
+  Words.set_constructor_degree 26 (-2);
+  Words.set_constructor_degree 27 (-1)

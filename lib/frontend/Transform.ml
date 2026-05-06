@@ -255,7 +255,7 @@ and anf_tail expr =
   | _ when is_simple expr ->
       let* expr = bind_value expr in
       expr
-  | App _ | Op _ ->
+  | App (Ctor _, _, _) | Op _ ->
       let* expr = bind_value expr in
       expr
   | Match (scrutinee, MatchPattern (cases, info0), info1) ->
