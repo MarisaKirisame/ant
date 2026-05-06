@@ -2,11 +2,11 @@ open Syntax
 
 let rec mark_tail_expr_impl (is_tail : bool) (expr : 'a expr) : bool expr =
   match expr with
-  | Unit -> Unit
-  | Int i -> Int i
-  | Float f -> Float f
-  | Bool b -> Bool b
-  | Str s -> Str s
+  | Unit _ -> Unit is_tail
+  | Int (i, _) -> Int (i, is_tail)
+  | Float (f, _) -> Float (f, is_tail)
+  | Bool (b, _) -> Bool (b, is_tail)
+  | Str (s, _) -> Str (s, is_tail)
   | Builtin (builtin, _) -> Builtin (builtin, is_tail)
   | Var (name, _) -> Var (name, is_tail)
   | GVar (name, _) -> GVar (name, is_tail)
@@ -14,10 +14,8 @@ let rec mark_tail_expr_impl (is_tail : bool) (expr : 'a expr) : bool expr =
   | App (fn, args, _) -> App (mark_tail_expr_impl false fn, List.map (mark_tail_expr_impl false) args, is_tail)
   | Op (op, lhs, rhs, _) -> Op (op, mark_tail_expr_impl false lhs, mark_tail_expr_impl false rhs, is_tail)
   | Tup (values, _) -> Tup (List.map (mark_tail_expr_impl false) values, is_tail)
-  | Arr (values, _) -> Arr (List.map (mark_tail_expr_impl false) values, is_tail)
   | Lam (params, body, _) -> Lam (List.map mark_tail_pattern params, mark_tail_expr_impl true body, is_tail)
   | Let (binding, body, _) -> Let (mark_tail_binding binding, mark_tail_expr_impl is_tail body, is_tail)
-  | Sel (target, field, _) -> Sel (mark_tail_expr_impl false target, field, is_tail)
   | If (cond, if_true, if_false, _) ->
       If
         ( mark_tail_expr_impl false cond,
@@ -35,26 +33,21 @@ and mark_tail_binding (binding : 'a binding) : bool binding =
         (List.map
            (fun (pattern, expr, _) -> (mark_tail_pattern pattern, mark_tail_expr_impl false expr, false))
            bindings)
-  | BCont (pattern, expr, _) -> BCont (mark_tail_pattern pattern, mark_tail_expr_impl false expr, false)
-  | BRecC bindings ->
-      BRecC
-        (List.map
-           (fun (pattern, expr, _) -> (mark_tail_pattern pattern, mark_tail_expr_impl false expr, false))
-           bindings)
 
 and mark_tail_pattern (pattern : 'a pattern) : bool pattern =
   match pattern with
-  | PAny -> PAny
-  | PInt i -> PInt i
-  | PBool b -> PBool b
-  | PUnit -> PUnit
+  | PAny _ -> PAny false
+  | PInt (i, _) -> PInt (i, false)
+  | PBool (b, _) -> PBool (b, false)
+  | PUnit _ -> PUnit false
   | PVar (name, _) -> PVar (name, false)
   | PTup (patterns, _) -> PTup (List.map mark_tail_pattern patterns, false)
   | PCtorApp (ctor, None, _) -> PCtorApp (ctor, None, false)
   | PCtorApp (ctor, Some pattern, _) -> PCtorApp (ctor, Some (mark_tail_pattern pattern), false)
 
-and mark_tail_cases is_tail (MatchPattern cases) =
-  MatchPattern (List.map (fun (pattern, expr) -> (mark_tail_pattern pattern, mark_tail_expr_impl is_tail expr)) cases)
+and mark_tail_cases is_tail (MatchPattern (cases, _)) =
+  MatchPattern
+    (List.map (fun (pattern, expr) -> (mark_tail_pattern pattern, mark_tail_expr_impl is_tail expr)) cases, false)
 
 let mark_tail (e : 'a expr) : bool expr = mark_tail_expr_impl true e
 

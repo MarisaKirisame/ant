@@ -98,7 +98,7 @@ let compile_adt (e : env) (tb : 'a ty_binding) =
 let rec compile_pp_expr (e : 'a expr) : document =
   match e with
   | Lam (xs, e, _) -> string "fun " ^^ separate_map space pp_pattern' xs ^^ string " -> " ^^ compile_pp_expr e
-  | Match (value, MatchPattern cases, _) ->
+  | Match (value, MatchPattern (cases, _), _) ->
       string "match (" ^^ string "to_ocaml_int_list" ^^ space ^^ compile_pp_expr value ^^ string ") with | "
       ^^ separate_map
            (break 1 ^^ string "|")
@@ -112,7 +112,10 @@ let rec compile_pp_expr (e : 'a expr) : document =
       string "int_list_" ^^ string cname ^^ string "(" ^^ separate_map (string ",") compile_pp_expr es ^^ string ")"
   | App (f, xs, _) -> string "(" ^^ separate_map space compile_pp_expr (f :: xs) ^^ string ")"
   | Op (op, l, r, _) -> string "(" ^^ compile_pp_expr l ^^ string op ^^ compile_pp_expr r ^^ string ")"
-  | Int i -> string "(" ^^ string (string_of_int i) ^^ string ")"
+  | Int (i, _) -> string "(" ^^ string (string_of_int i) ^^ string ")"
+  | Let (BOne (x, e1, _), e2, _) ->
+      string "(let " ^^ pp_pattern x ^^ string " = " ^^ compile_pp_expr e1 ^^ string " in " ^^ compile_pp_expr e2
+      ^^ string ")"
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_expr e)
 
 let compile_pp_stmt (e : env) (s : 'a stmt) : document =

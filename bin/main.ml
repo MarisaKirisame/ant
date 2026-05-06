@@ -21,10 +21,13 @@ let parse content =
       failwith "Failed due to lexing error"
 
 let driver input output print_ast compile_pat compile_ant type_alias (module Backend : Compile.Backend) typing
-    print_level print_cps_transformed print_de print_cps_de =
+    print_level print_anf =
   let src = read_all input in
   let syn = parse src in
   let ast = Typing.top_type_of_prog syn in
+  let anf = Transform.anf_prog ast in
+  (*let frontend = Pat.compile anf in*)
+  let frontend = anf in
   CompilePlain.set_type_alias_module type_alias;
   let debug_pp = PPrint.ToChannel.pretty 0.8 80 stdout in
   let debug = false in
@@ -32,12 +35,10 @@ let driver input output print_ast compile_pat compile_ant type_alias (module Bac
   let _ =
     if debug then debug_pp (Syntax.pp_prog ast);
     if print_ast then output_pp (Syntax.pp_prog ast);
-    if compile_pat then output_pp (Pat.show_all_pattern_matrixes ast);
-    if compile_ant then output_pp (Backend.compile ast);
+    if compile_pat then output_pp (Pat.show_all_pattern_matrixes frontend);
+    if compile_ant then output_pp (Backend.compile frontend);
     if typing then output_pp (Typing.pp_top_type_of_prog ~print_level ast);
-    if print_cps_transformed then output_pp (Syntax.pp_prog (Transform.cps_prog ast))
-    else if print_de then output_pp (Syntax.pp_prog (Transform.defunc_prog ast))
-    else if print_cps_de then output_pp (Syntax.pp_prog (Transform.defunc_prog (Transform.cps_prog ast)))
+    if print_anf then output_pp (Syntax.pp_prog anf)
   in
   ()
 
@@ -61,7 +62,7 @@ let backend =
     [
       ("memo", (module CompileMemo.Backend : Compile.Backend));
       ("seq", (module CompileSeq.Backend : Compile.Backend));
-      ("plain", (module CompilePlain.Backend));
+      ("plain", (module CompilePlain.Backend : Compile.Backend));
     ]
   in
   Arg.(value & opt (enum cdds) (module CompileMemo.Backend : Compile.Backend) & info [ "b"; "backend" ] ~doc)
@@ -87,17 +88,9 @@ let print_level =
   let doc = "Print the type with level information" in
   Arg.(value & flag & info [ "L"; "print-level" ] ~doc)
 
-let print_cps_transformed =
-  let doc = "Print the AST after CPS transformation" in
-  Arg.(value & flag & info [ "c"; "print-cps" ] ~doc)
-
-let print_de =
-  let doc = "Print the AST after defunctionalization" in
-  Arg.(value & flag & info [ "d"; "print-defunc" ] ~doc)
-
-let print_cps_de =
-  let doc = "Print the AST after CPS transformation and defunctionalization" in
-  Arg.(value & flag & info [ "D"; "print-cps-defunc" ] ~doc)
+let print_anf =
+  let doc = "Print the AST after ANF transformation" in
+  Arg.(value & flag & info [ "a"; "print-anf" ] ~doc)
 
 let cmd =
   let doc = "Ant Compiler" in
@@ -106,7 +99,7 @@ let cmd =
   Cmd.v info
     Term.(
       const driver $ input $ output $ print_ast $ compile_pat $ compile_ant $ type_alias $ backend $ typing
-      $ print_level $ print_cps_transformed $ print_de $ print_cps_de)
+      $ print_level $ print_anf)
 
 let i = Cmd.eval cmd
 
