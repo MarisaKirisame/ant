@@ -165,7 +165,6 @@ let pop_env (w : world) : value =
   v
 
 let env_call (w : world) (keep : int list) (args : int list) : seq =
-  let l = Dynarray.length w.state.e in
   let ret = appends (List.map keep ~f:(fun i -> Dynarray.get w.state.e i)) in
   w.state.e <- Dynarray.of_list (List.map args ~f:(fun i -> Dynarray.get w.state.e i));
   assert ((Generic.measure ~monoid ~measure ret).degree = List.length keep);
