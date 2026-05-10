@@ -84,6 +84,73 @@ let tag_cont_21 = 76
 let tag_cont_22 = 77
 let tag_cont_23 = 78
 
+let pc_edges =
+  [
+    (0, 0);
+    (0, 3);
+    (0, 4);
+    (0, 5);
+    (0, 6);
+    (0, 7);
+    (0, 8);
+    (0, 9);
+    (0, 10);
+    (0, 11);
+    (0, 12);
+    (0, 13);
+    (0, 14);
+    (0, 15);
+    (0, 17);
+    (0, 20);
+    (0, 23);
+    (0, 26);
+    (1, 0);
+    (1, 2);
+    (2, 0);
+    (2, 1);
+    (3, 0);
+    (3, 1);
+    (3, 3);
+    (4, 0);
+    (4, 3);
+    (5, 0);
+    (5, 3);
+    (6, 0);
+    (6, 3);
+    (7, 0);
+    (7, 3);
+    (8, 0);
+    (8, 3);
+    (9, 0);
+    (10, 0);
+    (10, 3);
+    (11, 0);
+    (11, 3);
+    (12, 0);
+    (13, 0);
+    (14, 0);
+    (14, 3);
+    (15, 0);
+    (15, 16);
+    (16, 0);
+    (17, 0);
+    (17, 18);
+    (18, 19);
+    (19, 0);
+    (20, 0);
+    (20, 21);
+    (21, 22);
+    (22, 0);
+    (23, 0);
+    (23, 24);
+    (24, 25);
+    (25, 0);
+    (26, 0);
+    (26, 27);
+    (27, 28);
+    (28, 0);
+  ]
+
 type nat = Z | S of nat
 
 let rec from_ocaml_nat x =
@@ -490,27 +557,27 @@ let populate_state () =
           w_3.state.k <- get_next_cont tl_0;
           restore_env w_3 2 tl_0;
           assert_env_length w_3 3;
-          w_3.state.c <- pc_to_exp (int_to_pc 16)
+          w_3.state.c <- pc_to_exp (int_to_pc 15)
       | 71 (* tag_cont_16 *) ->
           w_3.state.k <- get_next_cont tl_0;
           restore_env w_3 2 tl_0;
           assert_env_length w_3 3;
-          w_3.state.c <- pc_to_exp (int_to_pc 19)
+          w_3.state.c <- pc_to_exp (int_to_pc 17)
       | 72 (* tag_cont_17 *) ->
           w_3.state.k <- get_next_cont tl_0;
           restore_env w_3 2 tl_0;
           assert_env_length w_3 3;
-          w_3.state.c <- pc_to_exp (int_to_pc 22)
+          w_3.state.c <- pc_to_exp (int_to_pc 20)
       | 73 (* tag_cont_18 *) ->
           w_3.state.k <- get_next_cont tl_0;
           restore_env w_3 2 tl_0;
           assert_env_length w_3 3;
-          w_3.state.c <- pc_to_exp (int_to_pc 25)
+          w_3.state.c <- pc_to_exp (int_to_pc 23)
       | 74 (* tag_cont_19 *) ->
           w_3.state.k <- get_next_cont tl_0;
           restore_env w_3 2 tl_0;
           assert_env_length w_3 3;
-          w_3.state.c <- pc_to_exp (int_to_pc 28)
+          w_3.state.c <- pc_to_exp (int_to_pc 26)
       | 75 (* tag_cont_20 *) ->
           w_3.state.k <- get_next_cont tl_0;
           restore_env w_3 2 tl_0;
@@ -578,7 +645,7 @@ let populate_state () =
           assert_env_length w_1 3;
           ignore (env_call w_1 [] [ 2; 0 ]);
           w_1.state.c <- pc_to_exp (int_to_pc 1)
-      | _ -> failwith "unreachable (2)")
+      | _ -> failwith "unreachable (3)")
     2;
   add_exp
     (fun w_2 ->
@@ -937,7 +1004,7 @@ let populate_state () =
           Dynarray.set w_9.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_9.state.e 0 ]);
           assert_env_length w_9 1;
           return_n w_9 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (9)")
+      | _ -> failwith "unreachable (10)")
     9;
   add_exp
     (fun w_10 ->
@@ -1121,16 +1188,6 @@ let populate_state () =
           return_n w_14 0 (pc_to_exp (int_to_pc 0)))
     14;
   add_exp
-    (fun w_16 ->
-      assert_env_length w_16 3;
-      let x0_0 = resolve w_16 (Source.E 1) in
-      let x1_0 = resolve w_16 (Source.E 0) in
-      Dynarray.set w_16.state.e 0 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
-      Dynarray.set w_16.state.e 0 (Memo.appends [ Memo.from_constructor tag_VInt; Dynarray.get w_16.state.e 0 ]);
-      assert_env_length w_16 3;
-      return_n w_16 0 (pc_to_exp (int_to_pc 0)))
-    15;
-  add_exp
     (fun w_15 ->
       let x_14 = resolve w_15 (Source.E 2) in
       match Word.get_value (fst x_14) with
@@ -1138,7 +1195,7 @@ let populate_state () =
           let splits_41 = Memo.splits (snd x_14) in
           let split0_41 = List.nth splits_41 0 in
           Dynarray.set w_15.state.e 0 split0_41;
-          w_15.state.c <- pc_to_exp (int_to_pc 15)
+          w_15.state.c <- pc_to_exp (int_to_pc 16)
       | 38 (* tag_VStuck *) ->
           let splits_42 = Memo.splits (snd x_14) in
           let split0_42 = List.nth splits_42 0 in
@@ -1156,29 +1213,17 @@ let populate_state () =
           Dynarray.set w_15.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_15.state.e 0 ]);
           assert_env_length w_15 3;
           return_n w_15 0 (pc_to_exp (int_to_pc 0)))
+    15;
+  add_exp
+    (fun w_16 ->
+      assert_env_length w_16 3;
+      let x0_0 = resolve w_16 (Source.E 1) in
+      let x1_0 = resolve w_16 (Source.E 0) in
+      Dynarray.set w_16.state.e 0 (Memo.from_int (Word.get_value (fst x0_0) + Word.get_value (fst x1_0)));
+      Dynarray.set w_16.state.e 0 (Memo.appends [ Memo.from_constructor tag_VInt; Dynarray.get w_16.state.e 0 ]);
+      assert_env_length w_16 3;
+      return_n w_16 0 (pc_to_exp (int_to_pc 0)))
     16;
-  add_exp
-    (fun w_19 ->
-      assert_env_length w_19 3;
-      let cond_0 = resolve w_19 (Source.E 0) in
-      if Word.get_value (fst cond_0) <> 0 then (
-        Dynarray.set w_19.state.e 0 (Memo.from_constructor tag_VTrue);
-        assert_env_length w_19 3;
-        return_n w_19 0 (pc_to_exp (int_to_pc 0)))
-      else (
-        Dynarray.set w_19.state.e 0 (Memo.from_constructor tag_VFalse);
-        assert_env_length w_19 3;
-        return_n w_19 0 (pc_to_exp (int_to_pc 0))))
-    17;
-  add_exp
-    (fun w_18 ->
-      assert_env_length w_18 3;
-      let x0_1 = resolve w_18 (Source.E 1) in
-      let x1_1 = resolve w_18 (Source.E 0) in
-      Dynarray.set w_18.state.e 0
-        (Memo.from_int (if Word.get_value (fst x0_1) < Word.get_value (fst x1_1) then 1 else 0));
-      w_18.state.c <- pc_to_exp (int_to_pc 17))
-    18;
   add_exp
     (fun w_17 ->
       let x_15 = resolve w_17 (Source.E 2) in
@@ -1205,29 +1250,29 @@ let populate_state () =
           Dynarray.set w_17.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_17.state.e 0 ]);
           assert_env_length w_17 3;
           return_n w_17 0 (pc_to_exp (int_to_pc 0)))
-    19;
+    17;
   add_exp
-    (fun w_22 ->
-      assert_env_length w_22 3;
-      let cond_1 = resolve w_22 (Source.E 0) in
-      if Word.get_value (fst cond_1) <> 0 then (
-        Dynarray.set w_22.state.e 0 (Memo.from_constructor tag_VTrue);
-        assert_env_length w_22 3;
-        return_n w_22 0 (pc_to_exp (int_to_pc 0)))
+    (fun w_18 ->
+      assert_env_length w_18 3;
+      let x0_1 = resolve w_18 (Source.E 1) in
+      let x1_1 = resolve w_18 (Source.E 0) in
+      Dynarray.set w_18.state.e 0
+        (Memo.from_int (if Word.get_value (fst x0_1) < Word.get_value (fst x1_1) then 1 else 0));
+      w_18.state.c <- pc_to_exp (int_to_pc 19))
+    18;
+  add_exp
+    (fun w_19 ->
+      assert_env_length w_19 3;
+      let cond_0 = resolve w_19 (Source.E 0) in
+      if Word.get_value (fst cond_0) <> 0 then (
+        Dynarray.set w_19.state.e 0 (Memo.from_constructor tag_VTrue);
+        assert_env_length w_19 3;
+        return_n w_19 0 (pc_to_exp (int_to_pc 0)))
       else (
-        Dynarray.set w_22.state.e 0 (Memo.from_constructor tag_VFalse);
-        assert_env_length w_22 3;
-        return_n w_22 0 (pc_to_exp (int_to_pc 0))))
-    20;
-  add_exp
-    (fun w_21 ->
-      assert_env_length w_21 3;
-      let x0_2 = resolve w_21 (Source.E 1) in
-      let x1_2 = resolve w_21 (Source.E 0) in
-      Dynarray.set w_21.state.e 0
-        (Memo.from_int (if Word.get_value (fst x0_2) <= Word.get_value (fst x1_2) then 1 else 0));
-      w_21.state.c <- pc_to_exp (int_to_pc 20))
-    21;
+        Dynarray.set w_19.state.e 0 (Memo.from_constructor tag_VFalse);
+        assert_env_length w_19 3;
+        return_n w_19 0 (pc_to_exp (int_to_pc 0))))
+    19;
   add_exp
     (fun w_20 ->
       let x_16 = resolve w_20 (Source.E 2) in
@@ -1254,29 +1299,29 @@ let populate_state () =
           Dynarray.set w_20.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_20.state.e 0 ]);
           assert_env_length w_20 3;
           return_n w_20 0 (pc_to_exp (int_to_pc 0)))
-    22;
+    20;
   add_exp
-    (fun w_25 ->
-      assert_env_length w_25 3;
-      let cond_2 = resolve w_25 (Source.E 0) in
-      if Word.get_value (fst cond_2) <> 0 then (
-        Dynarray.set w_25.state.e 0 (Memo.from_constructor tag_VTrue);
-        assert_env_length w_25 3;
-        return_n w_25 0 (pc_to_exp (int_to_pc 0)))
+    (fun w_21 ->
+      assert_env_length w_21 3;
+      let x0_2 = resolve w_21 (Source.E 1) in
+      let x1_2 = resolve w_21 (Source.E 0) in
+      Dynarray.set w_21.state.e 0
+        (Memo.from_int (if Word.get_value (fst x0_2) <= Word.get_value (fst x1_2) then 1 else 0));
+      w_21.state.c <- pc_to_exp (int_to_pc 22))
+    21;
+  add_exp
+    (fun w_22 ->
+      assert_env_length w_22 3;
+      let cond_1 = resolve w_22 (Source.E 0) in
+      if Word.get_value (fst cond_1) <> 0 then (
+        Dynarray.set w_22.state.e 0 (Memo.from_constructor tag_VTrue);
+        assert_env_length w_22 3;
+        return_n w_22 0 (pc_to_exp (int_to_pc 0)))
       else (
-        Dynarray.set w_25.state.e 0 (Memo.from_constructor tag_VFalse);
-        assert_env_length w_25 3;
-        return_n w_25 0 (pc_to_exp (int_to_pc 0))))
-    23;
-  add_exp
-    (fun w_24 ->
-      assert_env_length w_24 3;
-      let x0_3 = resolve w_24 (Source.E 1) in
-      let x1_3 = resolve w_24 (Source.E 0) in
-      Dynarray.set w_24.state.e 0
-        (Memo.from_int (if Word.get_value (fst x0_3) > Word.get_value (fst x1_3) then 1 else 0));
-      w_24.state.c <- pc_to_exp (int_to_pc 23))
-    24;
+        Dynarray.set w_22.state.e 0 (Memo.from_constructor tag_VFalse);
+        assert_env_length w_22 3;
+        return_n w_22 0 (pc_to_exp (int_to_pc 0))))
+    22;
   add_exp
     (fun w_23 ->
       let x_17 = resolve w_23 (Source.E 2) in
@@ -1303,29 +1348,29 @@ let populate_state () =
           Dynarray.set w_23.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_23.state.e 0 ]);
           assert_env_length w_23 3;
           return_n w_23 0 (pc_to_exp (int_to_pc 0)))
-    25;
+    23;
   add_exp
-    (fun w_28 ->
-      assert_env_length w_28 3;
-      let cond_3 = resolve w_28 (Source.E 0) in
-      if Word.get_value (fst cond_3) <> 0 then (
-        Dynarray.set w_28.state.e 0 (Memo.from_constructor tag_VTrue);
-        assert_env_length w_28 3;
-        return_n w_28 0 (pc_to_exp (int_to_pc 0)))
+    (fun w_24 ->
+      assert_env_length w_24 3;
+      let x0_3 = resolve w_24 (Source.E 1) in
+      let x1_3 = resolve w_24 (Source.E 0) in
+      Dynarray.set w_24.state.e 0
+        (Memo.from_int (if Word.get_value (fst x0_3) > Word.get_value (fst x1_3) then 1 else 0));
+      w_24.state.c <- pc_to_exp (int_to_pc 25))
+    24;
+  add_exp
+    (fun w_25 ->
+      assert_env_length w_25 3;
+      let cond_2 = resolve w_25 (Source.E 0) in
+      if Word.get_value (fst cond_2) <> 0 then (
+        Dynarray.set w_25.state.e 0 (Memo.from_constructor tag_VTrue);
+        assert_env_length w_25 3;
+        return_n w_25 0 (pc_to_exp (int_to_pc 0)))
       else (
-        Dynarray.set w_28.state.e 0 (Memo.from_constructor tag_VFalse);
-        assert_env_length w_28 3;
-        return_n w_28 0 (pc_to_exp (int_to_pc 0))))
-    26;
-  add_exp
-    (fun w_27 ->
-      assert_env_length w_27 3;
-      let x0_4 = resolve w_27 (Source.E 1) in
-      let x1_4 = resolve w_27 (Source.E 0) in
-      Dynarray.set w_27.state.e 0
-        (Memo.from_int (if Word.get_value (fst x0_4) >= Word.get_value (fst x1_4) then 1 else 0));
-      w_27.state.c <- pc_to_exp (int_to_pc 26))
-    27;
+        Dynarray.set w_25.state.e 0 (Memo.from_constructor tag_VFalse);
+        assert_env_length w_25 3;
+        return_n w_25 0 (pc_to_exp (int_to_pc 0))))
+    25;
   add_exp
     (fun w_26 ->
       let x_18 = resolve w_26 (Source.E 2) in
@@ -1352,6 +1397,28 @@ let populate_state () =
           Dynarray.set w_26.state.e 0 (Memo.appends [ Memo.from_constructor tag_VStuck; Dynarray.get w_26.state.e 0 ]);
           assert_env_length w_26 3;
           return_n w_26 0 (pc_to_exp (int_to_pc 0)))
+    26;
+  add_exp
+    (fun w_27 ->
+      assert_env_length w_27 3;
+      let x0_4 = resolve w_27 (Source.E 1) in
+      let x1_4 = resolve w_27 (Source.E 0) in
+      Dynarray.set w_27.state.e 0
+        (Memo.from_int (if Word.get_value (fst x0_4) >= Word.get_value (fst x1_4) then 1 else 0));
+      w_27.state.c <- pc_to_exp (int_to_pc 28))
+    27;
+  add_exp
+    (fun w_28 ->
+      assert_env_length w_28 3;
+      let cond_3 = resolve w_28 (Source.E 0) in
+      if Word.get_value (fst cond_3) <> 0 then (
+        Dynarray.set w_28.state.e 0 (Memo.from_constructor tag_VTrue);
+        assert_env_length w_28 3;
+        return_n w_28 0 (pc_to_exp (int_to_pc 0)))
+      else (
+        Dynarray.set w_28.state.e 0 (Memo.from_constructor tag_VFalse);
+        assert_env_length w_28 3;
+        return_n w_28 0 (pc_to_exp (int_to_pc 0))))
     28;
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;

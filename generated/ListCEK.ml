@@ -33,6 +33,75 @@ let tag_cont_20 = 25
 let tag_cont_21 = 26
 let tag_cont_22 = 27
 
+let pc_edges =
+  [
+    (0, 0);
+    (0, 8);
+    (0, 10);
+    (0, 18);
+    (0, 22);
+    (0, 24);
+    (0, 27);
+    (0, 33);
+    (0, 34);
+    (0, 35);
+    (1, 0);
+    (1, 2);
+    (2, 0);
+    (2, 1);
+    (3, 0);
+    (3, 4);
+    (4, 3);
+    (5, 0);
+    (5, 6);
+    (6, 7);
+    (7, 5);
+    (8, 0);
+    (8, 8);
+    (9, 0);
+    (9, 9);
+    (10, 0);
+    (10, 11);
+    (11, 12);
+    (12, 0);
+    (12, 10);
+    (13, 0);
+    (13, 13);
+    (14, 0);
+    (14, 15);
+    (15, 0);
+    (15, 16);
+    (16, 0);
+    (16, 14);
+    (17, 14);
+    (18, 0);
+    (18, 19);
+    (19, 0);
+    (19, 20);
+    (20, 21);
+    (21, 18);
+    (22, 0);
+    (22, 23);
+    (23, 0);
+    (23, 17);
+    (24, 0);
+    (24, 25);
+    (25, 26);
+    (26, 24);
+    (27, 0);
+    (27, 28);
+    (28, 29);
+    (29, 27);
+    (30, 0);
+    (30, 31);
+    (31, 32);
+    (32, 30);
+    (33, 0);
+    (33, 30);
+    (34, 0);
+    (35, 22);
+  ]
+
 type int_list = Nil | Cons of int * int_list
 
 let rec from_ocaml_int_list x =
@@ -328,7 +397,7 @@ let populate_state () =
           let keep_0 = env_call w_1 [ 0; 2 ] [ 1 ] in
           w_1.state.k <- Memo.appends [ Memo.from_constructor tag_cont_1; keep_0; w_1.state.k ];
           w_1.state.c <- pc_to_exp (int_to_pc 1)
-      | _ -> failwith "unreachable (2)")
+      | _ -> failwith "unreachable (3)")
     2;
   add_exp
     (fun w_2 ->
@@ -376,9 +445,18 @@ let populate_state () =
           Dynarray.set w_4.state.e 0 split0_3;
           push_env w_4 split1_3;
           push_env w_4 (Memo.from_int 50);
-          w_4.state.c <- pc_to_exp (int_to_pc 7)
+          w_4.state.c <- pc_to_exp (int_to_pc 6)
       | _ -> failwith "unreachable (8)")
     5;
+  add_exp
+    (fun w_5 ->
+      assert_env_length w_5 3;
+      let x0_1 = resolve w_5 (Source.E 0) in
+      let x1_1 = resolve w_5 (Source.E 2) in
+      Dynarray.set w_5.state.e 2
+        (Memo.from_int (if Word.get_value (fst x0_1) > Word.get_value (fst x1_1) then 1 else 0));
+      w_5.state.c <- pc_to_exp (int_to_pc 7))
+    6;
   add_exp
     (fun w_6 ->
       assert_env_length w_6 3;
@@ -392,15 +470,6 @@ let populate_state () =
         assert_env_length w_6 3;
         ignore (env_call w_6 [] [ 1 ]);
         w_6.state.c <- pc_to_exp (int_to_pc 5)))
-    6;
-  add_exp
-    (fun w_5 ->
-      assert_env_length w_5 3;
-      let x0_1 = resolve w_5 (Source.E 0) in
-      let x1_1 = resolve w_5 (Source.E 2) in
-      Dynarray.set w_5.state.e 2
-        (Memo.from_int (if Word.get_value (fst x0_1) > Word.get_value (fst x1_1) then 1 else 0));
-      w_5.state.c <- pc_to_exp (int_to_pc 6))
     7;
   add_exp
     (fun w_7 ->
@@ -460,9 +529,17 @@ let populate_state () =
           let split1_6 = List.nth splits_6 1 in
           push_env w_9 split0_6;
           push_env w_9 split1_6;
-          w_9.state.c <- pc_to_exp (int_to_pc 12)
+          w_9.state.c <- pc_to_exp (int_to_pc 11)
       | _ -> failwith "unreachable (13)")
     10;
+  add_exp
+    (fun w_10 ->
+      assert_env_length w_10 4;
+      let x0_2 = resolve w_10 (Source.E 0) in
+      let x1_2 = resolve w_10 (Source.E 2) in
+      push_env w_10 (Memo.from_int (if Word.get_value (fst x0_2) <= Word.get_value (fst x1_2) then 1 else 0));
+      w_10.state.c <- pc_to_exp (int_to_pc 12))
+    11;
   add_exp
     (fun w_11 ->
       assert_env_length w_11 5;
@@ -477,14 +554,6 @@ let populate_state () =
         let keep_5 = env_call w_11 [ 2 ] [ 0; 3 ] in
         w_11.state.k <- Memo.appends [ Memo.from_constructor tag_cont_6; keep_5; w_11.state.k ];
         w_11.state.c <- pc_to_exp (int_to_pc 10)))
-    11;
-  add_exp
-    (fun w_10 ->
-      assert_env_length w_10 4;
-      let x0_2 = resolve w_10 (Source.E 0) in
-      let x1_2 = resolve w_10 (Source.E 2) in
-      push_env w_10 (Memo.from_int (if Word.get_value (fst x0_2) <= Word.get_value (fst x1_2) then 1 else 0));
-      w_10.state.c <- pc_to_exp (int_to_pc 11))
     12;
   add_exp
     (fun w_12 ->
@@ -525,9 +594,29 @@ let populate_state () =
           Dynarray.set w_13.state.e 1 split0_8;
           push_env w_13 split1_8;
           assert_env_length w_13 3;
-          w_13.state.c <- pc_to_exp (int_to_pc 16)
+          w_13.state.c <- pc_to_exp (int_to_pc 15)
       | _ -> failwith "unreachable (17)")
     14;
+  add_exp
+    (fun w_14 ->
+      let x_9 = resolve w_14 (Source.E 2) in
+      match Word.get_value (fst x_9) with
+      | 1 (* tag_Nil *) ->
+          Dynarray.set w_14.state.e 1 (Memo.from_constructor tag_Nil);
+          Dynarray.set w_14.state.e 0
+            (Memo.appends [ Memo.from_constructor tag_P; Dynarray.get w_14.state.e 1; Dynarray.get w_14.state.e 0 ]);
+          assert_env_length w_14 3;
+          return_n w_14 0 (pc_to_exp (int_to_pc 0))
+      | 2 (* tag_Cons *) ->
+          let splits_9 = Memo.splits (snd x_9) in
+          let split0_9 = List.nth splits_9 0 in
+          let split1_9 = List.nth splits_9 1 in
+          Dynarray.set w_14.state.e 1 split0_9;
+          Dynarray.set w_14.state.e 2 split1_9;
+          assert_env_length w_14 3;
+          w_14.state.c <- pc_to_exp (int_to_pc 16)
+      | _ -> failwith "unreachable (17)")
+    15;
   add_exp
     (fun w_15 ->
       let x_10 = resolve w_15 (Source.E 0) in
@@ -549,27 +638,7 @@ let populate_state () =
           let keep_7 = env_call w_15 [ 0 ] [ 1; 2 ] in
           w_15.state.k <- Memo.appends [ Memo.from_constructor tag_cont_8; keep_7; w_15.state.k ];
           w_15.state.c <- pc_to_exp (int_to_pc 14)
-      | _ -> failwith "unreachable (15)")
-    15;
-  add_exp
-    (fun w_14 ->
-      let x_9 = resolve w_14 (Source.E 2) in
-      match Word.get_value (fst x_9) with
-      | 1 (* tag_Nil *) ->
-          Dynarray.set w_14.state.e 1 (Memo.from_constructor tag_Nil);
-          Dynarray.set w_14.state.e 0
-            (Memo.appends [ Memo.from_constructor tag_P; Dynarray.get w_14.state.e 1; Dynarray.get w_14.state.e 0 ]);
-          assert_env_length w_14 3;
-          return_n w_14 0 (pc_to_exp (int_to_pc 0))
-      | 2 (* tag_Cons *) ->
-          let splits_9 = Memo.splits (snd x_9) in
-          let split0_9 = List.nth splits_9 0 in
-          let split1_9 = List.nth splits_9 1 in
-          Dynarray.set w_14.state.e 1 split0_9;
-          Dynarray.set w_14.state.e 2 split1_9;
-          assert_env_length w_14 3;
-          w_14.state.c <- pc_to_exp (int_to_pc 15)
-      | _ -> failwith "unreachable (16)")
+      | _ -> failwith "unreachable (17)")
     16;
   add_exp
     (fun w_16 ->
@@ -592,32 +661,9 @@ let populate_state () =
           push_env w_17 split0_11;
           push_env w_17 split1_11;
           assert_env_length w_17 4;
-          w_17.state.c <- pc_to_exp (int_to_pc 21)
+          w_17.state.c <- pc_to_exp (int_to_pc 19)
       | _ -> failwith "unreachable (22)")
     18;
-  add_exp
-    (fun w_20 ->
-      assert_env_length w_20 7;
-      let cond_2 = resolve w_20 (Source.E 6) in
-      if Word.get_value (fst cond_2) <> 0 then (
-        assert_env_length w_20 7;
-        let keep_8 = env_call w_20 [ 2 ] [ 3; 1 ] in
-        w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_8; w_20.state.k ];
-        w_20.state.c <- pc_to_exp (int_to_pc 18))
-      else (
-        assert_env_length w_20 7;
-        let keep_9 = env_call w_20 [ 4 ] [ 0; 5 ] in
-        w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_9; w_20.state.k ];
-        w_20.state.c <- pc_to_exp (int_to_pc 18)))
-    19;
-  add_exp
-    (fun w_19 ->
-      assert_env_length w_19 6;
-      let x0_3 = resolve w_19 (Source.E 2) in
-      let x1_3 = resolve w_19 (Source.E 4) in
-      push_env w_19 (Memo.from_int (if Word.get_value (fst x0_3) < Word.get_value (fst x1_3) then 1 else 0));
-      w_19.state.c <- pc_to_exp (int_to_pc 19))
-    20;
   add_exp
     (fun w_18 ->
       let x_12 = resolve w_18 (Source.E 1) in
@@ -632,7 +678,30 @@ let populate_state () =
           push_env w_18 split0_12;
           push_env w_18 split1_12;
           w_18.state.c <- pc_to_exp (int_to_pc 20)
-      | _ -> failwith "unreachable (21)")
+      | _ -> failwith "unreachable (22)")
+    19;
+  add_exp
+    (fun w_19 ->
+      assert_env_length w_19 6;
+      let x0_3 = resolve w_19 (Source.E 2) in
+      let x1_3 = resolve w_19 (Source.E 4) in
+      push_env w_19 (Memo.from_int (if Word.get_value (fst x0_3) < Word.get_value (fst x1_3) then 1 else 0));
+      w_19.state.c <- pc_to_exp (int_to_pc 21))
+    20;
+  add_exp
+    (fun w_20 ->
+      assert_env_length w_20 7;
+      let cond_2 = resolve w_20 (Source.E 6) in
+      if Word.get_value (fst cond_2) <> 0 then (
+        assert_env_length w_20 7;
+        let keep_8 = env_call w_20 [ 2 ] [ 3; 1 ] in
+        w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_9; keep_8; w_20.state.k ];
+        w_20.state.c <- pc_to_exp (int_to_pc 18))
+      else (
+        assert_env_length w_20 7;
+        let keep_9 = env_call w_20 [ 4 ] [ 0; 5 ] in
+        w_20.state.k <- Memo.appends [ Memo.from_constructor tag_cont_10; keep_9; w_20.state.k ];
+        w_20.state.c <- pc_to_exp (int_to_pc 18)))
     21;
   add_exp
     (fun w_21 ->
@@ -670,7 +739,7 @@ let populate_state () =
           let keep_10 = env_call w_22 [] [ 0 ] in
           w_22.state.k <- Memo.appends [ Memo.from_constructor tag_cont_11; keep_10; w_22.state.k ];
           w_22.state.c <- pc_to_exp (int_to_pc 17)
-      | _ -> failwith "unreachable (23)")
+      | _ -> failwith "unreachable (24)")
     23;
   add_exp
     (fun w_23 ->
@@ -687,9 +756,17 @@ let populate_state () =
           let split1_15 = List.nth splits_15 1 in
           Dynarray.set w_23.state.e 0 split0_15;
           push_env w_23 split1_15;
-          w_23.state.c <- pc_to_exp (int_to_pc 26)
+          w_23.state.c <- pc_to_exp (int_to_pc 25)
       | _ -> failwith "unreachable (27)")
     24;
+  add_exp
+    (fun w_24 ->
+      assert_env_length w_24 3;
+      let x0_4 = resolve w_24 (Source.E 0) in
+      let x1_4 = resolve w_24 (Source.E 1) in
+      push_env w_24 (Memo.from_int (if Word.get_value (fst x0_4) > Word.get_value (fst x1_4) then 1 else 0));
+      w_24.state.c <- pc_to_exp (int_to_pc 26))
+    25;
   add_exp
     (fun w_25 ->
       assert_env_length w_25 4;
@@ -703,14 +780,6 @@ let populate_state () =
         assert_env_length w_25 4;
         ignore (env_call w_25 [] [ 2; 1 ]);
         w_25.state.c <- pc_to_exp (int_to_pc 24)))
-    25;
-  add_exp
-    (fun w_24 ->
-      assert_env_length w_24 3;
-      let x0_4 = resolve w_24 (Source.E 0) in
-      let x1_4 = resolve w_24 (Source.E 1) in
-      push_env w_24 (Memo.from_int (if Word.get_value (fst x0_4) > Word.get_value (fst x1_4) then 1 else 0));
-      w_24.state.c <- pc_to_exp (int_to_pc 25))
     26;
   add_exp
     (fun w_26 ->
@@ -727,9 +796,17 @@ let populate_state () =
           let split1_16 = List.nth splits_16 1 in
           Dynarray.set w_26.state.e 0 split0_16;
           push_env w_26 split1_16;
-          w_26.state.c <- pc_to_exp (int_to_pc 29)
+          w_26.state.c <- pc_to_exp (int_to_pc 28)
       | _ -> failwith "unreachable (30)")
     27;
+  add_exp
+    (fun w_27 ->
+      assert_env_length w_27 3;
+      let x0_5 = resolve w_27 (Source.E 0) in
+      let x1_5 = resolve w_27 (Source.E 1) in
+      push_env w_27 (Memo.from_int (if Word.get_value (fst x0_5) = Word.get_value (fst x1_5) then 1 else 0));
+      w_27.state.c <- pc_to_exp (int_to_pc 29))
+    28;
   add_exp
     (fun w_28 ->
       assert_env_length w_28 4;
@@ -743,14 +820,6 @@ let populate_state () =
         assert_env_length w_28 4;
         ignore (env_call w_28 [] [ 2; 1 ]);
         w_28.state.c <- pc_to_exp (int_to_pc 27)))
-    28;
-  add_exp
-    (fun w_27 ->
-      assert_env_length w_27 3;
-      let x0_5 = resolve w_27 (Source.E 0) in
-      let x1_5 = resolve w_27 (Source.E 1) in
-      push_env w_27 (Memo.from_int (if Word.get_value (fst x0_5) = Word.get_value (fst x1_5) then 1 else 0));
-      w_27.state.c <- pc_to_exp (int_to_pc 28))
     29;
   add_exp
     (fun w_29 ->
@@ -767,9 +836,17 @@ let populate_state () =
           let split1_17 = List.nth splits_17 1 in
           Dynarray.set w_29.state.e 0 split0_17;
           push_env w_29 split1_17;
-          w_29.state.c <- pc_to_exp (int_to_pc 32)
+          w_29.state.c <- pc_to_exp (int_to_pc 31)
       | _ -> failwith "unreachable (33)")
     30;
+  add_exp
+    (fun w_30 ->
+      assert_env_length w_30 3;
+      let x0_6 = resolve w_30 (Source.E 0) in
+      let x1_6 = resolve w_30 (Source.E 1) in
+      push_env w_30 (Memo.from_int (if Word.get_value (fst x0_6) < Word.get_value (fst x1_6) then 1 else 0));
+      w_30.state.c <- pc_to_exp (int_to_pc 32))
+    31;
   add_exp
     (fun w_31 ->
       assert_env_length w_31 4;
@@ -783,14 +860,6 @@ let populate_state () =
         assert_env_length w_31 4;
         ignore (env_call w_31 [] [ 2; 1 ]);
         w_31.state.c <- pc_to_exp (int_to_pc 30)))
-    31;
-  add_exp
-    (fun w_30 ->
-      assert_env_length w_30 3;
-      let x0_6 = resolve w_30 (Source.E 0) in
-      let x1_6 = resolve w_30 (Source.E 1) in
-      push_env w_30 (Memo.from_int (if Word.get_value (fst x0_6) < Word.get_value (fst x1_6) then 1 else 0));
-      w_30.state.c <- pc_to_exp (int_to_pc 31))
     32;
   add_exp
     (fun w_32 ->
@@ -829,7 +898,7 @@ let populate_state () =
             (Memo.appends [ Memo.from_constructor tag_P; Dynarray.get w_34.state.e 0; Dynarray.get w_34.state.e 2 ]);
           assert_env_length w_34 3;
           return_n w_34 0 (pc_to_exp (int_to_pc 0))
-      | _ -> failwith "unreachable (34)")
+      | _ -> failwith "unreachable (35)")
     34;
   add_exp
     (fun w_35 ->
@@ -845,7 +914,7 @@ let populate_state () =
           let keep_15 = env_call w_35 [ 1 ] [ 0 ] in
           w_35.state.k <- Memo.appends [ Memo.from_constructor tag_cont_16; keep_15; w_35.state.k ];
           w_35.state.c <- pc_to_exp (int_to_pc 22)
-      | _ -> failwith "unreachable (35)")
+      | _ -> failwith "unreachable (36)")
     35;
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;
