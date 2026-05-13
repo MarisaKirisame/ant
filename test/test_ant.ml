@@ -52,20 +52,14 @@ end
 let string_contains s sub =
   let len_s = String.length s in
   let len_sub = String.length sub in
-  let rec loop i =
-    if i + len_sub > len_s then false
-    else if String.sub s i len_sub = sub then true
-    else loop (i + 1)
-  in
+  let rec loop i = if i + len_sub > len_s then false else if String.sub s i len_sub = sub then true else loop (i + 1) in
   if len_sub = 0 then true else loop 0
 
 let find_substring s sub =
   let len_s = String.length s in
   let len_sub = String.length sub in
   let rec loop i =
-    if i + len_sub > len_s then None
-    else if String.sub s i len_sub = sub then Some i
-    else loop (i + 1)
+    if i + len_sub > len_s then None else if String.sub s i len_sub = sub then Some i else loop (i + 1)
   in
   if len_sub = 0 then Some 0 else loop 0
 
@@ -76,14 +70,12 @@ let extract_int_field line field =
   | Some idx ->
       let start = idx + String.length marker in
       let len = String.length line in
-      let rec skip_spaces i =
-        if i < len && (line.[i] = ' ' || line.[i] = '\t') then skip_spaces (i + 1) else i
-      in
+      let rec skip_spaces i = if i < len && (line.[i] = ' ' || line.[i] = '\t') then skip_spaces (i + 1) else i in
       let rec parse i acc seen =
         if i >= len then if seen then Some acc else None
         else
           let c = line.[i] in
-          if c >= '0' && c <= '9' then parse (i + 1) (acc * 10 + (Char.code c - 48)) true
+          if c >= '0' && c <= '9' then parse (i + 1) ((acc * 10) + (Char.code c - 48)) true
           else if seen then Some acc
           else None
       in
@@ -91,9 +83,7 @@ let extract_int_field line field =
 
 let read_lines path =
   In_channel.with_open_text path (fun ic ->
-      let rec loop acc =
-        match In_channel.input_line ic with None -> List.rev acc | Some line -> loop (line :: acc)
-      in
+      let rec loop acc = match In_channel.input_line ic with None -> List.rev acc | Some line -> loop (line :: acc) in
       loop [])
 
 let rec find_repo_root dir =
@@ -103,9 +93,7 @@ let rec find_repo_root dir =
     if parent = dir then dir else find_repo_root parent
 
 let steps_from_file path =
-  let root =
-    match Sys.getenv_opt "DUNE_SOURCEROOT" with Some root -> root | None -> find_repo_root (Sys.getcwd ())
-  in
+  let root = match Sys.getenv_opt "DUNE_SOURCEROOT" with Some root -> root | None -> find_repo_root (Sys.getcwd ()) in
   let full_path = Filename.concat root path in
   assert (Sys.file_exists full_path);
   let lines = read_lines full_path in
@@ -130,9 +118,7 @@ let assert_contains_steps path expected_step expected_without =
   assert (List.exists (fun (step, without) -> step = expected_step && without = expected_without) steps)
 
 let int_of_word_seq seq =
-  match Memo.to_word seq with
-  | Word.Word.Int v -> v
-  | Word.Word.ConstructorTag _ -> failwith "expected int word"
+  match Memo.to_word seq with Word.Word.Int v -> v | Word.Word.ConstructorTag _ -> failwith "expected int word"
 
 let setup_exec_cek_program () =
   Words.reset ();
@@ -197,7 +183,11 @@ let test_dependency_steps () =
   setup_compose_program ();
   let memo = Memo.init_memo () in
   let start =
-    { State.c = Memo.pc_to_exp (Common.int_to_pc 1); e = Stdlib.Dynarray.of_list [ Memo.from_int 0 ]; k = Memo.from_constructor 1 }
+    {
+      State.c = Memo.pc_to_exp (Common.int_to_pc 1);
+      e = Stdlib.Dynarray.of_list [ Memo.from_int 0 ];
+      k = Memo.from_constructor 1;
+    }
   in
   let old1 = State.copy_state start in
   let w1 = State.make_world start memo in
@@ -313,8 +303,7 @@ let _ =
     | 2 ->
         assert (Intmap.mem z k = Hashtbl.mem ref_tbl k);
         assert (Intmap.find_opt z k = Hashtbl.find_opt ref_tbl k)
-    | _ ->
-        if Hashtbl.mem ref_tbl k then assert (Intmap.find z k = Hashtbl.find ref_tbl k)
+    | _ -> if Hashtbl.mem ref_tbl k then assert (Intmap.find z k = Hashtbl.find ref_tbl k)
   done;
   assert (Intmap.length z = Hashtbl.length ref_tbl);
   let iter_count = ref 0 in
