@@ -58,7 +58,7 @@ All CLI wiring lives in `bin/main.ml`.
 - `make build` – build through the managed switch (`dune build`).
 - `make run` – regenerate `generated/*.ml`, format, and execute `GeneratedMain`.
 - `dune runtest` – run unit tests in `test/test_ant.ml` (hash monoid and intmap checks).
-- `make coverage` – run tests with `bisect_ppx` instrumentation and write `_coverage/index.html` (requires `bisect_ppx`).
+- `make coverage` – run tests with `bisect_ppx` instrumentation and write Markdown coverage summaries under `_coverage/` (requires `bisect_ppx`).
 - `dune exec bench/<target>.exe` – run benchmarks in `bench/`.
 
 Generated modules under `generated/` are overwritten by `make run`; avoid editing them manually.

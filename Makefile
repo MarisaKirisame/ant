@@ -9,10 +9,7 @@ build:
 	uv run ./nightly.py build
 
 coverage:
-	rm -rf _coverage
-	mkdir -p _coverage
-	opam exec -- env BISECT_FILE="$$(pwd)/_coverage/bisect" dune runtest --ignore-lock-dir --instrument-with bisect_ppx --force
-	opam exec -- bisect-ppx-report html --coverage-path _coverage
+	uv run ./nightly.py coverage
 
 compile-generated:
 	uv run ./nightly.py compile-generated
