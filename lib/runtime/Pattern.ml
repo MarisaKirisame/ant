@@ -9,7 +9,6 @@ type measure = Value.measure_t
 
 (*Invariant: consecutive constructors should be fused*)
 type pattern = Value.value
-
 type pat = Value.fg_et = Words of words | Reference of reference | PVar of int
 
 let make_pvar n =

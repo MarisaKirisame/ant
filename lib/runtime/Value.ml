@@ -41,24 +41,13 @@ let rec value_valid x : bool =
       match Generic.front rest ~monoid ~measure with
       | None -> true
       | Some (_, y) ->
-          (match (x, y) with
-            | Words _, Words _ -> false
-            | PVar _, PVar _ -> false
-            | _ -> true)
-          && value_valid rest)
+          (match (x, y) with Words _, Words _ -> false | PVar _, PVar _ -> false | _ -> true) && value_valid rest)
 
 let summary x = Generic.measure ~monoid ~measure x
 let value_measure x = summary x
-
-let append (x : seq) (y : seq) : seq =
-  append_merge ~monoid ~measure ~merge:merge_fg_et x y
-
-let value_cons (et : fg_et) (v : seq) : seq =
-  cons_merge ~monoid ~measure ~merge:merge_fg_et et v
-
-let value_snoc (v : seq) (et : fg_et) : seq =
-  snoc_merge ~monoid ~measure ~merge:merge_fg_et v et
-
+let append (x : seq) (y : seq) : seq = append_merge ~monoid ~measure ~merge:merge_fg_et x y
+let value_cons (et : fg_et) (v : seq) : seq = cons_merge ~monoid ~measure ~merge:merge_fg_et et v
+let value_snoc (v : seq) (et : fg_et) : seq = snoc_merge ~monoid ~measure ~merge:merge_fg_et v et
 let value_snoc_unsafe (v : seq) (et : fg_et) : seq = Generic.snoc ~monoid ~measure v et
 let value_cons_unsafe (et : fg_et) (v : seq) : seq = Generic.cons ~monoid ~measure v et
 

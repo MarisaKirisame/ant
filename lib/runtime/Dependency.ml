@@ -14,10 +14,10 @@ type value_subst_cek = value_subst_map cek
 let string_of_pattern (p : pattern) : string =
   Generic.to_list p
   |> List.map (fun pat ->
-         match pat with
-         | PVar n -> "H(" ^ string_of_int n ^ ")"
-         | Words w -> string_of_words w
-         | Reference r -> string_of_reference r)
+      match pat with
+      | PVar n -> "H(" ^ string_of_int n ^ ")"
+      | Words w -> string_of_words w
+      | Reference r -> string_of_reference r)
   |> String.concat ""
 
 let rec unify (x : pattern) (y : pattern) : pattern =
