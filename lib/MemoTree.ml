@@ -107,23 +107,19 @@ let appends (x : seq list) : seq =
   | _ -> ValueTree.pack (flatten_seqs x)
 
 let splits (x : seq) : seq list = ValueTree.unpack_seq x
-
-let rec splits_1 x =
-  match splits x with h :: _ -> h | [] -> failwith "splits_1: empty"
-
-let rec splits_2 x =
-  match splits x with h1 :: h2 :: _ -> (h1, h2) | _ -> failwith "splits_2: not enough elements"
+let rec splits_1 x = match splits x with h :: _ -> h | [] -> failwith "splits_1: empty"
+let rec splits_2 x = match splits x with h1 :: h2 :: _ -> (h1, h2) | _ -> failwith "splits_2: not enough elements"
 
 let rec splits_3 x =
   match splits x with h1 :: h2 :: h3 :: _ -> (h1, h2, h3) | _ -> failwith "splits_3: not enough elements"
 
 let rec splits_4 x =
-  match splits x with
-  | h1 :: h2 :: h3 :: h4 :: _ -> (h1, h2, h3, h4)
-  | _ -> failwith "splits_4: not enough elements"
+  match splits x with h1 :: h2 :: h3 :: h4 :: _ -> (h1, h2, h3, h4) | _ -> failwith "splits_4: not enough elements"
 
 let list_match (x : seq) : (Word.t * seq) option =
-  match x with Reference _ -> failwith "list_match on Reference" | Node (label, children) -> Some (label, ValueTree.pack children)
+  match x with
+  | Reference _ -> failwith "list_match on Reference"
+  | Node (label, children) -> Some (label, ValueTree.pack children)
 
 let push_env (w : world) (v : value) : unit = Dynarray.add_last w.state.e v
 
@@ -214,15 +210,13 @@ let compute_subtree_end (tokens : token array) : int array =
     end_pos)
 
 let empty_trie () : trie = { steps = None; var = None; const = Children.create (); max_sc = 0 }
-
-let update_max_sc (t : trie) (step : step) : unit =
-  if step.sc > t.max_sc then t.max_sc <- step.sc
+let update_max_sc (t : trie) (step : step) : unit = if step.sc > t.max_sc then t.max_sc <- step.sc
 
 let rec insert_tokens (t : trie) (tokens : token list) (step : step) : unit =
   update_max_sc t step;
   match tokens with
   | [] -> t.steps <- Some (match t.steps with None -> step | Some s -> choose_step s step)
-  | TVar :: rest -> (
+  | TVar :: rest ->
       let child =
         match t.var with
         | Some child -> child
@@ -231,8 +225,8 @@ let rec insert_tokens (t : trie) (tokens : token list) (step : step) : unit =
             t.var <- Some child;
             child
       in
-      insert_tokens child rest step)
-  | TNode (label, arity) :: rest -> (
+      insert_tokens child rest step
+  | TNode (label, arity) :: rest ->
       let key = token_key label arity in
       let child =
         match Children.find t.const key with
@@ -242,7 +236,7 @@ let rec insert_tokens (t : trie) (tokens : token list) (step : step) : unit =
             Children.set t.const key child;
             child
       in
-      insert_tokens child rest step)
+      insert_tokens child rest step
 
 let pattern_size (p : PatternTree.pattern) = PatternTree.pattern_size p
 let patterns_size (p : PatternTree.pattern cek) : int = fold_ek p 0 (fun acc p -> acc + pattern_size p)
@@ -275,7 +269,8 @@ let insert_step (m : memo) (step : step) : unit =
   in
   step.insert_time <- elapsed_time
 
-let rec lookup_tokens (t : trie) (tokens : token array) (end_pos : int array) (pos : int) (expected_end : int) : step option =
+let rec lookup_tokens (t : trie) (tokens : token array) (end_pos : int array) (pos : int) (expected_end : int) :
+    step option =
   if pos = expected_end then t.steps
   else if pos > expected_end then None
   else
@@ -284,12 +279,14 @@ let rec lookup_tokens (t : trie) (tokens : token array) (end_pos : int array) (p
     in
     match tokens.(pos) with
     | TVar -> best
-    | TNode (label, arity) -> (
+    | TNode (label, arity) ->
         let key = token_key label arity in
         let const =
-          match Children.find t.const key with None -> None | Some child -> lookup_tokens child tokens end_pos (pos + 1) expected_end
+          match Children.find t.const key with
+          | None -> None
+          | Some child -> lookup_tokens child tokens end_pos (pos + 1) expected_end
         in
-        choose_step_option best const)
+        choose_step_option best const
 
 let lookup_step (value : state) (m : memo) : step option =
   let pc = value.c.pc in
@@ -331,7 +328,6 @@ let step_through_slot = Profile.register_slot Profile.memo_profile "step_through
 let compose_step_slot = Profile.register_slot Profile.memo_profile "compose_step"
 let insert_step_slot = Profile.register_slot Profile.memo_profile "insert_step"
 let lookup_step_slot = Profile.register_slot Profile.memo_profile "lookup_step"
-
 let instantiate (step : step) (_state : state) : step = step
 
 let exec_cek (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
@@ -453,7 +449,7 @@ let memo_stats (m : memo) : memo_stats =
     else (
       stem_nodes := !stem_nodes + 1;
       node_stats := { depth; insert_time = 1; node_state = Stem_node } :: !node_stats);
-    (match t.steps with
+    match t.steps with
     | None -> ()
     | Some st ->
         rule_stat :=
@@ -466,7 +462,7 @@ let memo_stats (m : memo) : memo_stats =
             depth;
             rule = lazy (DependencyTree.string_of_step st);
           }
-          :: !rule_stat)
+          :: !rule_stat
   in
   Array.iter m ~f:(fun opt_trie -> match opt_trie with None -> () | Some trie -> aux trie 0);
   {
