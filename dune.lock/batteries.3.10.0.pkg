@@ -15,4 +15,5 @@
  (fetch
   (url
    https://github.com/ocaml-batteries-team/batteries-included/releases/download/v3.10.0/batteries-3.10.0.tar.gz)
-  (checksum md5=b7f3b99f12f21b1da6b6aa13d993206d)))
+  (checksum
+   sha512=8b7f2479eb0271bcfd9168887c1e4a9a815c512eab3ee61b150fc4dfa9ec803e4f73115155f20b3017e4a822148d0e6d1c1e8e5f96790fd691b419dd39a908a2)))

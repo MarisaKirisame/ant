@@ -16,4 +16,4 @@
   (url
    https://github.com/ocaml-ppx/ppxlib/releases/download/0.35.0/ppxlib-0.35.0.tbz)
   (checksum
-   sha256=d9d959fc9f84260487e45684dc741898a92fc5506b61a7f5cac65d21832db925)))
+   sha512=e428b1e3b89261c7efdaa18016264d1afbf067cb9b0d41124b04796c2487ac7ca8ee9a24a60d56f20d1774cb44aaa9ecf1512f17455812ba8d62d4ef93616ee7)))
