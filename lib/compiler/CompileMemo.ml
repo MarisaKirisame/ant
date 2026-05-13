@@ -137,7 +137,6 @@ type ctx = {
   mutable conts_count : int;
   func_pc : (string, pc) Hashtbl.t;
   pc_edges : (int * int) Dynarray.t;
-  mutable current_pc : pc option;
 }
 
 let get_ctor_tag_name (name : string) : string = "tag_" ^ name
@@ -163,7 +162,6 @@ let new_ctx () : ctx =
       conts_count = 0;
       func_pc = Hashtbl.create ();
       pc_edges = Dynarray.create ();
-      current_pc = None;
     }
   in
   add_cont ctx "cont_done" 0 (fun w _ -> exec_done_ w);
@@ -179,35 +177,16 @@ let add_code (c : (world -> unit) code option) : pc =
 let set_code (pc : pc) (c : (world -> unit) code) : unit = Dynarray.set codes (pc_to_int pc) (Some c)
 let apply_cont : pc = add_code None
 
-let with_current_pc (ctx : ctx) (pc : pc) f =
-  let previous_pc = ctx.current_pc in
-  ctx.current_pc <- Some pc;
-  Fun.protect ~finally:(fun () -> ctx.current_pc <- previous_pc) f
+let record_pc_edge (ctx : ctx) (src : pc) (dst : pc) : unit =
+  Dynarray.add_last ctx.pc_edges (pc_to_int src, pc_to_int dst)
 
-let record_pc_edge (ctx : ctx) (dst : pc) : unit =
-  match ctx.current_pc with Some src -> Dynarray.add_last ctx.pc_edges (pc_to_int src, pc_to_int dst) | None -> ()
-
-let goto_pc (ctx : ctx) (w : world code) (dst : pc) : unit code =
-  record_pc_edge ctx dst;
-  goto_ w dst
-
-let return_to_apply_cont (ctx : ctx) (w : world code) (loc : int) : unit code =
-  record_pc_edge ctx apply_cont;
-  return_n_ w (int_ loc) (pc_to_exp_ (pc_ apply_cont))
-
-let set_code_with_pc (ctx : ctx) (pc : pc) (build : unit -> (world -> unit) code) : unit =
-  with_current_pc ctx pc (fun () -> set_code pc (build ()))
-
-let add_code_with_pc (ctx : ctx) (build : pc -> (world -> unit) code) : pc =
+let add_code_k (k : pc -> (world -> unit) code * 'a) : 'a =
   let pc = add_code None in
-  set_code_with_pc ctx pc (fun () -> build pc);
-  pc
-
-let add_code_k (ctx : ctx) (k : pc -> (world -> unit) code * 'a) : 'a =
-  let pc = add_code None in
-  let code, ret = with_current_pc ctx pc (fun () -> k pc) in
+  let code, ret = k pc in
   set_code pc code;
   ret
+
+let add_code_with_pc (build : pc -> (world -> unit) code) : pc = add_code_k (fun pc -> (build pc, pc))
 
 let with_splits count splits k =
   [%seqs
@@ -235,10 +214,18 @@ let register_constructors (e : ctx) ctors =
   List.iter (fun (con_name, types, _) -> register_constructor e con_name types) ctors
 
 type location = int
-type env = { values : location StrMap.t; env_length : int; changed : bool; w : world code }
+type env = { values : location StrMap.t; env_length : int; changed : bool; pc : pc; w : world code }
 type kont = env -> unit code
 
-let new_env w = { values = StrMap.empty; env_length = 0; changed = false; w }
+let new_env pc w = { values = StrMap.empty; env_length = 0; changed = false; pc; w }
+
+let goto_pc (ctx : ctx) (env : env) (dst : pc) : unit code =
+  record_pc_edge ctx env.pc dst;
+  goto_ env.w dst
+
+let return_to_apply_cont (ctx : ctx) (env : env) (loc : int) : unit code =
+  record_pc_edge ctx env.pc apply_cont;
+  return_n_ env.w (int_ loc) (pc_to_exp_ (pc_ apply_cont))
 
 let check_env env =
   StrMap.iter
@@ -273,7 +260,7 @@ let return ctx loc : kont =
  fun env ->
   [%seqs
     assert_env_length_ env.w (int_ env.env_length);
-    return_to_apply_cont ctx env.w loc]
+    return_to_apply_cont ctx env loc]
 
 type keep_t = { mutable keep : bool; mutable source : string option }
 
@@ -296,8 +283,8 @@ let keep_only (env : env) (fv : fv_t) : int Dynarray.t * env =
   (keep_idx, env)
 
 let reading ctx env (f : env -> unit code) : unit code =
-  let make_code w = f { env with changed = false; w } in
-  if env.changed then goto_pc ctx env.w (add_code_with_pc ctx (fun _ -> lam_ "w" make_code)) else f env
+  let make_code pc w = f { env with changed = false; pc; w } in
+  if env.changed then goto_pc ctx env (add_code_with_pc (fun pc -> lam_ "w" (make_code pc))) else f env
 
 let shrink (env : env) (fv : fv_t) : env =
   let values = StrMap.filter (fun k _ -> StrMap.mem k fv) env.values in
@@ -421,9 +408,9 @@ let rec compile_pp_expr (ctx : ctx) (env : env) (c : fv_t option expr) (k : loca
                 restore_env_ w (int_ keep_length) tl;
                 let env =
                   {
-                    keep_env with
                     values = StrMap.add l keep_length keep_env.values;
                     env_length = keep_length + 1;
+                    pc = apply_cont;
                     w;
                     changed = true;
                   }
@@ -433,14 +420,14 @@ let rec compile_pp_expr (ctx : ctx) (env : env) (c : fv_t option expr) (k : loca
             assert_env_length_ env.w (int_ env.env_length);
             (let$ keep = env_call_ env.w (list_literal_of_ int_ (Dynarray.to_list keep)) (list_literal_of_ int_ xs) in
              set_k_ env.w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ env.w ]));
-            goto_pc ctx env.w (Hashtbl.find_exn ctx.func_pc f)]
+            goto_pc ctx env (Hashtbl.find_exn ctx.func_pc f)]
       | _ -> failwith ("compile_pp_expr(let): " ^ Syntax.string_of_document @@ Syntax.pp_expr c))
   | App (GVar (f, _), xs, info) ->
       let xs = List.map (loc_from_var env) xs in
       [%seqs
         assert_env_length_ env.w (int_ env.env_length);
         to_unit_ $ env_call_ env.w (list_literal_of_ int_ []) (list_literal_of_ int_ xs);
-        goto_pc ctx env.w (Hashtbl.find_exn ctx.func_pc f)]
+        goto_pc ctx env (Hashtbl.find_exn ctx.func_pc f)]
   | _ -> failwith ("compile_pp_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr c)
 
 and compile_pp_cases (ctx : ctx) (env : env) (MatchPattern (c, _) : 'a cases) loc (k : location -> kont) : unit code =
@@ -517,7 +504,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
       let arg_num = List.length ps in
       let name = match x with PVar (x, _) -> x | _ -> failwith "bad match" in
       let cont_done_tag = ctor_tag_name ctx "cont_done" in
-      add_code_k ctx (fun entry_code ->
+      add_code_k (fun entry_code ->
           Hashtbl.add_exn ctx.func_pc ~key:name ~data:entry_code;
           let r =
             ( lam_ "w" (fun w ->
@@ -527,7 +514,7 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
                         match p with
                         | PVar (n, _) -> extend_env env n
                         | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern p))
-                      (new_env w) ps
+                      (new_env entry_code w) ps
                   in
                   let env = { env with changed = false } in
                   compile_pp_expr ctx env term (return ctx)),
@@ -545,49 +532,49 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
   | _ -> failwith (Syntax.string_of_document @@ Syntax.pp_stmt s)
 
 let generate_apply_cont ctx =
-  set_code_with_pc ctx apply_cont (fun () ->
-      lam_ "w" (fun w ->
-          (* We have to be careful: ctx.conts will grow as we apply the lambdas,
-           *   so we cannot do a single map over the whole array,
-           *   instead we have to take elements out on by one.
-           *)
-          let cont_codes = Dynarray.create () in
-          let rec loop tl i =
-            if i == Dynarray.length ctx.conts then cont_codes
-            else
-              let name, action = Dynarray.get ctx.conts i in
-              let code = (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl) in
-              Dynarray.add_last cont_codes code;
-              loop tl (i + 1)
-          in
-          [%seqs
-            assert_env_length_ w (int_ 1);
-            let hd, hd_pat = genvar "hd" in
-            let tl, tl_pat = genvar "tl" in
-            let pat = pair_pat_ hd_pat tl_pat in
-            let_pat_in_ pat
-              (resolve_ w (raw "K"))
-              (paren
-              $ match_ctor_tag_literal_default_ (word_get_value_ hd)
-                  (Dynarray.to_list (loop tl 0))
-                  (unreachable_ (pc_to_int apply_cont)))]))
+  set_code apply_cont
+    (lam_ "w" (fun w ->
+         (* We have to be careful: ctx.conts will grow as we apply the lambdas,
+          *   so we cannot do a single map over the whole array,
+          *   instead we have to take elements out on by one.
+          *)
+         let cont_codes = Dynarray.create () in
+         let rec loop tl i =
+           if i == Dynarray.length ctx.conts then cont_codes
+           else
+             let name, action = Dynarray.get ctx.conts i in
+             let code = (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl) in
+             Dynarray.add_last cont_codes code;
+             loop tl (i + 1)
+         in
+         [%seqs
+           assert_env_length_ w (int_ 1);
+           let hd, hd_pat = genvar "hd" in
+           let tl, tl_pat = genvar "tl" in
+           let pat = pair_pat_ hd_pat tl_pat in
+           let_pat_in_ pat
+             (resolve_ w (raw "K"))
+             (paren
+             $ match_ctor_tag_literal_default_ (word_get_value_ hd)
+                 (Dynarray.to_list (loop tl 0))
+                 (unreachable_ (pc_to_int apply_cont)))]))
 
 let generate_apply_cont_ ctx =
-  set_code_with_pc ctx apply_cont (fun () ->
-      lam_ "w" (fun w ->
-          [%seqs
-            assert_env_length_ w (int_ 1);
-            let hd, hd_pat = genvar "hd" in
-            let tl, tl_pat = genvar "tl" in
-            let pat = pair_pat_ hd_pat tl_pat in
-            let_pat_in_ pat
-              (resolve_ w (raw "K"))
-              (paren
-              $ match_ctor_tag_literal_default_ (word_get_value_ hd)
-                  (List.init (Dynarray.length ctx.conts) (fun i ->
-                       let name, action = Dynarray.get ctx.conts i in
-                       (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl)))
-                  (unreachable_ (pc_to_int apply_cont)))]))
+  set_code apply_cont
+    (lam_ "w" (fun w ->
+         [%seqs
+           assert_env_length_ w (int_ 1);
+           let hd, hd_pat = genvar "hd" in
+           let tl, tl_pat = genvar "tl" in
+           let pat = pair_pat_ hd_pat tl_pat in
+           let_pat_in_ pat
+             (resolve_ w (raw "K"))
+             (paren
+             $ match_ctor_tag_literal_default_ (word_get_value_ hd)
+                 (List.init (Dynarray.length ctx.conts) (fun i ->
+                      let name, action = Dynarray.get ctx.conts i in
+                      (Hashtbl.find_exn ctx.ctag name, Hashtbl.find_exn ctx.ctag_name name, action w tl)))
+                 (unreachable_ (pc_to_int apply_cont)))]))
 
 let ctor_tag_decls ctx =
   let xs = List.sort (fun (_, x) (_, y) -> x - y) (Hashtbl.to_alist ctx.ctag) in
