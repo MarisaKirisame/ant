@@ -191,8 +191,6 @@ let defunc_prog (prog : 'a prog) =
   in
   (defunc_apply :: prog, empty_info)
 
-let empty_info = SynInfo.empty_info
-
 let mk_fresh_pat prefix =
   let name = Fresh.next_fresh prefix in
   (PVar (name, empty_info), Var (name, empty_info))

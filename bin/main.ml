@@ -25,9 +25,10 @@ let driver input output print_ast compile_pat compile_ant type_alias (module Bac
   let src = read_all input in
   let syn = parse src in
   let ast = Typing.top_type_of_prog syn in
-  let anf = Transform.anf_prog ast in
-  (*let frontend = Pat.compile anf in*)
-  let frontend = anf in
+  (*let ast = Pat.compile ast in*)
+  (*todo: should not call anf for baseline, seems to regress*)
+  let ast = Transform.anf_prog ast in
+  let frontend = ast in
   CompilePlain.set_type_alias_module type_alias;
   let debug_pp = PPrint.ToChannel.pretty 0.8 80 stdout in
   let debug = false in
@@ -38,7 +39,7 @@ let driver input output print_ast compile_pat compile_ant type_alias (module Bac
     if compile_pat then output_pp (Pat.show_all_pattern_matrixes frontend);
     if compile_ant then output_pp (Backend.compile frontend);
     if typing then output_pp (Typing.pp_top_type_of_prog ~print_level ast);
-    if print_anf then output_pp (Syntax.pp_prog anf)
+    if print_anf then output_pp (Syntax.pp_prog (Transform.anf_prog ast))
   in
   ()
 
