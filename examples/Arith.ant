@@ -392,11 +392,7 @@ let rec normalize = fun e ->
 
 let rec simplify_aux = fun e ->
   let next = normalize e in
-  if expr_equal e next then next else simplify_aux next
-  (*let searched = search_opt (S (S (S (S (S (S Z)))))) next in
-  let final = normalize searched in
-  final*)
-  (*if expr_equal e final then final else simplify_aux final*);;
+  if expr_equal e next then next else simplify_aux next;;
 
 let rec diffx = fun e ->
   match e with

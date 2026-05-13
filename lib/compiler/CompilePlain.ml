@@ -75,11 +75,11 @@ let compile_type_alias module_name =
 
 let rec compile_pat (p : 'a pattern) : document =
   match p with
-  | PAny -> string "_"
-  | PInt v -> string (string_of_int v)
-  | PBool v -> string (string_of_bool v)
+  | PAny _ -> string "_"
+  | PInt (v, _) -> string (string_of_int v)
+  | PBool (v, _) -> string (string_of_bool v)
   | PVar (name, _) -> string name
-  | PUnit -> string "()"
+  | PUnit _ -> string "()"
   | PTup (xs, _) -> string "(" ^^ separate_map (string ", ") compile_pat xs ^^ string ")"
   | PCtorApp (name, None, _) -> string name
   | PCtorApp (name, Some p', _) -> string name ^^ space ^^ compile_pat p'
@@ -88,11 +88,11 @@ and parens_compile_pat p = parens (compile_pat p)
 
 let rec compile_expr (e : 'a expr) : document =
   match e with
-  | Unit -> string "()"
-  | Int v -> string (string_of_int v)
-  | Float v -> string (string_of_float v)
-  | Bool v -> string (string_of_bool v)
-  | Str v -> string v
+  | Unit _ -> string "()"
+  | Int (v, _) -> string (string_of_int v)
+  | Float (v, _) -> string (string_of_float v)
+  | Bool (v, _) -> string (string_of_bool v)
+  | Str (v, _) -> string v
   | Builtin (Builtin b, _) -> string b
   | Var (name, _) -> string name
   | GVar (name, _) -> string name
@@ -102,15 +102,13 @@ let rec compile_expr (e : 'a expr) : document =
   | App (fn, args, _) -> parens_compile_expr fn ^^ space ^^ separate_map space parens_compile_expr args
   | Op (op, lhs, rhs, _) -> parens (parens_compile_expr lhs ^^ string op ^^ parens_compile_expr rhs)
   | Tup (xs, _) -> string "(" ^^ separate_map (string ", ") compile_expr xs ^^ string ")"
-  | Arr (xs, _) -> string "[]" ^^ separate_map (string "; ") compile_expr xs ^^ string "]"
   | Lam (ps, value, _) ->
       string "fun " ^^ separate_map space parens_compile_pat ps ^^ string " -> " ^^ parens_compile_expr value
   | Let (binding, value, _) -> compile_binding binding (parens_compile_expr value)
-  | Sel (expr, prop, _) -> parens_compile_expr expr ^^ string "." ^^ pp_field prop
   | If (c, p, n, _) ->
       string "if " ^^ compile_expr c ^^ string " then " ^^ parens_compile_expr p ^^ string " else "
       ^^ parens_compile_expr n
-  | Match (tgt, MatchPattern cases, _) ->
+  | Match (tgt, MatchPattern (cases, _), _) ->
       string "match " ^^ compile_expr tgt ^^ string " with "
       ^^ separate_map (string "| ") (fun (p, e) -> parens_compile_pat p ^^ string " -> " ^^ parens_compile_expr e) cases
 
@@ -119,8 +117,8 @@ and parens_compile_expr e = parens (compile_expr e)
 and compile_binding (b : 'a binding) (cont : document) : document =
   match b with
   | BSeq (e, _) -> compile_expr e ^^ string ";" ^^ cont
-  | BOne (p, e, info) | BCont (p, e, info) -> string "let " ^^ compile_let (p, e, info) ^^ string " in " ^^ cont
-  | BRec xs | BRecC xs -> string "let rec " ^^ separate_map (string " and ") compile_let xs ^^ string " in " ^^ cont
+  | BOne (p, e, info) -> string "let " ^^ compile_let (p, e, info) ^^ string " in " ^^ cont
+  | BRec xs -> string "let rec " ^^ separate_map (string " and ") compile_let xs ^^ string " in " ^^ cont
 
 and compile_let (p, e, _) = parens_compile_pat p ^^ string " = " ^^ parens (compile_expr e)
 

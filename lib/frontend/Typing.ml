@@ -16,7 +16,7 @@ module ResolveGlobal = struct
     | PVar (x, _) -> Set.add acc x
     | PTup (ps, _) -> List.fold ~init:acc ~f:collect_pattern_vars ps
     | PCtorApp (_, Some p, _) -> collect_pattern_vars acc p
-    | PCtorApp (_, None, _) | PInt _ | PBool _ | PUnit | PAny -> acc
+    | PCtorApp (_, None, _) | PInt _ | PBool _ | PUnit _ | PAny _ -> acc
 
   let rec resolve_expr (env : env) (e : 'a expr) : 'a expr =
     let recurse = resolve_expr env in
@@ -27,7 +27,7 @@ module ResolveGlobal = struct
           match Hashtbl.find env.globals n with
           | Some _ -> GVar (n, info) (* It is a global variable *)
           | None -> e (* Unknown variable, let the Typer catch the error *))
-    | GVar _ | Ctor _ | Int _ | Float _ | Bool _ | Str _ | Unit | Builtin _ -> e
+    | GVar _ | Ctor _ | Int _ | Float _ | Bool _ | Str _ | Unit _ | Builtin _ -> e
     | Lam (ps, body, info) ->
         let new_locals = List.fold ~init:env.locals ~f:collect_pattern_vars ps in
         let new_env = { env with locals = new_locals } in
@@ -36,7 +36,6 @@ module ResolveGlobal = struct
     | Op (op, l, r, info) -> Op (op, recurse l, recurse r, info)
     | If (c, t, e, info) -> If (recurse c, recurse t, recurse e, info)
     | Tup (es, info) -> Tup (List.map ~f:recurse es, info)
-    | Arr (es, info) -> Arr (List.map ~f:recurse es, info)
     | Let (BSeq (l, b_info), r, info) -> Let (BSeq (recurse l, b_info), recurse r, info)
     | Let (BOne (p, def, b_info), body, info) ->
         let resolved_def = recurse def in
@@ -48,8 +47,7 @@ module ResolveGlobal = struct
         let rec_env = { env with locals = all_rec_locals } in
         let resolved_bindings = List.map bindings ~f:(fun (p, def, b_info) -> (p, resolve_expr rec_env def, b_info)) in
         Let (BRec resolved_bindings, resolve_expr rec_env body, info)
-    | Let ((BRecC _ | BCont _), _, _) -> failwith "Not supported"
-    | Match (target, MatchPattern cases, info) ->
+    | Match (target, MatchPattern (cases, info0), info1) ->
         let resolved_target = recurse target in
         let resolved_cases =
           List.map cases ~f:(fun (p, expr) ->
@@ -57,8 +55,7 @@ module ResolveGlobal = struct
               let case_env = { env with locals = case_locals } in
               (p, resolve_expr case_env expr))
         in
-        Match (resolved_target, MatchPattern resolved_cases, info)
-    | Sel (e, field, info) -> Sel (recurse e, field, info)
+        Match (resolved_target, MatchPattern (resolved_cases, info0), info1)
 end
 
 exception ElaborationError of string * int
@@ -294,13 +291,13 @@ let type_of_op op =
 
 let rec type_of_pattern (ctx : Type.ty StrMap.t) (p : 'a pattern) : 'a pattern * Type.ty =
   match p with
-  | PAny -> (p, new_tvar ())
-  | PInt _ -> (p, TPrim Int)
-  | PBool _ -> (p, TPrim Bool)
+  | PAny _ -> (p, new_tvar ())
+  | PInt (_, _) -> (p, TPrim Int)
+  | PBool (_, _) -> (p, TPrim Bool)
   | PVar (x, info) ->
       let tv = new_tvar () in
       (PVar (x, { info with ty = Some tv }), tv)
-  | PUnit -> (p, TPrim Unit)
+  | PUnit _ -> (p, TPrim Unit)
   | PTup (ps, info) ->
       let ps, ty_ps = List.unzip @@ List.map ~f:(type_of_pattern ctx) ps in
       let ty = new_tup ty_ps in
@@ -334,10 +331,10 @@ type binder_kind = Nothing | Trivial | NonTrivial
 
 let rec bind_pattern_variables_nodup ctx p =
   let rec loop ctx = function
-    | PAny -> ctx
-    | PInt _ -> ctx
-    | PBool _ -> ctx
-    | PUnit -> ctx
+    | PAny _ -> ctx
+    | PInt (_, _) -> ctx
+    | PBool (_, _) -> ctx
+    | PUnit _ -> ctx
     | PVar (x, { ty = Some t; _ }) -> update_ctx_nodup ctx ~key:x ~value:t
     | PVar (x, _) -> elab_error [%string "Cannot infer the type of variable: %{x}"]
     | PTup (ps, _) -> List.fold_left ~init:ctx ~f:loop ps
@@ -350,10 +347,10 @@ let rec bind_pattern_variables_shadow ctx p =
   (* NOTE: We still need ensure no duplicate bindings inside the same pattern. *)
   let dup = Hashtbl.create () in
   let rec loop ctx = function
-    | PAny -> ctx
+    | PAny _ -> ctx
     | PInt _ -> ctx
     | PBool _ -> ctx
-    | PUnit -> ctx
+    | PUnit _ -> ctx
     | PVar (x, { ty = Some t; _ }) -> (
         match Hashtbl.add dup ~key:x ~data:() with
         | `Ok -> update_ctx_shadow ctx ~key:x ~value:t
@@ -367,10 +364,10 @@ let rec bind_pattern_variables_shadow ctx p =
 
 let rec generalize_pattern_variables p =
   match p with
-  | PAny -> ()
-  | PInt _ -> ()
-  | PBool _ -> ()
-  | PUnit -> ()
+  | PAny _ -> ()
+  | PInt (_, _) -> ()
+  | PBool (_, _) -> ()
+  | PUnit _ -> ()
   | PVar (_, { ty = Some t; _ }) -> generalize t
   | PVar (x, _) -> elab_error [%string "Cannot infer the type of variable: %{x}"]
   | PTup (ps, _) -> List.iter ~f:(fun p -> generalize_pattern_variables p) ps
@@ -380,7 +377,7 @@ let rec generalize_pattern_variables p =
 let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
   try
     match e with
-    | Unit -> (e, TPrim Unit)
+    | Unit _ -> (e, TPrim Unit)
     | Int _ -> (e, TPrim Int)
     | Float _ -> (e, TPrim Float)
     | Bool _ -> (e, TPrim Bool)
@@ -468,20 +465,14 @@ let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
         let es, ty_es = List.unzip @@ List.map ~f:(type_of ctx) es in
         let ty = new_tup ty_es in
         (Tup (es, { info with ty = Some ty }), ty)
-    | Arr (es, info) ->
-        let es, ty_es = List.unzip @@ List.map ~f:(type_of ctx) es in
-        let ty = new_arr ty_es in
-        (Arr (es, { info with ty = Some ty }), ty)
     | Lam (ps, e, info) ->
         let ps, ty_ps = List.unzip @@ List.map ~f:(type_of_pattern ctx) ps in
         let ctx = List.fold_left ~init:ctx ~f:(fun ctx p -> bind_pattern_variables_shadow ctx p) ps in
         let e, ty_e = type_of ctx e in
         let ty = new_arrow ty_ps ty_e in
         (Lam (ps, e, { info with ty = Some ty }), ty)
-    | Sel (_e, FIndex _i, _info) -> failwith "not implemented"
-    | Sel (_e, FName _x, _info) -> failwith "not implemented"
-    | Match (_e, MatchPattern [], _info) -> failwith "todo: bottom type"
-    | Match (e, MatchPattern cases, info) ->
+    | Match (_e, MatchPattern ([], _), _) -> failwith "todo: bottom type"
+    | Match (e, MatchPattern (cases, info0), info1) ->
         let type_of_case (p, e) =
           let p, ty_p = type_of_pattern ctx p in
           let ctx = bind_pattern_variables_shadow ctx p in
@@ -493,7 +484,7 @@ let rec type_of (ctx : Type.ty StrMap.t) (e : info expr) : info expr * Type.ty =
         List.iter ~f:(fun ty_case -> unify ty_case ty_e) ty_cases;
         let tyr = List.hd_exn ty_exprs in
         List.iter ~f:(fun ty_expr -> unify ty_expr tyr) (List.tl_exn ty_exprs);
-        (Match (e, MatchPattern cases, { info with ty = Some tyr }), tyr)
+        (Match (e, MatchPattern (cases, info0), { info1 with ty = Some tyr }), tyr)
   with ElaborationError (msg, l) ->
     let s = Syntax.string_of_document @@ Syntax.pp_expr e in
     print_endline [%string "!!!!!! Type error %{msg} in expression:\n%{s}\n"];

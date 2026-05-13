@@ -98,16 +98,16 @@ ctor_pattern:
   | "<ctor>" llist1(delimited_pattern) { PCtorApp ($1, Some (PTup ($2, empty_info)), empty_info) }
 
 delimited_pattern:
-  | "<int>" { PInt $1 }
-  | "<bool>" { PBool $1 }
-  | "<id>" { if $1 = "_" then PAny else PVar ($1, empty_info) }
-  | "(" ")" { PUnit }
+  | "<int>" { PInt ($1, empty_info) }
+  | "<bool>" { PBool ($1, empty_info) }
+  | "<id>" { if $1 = "_" then PAny empty_info else PVar ($1, empty_info) }
+  | "(" ")" { PUnit empty_info }
   | "(" pattern ")" { $2 }
 
 simple_pattern:
-  | "_" { PAny }
+  | "_" { PAny empty_info }
   | "<id>" { PVar ($1, empty_info) }
-  | "(" ")" { PUnit }
+  | "(" ")" { PUnit empty_info }
   | "(" simple_pattern ")" { $2 }
   | simple_pattern_comma_list %prec below_COMMA { PTup ($1, empty_info) }
 
@@ -150,18 +150,15 @@ case : pattern "->" expr { ($1, $3) }
   | "/" { "/" }
 
 simple_expr:
-  | "(" ")" { Unit }
+  | "(" ")" { Unit empty_info }
   | "<id>" { Var ($1, empty_info) }
   | "<raw_ctor>" { App (Ctor ($1, empty_info), [], empty_info) }
   | "<ctor>" { Ctor ($1, empty_info) }
-  | "<int>" { Int $1 }
-  | "<bool>" { Bool $1 }
-  | "<str>" { Str $1 }
+  | "<int>" { Int ($1, empty_info) }
+  | "<bool>" { Bool ($1, empty_info) }
+  | "<str>" { Str ($1, empty_info) }
   | "<builtin>" { Builtin (Builtin $1, empty_info) }
   | "(" seq_expr ")" { $2 }
-  | "[" expr_semi_list "]" { Arr ($2, empty_info) }
-  | simple_expr "." "<id>" { Sel ($1, FName $3, empty_info) }
-  | simple_expr "." "<int>" { Sel ($1, FIndex $3, empty_info) }
 
 %inline binding:
   | simple_pattern "=" seq_expr { ($1, $3) }
@@ -185,10 +182,10 @@ expr:
   | expr infix_op4 expr { Op ($2, $1, $3, empty_info) }
   | "let" binding "in" expr { let (p, e) = $2 in Let (BOne (p, e, empty_info), $4, empty_info) }
   | "let" "rec" binding and_binding* "in" expr { Let (BRec (List.map (fun (p, e) -> (p, e, empty_info)) ($3 :: $4)), $6, empty_info) }
-  | "match" expr "with" cases { Match ($2, (MatchPattern $4), empty_info) }
+  | "match" expr "with" cases { Match ($2, (MatchPattern ($4, empty_info)), empty_info) }
   | "fun" simple_pattern+ "->" expr { Lam ($2, $4, empty_info) }
   | "if" expr "then" expr "else" expr { If ($2, $4, $6, empty_info) }
-  | "if" expr "then" expr { If ($2, $4, Unit, empty_info) }
+  | "if" expr "then" expr { If ($2, $4, Unit empty_info, empty_info) }
 
 seq_expr:
   | expr %prec below_SEMI { $1 }

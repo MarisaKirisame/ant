@@ -130,6 +130,10 @@ let if_ (cond : 'a code) (then_ : 'b code) (else_ : 'b code) : 'b code =
   code $ group (string "if " ^^ uncode cond ^^ string " then " ^^ uncode then_ ^^ string " else " ^^ uncode else_)
 
 let dyn_array_get_ (arr : 'a Dynarray.t code) (i : int code) : 'a code = app2_ (from_ir $ Function "Dynarray.get") arr i
+
+let dyn_array_set_ (arr : 'a Dynarray.t code) (i : int code) (v : 'a code) : unit code =
+  app3_ (from_ir $ Function "Dynarray.set") arr i v
+
 let dyn_array_remove_last_ (arr : 'a Dynarray.t code) : unit code = app_ (from_ir $ Function "Dynarray.remove_last") arr
 let world_state_ (w : world code) : state code = code $ parens (uncode w ^^ string ".state")
 let state_env_ (s : state code) : env code = code $ parens (uncode s ^^ string ".e")
@@ -149,10 +153,14 @@ let pop_env_ (w : world code) : Value.value code = app_ (from_ir $ Function "pop
 let goto_ (w : world code) (pc_value : pc) : unit code = set_c_ w (pc_to_exp_ (pc_ pc_value))
 let push_env_ (w : world code) (v : Value.seq code) : unit code = app2_ (from_ir $ Function "push_env") w v
 let get_env_ (w : world code) (i : int code) : Value.seq code = dyn_array_get_ (state_env_ @@ world_state_ w) i
+
+let set_env_ (w : world code) (i : int code) (v : Value.seq code) : unit code =
+  dyn_array_set_ (state_env_ @@ world_state_ w) i v
+
 let exec_done_ (w : world code) : unit code = app_ (from_ir $ Function "exec_done") w
 
-let env_call_ (w : world code) (keep : int list code) (nargs : int code) : Value.seq code =
-  app3_ (from_ir $ Function "env_call") w keep nargs
+let env_call_ (w : world code) (keep : int list code) (args : int list code) : Value.seq code =
+  app3_ (from_ir $ Function "env_call") w keep args
 
 let restore_env_ (w : world code) (n : int code) (seqs : Value.seq code) : unit code =
   app3_ (from_ir $ Function "restore_env") w n seqs
