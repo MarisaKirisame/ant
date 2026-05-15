@@ -136,6 +136,7 @@ type ctx = {
   conts : (string * (world code -> words code -> unit code)) Dynarray.t;
   mutable conts_count : int;
   func_pc : (string, pc) Hashtbl.t;
+  pc_edges : (int * int) Dynarray.t;
 }
 
 let get_ctor_tag_name (name : string) : string = "tag_" ^ name
@@ -160,6 +161,7 @@ let new_ctx () : ctx =
       conts = Dynarray.create ();
       conts_count = 0;
       func_pc = Hashtbl.create ();
+      pc_edges = Dynarray.create ();
     }
   in
   add_cont ctx "cont_done" 0 (fun w _ -> exec_done_ w);
@@ -173,12 +175,18 @@ let add_code (c : (world -> unit) code option) : pc =
   int_to_pc pc
 
 let set_code (pc : pc) (c : (world -> unit) code) : unit = Dynarray.set codes (pc_to_int pc) (Some c)
+let apply_cont : pc = add_code None
+
+let record_pc_edge (ctx : ctx) (src : pc) (dst : pc) : unit =
+  Dynarray.add_last ctx.pc_edges (pc_to_int src, pc_to_int dst)
 
 let add_code_k (k : pc -> (world -> unit) code * 'a) : 'a =
   let pc = add_code None in
   let code, ret = k pc in
   set_code pc code;
   ret
+
+let add_code_with_pc (build : pc -> (world -> unit) code) : pc = add_code_k (fun pc -> (build pc, pc))
 
 let with_splits count splits k =
   [%seqs
@@ -205,13 +213,19 @@ let register_constructor (ctx : ctx) con_name types =
 let register_constructors (e : ctx) ctors =
   List.iter (fun (con_name, types, _) -> register_constructor e con_name types) ctors
 
-let apply_cont : pc = add_code None
-
 type location = int
-type env = { values : location StrMap.t; env_length : int; changed : bool; w : world code }
+type env = { values : location StrMap.t; env_length : int; changed : bool; pc : pc; w : world code }
 type kont = env -> unit code
 
-let new_env w = { values = StrMap.empty; env_length = 0; changed = false; w }
+let new_env pc w = { values = StrMap.empty; env_length = 0; changed = false; pc; w }
+
+let goto_pc (ctx : ctx) (env : env) (dst : pc) : unit code =
+  record_pc_edge ctx env.pc dst;
+  goto_ env.w dst
+
+let return_to_apply_cont (ctx : ctx) (env : env) (loc : int) : unit code =
+  record_pc_edge ctx env.pc apply_cont;
+  return_n_ env.w (int_ loc) (pc_to_exp_ (pc_ apply_cont))
 
 let check_env env =
   StrMap.iter
@@ -242,11 +256,11 @@ let extend_env env name =
 
 let bind env x loc : env = { env with values = StrMap.add_exn x loc env.values }
 
-let return loc : kont =
+let return ctx loc : kont =
  fun env ->
   [%seqs
     assert_env_length_ env.w (int_ env.env_length);
-    return_n_ env.w (int_ loc) (pc_to_exp_ (pc_ apply_cont))]
+    return_to_apply_cont ctx env loc]
 
 type keep_t = { mutable keep : bool; mutable source : string option }
 
@@ -268,9 +282,9 @@ let keep_only (env : env) (fv : fv_t) : int Dynarray.t * env =
   let env = { env with values = !values; env_length = Dynarray.length keep_idx } in
   (keep_idx, env)
 
-let reading env (f : env -> unit code) : unit code =
-  let make_code w = f { env with changed = false; w } in
-  if env.changed then goto_ env.w (add_code $ Some (lam_ "w" make_code)) else f env
+let reading ctx env (f : env -> unit code) : unit code =
+  let make_code pc w = f { env with changed = false; pc; w } in
+  if env.changed then goto_pc ctx env (add_code_with_pc (fun pc -> lam_ "w" (make_code pc))) else f env
 
 let shrink (env : env) (fv : fv_t) : env =
   let values = StrMap.filter (fun k _ -> StrMap.mem k fv) env.values in
@@ -335,7 +349,7 @@ let rec compile_pp_expr (ctx : ctx) (env : env) (c : fv_t option expr) (k : loca
       let* loc = compile_pp_expr ctx env value in
       fun env -> compile_pp_cases ctx env cases loc k
   | If (cond, thn, els, _) ->
-      reading env $ fun env ->
+      reading ctx env $ fun env ->
       let cond = loc_from_var env cond in
       let cond_name = gensym "cond" in
       [%seqs
@@ -374,7 +388,7 @@ let rec compile_pp_expr (ctx : ctx) (env : env) (c : fv_t option expr) (k : loca
             | "||" -> lor_
             | _ -> failwith ("compile_pp_expr: unsupported op " ^ op)
           in
-          reading env $ fun env ->
+          reading ctx env $ fun env ->
           let x0 = loc_from_var env x0 in
           let x1 = loc_from_var env x1 in
           [%seqs
@@ -394,9 +408,9 @@ let rec compile_pp_expr (ctx : ctx) (env : env) (c : fv_t option expr) (k : loca
                 restore_env_ w (int_ keep_length) tl;
                 let env =
                   {
-                    keep_env with
                     values = StrMap.add l keep_length keep_env.values;
                     env_length = keep_length + 1;
+                    pc = apply_cont;
                     w;
                     changed = true;
                   }
@@ -406,20 +420,20 @@ let rec compile_pp_expr (ctx : ctx) (env : env) (c : fv_t option expr) (k : loca
             assert_env_length_ env.w (int_ env.env_length);
             (let$ keep = env_call_ env.w (list_literal_of_ int_ (Dynarray.to_list keep)) (list_literal_of_ int_ xs) in
              set_k_ env.w (memo_appends_ [ from_constructor_ (ctor_tag_name ctx cont_name); keep; world_kont_ env.w ]));
-            goto_ env.w (Hashtbl.find_exn ctx.func_pc f)]
+            goto_pc ctx env (Hashtbl.find_exn ctx.func_pc f)]
       | _ -> failwith ("compile_pp_expr(let): " ^ Syntax.string_of_document @@ Syntax.pp_expr c))
   | App (GVar (f, _), xs, info) ->
       let xs = List.map (loc_from_var env) xs in
       [%seqs
         assert_env_length_ env.w (int_ env.env_length);
         to_unit_ $ env_call_ env.w (list_literal_of_ int_ []) (list_literal_of_ int_ xs);
-        goto_ env.w (Hashtbl.find_exn ctx.func_pc f)]
+        goto_pc ctx env (Hashtbl.find_exn ctx.func_pc f)]
   | _ -> failwith ("compile_pp_expr: " ^ Syntax.string_of_document @@ Syntax.pp_expr c)
 
 and compile_pp_cases (ctx : ctx) (env : env) (MatchPattern (c, _) : 'a cases) loc (k : location -> kont) : unit code =
   [%seqs
     assert_env_length_ env.w (int_ env.env_length);
-    let* env = reading env in
+    let* env = reading ctx env in
     [%seqs
       let$ x = resolve_ env.w (src_E_ loc) in
       let case cname =
@@ -500,10 +514,10 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
                         match p with
                         | PVar (n, _) -> extend_env env n
                         | _ -> failwith ("fv_pat: " ^ Syntax.string_of_document @@ Syntax.pp_pattern p))
-                      (new_env w) ps
+                      (new_env entry_code w) ps
                   in
                   let env = { env with changed = false } in
-                  compile_pp_expr ctx env term return),
+                  compile_pp_expr ctx env term (return ctx)),
               string "let rec" ^^ space ^^ string name ^^ space ^^ string "?config" ^^ space
               ^^ separate space (List.init arg_num (fun i -> string ("(x" ^ string_of_int i ^ " : Value.seq)")))
               ^^ string ": exec_result " ^^ string "=" ^^ space ^^ group @@ string "(exec_cek ?config"
@@ -520,8 +534,8 @@ let compile_pp_stmt (ctx : ctx) (s : 'a stmt) : document =
 let generate_apply_cont ctx =
   set_code apply_cont
     (lam_ "w" (fun w ->
-         (* We have to be careful: ctx.conts will grow as we apply the lambdas, 
-          *   so we cannot do a single map over the whole array, 
+         (* We have to be careful: ctx.conts will grow as we apply the lambdas,
+          *   so we cannot do a single map over the whole array,
           *   instead we have to take elements out on by one.
           *)
          let cont_codes = Dynarray.create () in
@@ -570,13 +584,24 @@ let ctor_tag_decls ctx =
       string "let " ^^ string tag_name ^^ string " = " ^^ string (string_of_int tag))
     xs
 
+let pc_edges_decl ctx =
+  let edges = Dynarray.to_list ctx.pc_edges |> List.sort_uniq compare in
+  string "let pc_edges = ["
+  ^^ separate (string "; ")
+       (List.map
+          (fun (src, dst) ->
+            string "(" ^^ string (string_of_int src) ^^ string ", " ^^ string (string_of_int dst) ^^ string ")")
+          edges)
+  ^^ string "]"
+
 let pp_cek_ant x =
   let ctx = new_ctx () in
   let generated_stmt = separate_map (break 1) (compile_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
-  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ ctor_tag_decls ctx ^^ break 1 ^^ generated_stmt ^^ break 1
-  ^^ string "let populate_state () =" ^^ break 1 ^^ string "  Memo.reset ();" ^^ break 1 ^^ string "  Words.reset ();"
+  ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ ctor_tag_decls ctx ^^ break 1 ^^ pc_edges_decl ctx ^^ break 1
+  ^^ generated_stmt ^^ break 1 ^^ string "let populate_state () =" ^^ break 1 ^^ string "  Memo.reset ();" ^^ break 1
+  ^^ string "  Words.reset ();"
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string "add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i) ^^ semi))
