@@ -434,6 +434,11 @@ let pc_edges =
     (140, 57);
   ]
 
+let configure_memo_policy () =
+  match Sys.getenv_opt "ANT_MEMO_POLICY" with
+  | Some "mfvs" -> Memo.set_memoized_pcs (Mfvs.solve pc_edges)
+  | _ -> Memo.clear_memoized_pcs ()
+
 type nat = Z | S of nat
 
 let rec from_ocaml_nat x =
@@ -3551,6 +3556,7 @@ let populate_state () =
         ignore (env_call w_140 [] [ 0; 2 ]);
         w_140.state.c <- pc_to_exp (int_to_pc 57)))
     140;
+  configure_memo_policy ();
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;
   Words.set_constructor_degree 2 0;

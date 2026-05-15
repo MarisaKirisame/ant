@@ -594,18 +594,26 @@ let pc_edges_decl ctx =
           edges)
   ^^ string "]"
 
+let memo_policy_decl =
+  string "let configure_memo_policy () =" ^^ break 1
+  ^^ string "  match Sys.getenv_opt \"ANT_MEMO_POLICY\" with"
+  ^^ break 1
+  ^^ string "  | Some \"mfvs\" -> Memo.set_memoized_pcs (Mfvs.solve pc_edges)"
+  ^^ break 1
+  ^^ string "  | _ -> Memo.clear_memoized_pcs ()"
+
 let pp_cek_ant x =
   let ctx = new_ctx () in
   let generated_stmt = separate_map (break 1) (compile_pp_stmt ctx) x in
   generate_apply_cont ctx;
   string "open Ant" ^^ break 1 ^^ string "open Word" ^^ break 1 ^^ string "open Memo" ^^ break 1 ^^ string "open Value"
   ^^ break 1 ^^ string "open Common" ^^ break 1 ^^ ctor_tag_decls ctx ^^ break 1 ^^ pc_edges_decl ctx ^^ break 1
-  ^^ generated_stmt ^^ break 1 ^^ string "let populate_state () =" ^^ break 1 ^^ string "  Memo.reset ();" ^^ break 1
-  ^^ string "  Words.reset ();"
+  ^^ memo_policy_decl ^^ break 1 ^^ generated_stmt ^^ break 1 ^^ string "let populate_state () =" ^^ break 1
+  ^^ string "  Memo.reset ();" ^^ break 1 ^^ string "  Words.reset ();"
   ^^ separate (break 1)
        (List.init (Dynarray.length codes) (fun i ->
             string "add_exp " ^^ uncode (Option.get (Dynarray.get codes i)) ^^ space ^^ uncode (int_ i) ^^ semi))
-  ^^ break 1
+  ^^ break 1 ^^ string "  configure_memo_policy ();" ^^ break 1
   ^^ separate
        (semi ^^ break 1)
        (List.init (Dynarray.length ctx.constructor_degree) (fun i ->
