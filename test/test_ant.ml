@@ -21,8 +21,8 @@ let test_mfvs () =
   let shared_hub = [ (0, 1); (1, 2); (2, 0); (0, 3); (3, 4); (4, 0) ] in
   assert_same_set [ 0 ] (Mfvs.solve shared_hub);
   let product_beats_sum = [ (0, 1); (1, 2); (2, 0); (2, 3); (3, 2); (2, 4); (4, 2); (0, 5); (6, 0); (7, 0); (8, 0) ] in
-  let by_sum = Mfvs.solve_with Mfvs.Degree_sum product_beats_sum in
-  let by_product = Mfvs.solve_with Mfvs.Degree_product product_beats_sum in
+  let by_sum = Mfvs.solve_with Mfvs.degree_sum product_beats_sum in
+  let by_product = Mfvs.solve_with Mfvs.degree_product product_beats_sum in
   assert (List.length by_product < List.length by_sum);
   assert_same_set by_product (Mfvs.solve product_beats_sum);
   assert_acyclic_after_removing product_beats_sum by_product

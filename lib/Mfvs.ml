@@ -2,13 +2,15 @@ module IntMap = Map.Make (Int)
 module IntSet = Set.Make (Int)
 
 type edge = int * int
-type heuristic = Degree_sum | Degree_product
+type heuristic = indegree:int -> outdegree:int -> int
+
+let degree_sum ~indegree ~outdegree = indegree + outdegree
+let degree_product ~indegree ~outdegree = indegree * outdegree
 
 let vertices_of_edges edges =
   List.fold_left (fun vertices (src, dst) -> vertices |> IntSet.add src |> IntSet.add dst) IntSet.empty edges
 
-let edge_is_active removed (src, dst) = (not (IntSet.mem src removed)) && not (IntSet.mem dst removed)
-let active_edges removed edges = List.filter (edge_is_active removed) edges
+let remove_vertex vertex edges = List.filter (fun (src, dst) -> src <> vertex && dst <> vertex) edges
 
 let add_vertex vertex adjacency =
   if IntMap.mem vertex adjacency then adjacency else IntMap.add vertex IntSet.empty adjacency
@@ -20,18 +22,19 @@ let add_edge adjacency (src, dst) =
 
 let adjacency_of_edges edges = List.fold_left add_edge IntMap.empty edges
 
+(* Standard DFS coloring:
+   - White vertices have not been visited.
+   - Gray vertices are on the current recursion stack.
+   - Black vertices are fully explored.
+   A directed edge to a gray vertex is a back edge, so the stack slice ending at
+   that gray vertex is a directed cycle. *)
 type color = White | Gray | Black
 
 let color_of vertex colors = Option.value (IntMap.find_opt vertex colors) ~default:White
 
 let take_cycle target stack =
-  let rec aux acc = function
-    | [] -> List.rev acc
-    | vertex :: rest ->
-        let acc = vertex :: acc in
-        if vertex = target then List.rev acc else aux acc rest
-  in
-  aux [] stack
+  let rec aux = function [] -> [] | vertex :: rest -> if vertex = target then [ vertex ] else vertex :: aux rest in
+  aux stack
 
 let find_directed_cycle edges =
   let adjacency = adjacency_of_edges edges in
@@ -70,7 +73,7 @@ let degree_score heuristic edges =
   fun vertex ->
     let indegree = Option.value (IntMap.find_opt vertex indegrees) ~default:0 in
     let outdegree = Option.value (IntMap.find_opt vertex outdegrees) ~default:0 in
-    match heuristic with Degree_sum -> indegree + outdegree | Degree_product -> indegree * outdegree
+    heuristic ~indegree ~outdegree
 
 let choose_vertex heuristic edges cycle =
   let score = degree_score heuristic edges in
@@ -84,17 +87,16 @@ let choose_vertex heuristic edges cycle =
   | vertex :: rest -> List.fold_left (fun best vertex -> if better vertex best then vertex else best) vertex rest
 
 let solve_with heuristic edges =
-  let rec aux removed selected =
-    let edges = active_edges removed edges in
+  let rec aux edges selected =
     match find_directed_cycle edges with
-    | None -> List.rev selected
+    | None -> selected
     | Some cycle ->
         let vertex = choose_vertex heuristic edges cycle in
-        aux (IntSet.add vertex removed) (vertex :: selected)
+        aux (remove_vertex vertex edges) (vertex :: selected)
   in
-  aux IntSet.empty []
+  aux edges []
 
 let solve edges =
-  let by_sum = solve_with Degree_sum edges in
-  let by_product = solve_with Degree_product edges in
+  let by_sum = solve_with degree_sum edges in
+  let by_product = solve_with degree_product edges in
   if List.length by_sum <= List.length by_product then by_sum else by_product
