@@ -1,5 +1,32 @@
 open Ant
 
+let assert_same_set expected actual =
+  let normalize = List.sort compare in
+  assert (normalize expected = normalize actual)
+
+let assert_acyclic_after_removing edges removed =
+  let removed = List.fold_left (fun set vertex -> Mfvs.IntSet.add vertex set) Mfvs.IntSet.empty removed in
+  let remaining =
+    List.filter (fun (src, dst) -> (not (Mfvs.IntSet.mem src removed)) && not (Mfvs.IntSet.mem dst removed)) edges
+  in
+  assert (Mfvs.find_directed_cycle remaining = None)
+
+let test_mfvs () =
+  assert_same_set [] (Mfvs.solve []);
+  assert_same_set [ 0 ] (Mfvs.solve [ (0, 0) ]);
+  let triangle = [ (0, 1); (1, 2); (2, 0) ] in
+  let triangle_solution = Mfvs.solve triangle in
+  assert (List.length triangle_solution = 1);
+  assert_acyclic_after_removing triangle triangle_solution;
+  let shared_hub = [ (0, 1); (1, 2); (2, 0); (0, 3); (3, 4); (4, 0) ] in
+  assert_same_set [ 0 ] (Mfvs.solve shared_hub);
+  let product_beats_sum = [ (0, 1); (1, 2); (2, 0); (2, 3); (3, 2); (2, 4); (4, 2); (0, 5); (6, 0); (7, 0); (8, 0) ] in
+  let by_sum = Mfvs.solve_with Mfvs.degree_sum product_beats_sum in
+  let by_product = Mfvs.solve_with Mfvs.degree_product product_beats_sum in
+  assert (List.length by_product < List.length by_sum);
+  assert_same_set by_product (Mfvs.solve product_beats_sum);
+  assert_acyclic_after_removing product_beats_sum by_product
+
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =
     let open M in
@@ -50,6 +77,7 @@ module TestMonoidHash (M : Hash.MonoidHash) = struct
 end
 
 let _ =
+  test_mfvs ();
   let x = Intmap.create 32 in
   for i = 0 to 9 do
     Intmap.add x i (i + 1)
