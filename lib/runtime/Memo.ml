@@ -91,28 +91,12 @@ let rec resolve (w : world) (src : source) : Word.t * seq =
   | _ -> failwith "cannot resolve reference"
 
 let pc_map : exp Dynarray.t = Dynarray.create ()
-let memoized_pcs : bool array option ref = ref None
-
-let reset () =
-  Dynarray.clear pc_map;
-  memoized_pcs := None
+let reset () = Dynarray.clear pc_map
 
 let add_exp (f : world -> unit) (pc_ : int) : unit =
   let pc = Dynarray.length pc_map in
   assert (Int.equal pc pc_);
   Dynarray.add_last pc_map { step = f; pc }
-
-let clear_memoized_pcs () = memoized_pcs := None
-
-let set_memoized_pcs pcs =
-  let policy = Array.create ~len:(Dynarray.length pc_map) false in
-  List.iter pcs ~f:(fun pc ->
-      if pc < 0 || pc >= Array.length policy then invalid_arg ("Memo.set_memoized_pcs: invalid pc " ^ string_of_int pc);
-      policy.(pc) <- true);
-  memoized_pcs := Some policy
-
-let should_memoize_pc pc =
-  match !memoized_pcs with None -> true | Some policy -> pc >= 0 && pc < Array.length policy && policy.(pc)
 
 let pc_to_exp (Pc pc) : exp = Dynarray.get pc_map pc
 let from_constructor (ctag : int) : seq = Generic.singleton (Words (Generic.singleton (Word.ConstructorTag ctag)))
@@ -394,15 +378,14 @@ let rec list_to_pattern (x : Pattern.pattern list) : Pattern.pattern =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Pattern.pattern_append h (list_to_pattern t)
 
 let insert_step (m : memo) (step : step) : unit =
-  if should_memoize_pc step.src.c.pc then (
-    let start_time = Timer.create () in
-    let end_time = Timer.create () in
-    Timer.record start_time;
-    Array.set m step.src.c.pc
-      (Some (insert_option (Array.get m step.src.c.pc) (list_to_pattern (ek_to_list step.src)) step));
-    Timer.record end_time;
-    let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
-    step.insert_time <- elapsed_time)
+  let start_time = Timer.create () in
+  let end_time = Timer.create () in
+  Timer.record start_time;
+  Array.set m step.src.c.pc
+    (Some (insert_option (Array.get m step.src.c.pc) (list_to_pattern (ek_to_list step.src)) step));
+  Timer.record end_time;
+  let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
+  step.insert_time <- elapsed_time
 
 let step_sc (step : (step * Value.value Rev.t) option) : int = match step with None -> 0 | Some (step, _) -> step.sc
 
@@ -469,9 +452,7 @@ let rec list_to_value (x : Value.value list) : Value.value =
 
 let lookup_step (value : state) (m : memo) : (step * Value.value Rev.t) option =
   let pc = value.c.pc in
-  if should_memoize_pc pc then
-    lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) (Rev.from_list []) None
-  else None
+  lookup_step_aux (Array.get m pc) (list_to_value (ek_to_list value)) (Rev.from_list []) None
 
 type 'a bin = 'a digit list
 and 'a digit = Zero | One of 'a

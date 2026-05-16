@@ -102,11 +102,6 @@ let pc_edges =
     (35, 22);
   ]
 
-let configure_memo_policy () =
-  match Sys.getenv_opt "ANT_MEMO_POLICY" with
-  | Some "mfvs" -> Memo.set_memoized_pcs (Mfvs.solve pc_edges)
-  | _ -> Memo.clear_memoized_pcs ()
-
 type int_list = Nil | Cons of int * int_list
 
 let rec from_ocaml_int_list x =
@@ -921,7 +916,6 @@ let populate_state () =
           w_35.state.c <- pc_to_exp (int_to_pc 22)
       | _ -> failwith "unreachable (36)")
     35;
-  configure_memo_policy ();
   Words.set_constructor_degree 0 1;
   Words.set_constructor_degree 1 1;
   Words.set_constructor_degree 2 (-1);
