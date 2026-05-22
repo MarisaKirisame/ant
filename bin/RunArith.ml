@@ -156,12 +156,9 @@ let rec make_term size =
     if Random.bool () then split (fun x y -> LC.Add (x, y)) else split (fun x y -> LC.Mul (x, y))
 
 let run_bench_cases () =
-  let cases =
-    [ 100; 105; 110; 115; 120; 125; 130; 135; 140; 145; 150; 155; 160; 165; 170; 175; 180; 185; 190; 195; 200 ]
-  in
+  let cases = [ 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76 ] in
   List.iter
     (fun size ->
-      let size = size * 2 in
       Out_channel.flush Stdio.stdout;
       let expr = make_term size in
       print_endline ("Running arith case " ^ string_of_int size ^ "...");
