@@ -180,7 +180,7 @@ hazel_modes = tuple(
     for prefix in variant_prefixes
     for mode in base_modes
 )
-bad = set(["th_ms", "th_pair"])
+bad = set(["th_ms", "th_pair", "th_qs"])
 hazel_modes = tuple(m for m in hazel_modes if m not in bad)
 arith_modes = ("arith",)
 modes = arith_modes + hazel_modes
