@@ -310,7 +310,7 @@ def load_records(
             except Exception as exc:  # pylint: disable=broad-except
                 raise RuntimeError(f"failed to parse line {line_no}") from exc
     if not exec_times:
-        raise RuntimeError("no exec_time records found in file")
+        raise RuntimeError(f"no exec_time records found in file {path}")
     return Result(
         exec_times=exec_times,
         depth_breakdown=depth_breakdown,
