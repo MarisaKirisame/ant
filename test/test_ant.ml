@@ -1,5 +1,7 @@
 open Ant
 
+module Dynarray = Stdlib.Dynarray
+
 let assert_same_set expected actual =
   let normalize = List.sort compare in
   assert (normalize expected = normalize actual)
@@ -26,6 +28,42 @@ let test_mfvs () =
   assert (List.length by_product < List.length by_sum);
   assert_same_set by_product (Mfvs.solve product_beats_sum);
   assert_acyclic_after_removing product_beats_sum by_product
+
+let singleton_pattern i = Pattern.pattern_cons (Pattern.PCon (Words.from_int i)) BatFingerTree.Generic.empty
+
+let singleton_value i = Value.value_cons (Value.Words (Words.from_int i)) BatFingerTree.Generic.empty
+
+let test_random_memo_eviction () =
+  Memo.reset ();
+  Memo.add_exp (fun _ -> ()) 0;
+  let exp = Memo.pc_to_exp (Common.Pc 0) in
+  let memo = Memo.init_memo () in
+  for i = 0 to 9 do
+    let src : Pattern.pattern State.cek = { c = exp; e = Dynarray.create (); k = singleton_pattern i } in
+    let dst : Value.value State.cek = { c = exp; e = Dynarray.create (); k = singleton_value (i + 100) } in
+    let step : State.step = { src; dst; sc = i + 1; hit = i; insert_time = i + 10 } in
+    Memo.insert_step memo step
+  done;
+  assert (Memo.memo_size memo = 10);
+  let evicted =
+    Memo.evict_to_size memo ~random_state:(Stdlib.Random.State.make [| 0x5eed |]) ~size:4
+  in
+  assert (List.length evicted = 6);
+  assert (Memo.memo_size memo = 4);
+  assert ((Memo.memo_stats memo).node_counts.stem_nodes = 4);
+  List.iter
+    (fun (eviction : Memo.eviction) ->
+      assert (eviction.evicted_pc = 0);
+      assert (eviction.evicted_size = 1);
+      assert (eviction.evicted_pvar_length = 0);
+      assert (eviction.evicted_sc = eviction.evicted_step.sc);
+      assert (eviction.evicted_hit_count = eviction.evicted_step.hit);
+      assert (eviction.evicted_insert_time = eviction.evicted_step.insert_time))
+    evicted;
+  assert (Memo.evict_to_size memo ~size:10 = []);
+  assert (Memo.memo_size memo = 4);
+  assert (List.length (Memo.evict_to_size memo ~size:0) = 4);
+  assert (Memo.memo_size memo = 0)
 
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =
@@ -78,6 +116,7 @@ end
 
 let _ =
   test_mfvs ();
+  test_random_memo_eviction ();
   let x = Intmap.create 32 in
   for i = 0 to 9 do
     Intmap.add x i (i + 1)

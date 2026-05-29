@@ -377,15 +377,98 @@ let patterns_pvar_length (p : Pattern.pattern cek) : int =
 let rec list_to_pattern (x : Pattern.pattern list) : Pattern.pattern =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Pattern.pattern_append h (list_to_pattern t)
 
+let insert_step_untimed (m : memo) (step : step) : unit =
+  Array.set m step.src.c.pc
+    (Some (insert_option (Array.get m step.src.c.pc) (list_to_pattern (ek_to_list step.src)) step))
+
 let insert_step (m : memo) (step : step) : unit =
   let start_time = Timer.create () in
   let end_time = Timer.create () in
   Timer.record start_time;
-  Array.set m step.src.c.pc
-    (Some (insert_option (Array.get m step.src.c.pc) (list_to_pattern (ek_to_list step.src)) step));
+  insert_step_untimed m step;
   Timer.record end_time;
   let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
   step.insert_time <- elapsed_time
+
+type eviction_strategy = Random_eviction
+
+type eviction = {
+  evicted_pc : int;
+  evicted_step : step;
+  evicted_size : int;
+  evicted_pvar_length : int;
+  evicted_sc : int;
+  evicted_hit_count : int;
+  evicted_insert_time : int;
+  evicted_rule : string Lazy.t;
+}
+
+type memo_entry = { entry_pc : int; entry_step : step }
+
+let memo_entry_of_step (step : step) : memo_entry = { entry_pc = step.src.c.pc; entry_step = step }
+
+let eviction_of_entry (entry : memo_entry) : eviction =
+  let step = entry.entry_step in
+  {
+    evicted_pc = entry.entry_pc;
+    evicted_step = step;
+    evicted_size = patterns_size step.src;
+    evicted_pvar_length = patterns_pvar_length step.src;
+    evicted_sc = step.sc;
+    evicted_hit_count = step.hit;
+    evicted_insert_time = step.insert_time;
+    evicted_rule = lazy (Dependency.string_of_step step);
+  }
+
+let memo_entries (m : memo) : memo_entry list =
+  let entries = ref [] in
+  let rec aux (t : trie) : unit =
+    match t with
+    | Leaf { step; _ } -> entries := memo_entry_of_step step :: !entries
+    | Branch br ->
+        Children.iter br.const ~f:aux;
+        Option.iter br.var ~f:aux
+  in
+  Array.iter m ~f:(fun opt_trie -> Option.iter opt_trie ~f:aux);
+  !entries
+
+let memo_size (m : memo) : int = List.length (memo_entries m)
+
+let partition_random_entries ?random_state (entries : memo_entry list) ~(evict_count : int) :
+    memo_entry list * memo_entry list =
+  let arr = Stdlib.Array.of_list entries in
+  let len = Stdlib.Array.length arr in
+  let random_int =
+    match random_state with Some state -> Stdlib.Random.State.int state | None -> Stdlib.Random.int
+  in
+  for i = 0 to evict_count - 1 do
+    let j = i + random_int (len - i) in
+    let tmp = arr.(i) in
+    arr.(i) <- arr.(j);
+    arr.(j) <- tmp
+  done;
+  let evicted = ref [] in
+  let retained = ref [] in
+  for i = len - 1 downto 0 do
+    if i < evict_count then evicted := arr.(i) :: !evicted else retained := arr.(i) :: !retained
+  done;
+  (!evicted, !retained)
+
+let rebuild_memo (m : memo) (entries : memo_entry list) : unit =
+  Array.iteri m ~f:(fun i _ -> Array.set m i None);
+  Stdlib.List.iter (fun entry -> insert_step_untimed m entry.entry_step) entries
+
+let evict_to_size ?random_state ?(strategy = Random_eviction) (m : memo) ~(size : int) : eviction list =
+  if size < 0 then invalid_arg "Memo.evict_to_size: size must be non-negative";
+  let entries = memo_entries m in
+  let evict_count = max 0 (List.length entries - size) in
+  if evict_count = 0 then []
+  else
+    let evicted, retained =
+      match strategy with Random_eviction -> partition_random_entries ?random_state entries ~evict_count
+    in
+    rebuild_memo m retained;
+    Stdlib.List.map eviction_of_entry evicted
 
 let step_sc (step : (step * Value.value Rev.t) option) : int = match step with None -> 0 | Some (step, _) -> step.sc
 
