@@ -1,5 +1,4 @@
 open Ant
-
 module Dynarray = Stdlib.Dynarray
 
 let assert_same_set expected actual =
@@ -30,7 +29,6 @@ let test_mfvs () =
   assert_acyclic_after_removing product_beats_sum by_product
 
 let singleton_pattern i = Pattern.pattern_cons (Pattern.PCon (Words.from_int i)) BatFingerTree.Generic.empty
-
 let singleton_value i = Value.value_cons (Value.Words (Words.from_int i)) BatFingerTree.Generic.empty
 
 let test_random_memo_eviction () =
@@ -45,9 +43,7 @@ let test_random_memo_eviction () =
     Memo.insert_step memo step
   done;
   assert (Memo.memo_size memo = 10);
-  let evicted =
-    Memo.evict_to_size memo ~random_state:(Stdlib.Random.State.make [| 0x5eed |]) ~size:4
-  in
+  let evicted = Memo.evict_to_size memo ~random_state:(Stdlib.Random.State.make [| 0x5eed |]) ~size:4 in
   assert (List.length evicted = 6);
   assert (Memo.memo_size memo = 4);
   assert ((Memo.memo_stats memo).node_counts.stem_nodes = 4);

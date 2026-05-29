@@ -438,9 +438,7 @@ let partition_random_entries ?random_state (entries : memo_entry list) ~(evict_c
     memo_entry list * memo_entry list =
   let arr = Stdlib.Array.of_list entries in
   let len = Stdlib.Array.length arr in
-  let random_int =
-    match random_state with Some state -> Stdlib.Random.State.int state | None -> Stdlib.Random.int
-  in
+  let random_int = match random_state with Some state -> Stdlib.Random.State.int state | None -> Stdlib.Random.int in
   for i = 0 to evict_count - 1 do
     let j = i + random_int (len - i) in
     let tmp = arr.(i) in
