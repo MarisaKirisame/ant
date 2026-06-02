@@ -390,7 +390,11 @@ let insert_step (m : memo) (step : step) : unit =
   let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
   step.insert_time <- elapsed_time
 
-type eviction_strategy = Random_eviction
+type memo_entry = { entry_pc : int; entry_step : step }
+
+type eviction_strategy =
+  | Random_eviction
+  | Least_hit_count_eviction
 
 type eviction = {
   evicted_pc : int;
@@ -402,8 +406,6 @@ type eviction = {
   evicted_insert_time : int;
   evicted_rule : string Lazy.t;
 }
-
-type memo_entry = { entry_pc : int; entry_step : step }
 
 let memo_entry_of_step (step : step) : memo_entry = { entry_pc = step.src.c.pc; entry_step = step }
 
@@ -434,8 +436,7 @@ let memo_entries (m : memo) : memo_entry list =
 
 let memo_size (m : memo) : int = List.length (memo_entries m)
 
-let partition_random_entries ?random_state (entries : memo_entry list) ~(evict_count : int) :
-    memo_entry list * memo_entry list =
+let select_random_entries ?random_state (entries : memo_entry list) ~(evict_count : int) : memo_entry list =
   let arr = Stdlib.Array.of_list entries in
   let len = Stdlib.Array.length arr in
   let random_int = match random_state with Some state -> Stdlib.Random.State.int state | None -> Stdlib.Random.int in
@@ -445,16 +446,41 @@ let partition_random_entries ?random_state (entries : memo_entry list) ~(evict_c
     arr.(i) <- arr.(j);
     arr.(j) <- tmp
   done;
-  let evicted = ref [] in
-  let retained = ref [] in
-  for i = len - 1 downto 0 do
-    if i < evict_count then evicted := arr.(i) :: !evicted else retained := arr.(i) :: !retained
+  let selected = ref [] in
+  for i = evict_count - 1 downto 0 do
+    selected := arr.(i) :: !selected
   done;
-  (!evicted, !retained)
+  !selected
 
-let rebuild_memo (m : memo) (entries : memo_entry list) : unit =
-  Array.iteri m ~f:(fun i _ -> Array.set m i None);
-  Stdlib.List.iter (fun entry -> insert_step_untimed m entry.entry_step) entries
+let compare_by_step f x y = Int.compare (f x.entry_step) (f y.entry_step)
+
+let select_sorted_entries entries ~(evict_count : int) ~f =
+  List.take (List.sort entries ~compare:(compare_by_step f)) evict_count
+
+let select_evictions ?random_state (strategy : eviction_strategy) (entries : memo_entry list) ~(evict_count : int) :
+    memo_entry list =
+  match strategy with
+  | Random_eviction -> select_random_entries ?random_state entries ~evict_count
+  | Least_hit_count_eviction -> select_sorted_entries entries ~evict_count ~f:(fun step -> step.hit)
+
+let recompute_branch_max_sc (br : branch) : unit =
+  br.max_sc <- max (max_sc_of_trie_opt br.var) (max_sc_of_children br.const)
+
+let prune_evicted_entries (m : memo) : unit =
+  let rec prune_trie (t : trie) : trie option =
+    match t with
+    | Leaf { step; _ } -> if step.evict_mark then None else Some t
+    | Branch br ->
+        Children.to_alist br.const
+        |> Stdlib.List.iter (fun (key, child) ->
+               match prune_trie child with None -> Children.remove br.const key | Some _ -> ());
+        br.var <- Option.bind br.var ~f:prune_trie;
+        if Children.length br.const = 0 && Option.is_none br.var then None
+        else (
+          recompute_branch_max_sc br;
+          Some t)
+  in
+  Array.iteri m ~f:(fun i opt_trie -> match opt_trie with None -> () | Some trie -> Array.set m i (prune_trie trie))
 
 let evict_to_size ?random_state ?(strategy = Random_eviction) (m : memo) ~(size : int) : eviction list =
   if size < 0 then invalid_arg "Memo.evict_to_size: size must be non-negative";
@@ -462,10 +488,10 @@ let evict_to_size ?random_state ?(strategy = Random_eviction) (m : memo) ~(size 
   let evict_count = max 0 (List.length entries - size) in
   if evict_count = 0 then []
   else
-    let evicted, retained =
-      match strategy with Random_eviction -> partition_random_entries ?random_state entries ~evict_count
-    in
-    rebuild_memo m retained;
+    let evicted = select_evictions ?random_state strategy entries ~evict_count in
+    Stdlib.List.iter (fun entry -> entry.entry_step.evict_mark <- true) evicted;
+    prune_evicted_entries m;
+    Stdlib.List.iter (fun entry -> entry.entry_step.evict_mark <- false) evicted;
     Stdlib.List.map eviction_of_entry evicted
 
 let step_sc (step : (step * Value.value Rev.t) option) : int = match step with None -> 0 | Some (step, _) -> step.sc

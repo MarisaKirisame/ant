@@ -31,17 +31,21 @@ let test_mfvs () =
 let singleton_pattern i = Pattern.pattern_cons (Pattern.PCon (Words.from_int i)) BatFingerTree.Generic.empty
 let singleton_value i = Value.value_cons (Value.Words (Words.from_int i)) BatFingerTree.Generic.empty
 
-let test_random_memo_eviction () =
+let make_test_memo count =
   Memo.reset ();
   Memo.add_exp (fun _ -> ()) 0;
   let exp = Memo.pc_to_exp (Common.Pc 0) in
   let memo = Memo.init_memo () in
-  for i = 0 to 9 do
+  for i = 0 to count - 1 do
     let src : Pattern.pattern State.cek = { c = exp; e = Dynarray.create (); k = singleton_pattern i } in
     let dst : Value.value State.cek = { c = exp; e = Dynarray.create (); k = singleton_value (i + 100) } in
-    let step : State.step = { src; dst; sc = i + 1; hit = i; insert_time = i + 10 } in
+    let step : State.step = { src; dst; sc = i + 1; hit = i; insert_time = i + 10; evict_mark = false } in
     Memo.insert_step memo step
   done;
+  memo
+
+let test_random_memo_eviction () =
+  let memo = make_test_memo 10 in
   assert (Memo.memo_size memo = 10);
   let evicted = Memo.evict_to_size memo ~random_state:(Stdlib.Random.State.make [| 0x5eed |]) ~size:4 in
   assert (List.length evicted = 6);
@@ -60,6 +64,13 @@ let test_random_memo_eviction () =
   assert (Memo.memo_size memo = 4);
   assert (List.length (Memo.evict_to_size memo ~size:0) = 4);
   assert (Memo.memo_size memo = 0)
+
+let test_ordered_memo_eviction_strategy () =
+  let memo = make_test_memo 10 in
+  let evicted = Memo.evict_to_size memo ~strategy:Memo.Least_hit_count_eviction ~size:7 in
+  assert (List.map (fun (eviction : Memo.eviction) -> eviction.evicted_hit_count) evicted = [ 0; 1; 2 ]);
+  assert (Memo.memo_size memo = 7);
+  assert ((Memo.memo_stats memo).node_counts.stem_nodes = 7)
 
 module TestMonoidHash (M : Hash.MonoidHash) = struct
   let test_hash () =
@@ -113,6 +124,7 @@ end
 let _ =
   test_mfvs ();
   test_random_memo_eviction ();
+  test_ordered_memo_eviction_strategy ();
   let x = Intmap.create 32 in
   for i = 0 to 9 do
     Intmap.add x i (i + 1)

@@ -48,6 +48,8 @@ module Children = struct
 
   let iter (t : 'a t) ~(f : 'a -> unit) : unit =
     match t.repr with Small lst -> List.iter (fun (_, v) -> f v) lst | Hash tbl -> Hashtbl.iter tbl ~f
+
+  let to_alist (t : 'a t) : (int * 'a) list = match t.repr with Small lst -> lst | Hash tbl -> Hashtbl.to_alist tbl
 end
 
 type env = value Dynarray.t
@@ -63,7 +65,14 @@ and exp = {
 and kont = value
 and 'a cek = { mutable c : exp; mutable e : 'a Dynarray.t; mutable k : 'a }
 and state = value cek
-and step = { src : pattern cek; dst : value cek; sc : int; mutable hit : int; mutable insert_time : int }
+and step = {
+  src : pattern cek;
+  dst : value cek;
+  sc : int;
+  mutable hit : int;
+  mutable insert_time : int;
+  mutable evict_mark : bool;
+}
 and memo = trie option Array.t
 and trie = Leaf of { prefix : Pattern.pattern; step : step; max_sc : int } | Branch of branch
 
@@ -71,7 +80,7 @@ and branch = {
   creator : string;
   degree : int;
   prefix : Words.words;
-  var : trie option;
+  mutable var : trie option;
   const : trie Children.t;
   mutable max_sc : int;
 }
