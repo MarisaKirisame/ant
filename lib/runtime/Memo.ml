@@ -391,10 +391,7 @@ let insert_step (m : memo) (step : step) : unit =
   step.insert_time <- elapsed_time
 
 type memo_entry = { entry_pc : int; entry_step : step }
-
-type eviction_strategy =
-  | Random_eviction
-  | Least_hit_count_eviction
+type eviction_strategy = Random_eviction | Least_hit_count_eviction
 
 type eviction = {
   evicted_pc : int;
@@ -473,7 +470,7 @@ let prune_evicted_entries (m : memo) : unit =
     | Branch br ->
         Children.to_alist br.const
         |> Stdlib.List.iter (fun (key, child) ->
-               match prune_trie child with None -> Children.remove br.const key | Some _ -> ());
+            match prune_trie child with None -> Children.remove br.const key | Some _ -> ());
         br.var <- Option.bind br.var ~f:prune_trie;
         if Children.length br.const = 0 && Option.is_none br.var then None
         else (
