@@ -1,6 +1,19 @@
 open Cmdliner
 open Ant
 
+(* A simple tag denotes the real backend,
+   which can be used by Cmdliner to do equality comparison. *)
+type backend_tag = PlainBackend | SeqBackend | MemoBackend
+
+let compile_with_backend backend frontend =
+  let module M =
+    (val match backend with
+         | PlainBackend -> (module CompilePlain.Backend : Compile.Backend)
+         | SeqBackend -> (module CompileSeq.Backend : Compile.Backend)
+         | MemoBackend -> (module CompileMemo.Backend : Compile.Backend))
+  in
+  M.compile frontend
+
 let read_all file = In_channel.with_open_text file In_channel.input_all
 
 let parse content =
@@ -20,8 +33,7 @@ let parse content =
       Printf.eprintf "Lexing error at line %d, character %d: %s\n" line cnum @@ Lexer.string_of_error e;
       failwith "Failed due to lexing error"
 
-let driver input output print_ast compile_pat compile_ant type_alias (module Backend : Compile.Backend) typing
-    print_level print_anf =
+let driver input output print_ast compile_pat compile_ant type_alias backend_tag typing print_level print_anf =
   let src = read_all input in
   let syn = parse src in
   let ast = Typing.top_type_of_prog syn in
@@ -37,7 +49,7 @@ let driver input output print_ast compile_pat compile_ant type_alias (module Bac
     if debug then debug_pp (Syntax.pp_prog ast);
     if print_ast then output_pp (Syntax.pp_prog ast);
     if compile_pat then output_pp (Pat.show_all_pattern_matrixes frontend);
-    if compile_ant then output_pp (Backend.compile frontend);
+    if compile_ant then output_pp (compile_with_backend backend_tag frontend);
     if typing then output_pp (Typing.pp_top_type_of_prog ~print_level ast);
     if print_anf then output_pp (Syntax.pp_prog (Transform.anf_prog ast))
   in
@@ -59,14 +71,8 @@ let print_ast =
 
 let backend =
   let doc = "Backend used to compile the ant source, defaulting to memo" in
-  let cdds =
-    [
-      ("memo", (module CompileMemo.Backend : Compile.Backend));
-      ("seq", (module CompileSeq.Backend : Compile.Backend));
-      ("plain", (module CompilePlain.Backend : Compile.Backend));
-    ]
-  in
-  Arg.(value & opt (enum cdds) (module CompileMemo.Backend : Compile.Backend) & info [ "b"; "backend" ] ~doc)
+  let cdds = [ ("memo", MemoBackend); ("seq", SeqBackend); ("plain", PlainBackend) ] in
+  Arg.(value & opt (enum cdds) MemoBackend & info [ "b"; "backend" ] ~doc)
 
 let compile_ant =
   let doc = "Compile the ant source" in
