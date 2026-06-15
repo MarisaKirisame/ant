@@ -79,7 +79,7 @@ Z) ?B) ?K`. After re-execute the code on the pattern, we get the rewrote form as
   step counter by `sc`, effectively skipping interpretation for the matched
   fragment.
 
-## Composing Steps
+## Composing Steps (`Dependency.compose_step`)
 
 To grow reusable fragments, `Memo.exec_cek` keeps a binary counter of recently
 executed slices. Whenever two neighbouring slices share a program counter,
@@ -91,6 +91,23 @@ executed slices. Whenever two neighbouring slices share a program counter,
    two steps back-to-back, producing a composed `{ src; dst; sc }` with
    `sc = sc_x + sc_y`.
 3. Insert the composed step into the memo list for future reuse.
+
+Consider two adjacent steps `x` and `y` which represents following rewrite rules
+
+``` text
+Recurse (Pair (S Z) ?l1) ?k1 -> Recurse ?l1 (Cons1 ?k1)
+
+Recurse (Z ?l2)          ?k2 -> Recurse ?l2 (Cons0 ?k2)
+```
+
+It's not hard to see that pattern `Recurse ?l2 (Cons1 ?k1)` (`x.dst`) and
+`Recurse (Z ?l2) ?k2` both matches on the same state. Therefore we use
+unification algorithm to calculate the substitutions for `x.src` and get
+`?l1 -> (Pair Z ?l2)`
+
+Noted that we don't calculate substitutions for `Recurse ?l2 (Cons0 ?k2)`
+(`y.dst`), instead, it was dervied via applying step `x` and `y` again on the
+generalized input `Recurse (Pair (S Z) (Pair Z ?l2))`.
 
 ## Limitations and Next Work
 
