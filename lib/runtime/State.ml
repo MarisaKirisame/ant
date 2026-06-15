@@ -48,6 +48,9 @@ module Children = struct
 
   let iter (t : 'a t) ~(f : 'a -> unit) : unit =
     match t.repr with Small lst -> List.iter (fun (_, v) -> f v) lst | Hash tbl -> Hashtbl.iter tbl ~f
+
+  let iteri (t : 'a t) ~(f : key:int -> data:'a -> unit) : unit =
+    match t.repr with Small lst -> List.iter (fun (key, data) -> f ~key ~data) lst | Hash tbl -> Hashtbl.iteri tbl ~f
 end
 
 type env = value Dynarray.t

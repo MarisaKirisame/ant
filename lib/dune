@@ -26,6 +26,8 @@
   State
   Hash
   Intmap
+  Kll
+  Eviction
   Mfvs
   Common
   AntHashtbl

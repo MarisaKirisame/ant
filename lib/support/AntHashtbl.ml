@@ -14,6 +14,7 @@ module type S = sig
   val add_exn : ('k, 'v) t -> key:'k -> data:'v -> unit
   val remove : ('k, 'v) t -> 'k -> unit
   val iter : ('k, 'v) t -> f:('v -> unit) -> unit
+  val iteri : ('k, 'v) t -> f:(key:'k -> data:'v -> unit) -> unit
   val to_alist : ('k, 'v) t -> ('k * 'v) list
   val of_seq : ('k * 'v) Seq.t -> ('k, 'v) t
 end
@@ -95,6 +96,11 @@ module Small (Fallback : S) : S = struct
     | Small small -> List.iter (fun (_, value) -> f value) small.items
     | Fallback tbl -> Fallback.iter tbl ~f
 
+  let iteri t ~f =
+    match t.repr with
+    | Small small -> List.iter (fun (key, data) -> f ~key ~data) small.items
+    | Fallback tbl -> Fallback.iteri tbl ~f
+
   let to_alist t = match t.repr with Small small -> small.items | Fallback tbl -> Fallback.to_alist tbl
 
   let of_seq seq =
@@ -131,6 +137,7 @@ module Stdlib : S = struct
 
   let remove = Stdlib.Hashtbl.remove
   let iter t ~f = Stdlib.Hashtbl.iter (fun _ v -> f v) t
+  let iteri t ~f = Stdlib.Hashtbl.iter (fun key data -> f ~key ~data) t
   let to_alist t = Stdlib.Hashtbl.to_seq t |> List.of_seq
 
   let of_seq seq =
@@ -155,6 +162,7 @@ module Core : S = struct
   let add_exn = Core.Hashtbl.add_exn
   let remove = Core.Hashtbl.remove
   let iter t ~f = Core.Hashtbl.iter t ~f
+  let iteri t ~f = Core.Hashtbl.iteri t ~f
   let to_alist = Core.Hashtbl.to_alist
 
   let of_seq seq =
