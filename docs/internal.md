@@ -38,11 +38,53 @@ their responsibilities, and the data structures that make reuse possible.
   syntax/IR to produce OCaml source, accumulating snippets in `codes` for final
   emission.
 
-Temporary values are stored in the environment whenever possible to avoid
-interpretative overhead from the continuation stack `K`; we only use `K` for
-non-tail calls.
-
 ## Runtime Representation
+
+### How the CEK machine works
+
+The CEK machine used in Ant is different from the traditional settings, it's
+more like a stack or register machine.
+
+Compiler will allocate "registers" for intermediate computations in program
+based on the result of live analysis. A "reigster" is an entry in the
+environment array (`E`), and unlike the registers in a physical CPU, the
+environment array have theoretically unlimited capacity. Ant doesn't use
+continuation (`K`) to track intermediate computations thus reduce the
+interpretative overhead.
+  
+### Calling functions
+
+To support activating a non-tail function call, Compiler will record the values
+that must be preseved across the call. These values formed a (defunctionalized)
+continuation of the call, and chained as a stack in `K`.
+
+``` text
+Top of Stack (The `K`)
+        │
+        ▼
+  +──────────────────────────+
+  | Tag:   tag_cont_1        |
+  | Saved: [$1, $2]          |
+  | Next:  ──────────────────┼───┐
+  +──────────────────────────+   │
+                                 ▼
+                           +──────────────────────────+
+                           | Tag:   tag_cont_2        |
+                           | Saved: [$4]              |
+                           | Next:  ──────────────────┼───┐
+                           +──────────────────────────+   │
+                                                          ▼
+                                                    +──────────────────────────+
+                                                    | Tag:   tag_cont_3        |
+                                                    | Saved: []                |
+                                                    | Next:  NULL              |
+                                                    +──────────────────────────+
+```
+
+Compiler will also generate a centralized handler for returning. Thus returning
+from callee just a jump to the handler with the value to be returned, handler
+will pop the continuation from `K`, restore the environment, and finally
+transfer the control-flow backed to the caller.
 
 ### Words, Values, and Patterns (`Words.ml`, `Value.ml`, `Pattern.ml`)
 - `Word.t` encodes integers and constructor tags; `Words.t` stores a prefix
