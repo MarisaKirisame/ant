@@ -1,7 +1,7 @@
 open State
 
 type eviction_policy = { retain_ratio : float; kll_k : int }
-type eviction_state = { mutable max_tree_size_seen : int }
+type eviction_state = { mutable max_tree_size_seen : int; mutable batch_count : int; mutable evict_count : int }
 
 let make_eviction_policy ~retain_ratio ~kll_k =
   if retain_ratio < 0.0 || retain_ratio > 1.0 then
@@ -9,7 +9,7 @@ let make_eviction_policy ~retain_ratio ~kll_k =
   if kll_k <= 0 then invalid_arg "Eviction.make_eviction_policy: kll_k must be positive";
   { retain_ratio; kll_k }
 
-let init_eviction_state () = { max_tree_size_seen = 0 }
+let init_eviction_state () = { max_tree_size_seen = 0; batch_count = 0; evict_count = 0 }
 
 let update_max_tree_size_seen state ~current_size =
   if current_size > state.max_tree_size_seen then state.max_tree_size_seen <- current_size
@@ -22,7 +22,7 @@ let target_size_from_state ~policy ~state =
 let score_step (step : State.step) : int =
   assert (step.sc >= 0);
   assert (step.hit >= 0);
-  step.sc * step.hit
+  step.sc * (1 + step.hit)
 
 let rec iter_trie_steps (f : State.step -> unit) (trie : trie) : unit =
   match trie with
@@ -32,7 +32,7 @@ let rec iter_trie_steps (f : State.step -> unit) (trie : trie) : unit =
       Children.iter br.const ~f:(iter_trie_steps f)
 
 let iter_memo_steps (f : State.step -> unit) (memo : State.memo) : unit =
-  Array.iter (function None -> () | Some trie -> iter_trie_steps f trie) memo
+  Array.iter (function None, _ -> () | Some trie, _ -> iter_trie_steps f trie) memo.entries
 
 let rec trie_size (trie : trie) : int =
   match trie with
@@ -46,13 +46,11 @@ let rec trie_size (trie : trie) : int =
       in
       var_count + const_count
 
-let memo_size (memo : State.memo) : int =
-  Array.fold_left (fun acc opt -> match opt with None -> acc | Some trie -> acc + trie_size trie) 0 memo
-
+let memo_size (memo : State.memo) : int = memo.size
 let stream_scores_from_trie ~kll trie = iter_trie_steps (fun step -> Kll.add kll (score_step step)) trie
 
 let stream_scores_from_memo ~kll memo =
-  Array.iter (function None -> () | Some trie -> stream_scores_from_trie ~kll trie) memo
+  Array.iter (function None, _ -> () | Some trie, _ -> stream_scores_from_trie ~kll trie) memo.entries
 
 let eviction_fraction_for_target ~target_size memo =
   let total = memo_size memo in
@@ -74,6 +72,7 @@ let max_sc_of_trie (trie : trie) : int = match trie with Leaf { max_sc; _ } -> m
 let prune_memo_to_target ~kll_k ~evict_fraction memo =
   assert (evict_fraction >= 0.0);
   assert (evict_fraction <= 1.0);
+  let before_size = memo_size memo in
   let threshold = threshold_for_fraction_from_memo ~kll_k ~evict_fraction memo in
 
   (* TODO: compress trie paths after pruning to reduce depth and memory overhead. *)
@@ -81,7 +80,7 @@ let prune_memo_to_target ~kll_k ~evict_fraction memo =
     match trie with
     | Leaf { prefix; step; _ } ->
         let s = score_step step in
-        if s >= threshold then Some (Leaf { prefix; step; max_sc = step.sc }) else None
+        if s > threshold then Some (Leaf { prefix; step; max_sc = step.sc }) else None
     | Branch br ->
         let var' = match br.var with None -> None | Some var -> prune_trie var in
         let const' = Children.create () in
@@ -104,13 +103,39 @@ let prune_memo_to_target ~kll_k ~evict_fraction memo =
             (Branch { creator = br.creator; degree = br.degree; prefix = br.prefix; var = var'; const = const'; max_sc })
   in
 
-  Array.map (function None -> None | Some trie -> prune_trie trie) memo
+  let pruned_size = ref 0 in
+  let entries =
+    Array.mapi
+      (fun _ -> function
+        | None, _ -> (None, 0)
+        | Some trie, _ -> (
+            let pruned = prune_trie trie in
+            match pruned with
+            | None -> (None, 0)
+            | Some kept ->
+                let kept_size = trie_size kept in
+                pruned_size := !pruned_size + kept_size;
+                (Some kept, kept_size)))
+      memo.entries
+  in
+  Printf.printf "batch_evict_memo: before_size=%d threshold=%d after_size=%d\n%!" before_size threshold !pruned_size;
+  { entries; size = !pruned_size }
 
 let batch_evict_memo ~policy ~state memo =
+  let minimum_eviction_fraction = 0.20 in
+  state.batch_count <- state.batch_count + 1;
   let current_size = memo_size memo in
   update_max_tree_size_seen state ~current_size;
   let target_size = target_size_from_state ~policy ~state in
   if current_size <= target_size then memo
   else
     let evict_fraction = eviction_fraction_for_target ~target_size memo in
-    prune_memo_to_target ~kll_k:policy.kll_k ~evict_fraction memo
+    if evict_fraction < minimum_eviction_fraction then memo
+    else (
+      state.evict_count <- state.evict_count + 1;
+      let evict_rate_percent = 100.0 *. float_of_int state.evict_count /. float_of_int state.batch_count in
+      Printf.printf
+        "batch_evict_memo: evicting (count=%d/%d, rate=%.2f%%, current_size=%d, target_size=%d, evict_fraction=%.2f%%)\n\
+         %!"
+        state.evict_count state.batch_count evict_rate_percent current_size target_size (100.0 *. evict_fraction);
+      prune_memo_to_target ~kll_k:policy.kll_k ~evict_fraction memo)

@@ -1,5 +1,5 @@
 type eviction_policy = { retain_ratio : float; kll_k : int }
-type eviction_state = { mutable max_tree_size_seen : int }
+type eviction_state = { mutable max_tree_size_seen : int; mutable batch_count : int; mutable evict_count : int }
 
 val make_eviction_policy : retain_ratio:float -> kll_k:int -> eviction_policy
 val init_eviction_state : unit -> eviction_state
