@@ -75,6 +75,8 @@ class ExecTimeRecord:
     plain_profile: list[ProfileEntry]
     memo_heap_words: int | None
     cek_heap_words: int | None
+    input_size: int | None
+    repeat_index: int | None
 
 
 @dataclass(frozen=True)
@@ -168,6 +170,12 @@ def load_records(
                     cek_heap_words = _optional_int(
                         rec.get("cek_heap_words"), ctx="exec_time.cek_heap_words"
                     )
+                    input_size = _optional_int(
+                        rec.get("input_size"), ctx="exec_time.input_size"
+                    )
+                    repeat_index = _optional_int(
+                        rec.get("repeat_index"), ctx="exec_time.repeat_index"
+                    )
                     exec_times.append(
                         ExecTimeRecord(
                             step=step,
@@ -177,6 +185,8 @@ def load_records(
                             plain_profile=plain_profile,
                             memo_heap_words=memo_heap_words,
                             cek_heap_words=cek_heap_words,
+                            input_size=input_size,
+                            repeat_index=repeat_index,
                         )
                     )
                 elif name == "memo_stats":

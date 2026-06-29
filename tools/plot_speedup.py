@@ -8,6 +8,8 @@ The metric plotted (wall-clock time vs evaluation steps) is controlled by
   * "plain_profile": list of [name, time_ns] entries for baseline run
   * "step": memoized step count
   * "without_memo_step": baseline step count
+  * optional "input_size": input size for size-sweep reports
+  * optional "repeat_index": repeat index for size-sweep reports
 
 The script computes speedup statistics and writes two plots: a baseline vs
 memoized scatter plot on log-log axes, and a speedup-over-run line plot. The
@@ -20,6 +22,7 @@ from __future__ import annotations
 
 import math
 import statistics
+from collections import defaultdict
 from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
@@ -232,6 +235,47 @@ def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
         ylabel=f"Speedup ({METRIC_LABEL}, baseline / memoized, log scale)",
         yscale="log",
         plotter=lambda ax: ax.plot(xs, ratios, marker="o", linewidth=1.5),
+    )
+
+
+def plot_speedup_by_size(result: Result, output_dir: Path) -> str | None:
+    groups: dict[int, list[float]] = defaultdict(list)
+    for record in result.exec_times:
+        if record.input_size is None:
+            continue
+        memo = _sum_profile(record.memo_profile, key_name="memo_profile")
+        cek = _sum_profile(record.cek_profile, key_name="cek_profile")
+        groups[record.input_size].append(cek / memo)
+    if not groups:
+        return None
+
+    sizes = sorted(groups)
+    mean_ratios = [
+        math.exp(statistics.mean(math.log(ratio) for ratio in groups[size]))
+        for size in sizes
+    ]
+
+    def _plot(ax: plt.Axes) -> None:
+        for size in sizes:
+            ratios = groups[size]
+            ax.scatter([size] * len(ratios), ratios, alpha=0.65, label="_nolegend_")
+        ax.plot(
+            sizes,
+            mean_ratios,
+            marker="o",
+            linewidth=1.8,
+            color="black",
+            label="Geometric mean",
+        )
+
+    return _save_plot(
+        output_dir,
+        title="Speedup by Input Size",
+        xlabel="Input size",
+        ylabel="Speedup (CEK profile time / memo profile time, log scale)",
+        yscale="log",
+        legend=True,
+        plotter=_plot,
     )
 
 

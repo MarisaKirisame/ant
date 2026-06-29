@@ -272,29 +272,35 @@ let measure_memory_consumption (f : unit -> 'a) : 'a * heap_words_stats =
           peak_heap_words = subtract_resting_heap_size !peak_heap_words;
         } ))
 
-let write_steps_json_from_parts oc ~(exec_res : Memo.exec_result) ~(memo_profile : (string * int) list)
-    ~(plain_profile : (string * int) list) ~(cek_profile : (string * int) list) ~(memo_heap_words : int)
-    ~(cek_heap_words : int) : unit =
+let write_steps_json_from_parts oc ~input_size ~repeat_index ~(exec_res : Memo.exec_result)
+    ~(memo_profile : (string * int) list) ~(plain_profile : (string * int) list)
+    ~(cek_profile : (string * int) list) ~(memo_heap_words : int) ~(cek_heap_words : int) : unit =
   let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
+  let optional_fields =
+    List.filter_map
+      (fun (name, value) -> Option.map (fun value -> (name, `Int value)) value)
+      [ ("input_size", input_size); ("repeat_index", repeat_index) ]
+  in
   let json =
     `Assoc
-      [
-        ("name", `String "exec_time");
-        ("step", `Int exec_res.step);
-        ("without_memo_step", `Int exec_res.without_memo_step);
-        ("memo_profile", memo_profile |> json_of_profile);
-        ("plain_profile", plain_profile |> json_of_profile);
-        ("cek_profile", cek_profile |> json_of_profile);
-        ("memo_heap_words", `Int memo_heap_words);
-        ("cek_heap_words", `Int cek_heap_words);
-      ]
+      ([
+         ("name", `String "exec_time");
+         ("step", `Int exec_res.step);
+         ("without_memo_step", `Int exec_res.without_memo_step);
+         ("memo_profile", memo_profile |> json_of_profile);
+         ("plain_profile", plain_profile |> json_of_profile);
+         ("cek_profile", cek_profile |> json_of_profile);
+         ("memo_heap_words", `Int memo_heap_words);
+         ("cek_heap_words", `Int cek_heap_words);
+       ]
+      @ optional_fields)
   in
   Yojson.Safe.to_string json |> output_string oc;
   output_char oc '\n';
   flush oc
 
 let write_steps_json oc (r : Memo.exec_result) ~(memo_heap_words : int) ~(cek_heap_words : int) : unit =
-  write_steps_json_from_parts oc ~exec_res:r
+  write_steps_json_from_parts oc ~input_size:None ~repeat_index:None ~exec_res:r
     ~memo_profile:(Profile.dump_profile Profile.memo_profile)
     ~plain_profile:(Profile.dump_profile Profile.plain_profile)
     ~cek_profile:(Profile.dump_profile Profile.cek_profile)
@@ -428,7 +434,6 @@ let quicksort_nexpr =
      greater = quicksort (filter (fun x -> x >= pivot) rest) in append smaller (pivot :: greater)"
 
 let quicksort_expr = expr_of_nexpr quicksort_nexpr
-let experiment_list_length = 400
 let experiment_random_seed = 42
 let experiment_random_bound = 100
 

@@ -39,23 +39,37 @@ let program_path dataset benchmark =
   Printf.sprintf "data/%s_%s.json" (dataset_data_prefix dataset) (benchmark_data_suffix benchmark)
 
 let list_to_cons_str xs = match xs with [] -> "[]" | _ -> String.concat " :: " (List.map string_of_int xs) ^ " :: []"
-let large_input = Common.make_random_input_list Common.experiment_list_length
-let large_left, large_right = Common.make_random_input_list_pair Common.experiment_list_length
 
-let benchmark_test_string = function
-  | Append -> Printf.sprintf {| my_append (%s) (%s) |} (list_to_cons_str large_left) (list_to_cons_str large_right)
-  | Filter -> Printf.sprintf {| my_filter (fun x -> x > 50) (%s) |} (list_to_cons_str large_input)
-  | Map -> Printf.sprintf {| my_map (fun x -> x + 1) (%s) |} (list_to_cons_str large_input)
-  | QS -> Printf.sprintf {| my_quicksort (%s) |} (list_to_cons_str large_input)
-  | IS -> Printf.sprintf {| my_insertsort (%s) |} (list_to_cons_str large_input)
-  | MS -> Printf.sprintf {| my_mergesort (%s) |} (list_to_cons_str large_input)
-  | Pair -> Printf.sprintf {| my_pair (%s) |} (list_to_cons_str large_input)
-  | Rev -> Printf.sprintf {| my_reverse (%s) |} (list_to_cons_str large_input)
+let input_sizes = [ 50; 100; 150; 200; 250; 300; 350; 400 ]
+let repeat_count = 10
+
+let seed_for ~input_size ~repeat_index = Common.experiment_random_seed + (input_size * repeat_count) + repeat_index
+
+let benchmark_test_string benchmark ~input_size ~repeat_index =
+  let seed = seed_for ~input_size ~repeat_index in
+  let input = Common.make_random_input_list ~seed input_size in
+  let left, right = Common.make_random_input_list_pair ~seed input_size in
+  match benchmark with
+  | Append -> Printf.sprintf {| my_append (%s) (%s) |} (list_to_cons_str left) (list_to_cons_str right)
+  | Filter -> Printf.sprintf {| my_filter (fun x -> x > 50) (%s) |} (list_to_cons_str input)
+  | Map -> Printf.sprintf {| my_map (fun x -> x + 1) (%s) |} (list_to_cons_str input)
+  | QS -> Printf.sprintf {| my_quicksort (%s) |} (list_to_cons_str input)
+  | IS -> Printf.sprintf {| my_insertsort (%s) |} (list_to_cons_str input)
+  | MS -> Printf.sprintf {| my_mergesort (%s) |} (list_to_cons_str input)
+  | Pair -> Printf.sprintf {| my_pair (%s) |} (list_to_cons_str input)
+  | Rev -> Printf.sprintf {| my_reverse (%s) |} (list_to_cons_str input)
+
+let benchmark_tests benchmark =
+  List.concat_map
+    (fun input_size ->
+      List.init repeat_count (fun repeat_index ->
+          let test = Common.parse_nexpr (benchmark_test_string benchmark ~input_size ~repeat_index) in
+          FromHazel.{ test; input_size = Some input_size; repeat_index = Some repeat_index }))
+    input_sizes
 
 let run ~dataset ~benchmark =
-  let test = Common.parse_nexpr (benchmark_test_string benchmark) in
-  FromHazel.run_with_test ~program_name:(mode_name dataset benchmark) ~program_path:(program_path dataset benchmark)
-    ~steps_file:(steps_file dataset benchmark) ~test
+  FromHazel.run_with_tests ~program_name:(mode_name dataset benchmark) ~program_path:(program_path dataset benchmark)
+    ~steps_file:(steps_file dataset benchmark) ~tests:(benchmark_tests benchmark)
 
 let run_mk benchmark = run ~dataset:Mk ~benchmark
 let run_th benchmark = run ~dataset:Th ~benchmark

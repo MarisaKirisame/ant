@@ -10,11 +10,13 @@ let steps_file = "eval_steps_arith.json"
 type step_writer = Memo.exec_result -> unit
 
 let current_write_steps : step_writer option ref = ref None
+let current_input_size : int option ref = ref None
+let current_repeat_index : int option ref = ref None
 
-let init_random () =
+let random_seed () =
   match Sys.getenv_opt "ARITH_SEED" with
-  | Some seed -> ( match int_of_string_opt seed with Some n -> Random.init n | None -> Random.init 0)
-  | None -> Random.init 0
+  | Some seed -> ( match int_of_string_opt seed with Some n -> n | None -> 0)
+  | None -> 0
 
 let with_memo f =
   let memo = Memo.init_memo () in
@@ -94,16 +96,22 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
 
 let write_steps_json oc (r : Memo.exec_result) : unit =
   let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
+  let optional_fields =
+    List.filter_map
+      (fun (name, value) -> Option.map (fun value -> (name, `Int value)) value)
+      [ ("input_size", !current_input_size); ("repeat_index", !current_repeat_index) ]
+  in
   let json =
     `Assoc
-      [
-        ("name", `String "exec_time");
-        ("step", `Int r.step);
-        ("without_memo_step", `Int r.without_memo_step);
-        ("memo_profile", Ant.Profile.dump_profile Ant.Profile.memo_profile |> json_of_profile);
-        ("plain_profile", Ant.Profile.dump_profile Ant.Profile.plain_profile |> json_of_profile);
-        ("cek_profile", Ant.Profile.dump_profile Ant.Profile.cek_profile |> json_of_profile);
-      ]
+      ([
+         ("name", `String "exec_time");
+         ("step", `Int r.step);
+         ("without_memo_step", `Int r.without_memo_step);
+         ("memo_profile", Ant.Profile.dump_profile Ant.Profile.memo_profile |> json_of_profile);
+         ("plain_profile", Ant.Profile.dump_profile Ant.Profile.plain_profile |> json_of_profile);
+         ("cek_profile", Ant.Profile.dump_profile Ant.Profile.cek_profile |> json_of_profile);
+       ]
+      @ optional_fields)
   in
   Yojson.Safe.to_string json |> output_string oc;
   output_char oc '\n';
@@ -155,28 +163,38 @@ let rec make_term size =
     in
     if Random.bool () then split (fun x y -> LC.Add (x, y)) else split (fun x y -> LC.Mul (x, y))
 
+let input_sizes = [ 40; 90; 140; 190 ]
+let repeat_count = 10
+
+let seed_for ~base_seed ~input_size ~repeat_index = base_seed + (input_size * repeat_count) + repeat_index
+
 let run_bench_cases () =
-  let cases =
-    [ 100; 105; 110; 115; 120; 125; 130; 135; 140; 145; 150; 155; 160; 165; 170; 175; 180; 185; 190; 195; 200 ]
-  in
+  let base_seed = random_seed () in
   List.iter
-    (fun size ->
-      let size = size * 2 in
-      Out_channel.flush Stdio.stdout;
-      let expr = make_term size in
-      print_endline ("Running arith case " ^ string_of_int size ^ "...");
-      ignore (eval_main_expr_with_details expr))
-    cases
+    (fun input_size ->
+      List.iter
+        (fun repeat_index ->
+          current_input_size := Some input_size;
+          current_repeat_index := Some repeat_index;
+          Random.init (seed_for ~base_seed ~input_size ~repeat_index);
+          Out_channel.flush Stdio.stdout;
+          let expr = make_term input_size in
+          Printf.printf "Running arith case size=%d repeat=%d...\n%!" input_size repeat_index;
+          ignore (eval_main_expr_with_details expr))
+        (List.init repeat_count Fun.id))
+    input_sizes
 
 let run () =
   with_outchannel steps_file (fun oc ->
       let write_steps = write_steps_json oc in
-      init_random ();
       LC.populate_state ();
       let memo = Memo.init_memo () in
       current_write_steps := Some write_steps;
       Fun.protect
-        ~finally:(fun () -> current_write_steps := None)
+        ~finally:(fun () ->
+          current_write_steps := None;
+          current_input_size := None;
+          current_repeat_index := None)
         (fun () ->
           run_bench_cases ();
           write_memo_stats_json oc memo))

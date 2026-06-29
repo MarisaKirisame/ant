@@ -23,6 +23,7 @@ from plot_speedup import (
     plot_hashtable_stat_depth_size,
     plot_depth_breakdown,
     plot_depth_breakdown_cdf,
+    plot_speedup_by_size,
     profile_totals_from_result,
     render_profile_table,
 )
@@ -73,6 +74,7 @@ def render_html(
         hashtable_depth_size_scatter_plot = plot_hashtable_stat_depth_size(
             records.hashtable_stat, output_dir
         )
+    speedup_by_size_plot = plot_speedup_by_size(records, output_dir)
     profile_totals, profile_total_time = profile_totals_from_result(records)
     profile_table = render_profile_table(profile_totals, profile_total_time)
     doc = document(title="Memoization Speedup")
@@ -116,6 +118,8 @@ def render_html(
                 pairs=pairs_from_steps(records),
                 report_kind=report_kind,
             )
+            if speedup_by_size_plot is not None:
+                _plot_image(speedup_by_size_plot, "Input size vs speedup plot")
             if memo_plot is not None:
                 _plot_image(memo_plot, "Memo stats depth vs node count plot")
             if memo_cdf_plot is not None:
