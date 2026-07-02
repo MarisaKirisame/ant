@@ -423,6 +423,12 @@ let extract_program sexp =
   | Sexp.List [ Sexp.Atom "exercise"; Sexp.Atom _exercise_id; _prelude; impl; _tests ] -> impl
   | _ -> invalid_arg (Printf.sprintf "Expected (exercise <id> <focus> <impl> <test>), got %s" (Sexp.to_string_hum sexp))
 
+let extract_program_with_meta sexp =
+  match sexp with
+  | Sexp.List [ Sexp.Atom "exercise"; Sexp.Atom exercise_id; _prelude; impl; _tests ] ->
+      (int_of_string_opt exercise_id, impl)
+  | _ -> invalid_arg (Printf.sprintf "Expected (exercise <id> <focus> <impl> <test>), got %s" (Sexp.to_string_hum sexp))
+
 let parse ~candidate_index ~program_path program =
   try Sexp.of_string program
   with exn ->
@@ -469,18 +475,51 @@ let rec subst_deepest_hole y x =
   | NEVar _ | NECons _ | NEAbs _ | NEMinus _ -> x
   | _ -> failwith ("subst_deepest_hole not implemented for expr: " ^ Format.asprintf "%a" pp_nexpr x)
 
+type parsed_candidate = { source_index : int; source_exercise_id : int option; nexpr : nexpr }
+
+type collapsed_candidate = {
+  nexpr : nexpr;
+  source_indices : int list;
+  source_exercise_ids : int option list;
+}
+
+let collapse_adjacent_candidates (candidates : parsed_candidate list) : collapsed_candidate list =
+  let rec loop current acc = function
+    | [] -> List.rev (current :: acc)
+    | (x : parsed_candidate) :: xs ->
+        if NamedExpr.equal_nexpr x.nexpr current.nexpr then
+          let merged =
+            {
+              current with
+              source_indices = current.source_indices @ [ x.source_index ];
+              source_exercise_ids = current.source_exercise_ids @ [ x.source_exercise_id ];
+            }
+          in
+          loop merged acc xs
+        else
+          let next =
+            { nexpr = x.nexpr; source_indices = [ x.source_index ]; source_exercise_ids = [ x.source_exercise_id ] }
+          in
+          loop next (current :: acc) xs
+  in
+  match candidates with
+  | [] -> []
+  | (x : parsed_candidate) :: xs ->
+      let first = { nexpr = x.nexpr; source_indices = [ x.source_index ]; source_exercise_ids = [ x.source_exercise_id ] } in
+      loop first [] xs
+
 let parse_program_with_test ~program_path test =
   let programs = read_program_strings ~program_path in
   let last_expr = ref None in
   let parse_candidate i program =
     let sexp = parse ~candidate_index:i ~program_path program in
-    let impl = sexp |> extract_program in
+    let source_exercise_id, impl = sexp |> extract_program_with_meta in
     let expr = expr_of_sexp impl in
     last_expr := Some expr;
     let nexpr = nexpr_of_expr expr in
-    nexpr |> subst_deepest_hole test |> clean
+    { source_index = i; source_exercise_id; nexpr = (nexpr |> subst_deepest_hole test |> clean) }
   in
-  let programs = programs |> List.mapi parse_candidate |> dedup NamedExpr.equal_nexpr in
+  let programs = programs |> List.mapi parse_candidate |> collapse_adjacent_candidates in
   (programs, !last_expr)
 
 let run_with_test ~program_name ~program_path ~steps_file ~test =
@@ -490,33 +529,61 @@ let run_with_test ~program_name ~program_path ~steps_file ~test =
       let candidates, last_expr = parse_program_with_test ~program_path test in
       let indexed_candidates =
         candidates
-        |> List.mapi (fun i nexpr ->
-            Format.printf "%s candidate %d: %a@." program_name i pp_nexpr nexpr;
-            let expr = expr_of_nexpr nexpr in
+        |> List.mapi (fun i candidate ->
+            Format.printf "%s candidate %d: %a@." program_name i pp_nexpr candidate.nexpr;
+            let expr = expr_of_nexpr candidate.nexpr in
             Format.printf "%s candidate %d expr: %a@." program_name i RunLiveCommon.pp_expr expr;
-            (i, expr))
+            (i, candidate, expr))
       in
       record_resting_heap_size ();
       let baseline_pass =
         indexed_candidates
-        |> List.map (fun (i, expr) ->
+        |> List.map (fun (i, candidate, expr) ->
             let baseline_result = eval_expression_baseline_only expr in
-            (i, baseline_result))
+            (i, candidate, baseline_result))
       in
       record_resting_heap_size ();
       let memo_pass =
         indexed_candidates
-        |> List.map (fun (i, expr) ->
+        |> List.map (fun (i, candidate, expr) ->
             let memo_result = eval_expression_memo_only ~memo expr in
             Printf.printf "%s candidate %d value: %s\n" program_name i (value_to_string memo_result.value);
-            (i, memo_result))
+            (i, candidate, memo_result))
       in
       List.iter2
-        (fun (memo_idx, memo_result) (baseline_idx, baseline_result) ->
+        (fun (memo_idx, memo_candidate, memo_result) (baseline_idx, baseline_candidate, baseline_result) ->
           if memo_idx <> baseline_idx then failwith "candidate order mismatch between memo and baseline passes";
+          if memo_candidate.source_indices <> baseline_candidate.source_indices then
+            failwith "candidate source mapping mismatch between memo and baseline passes";
+          let source_indices = memo_candidate.source_indices in
+          let source_first_index, source_last_index =
+            match source_indices with
+            | [] -> failwith "candidate source index list unexpectedly empty"
+            | first :: _ -> (first, List.hd (List.rev source_indices))
+          in
+          let source_indices_json = `List (List.map (fun idx -> `Int idx) source_indices) in
+          let source_exercise_ids_json =
+            `List
+              (List.map
+                 (function
+                   | Some exercise_id -> `Int exercise_id
+                   | None -> `Null)
+                 memo_candidate.source_exercise_ids)
+          in
+          let extra_fields =
+            [
+              ("trace_exec_index", `Int memo_idx);
+              ("trace_source_indices", source_indices_json);
+              ("trace_source_count", `Int (List.length source_indices));
+              ("trace_source_first_index", `Int source_first_index);
+              ("trace_source_last_index", `Int source_last_index);
+              ("trace_source_exercise_ids", source_exercise_ids_json);
+            ]
+          in
           write_steps_json_from_parts oc ~exec_res:memo_result.exec_res ~memo_profile:memo_result.memo_profile
             ~plain_profile:baseline_result.plain_profile ~cek_profile:baseline_result.cek_profile
-            ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words:baseline_result.cek_heap_words)
+            ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words:baseline_result.cek_heap_words
+            ~extra_fields ())
         memo_pass baseline_pass;
       (match last_expr with
       | None -> failwith "why"

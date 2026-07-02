@@ -1,6 +1,5 @@
 open Ant
 open NamedExpr
-open Yojson.Safe
 module LC = LiveCEK
 module LP = LivePlain
 
@@ -273,21 +272,22 @@ let measure_memory_consumption (f : unit -> 'a) : 'a * heap_words_stats =
         } ))
 
 let write_steps_json_from_parts oc ~(exec_res : Memo.exec_result) ~(memo_profile : (string * int) list)
-    ~(plain_profile : (string * int) list) ~(cek_profile : (string * int) list) ~(memo_heap_words : int)
-    ~(cek_heap_words : int) : unit =
+  ~(plain_profile : (string * int) list) ~(cek_profile : (string * int) list) ~(memo_heap_words : int)
+  ~(cek_heap_words : int) ?(extra_fields : (string * Yojson.Safe.t) list = []) () : unit =
   let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
-  let json =
-    `Assoc
-      [
-        ("name", `String "exec_time");
-        ("step", `Int exec_res.step);
-        ("without_memo_step", `Int exec_res.without_memo_step);
-        ("memo_profile", memo_profile |> json_of_profile);
-        ("plain_profile", plain_profile |> json_of_profile);
-        ("cek_profile", cek_profile |> json_of_profile);
-        ("memo_heap_words", `Int memo_heap_words);
-        ("cek_heap_words", `Int cek_heap_words);
-      ]
+  let base_fields =
+    [
+      ("name", `String "exec_time");
+      ("step", `Int exec_res.step);
+      ("without_memo_step", `Int exec_res.without_memo_step);
+      ("memo_profile", memo_profile |> json_of_profile);
+      ("plain_profile", plain_profile |> json_of_profile);
+      ("cek_profile", cek_profile |> json_of_profile);
+      ("memo_heap_words", `Int memo_heap_words);
+      ("cek_heap_words", `Int cek_heap_words);
+    ]
+  in
+  let json = `Assoc (base_fields @ extra_fields)
   in
   Yojson.Safe.to_string json |> output_string oc;
   output_char oc '\n';
@@ -298,7 +298,7 @@ let write_steps_json oc (r : Memo.exec_result) ~(memo_heap_words : int) ~(cek_he
     ~memo_profile:(Profile.dump_profile Profile.memo_profile)
     ~plain_profile:(Profile.dump_profile Profile.plain_profile)
     ~cek_profile:(Profile.dump_profile Profile.cek_profile)
-    ~memo_heap_words ~cek_heap_words
+    ~memo_heap_words ~cek_heap_words ()
 
 let write_memo_stats_json oc (memo : State.memo) : unit =
   let stats = Memo.memo_stats memo in
