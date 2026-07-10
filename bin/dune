@@ -4,6 +4,7 @@
  (modules
   GeneratedMain
   FromHazel
+  HazelBackConvert
   HazelAppend
   HazelExperiment
   HazelFilter
@@ -23,7 +24,8 @@
   RunLiveLeftToRight
   RunLiveListExtend
   RunLiveSimple
-  RunTestAsymptotics)
+  RunTestAsymptotics
+  ToHazel)
  (libraries ant cmdliner core batteries yojson sexplib unix runmodes)
  (preprocess
   (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))

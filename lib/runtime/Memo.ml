@@ -206,7 +206,7 @@ let assert_env_length (w : world) (e : int) : unit =
 
 let init_memo () : memo =
   let len = Dynarray.length pc_map in
-  { entries = Array.create ~len (None, 0); size = 0 }
+  { entries = Array.create ~len (None, 0); size = 0; epoch = 0 }
 
 let string_of_trie (t : trie) : string = match t with Leaf _ -> "Leaf" | Branch _ -> "Branch"
 let choose_step x y = if x.sc > y.sc then x else y
@@ -398,6 +398,7 @@ let insert_step (m : memo) (step : step) : unit =
     let start_time = Timer.create () in
     let end_time = Timer.create () in
     Timer.record start_time;
+    step.creation_epoch <- m.epoch;
     let pc = step.src.c.pc in
     let existing, old_tree_size = Array.get m.entries pc in
     let size = ref old_tree_size in
@@ -501,11 +502,11 @@ let lookup_step_slot = Profile.register_slot Profile.memo_profile "lookup_step"
 
 type eviction_strategy = In_loop_hard_cap | Legacy_batch
 
-let global_eviction_strategy = In_loop_hard_cap
-let eviction_policy = Eviction.make_eviction_policy ~retain_ratio:0.5 ~kll_k:200
+let global_eviction_strategy = Legacy_batch
+let eviction_policy = Eviction.make_eviction_policy ~retain_ratio:0.5 ~kll_k:100
 let eviction_state = Eviction.init_eviction_state ()
-let in_loop_eviction_trigger_size = 600
-let in_loop_eviction_target_size = 300
+let in_loop_eviction_trigger_size = 1000
+let in_loop_eviction_target_size = 500
 
 let instantiate (step : step) (state : state) : step =
   let minimum_size_for_instantiation = 5 in
@@ -536,6 +537,7 @@ let instantiate_slot = Profile.register_slot Profile.memo_profile "instantiate"
 
 let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
   let run () =
+    m.epoch <- m.epoch + 1;
     let dbg_step_through step state =
       assert (step.sc > 0);
       step.hit <- step.hit + 1;

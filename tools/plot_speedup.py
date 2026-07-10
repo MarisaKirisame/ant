@@ -96,8 +96,9 @@ def _save_plot(
     xscale: str | None = None,
     yscale: str | None = None,
     legend: bool = False,
+    output_name: str | None = None,
 ) -> str:
-    output_path = output_dir / _fresh_plot_name()
+    output_path = output_dir / (output_name or _fresh_plot_name())
     fig, ax = plt.subplots(figsize=(6, 4.5))
     plotter(ax)
     if xscale:
@@ -126,6 +127,10 @@ def plot_scatter_for_kind(
     output_dir: Path,
     *,
     report_kind: str,
+    title: str = "Chordata vs Baseline",
+    xlabel: str = "Baseline time (ns)",
+    ylabel: str = "Chordata time (ns)",
+    output_name: str | None = None,
 ) -> str:
     pairs_list = list(pairs)
     baselines = [baseline for baseline, _ in pairs_list]
@@ -213,12 +218,13 @@ def plot_scatter_for_kind(
 
     return _save_plot(
         output_dir,
-        title="Chordata vs Baseline",
-        xlabel="Baseline time (ns)",
-        ylabel="Chordata time (ns)",
+        title=title,
+        xlabel=xlabel,
+        ylabel=ylabel,
         xscale=xscale,
         yscale=yscale,
         legend=REPORT_DRAW_INTERPOLATION_LINE,
+        output_name=output_name,
         plotter=_plot,
     )
 

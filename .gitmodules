@@ -7,3 +7,7 @@
 [submodule "lib/hashtbl"]
         path = lib/hashtbl
         url = https://github.com/waterlens/hashtbl.git
+[submodule "hazel"]
+	path = hazel
+	url = git@github.com:MarisaKirisame/hazel.git
+	branch = hazel-eval-batch

@@ -19,10 +19,15 @@ let target_size_from_state ~policy ~state =
   assert (raw >= 0.0);
   int_of_float raw
 
-let score_step (step : State.step) : int =
+let score_step ~current_epoch (step : State.step) : int =
   assert (step.sc >= 0);
   assert (step.hit >= 0);
-  step.sc * (1 + step.hit)
+  assert (step.creation_epoch >= 0);
+  assert (current_epoch >= step.creation_epoch);
+  let old_score = step.sc * (1 + step.hit) in
+  let age = current_epoch - step.creation_epoch + 1 in
+  assert (age > 0);
+  old_score / age
 
 let rec iter_trie_steps (f : State.step -> unit) (trie : trie) : unit =
   match trie with
@@ -47,10 +52,12 @@ let rec trie_size (trie : trie) : int =
       var_count + const_count
 
 let memo_size (memo : State.memo) : int = memo.size
-let stream_scores_from_trie ~kll trie = iter_trie_steps (fun step -> Kll.add kll (score_step step)) trie
 
-let stream_scores_from_memo ~kll memo =
-  Array.iter (function None, _ -> () | Some trie, _ -> stream_scores_from_trie ~kll trie) memo.entries
+let stream_scores_from_trie ~current_epoch ~kll trie =
+  iter_trie_steps (fun step -> Kll.add kll (score_step ~current_epoch step)) trie
+
+let stream_scores_from_memo ~current_epoch ~kll memo =
+  Array.iter (function None, _ -> () | Some trie, _ -> stream_scores_from_trie ~current_epoch ~kll trie) memo.entries
 
 let eviction_fraction_for_target ~target_size memo =
   let total = memo_size memo in
@@ -60,11 +67,11 @@ let eviction_fraction_for_target ~target_size memo =
   assert (to_evict > 0);
   float_of_int to_evict /. float_of_int total
 
-let threshold_for_fraction_from_memo ~kll_k ~evict_fraction memo =
+let threshold_for_fraction_from_memo ~current_epoch ~kll_k ~evict_fraction memo =
   assert (evict_fraction >= 0.0);
   assert (evict_fraction <= 1.0);
   let kll = Kll.create ~k:kll_k () in
-  stream_scores_from_memo ~kll memo;
+  stream_scores_from_memo ~current_epoch ~kll memo;
   match Kll.quantile kll ~q:evict_fraction with Some threshold -> threshold | None -> assert false
 
 let max_sc_of_trie (trie : trie) : int = match trie with Leaf { max_sc; _ } -> max_sc | Branch br -> br.max_sc
@@ -73,13 +80,13 @@ let prune_memo_to_target ~kll_k ~evict_fraction memo =
   assert (evict_fraction >= 0.0);
   assert (evict_fraction <= 1.0);
   let before_size = memo_size memo in
-  let threshold = threshold_for_fraction_from_memo ~kll_k ~evict_fraction memo in
+  let threshold = threshold_for_fraction_from_memo ~current_epoch:memo.epoch ~kll_k ~evict_fraction memo in
 
   (* TODO: compress trie paths after pruning to reduce depth and memory overhead. *)
   let rec prune_trie (trie : trie) : trie option =
     match trie with
     | Leaf { prefix; step; _ } ->
-        let s = score_step step in
+        let s = score_step ~current_epoch:memo.epoch step in
         if s > threshold then Some (Leaf { prefix; step; max_sc = step.sc }) else None
     | Branch br ->
         let var' = match br.var with None -> None | Some var -> prune_trie var in
@@ -119,7 +126,7 @@ let prune_memo_to_target ~kll_k ~evict_fraction memo =
       memo.entries
   in
   Printf.printf "batch_evict_memo: before_size=%d threshold=%d after_size=%d\n%!" before_size threshold !pruned_size;
-  { entries; size = !pruned_size }
+  { entries; size = !pruned_size; epoch = memo.epoch }
 
 let batch_evict_memo ~policy ~state memo =
   let minimum_eviction_fraction = 0.20 in

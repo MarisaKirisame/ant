@@ -59,6 +59,7 @@ def run(
     command: Iterable[str],
     *,
     env: Optional[Mapping[str, str]] = None,
+    cwd: Optional[Path] = None,
     check: bool = True,
     silent: bool = False,
     capture: bool = False,
@@ -77,6 +78,7 @@ def run(
         stderr = None
     result = subprocess.run(
         cmd_list,
+        cwd=cwd,
         env=env,
         check=False,
         stdout=stdout,
@@ -145,6 +147,15 @@ def install_dependencies() -> None:
     opam_exec(["dune", "pkg", "lock"])
 
 
+def hazel_dependency() -> None:
+    ensure_switch()
+    run(["git", "submodule", "update", "--init", "--recursive", "hazel"])
+    opam_exec(
+        ["dune", "build", "src/CLI/cli.bc.js", "--profile", "dev"],
+        cwd=REPO_ROOT / "hazel",
+    )
+
+
 def build_project() -> None:
     ensure_switch()
     env = _opam_env_with_ocamlrunparam()
@@ -180,8 +191,10 @@ hazel_modes = tuple(
     for prefix in variant_prefixes
     for mode in base_modes
 )
-bad = set(["th_ms", "th_pair"])
-hazel_modes = tuple(m for m in hazel_modes if m not in bad)
+hazel_bad = set(["th_ms", "th_pair"])
+hazel_modes = tuple(m for m in hazel_modes if m not in hazel_bad)
+hazel_compare_bad = set(["qs", "th_qs", "at_qs", "at_is"])
+hazel_compare_modes = tuple(m for m in hazel_modes if m not in hazel_compare_bad)
 arith_modes = ("arith",)
 modes = arith_modes + hazel_modes
 
@@ -203,12 +216,42 @@ def run_modes(selected_modes: tuple[str, ...]) -> None:
     for mode in selected_modes:
         opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
 
+
+def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
+    _remove_eval_steps_files_for_modes(selected_modes)
+    ensure_switch()
+    env = _opam_env_with_ocamlrunparam()
+    generate_ml_files(env=env)
+    opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
+    for mode in selected_modes:
+        opam_exec(["dune", "exec", "GeneratedMain", "--", "hazel-compare", mode], env=env)
+
 def run_project() -> None:
     run_modes(modes)
 
 
 def hazel_project() -> None:
     run_modes(hazel_modes)
+
+
+def _hazel_experiment_modes() -> tuple[str, ...]:
+    return hazel_modes
+
+
+def _hazel_compare_experiment_modes() -> tuple[str, ...]:
+    return hazel_compare_modes
+
+
+def hazel_experiment_project() -> None:
+    selected_modes = _hazel_experiment_modes()
+    compare_modes = _hazel_compare_experiment_modes()
+    compare_blacklisted_modes = tuple(m for m in selected_modes if m not in compare_modes)
+    # Prevent stale rows from non-selected benchmarks from appearing in reports.
+    _remove_eval_steps_files_for_modes(hazel_modes)
+    if compare_blacklisted_modes:
+        run_modes(compare_blacklisted_modes)
+    run_compare_modes(compare_modes)
+    report_module.generate_hazel_reports(include_hazel_compare=True, modes=selected_modes, hazel_compare_modes=compare_modes)
 
 
 def arith_project() -> None:
@@ -338,7 +381,7 @@ def main(argv: Iterable[str]) -> int:
     args = list(argv)
     usage = (
         "Usage: nightly.py "
-        "[dependency|build|coverage|run|profile|hazel|hazel-report|arith|arith-report|"
+        "[dependency|hazel-dependency|build|coverage|run|profile|hazel|hazel-experiment|hazel-report|arith|arith-report|"
         "report|experiment|hazel-tex|arith-tex|compile-generated|all]"
     )
     if len(args) > 1:
@@ -350,6 +393,8 @@ def main(argv: Iterable[str]) -> int:
 
     if stage == "dependency":
         install_dependencies()
+    elif stage == "hazel-dependency":
+        hazel_dependency()
     elif stage == "build":
         build_project()
     elif stage == "coverage":
@@ -360,6 +405,8 @@ def main(argv: Iterable[str]) -> int:
         profile_project()
     elif stage == "hazel":
         hazel_project()
+    elif stage == "hazel-experiment":
+        hazel_experiment_project()
     elif stage == "hazel-report":
         hazel_report_project()
     elif stage == "arith":
@@ -378,6 +425,7 @@ def main(argv: Iterable[str]) -> int:
         compile_generated()
     elif stage == "all":
         install_dependencies()
+        hazel_dependency()
         build_project()
         run_project()
         report_module.generate_reports()

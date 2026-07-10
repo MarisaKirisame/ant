@@ -272,8 +272,8 @@ let measure_memory_consumption (f : unit -> 'a) : 'a * heap_words_stats =
         } ))
 
 let write_steps_json_from_parts oc ~(exec_res : Memo.exec_result) ~(memo_profile : (string * int) list)
-  ~(plain_profile : (string * int) list) ~(cek_profile : (string * int) list) ~(memo_heap_words : int)
-  ~(cek_heap_words : int) ?(extra_fields : (string * Yojson.Safe.t) list = []) () : unit =
+    ~(plain_profile : (string * int) list) ~(cek_profile : (string * int) list) ~(memo_heap_words : int)
+    ~(cek_heap_words : int) ?(extra_fields : (string * Yojson.Safe.t) list = []) () : unit =
   let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
   let base_fields =
     [
@@ -287,8 +287,7 @@ let write_steps_json_from_parts oc ~(exec_res : Memo.exec_result) ~(memo_profile
       ("cek_heap_words", `Int cek_heap_words);
     ]
   in
-  let json = `Assoc (base_fields @ extra_fields)
-  in
+  let json = `Assoc (base_fields @ extra_fields) in
   Yojson.Safe.to_string json |> output_string oc;
   output_char oc '\n';
   flush oc
@@ -428,7 +427,13 @@ let quicksort_nexpr =
      greater = quicksort (filter (fun x -> x >= pivot) rest) in append smaller (pivot :: greater)"
 
 let quicksort_expr = expr_of_nexpr quicksort_nexpr
-let experiment_list_length = 400
+
+let int_env_or_default ~name ~default =
+  match Sys.getenv_opt name with
+  | None -> default
+  | Some raw -> ( match int_of_string_opt raw with Some n when n > 0 -> n | _ -> default)
+
+let experiment_list_length = int_env_or_default ~name:"ANT_EXPERIMENT_LIST_LENGTH" ~default:400
 let experiment_random_seed = 42
 let experiment_random_bound = 100
 

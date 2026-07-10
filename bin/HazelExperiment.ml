@@ -52,14 +52,25 @@ let benchmark_test_string = function
   | Pair -> Printf.sprintf {| my_pair (%s) |} (list_to_cons_str large_input)
   | Rev -> Printf.sprintf {| my_reverse (%s) |} (list_to_cons_str large_input)
 
-let run ~dataset ~benchmark =
+let run ?hazel_compare ~dataset ~benchmark () =
   let test = Common.parse_nexpr (benchmark_test_string benchmark) in
   FromHazel.run_with_test ~program_name:(mode_name dataset benchmark) ~program_path:(program_path dataset benchmark)
-    ~steps_file:(steps_file dataset benchmark) ~test
+    ~steps_file:(steps_file dataset benchmark) ~test ?hazel_compare
 
-let run_mk benchmark = run ~dataset:Mk ~benchmark
-let run_th benchmark = run ~dataset:Th ~benchmark
-let run_at benchmark = run ~dataset:At ~benchmark
+let run_mk benchmark = run ~dataset:Mk ~benchmark ()
+let run_th benchmark = run ~dataset:Th ~benchmark ()
+let run_at benchmark = run ~dataset:At ~benchmark ()
+
+let hazel_compare_config =
+  {
+    FromHazel.hazel_cmd =
+      Printf.sprintf "node --max-old-space-size=8192 --stack-size=32768 -r %s %s"
+        (Filename.quote "hazel/src/CLI/polyfill.js")
+        (Filename.quote "hazel/_build/default/src/CLI/cli.bc.js");
+  }
+
+let run_compare ?(hazel_compare = hazel_compare_config) ~dataset ~benchmark () =
+  run ~hazel_compare:(Some hazel_compare) ~dataset ~benchmark ()
 
 let decode_mode mode =
   let normalized = String.lowercase_ascii mode in
@@ -75,7 +86,14 @@ let run_mode mode =
   match decode_mode mode with
   | None -> false
   | Some (dataset, benchmark) ->
-      run ~dataset ~benchmark;
+      run ~dataset ~benchmark ();
+      true
+
+let run_compare_mode mode =
+  match decode_mode mode with
+  | None -> false
+  | Some (dataset, benchmark) ->
+      run_compare ~dataset ~benchmark ();
       true
 
 let all_modes =

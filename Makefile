@@ -1,9 +1,12 @@
 .DEFAULT_GOAL := all
 
-.PHONY: dependency build coverage run profile compile-generated nightly all report experiment hazel-tex arith-tex hazel hazel-report arith arith-report website website-check website-clean website-serve
+.PHONY: dependency hazel-dependency build coverage run profile compile-generated nightly all report experiment hazel-experiment hazel-tex arith-tex hazel hazel-report arith arith-report website website-check website-clean website-serve
 
 dependency:
 	uv run ./nightly.py dependency
+
+hazel-dependency:
+	uv run ./nightly.py hazel-dependency
 
 build:
 	uv run ./nightly.py build
@@ -19,6 +22,9 @@ run:
 
 hazel:
 	uv run ./nightly.py hazel
+
+hazel-experiment:
+	uv run ./nightly.py hazel-experiment
 
 arith:
 	uv run ./nightly.py arith

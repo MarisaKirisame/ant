@@ -8,6 +8,7 @@ speedup summaries (geometric + arithmetic means) for key comparisons.
 from __future__ import annotations
 
 import math
+import json
 import os
 import shutil
 import statistics
@@ -40,6 +41,8 @@ BASE_EXPERIMENTS: list[tuple[str, str]] = [
     ("pair", "Pair"),
     ("rev", "Reverse"),
 ]
+
+HAZEL_COMPARE_EXCLUDED_MODES = frozenset({"qs", "th_qs", "at_qs", "at_is"})
 
 VARIANTS: list[tuple[str, str, str]] = [
     ("eval_steps_{key}.json", "{key}", ""),
@@ -231,17 +234,37 @@ def generate_reports() -> None:
     )
 
 
-def generate_hazel_reports() -> None:
+def generate_hazel_reports(
+    *,
+    include_hazel_compare: bool = True,
+    modes: Sequence[str] | None = None,
+    hazel_compare_modes: Sequence[str] | None = None,
+) -> None:
     css_source = Path(__file__).with_name("style.css")
     tex_output = Path("output/hazel/hazel_result.tex")
-    generate_tex_table(output_path=tex_output)
+    generate_tex_table(
+        output_path=tex_output,
+        include_hazel_compare=include_hazel_compare,
+        modes=modes,
+        hazel_compare_modes=hazel_compare_modes,
+    )
+
+    extra_entries: list[tuple[str, Path]] = []
+    if include_hazel_compare:
+        hazel_compare_index = Path("output/hazel/hazel_compare/index.html")
+        if not hazel_compare_index.exists():
+            hazel_compare_index = generate_hazel_compare_reports(modes=hazel_compare_modes)
+        if hazel_compare_index is not None:
+            extra_entries.append(("Chordata vs Hazel Baseline", hazel_compare_index))
+
     _generate_reports_for_experiments(
         title="Hazel Benchmark Index",
         output=Path("output/hazel/index.html"),
-        experiments=_hazel_experiments(Path("output/hazel")),
+        experiments=_hazel_experiments(Path("output/hazel"), modes=modes),
         downloads=[("Download hazel_result.tex", tex_output)],
         css_source=css_source,
         report_kind="hazel",
+        extra_entries=extra_entries,
     )
 
 
@@ -259,10 +282,14 @@ def generate_arith_reports() -> None:
     )
 
 
-def _hazel_experiments(base_dir: Path) -> list[tuple[str, Path, Path]]:
+def _hazel_experiments(base_dir: Path, *, modes: Sequence[str] | None = None) -> list[tuple[str, Path, Path]]:
+    selected = set(modes) if modes is not None else None
     experiments: list[tuple[str, Path, Path]] = []
     for steps_pattern, output_pattern, label_suffix in VARIANTS:
         for key, label in BASE_EXPERIMENTS:
+            mode = output_pattern.format(key=key)
+            if selected is not None and mode not in selected:
+                continue
             experiments.append(
                 (
                     f"{label} Benchmark{label_suffix}",
@@ -285,6 +312,7 @@ def _generate_reports_for_experiments(
     downloads: Sequence[tuple[str, Path]] | None = None,
     css_source: Path,
     report_kind: str,
+    extra_entries: Sequence[tuple[str, Path]] | None = None,
 ) -> None:
     generated_entries: list[tuple[str, Path]] = []
     for label, input_path, output_dir in experiments:
@@ -298,6 +326,8 @@ def _generate_reports_for_experiments(
             report_kind=report_kind,
         )
         generated_entries.append((label, output_dir / "index.html"))
+    if extra_entries:
+        generated_entries.extend(extra_entries)
     generate_html(
         title=title,
         output=output,
@@ -437,13 +467,38 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
     return lines
 
 
-def generate_tex_table(*, output_path: Path = Path("output/hazel/hazel_result.tex")) -> None:
+def _mode_from_steps_pattern(steps_pattern: str, key: str) -> str:
+    if steps_pattern.startswith("eval_steps_th_"):
+        return f"th_{key}"
+    if steps_pattern.startswith("eval_steps_at_"):
+        return f"at_{key}"
+    return key
+
+
+def generate_tex_table(
+    *,
+    output_path: Path = Path("output/hazel/hazel_result.tex"),
+    include_hazel_compare: bool = True,
+    modes: Sequence[str] | None = None,
+    hazel_compare_modes: Sequence[str] | None = None,
+) -> None:
+    if include_hazel_compare:
+        generate_hazel_compare_reports(modes=hazel_compare_modes)
+        baseline_geomean = _hazel_baseline_geomean_for_tex()
+    else:
+        baseline_geomean = "timeout"
+    selected = set(modes) if modes is not None else None
     available_input_paths: list[Path] = []
     rows: list[tuple[str, list[str], list[str]]] = []
     for variant_label, steps_pattern in TABLE_VARIANTS:
         speedup_values: list[str] = []
         memory_overhead_values: list[str] = []
         for key, _ in BASE_EXPERIMENTS:
+            mode = _mode_from_steps_pattern(steps_pattern, key)
+            if selected is not None and mode not in selected:
+                speedup_values.append("timeout")
+                memory_overhead_values.append("timeout")
+                continue
             input_path = Path(steps_pattern.format(key=key))
             if not input_path.exists():
                 speedup_values.append("timeout")
@@ -490,6 +545,7 @@ def generate_tex_table(*, output_path: Path = Path("output/hazel/hazel_result.te
         "\\newcommand{\\hazelPointCount}{" + str(point_count) + "}",
         "\\newcommand{\\hazelTotalSpeedup}{" + total_speedup + "}",
         "\\newcommand{\\hazelTotalMemoryOverhead}{" + total_memory_overhead + "}",
+        "\\newcommand{\\hazelBaselineGeoMean}{" + baseline_geomean + "}",
         "\\newcommand{\\hazelSpeedBreakdown}{%",
         *breakdown_lines,
         "}",
@@ -583,3 +639,173 @@ def _collect_pairs(data_paths: Iterable[Path]) -> list[tuple[float, float]]:
             pairs_from_profiles(result, baseline_key="cek_profile", memo_key="memo_profile")
         )
     return pairs
+
+
+def _profile_sum(entries: object) -> float:
+    if not isinstance(entries, list):
+        return 0.0
+    total = 0.0
+    for pair in entries:
+        if not isinstance(pair, list) or len(pair) != 2:
+            continue
+        value = pair[1]
+        if isinstance(value, (int, float)):
+            total += float(value)
+    return total
+
+
+def _collect_hazel_compare_pairs(
+    input_paths: Sequence[Path],
+    *,
+    hazel_key: str,
+) -> list[tuple[float, float]]:
+    pairs: list[tuple[float, float]] = []
+    for path in input_paths:
+        if not path.exists():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(row, dict):
+                continue
+            if row.get("name") != "exec_time":
+                continue
+            if row.get("hazel_status") != "ok":
+                continue
+            chordata = _profile_sum(row.get("memo_profile"))
+            hazel_value = row.get(hazel_key)
+            if not isinstance(hazel_value, (int, float)):
+                continue
+            hazel = float(hazel_value)
+            if chordata > 0 and hazel > 0:
+                pairs.append((chordata, hazel))
+    return pairs
+
+
+def _hazel_compare_summary(pairs: Sequence[tuple[float, float]]) -> dict[str, float]:
+    hazel_over_chordata_ratios = [hz / chordata for chordata, hz in pairs]
+    return {
+        "samples": float(len(hazel_over_chordata_ratios)),
+        "geo_mean_hazel_over_chordata": math.exp(statistics.mean(math.log(r) for r in hazel_over_chordata_ratios)),
+        "arith_mean_hazel_over_chordata": statistics.mean(hazel_over_chordata_ratios),
+        "end_to_end_hazel_over_chordata": sum(hz for _, hz in pairs) / sum(chordata for chordata, _ in pairs),
+    }
+
+
+def _summary_json(path: Path) -> dict[str, object] | None:
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def generate_hazel_compare_reports(
+    *,
+    output_dir: Path = Path("output/hazel/hazel_compare"),
+    output: Path = Path("output/hazel/hazel_compare/index.html"),
+    modes: Sequence[str] | None = None,
+) -> Path | None:
+    selected = set(modes) if modes is not None else None
+    input_paths: list[Path] = []
+    for steps_pattern, _, _ in VARIANTS:
+        for key, _ in BASE_EXPERIMENTS:
+            mode = _mode_from_steps_pattern(steps_pattern, key)
+            if selected is not None:
+                if mode not in selected:
+                    continue
+            elif mode in HAZEL_COMPARE_EXCLUDED_MODES:
+                continue
+            input_paths.append(Path(steps_pattern.format(key=key)))
+
+    eval_only_pairs = _collect_hazel_compare_pairs(input_paths, hazel_key="hazel_eval_only_ns")
+    eval_only_summary_path = output_dir / "hazel_vs_chordata_eval_only_summary.json"
+    stale_summary_path = output_dir / "hazel_vs_ant_cek_eval_only_summary.json"
+    if not eval_only_pairs:
+        eval_only_summary_path.unlink(missing_ok=True)
+        stale_summary_path.unlink(missing_ok=True)
+        return None
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    css_source = Path(__file__).with_name("style.css")
+    css_path = output.parent / css_source.name
+    shutil.copyfile(css_source, css_path)
+    css_href = os.path.relpath(css_path, output.parent)
+    for stale_plot in output_dir.glob("[0-9]*.png"):
+        stale_plot.unlink()
+    stale_summary_path.unlink(missing_ok=True)
+
+    eval_only_summary: dict[str, float] | None = None
+    eval_only_scatter_rel: str | None = None
+    if eval_only_pairs:
+        eval_only_summary = _hazel_compare_summary(eval_only_pairs)
+        eval_only_summary_path.write_text(json.dumps(eval_only_summary, indent=2), encoding="utf-8")
+        hazel_baseline_pairs = [(hazel, chordata) for chordata, hazel in eval_only_pairs]
+        scatter_name = plot_scatter_for_kind(
+            hazel_baseline_pairs,
+            output_dir,
+            report_kind="hazel",
+            title="Chordata vs Hazel Baseline",
+            xlabel="Hazel baseline time (ns)",
+            ylabel="Chordata time (ns)",
+            output_name="hazel_vs_chordata_scatter.png",
+        )
+        eval_only_scatter_rel = os.path.relpath(output_dir / scatter_name, output.parent)
+
+    doc = document(title="Chordata vs Hazel Baseline")
+    doc["lang"] = "en"
+    with doc.head:
+        tag.meta(charset="utf-8")
+        tag.link(rel="stylesheet", href=css_href)
+    with doc:
+        with tag.main():
+            tag.h1("Chordata vs Hazel Baseline")
+            tag.p("Summary of Hazel baseline time divided by Chordata time from hazel-compare eval_steps data.")
+
+            if eval_only_summary:
+                tag.h2("Hazel baseline / Chordata")
+                with tag.section(cls="stats"):
+                    stat_card("Samples", str(int(eval_only_summary["samples"])))
+                    stat_card(
+                        "Geometric mean",
+                        f"{fmt_speedup(eval_only_summary['geo_mean_hazel_over_chordata'])}x",
+                    )
+                    stat_card(
+                        "Arithmetic mean",
+                        f"{fmt_speedup(eval_only_summary['arith_mean_hazel_over_chordata'])}x",
+                    )
+                    stat_card(
+                        "End-to-end",
+                        f"{fmt_speedup(eval_only_summary['end_to_end_hazel_over_chordata'])}x",
+                    )
+                if eval_only_scatter_rel:
+                    with tag.section(cls="plot"):
+                        tag.img(
+                            src=eval_only_scatter_rel,
+                            alt="Chordata versus Hazel baseline scatter plot",
+                        )
+
+    output.write_text(doc.render(), encoding="utf-8")
+    return output
+
+
+def _hazel_baseline_geomean_for_tex(
+    summary_path: Path = Path("output/hazel/hazel_compare/hazel_vs_chordata_eval_only_summary.json"),
+) -> str:
+    summary = _summary_json(summary_path)
+    if summary is None:
+        return "timeout"
+    geo = summary.get("geo_mean_hazel_over_chordata")
+    if not isinstance(geo, (int, float)):
+        return "timeout"
+    if float(geo) <= 0:
+        return "timeout"
+    return _tex_ratio(float(geo), include_times_symbol=True)

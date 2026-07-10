@@ -66,8 +66,17 @@ and exp = {
 and kont = value
 and 'a cek = { mutable c : exp; mutable e : 'a Dynarray.t; mutable k : 'a }
 and state = value cek
-and step = { src : pattern cek; dst : value cek; sc : int; mutable hit : int; mutable insert_time : int }
-and memo = { mutable entries : (trie option * int) Array.t; mutable size : int }
+
+and step = {
+  src : pattern cek;
+  dst : value cek;
+  sc : int;
+  mutable hit : int;
+  mutable insert_time : int;
+  mutable creation_epoch : int;
+}
+
+and memo = { mutable entries : (trie option * int) Array.t; mutable size : int; mutable epoch : int }
 and trie = Leaf of { prefix : Pattern.pattern; step : step; max_sc : int } | Branch of branch
 
 and branch = {

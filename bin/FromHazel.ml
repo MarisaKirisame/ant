@@ -476,12 +476,154 @@ let rec subst_deepest_hole y x =
   | _ -> failwith ("subst_deepest_hole not implemented for expr: " ^ Format.asprintf "%a" pp_nexpr x)
 
 type parsed_candidate = { source_index : int; source_exercise_id : int option; nexpr : nexpr }
+type collapsed_candidate = { nexpr : nexpr; source_indices : int list; source_exercise_ids : int option list }
+type hazel_compare_config = { hazel_cmd : string }
+type hazel_compare_result = { parse_eval_ns : int; eval_only_ns : int; status : string; error : string }
 
-type collapsed_candidate = {
-  nexpr : nexpr;
-  source_indices : int list;
-  source_exercise_ids : int option list;
-}
+let hazel_input_placeholder_name = "hazel_input_random_list"
+
+let rec int_list_of_nexpr = function
+  | NENil -> Some []
+  | NECons (NEInt i, tl) -> Option.map (fun xs -> i :: xs) (int_list_of_nexpr tl)
+  | _ -> None
+
+let choose_largest_int_list (expr : nexpr) : int list option =
+  let best = ref None in
+  let consider ints =
+    match !best with
+    | None -> best := Some ints
+    | Some prev when List.length ints > List.length prev -> best := Some ints
+    | Some _ -> ()
+  in
+  let rec walk = function
+    | NEInt _ | NETrue | NEFalse | NEUnit | NEHole | NENil | NEVar _ -> ()
+    | NEAbs (_, body) -> walk body
+    | NELet (_, bound, body) ->
+        walk bound;
+        walk body
+    | NEFix (_, _, body) -> walk body
+    | NEIf (c, t, e) ->
+        walk c;
+        walk t;
+        walk e
+    | NEMatchList (target, nil_case, _, _, cons_case) ->
+        walk target;
+        walk nil_case;
+        walk cons_case
+    | NEApp (f, a) ->
+        walk f;
+        walk a
+    | NEAnd (l, r)
+    | NEPlus (l, r)
+    | NEMinus (l, r)
+    | NELt (l, r)
+    | NELe (l, r)
+    | NEGt (l, r)
+    | NEGe (l, r)
+    | NESeq (l, r)
+    | NEPair (l, r) ->
+        walk l;
+        walk r
+    | NECons (_, _) as expr -> (
+        match int_list_of_nexpr expr with
+        | Some ints -> consider ints
+        | None -> (
+            match expr with
+            | NECons (hd, tl) ->
+                walk hd;
+                walk tl
+            | _ -> ()))
+    | NEZro x | NEFst x -> walk x
+  in
+  walk expr;
+  !best
+
+let rewrite_large_int_lists ~(min_length : int) (expr : nexpr) : nexpr * bool =
+  let rec go expr =
+    match int_list_of_nexpr expr with
+    | Some ints when List.length ints >= min_length -> (NEVar hazel_input_placeholder_name, true)
+    | _ -> (
+        match expr with
+        | NEInt _ | NETrue | NEFalse | NEUnit | NEHole | NENil | NEVar _ -> (expr, false)
+        | NEAbs (arg, body) ->
+            let body', replaced = go body in
+            (NEAbs (arg, body'), replaced)
+        | NELet (name, bound, body) ->
+            let bound', replaced_bound = go bound in
+            let body', replaced_body = go body in
+            (NELet (name, bound', body'), replaced_bound || replaced_body)
+        | NEFix (name, arg, body) ->
+            let body', replaced = go body in
+            (NEFix (name, arg, body'), replaced)
+        | NEIf (c, t, e) ->
+            let c', rc = go c in
+            let t', rt = go t in
+            let e', re = go e in
+            (NEIf (c', t', e'), rc || rt || re)
+        | NEMatchList (target_expr, nil_case, head_name, tail_name, cons_case) ->
+            let target_expr', r_target = go target_expr in
+            let nil_case', r_nil = go nil_case in
+            let cons_case', r_cons = go cons_case in
+            (NEMatchList (target_expr', nil_case', head_name, tail_name, cons_case'), r_target || r_nil || r_cons)
+        | NEApp (f, a) ->
+            let f', rf = go f in
+            let a', ra = go a in
+            (NEApp (f', a'), rf || ra)
+        | NEAnd (l, r) ->
+            let l', rl = go l in
+            let r', rr = go r in
+            (NEAnd (l', r'), rl || rr)
+        | NEPlus (l, r) ->
+            let l', rl = go l in
+            let r', rr = go r in
+            (NEPlus (l', r'), rl || rr)
+        | NEMinus (l, r) ->
+            let l', rl = go l in
+            let r', rr = go r in
+            (NEMinus (l', r'), rl || rr)
+        | NELt (l, r) ->
+            let l', rl = go l in
+            let r', rr = go r in
+            (NELt (l', r'), rl || rr)
+        | NELe (l, r) ->
+            let l', rl = go l in
+            let r', rr = go r in
+            (NELe (l', r'), rl || rr)
+        | NEGt (l, r) ->
+            let l', rl = go l in
+            let r', rr = go r in
+            (NEGt (l', r'), rl || rr)
+        | NEGe (l, r) ->
+            let l', rl = go l in
+            let r', rr = go r in
+            (NEGe (l', r'), rl || rr)
+        | NESeq (l, r) ->
+            let l', rl = go l in
+            let r', rr = go r in
+            (NESeq (l', r'), rl || rr)
+        | NEPair (l, r) ->
+            let l', rl = go l in
+            let r', rr = go r in
+            (NEPair (l', r'), rl || rr)
+        | NECons (hd, tl) ->
+            let hd', rh = go hd in
+            let tl', rt = go tl in
+            (NECons (hd', tl'), rh || rt)
+        | NEZro x ->
+            let x', replaced = go x in
+            (NEZro x', replaced)
+        | NEFst x ->
+            let x', replaced = go x in
+            (NEFst x', replaced))
+  in
+  go expr
+
+let extract_side_input_list (expr : nexpr) : nexpr * int list option =
+  match choose_largest_int_list expr with
+  | Some ints when List.length ints >= 6 ->
+      let rewritten, replaced = rewrite_large_int_lists ~min_length:6 expr in
+      if replaced then (rewritten, Some ints) else (expr, None)
+  | _ -> (expr, None)
 
 let collapse_adjacent_candidates (candidates : parsed_candidate list) : collapsed_candidate list =
   let rec loop current acc = function
@@ -505,7 +647,9 @@ let collapse_adjacent_candidates (candidates : parsed_candidate list) : collapse
   match candidates with
   | [] -> []
   | (x : parsed_candidate) :: xs ->
-      let first = { nexpr = x.nexpr; source_indices = [ x.source_index ]; source_exercise_ids = [ x.source_exercise_id ] } in
+      let first =
+        { nexpr = x.nexpr; source_indices = [ x.source_index ]; source_exercise_ids = [ x.source_exercise_id ] }
+      in
       loop first [] xs
 
 let parse_program_with_test ~program_path test =
@@ -517,12 +661,76 @@ let parse_program_with_test ~program_path test =
     let expr = expr_of_sexp impl in
     last_expr := Some expr;
     let nexpr = nexpr_of_expr expr in
-    { source_index = i; source_exercise_id; nexpr = (nexpr |> subst_deepest_hole test |> clean) }
+    { source_index = i; source_exercise_id; nexpr = nexpr |> subst_deepest_hole test |> clean }
   in
   let programs = programs |> List.mapi parse_candidate |> collapse_adjacent_candidates in
   (programs, !last_expr)
 
-let run_with_test ~program_name ~program_path ~steps_file ~test =
+let hazel_compare_items_of_candidates ~(program_name : string) (candidates : collapsed_candidate list) : Yojson.Safe.t =
+  `List
+    (List.mapi
+       (fun i candidate ->
+         let source_nexpr, side_input_list = extract_side_input_list candidate.nexpr in
+         let input_int_list_json =
+           match side_input_list with None -> `Null | Some ints -> `List (List.map (fun x -> `Int x) ints)
+         in
+         let fields =
+           [
+             ("id", `String (Printf.sprintf "%s:%d" program_name i));
+             ("source", `String (ToHazel.source_of_nexpr source_nexpr));
+             ("input_int_list", input_int_list_json);
+           ]
+         in
+         `Assoc fields)
+       candidates)
+
+let hazel_compare_result_of_yojson json : hazel_compare_result =
+  let open Yojson.Safe.Util in
+  let int_of_int_or_float member_name =
+    match json |> member member_name with
+    | `Int x -> x
+    | `Float x -> int_of_float x
+    | `Intlit x -> int_of_string x
+    | _ -> failwith (Printf.sprintf "hazel compare field %s was not int/float" member_name)
+  in
+  {
+    parse_eval_ns = int_of_int_or_float "parse_eval_ns";
+    eval_only_ns = int_of_int_or_float "eval_only_ns";
+    status = json |> member "status" |> to_string;
+    error = json |> member "error" |> to_string;
+  }
+
+let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(cfg : hazel_compare_config) :
+    hazel_compare_result list =
+  let candidates =
+    match Sys.getenv_opt "ANT_HAZEL_COMPARE_MAX_CANDIDATES" with
+    | None -> candidates
+    | Some raw -> ( match int_of_string_opt raw with Some n when n >= 0 -> List.take n candidates | _ -> candidates)
+  in
+  let input_path = Filename.temp_file (program_name ^ "_hazel_batch") ".json" in
+  let output_path = Filename.temp_file (program_name ^ "_hazel_batch_out") ".json" in
+  Fun.protect
+    ~finally:(fun () ->
+      (try Sys.remove input_path with _ -> ());
+      try Sys.remove output_path with _ -> ())
+    (fun () ->
+      let oc = open_out input_path in
+      Fun.protect
+        ~finally:(fun () -> close_out_noerr oc)
+        (fun () ->
+          hazel_compare_items_of_candidates ~program_name candidates |> Yojson.Safe.to_channel oc;
+          output_char oc '\n');
+      let quoted_input = Filename.quote input_path in
+      let quoted_output = Filename.quote output_path in
+      let cmd = Printf.sprintf "%s eval-batch %s --output %s" cfg.hazel_cmd quoted_input quoted_output in
+      let status = Sys.command cmd in
+      if status <> 0 then failwith (Printf.sprintf "hazel eval-batch failed for %s (exit=%d)" program_name status);
+      let results_json = Yojson.Safe.from_file output_path in
+      match results_json with
+      | `List items -> List.map hazel_compare_result_of_yojson items
+      | _ -> failwith (Printf.sprintf "hazel eval-batch output was not a JSON list for %s" program_name))
+
+let run_with_test ?(hazel_compare = None) ~program_name ~program_path ~steps_file ~test =
   with_outchannel steps_file (fun oc ->
       RunLiveCommon.LC.populate_state ();
       let memo = Ant.Memo.init_memo () in
@@ -534,6 +742,9 @@ let run_with_test ~program_name ~program_path ~steps_file ~test =
             let expr = expr_of_nexpr candidate.nexpr in
             Format.printf "%s candidate %d expr: %a@." program_name i RunLiveCommon.pp_expr expr;
             (i, candidate, expr))
+      in
+      let hazel_compare_results =
+        match hazel_compare with None -> None | Some cfg -> Some (run_hazel_compare ~program_name ~candidates ~cfg)
       in
       record_resting_heap_size ();
       let baseline_pass =
@@ -565,10 +776,22 @@ let run_with_test ~program_name ~program_path ~steps_file ~test =
           let source_exercise_ids_json =
             `List
               (List.map
-                 (function
-                   | Some exercise_id -> `Int exercise_id
-                   | None -> `Null)
+                 (function Some exercise_id -> `Int exercise_id | None -> `Null)
                  memo_candidate.source_exercise_ids)
+          in
+          let hazel_fields =
+            match hazel_compare_results with
+            | None -> []
+            | Some results -> (
+                match List.nth_opt results memo_idx with
+                | None -> []
+                | Some result ->
+                    [
+                      ("hazel_parse_eval_ns", `Int result.parse_eval_ns);
+                      ("hazel_eval_only_ns", `Int result.eval_only_ns);
+                      ("hazel_status", `String result.status);
+                      ("hazel_error", `String result.error);
+                    ])
           in
           let extra_fields =
             [
@@ -579,11 +802,11 @@ let run_with_test ~program_name ~program_path ~steps_file ~test =
               ("trace_source_last_index", `Int source_last_index);
               ("trace_source_exercise_ids", source_exercise_ids_json);
             ]
+            @ hazel_fields
           in
           write_steps_json_from_parts oc ~exec_res:memo_result.exec_res ~memo_profile:memo_result.memo_profile
             ~plain_profile:baseline_result.plain_profile ~cek_profile:baseline_result.cek_profile
-            ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words:baseline_result.cek_heap_words
-            ~extra_fields ())
+            ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words:baseline_result.cek_heap_words ~extra_fields ())
         memo_pass baseline_pass;
       (match last_expr with
       | None -> failwith "why"
