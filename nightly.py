@@ -41,7 +41,7 @@ def _resolve_switch() -> str:
 SWITCH = _resolve_switch()
 OPAM_ARCHIVE_REPOSITORY_URL = "git+https://github.com/ocaml/opam-repository-archive"
 TOOLCHAIN_PACKAGES = [
-    "dune",
+    "dune>=3.24.0",
 ]
 DEV_PACKAGES = [
     "ocaml-lsp-server",
