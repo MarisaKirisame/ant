@@ -63,18 +63,18 @@ ENTROPY_PROGRAMS = (
     ("pair", "Pair"),
 )
 
-HAZEL_COMPARE_EXCLUDED_MODES = frozenset({"qs", "th_qs", "at_qs", "at_is"})
+HAZEL_COMPARE_EXCLUDED_MODES = frozenset()
 
 VARIANTS: list[tuple[str, str, str]] = [
-    ("eval_steps_{key}.json", "{key}", ""),
-    ("eval_steps_th_{key}.json", "th_{key}", " (th)"),
-    ("eval_steps_at_{key}.json", "at_{key}", " (at)"),
+    ("results/hazel/{key}.json", "{key}", ""),
+    ("results/hazel/th_{key}.json", "th_{key}", " (th)"),
+    ("results/hazel/at_{key}.json", "at_{key}", " (at)"),
 ]
 
 TABLE_VARIANTS: list[tuple[str, str]] = [
-    ("Alice", "eval_steps_{key}.json"),
-    ("Bob", "eval_steps_at_{key}.json"),
-    ("Cam", "eval_steps_th_{key}.json"),
+    ("Alice", "results/hazel/{key}.json"),
+    ("Bob", "results/hazel/at_{key}.json"),
+    ("Cam", "results/hazel/th_{key}.json"),
 ]
 
 def _render_html(
@@ -232,10 +232,10 @@ def generate_html(
 def generate_table() -> None:
     speedup_module.generate_table(
         to_compares=[
-            ("Random", Path("eval_steps_asymptotic_random.json")),
-            ("Low entropy", Path("eval_steps_asymptotic_low_entropy.json")),
-            ("Modification", Path("eval_steps_asymptotic_warmed_up.json")),
-            ("Repeated", Path("eval_steps_asymptotic_repeated.json")),
+            ("Random", Path("results/entropy/map/random/65536.json")),
+            ("Low entropy", Path("results/entropy/map/block/65536.json")),
+            ("Modification", Path("results/entropy/map/mod1/65536.json")),
+            ("Repeated", Path("results/entropy/map/same/65536.json")),
         ],
         output_dir=Path("")
     )
@@ -519,7 +519,7 @@ def _hazel_experiments(base_dir: Path, *, modes: Sequence[str] | None = None) ->
 
 
 def _arith_experiments(base_dir: Path) -> list[tuple[str, Path, Path]]:
-    return [("Arith Benchmark", Path("eval_steps_arith.json"), base_dir / "arith")]
+    return [("Arith Benchmark", Path("results/arith/arith.json"), base_dir / "arith")]
 
 
 def _generate_reports_for_experiments(
@@ -686,9 +686,10 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
 
 
 def _mode_from_steps_pattern(steps_pattern: str, key: str) -> str:
-    if steps_pattern.startswith("eval_steps_th_"):
+    name = Path(steps_pattern.format(key=key)).name
+    if name.startswith("th_"):
         return f"th_{key}"
-    if steps_pattern.startswith("eval_steps_at_"):
+    if name.startswith("at_"):
         return f"at_{key}"
     return key
 
@@ -800,7 +801,7 @@ def generate_tex_table(
 
 def generate_arith_tex(
     *,
-    input_path: Path = Path("eval_steps_arith.json"),
+    input_path: Path = Path("results/arith/arith.json"),
     output_path: Path = Path("output/arith/arith_result.tex"),
 ) -> None:
     speedup = "timeout"
@@ -986,7 +987,7 @@ def generate_hazel_compare_reports(
     with doc:
         with tag.main():
             tag.h1("Chordata vs Hazel Baseline")
-            tag.p("Summary of Hazel baseline time divided by Chordata time from hazel-compare eval_steps data.")
+            tag.p("Summary of Hazel baseline time divided by Chordata time from hazel-compare result data.")
 
             if eval_only_summary:
                 tag.h2("Hazel baseline / Chordata")

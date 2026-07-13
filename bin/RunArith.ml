@@ -5,7 +5,7 @@ module Word = Ant.Word.Word
 module Json = Yojson.Safe
 module State = Ant.State
 
-let default_steps_file = "eval_steps_arith.json"
+let default_steps_file = "results/arith/arith.json"
 let default_term_size = 400
 let default_sample_count = 20
 
@@ -22,7 +22,14 @@ let with_memo f =
   let memo = Memo.init_memo () in
   f memo
 
+let ensure_parent_dir path =
+  let parent = Filename.dirname path in
+  if (not (String.equal parent ".")) && not (Sys.file_exists parent) then
+    let cmd = Printf.sprintf "mkdir -p %s" (Filename.quote parent) in
+    if Sys.command cmd <> 0 then failwith (Printf.sprintf "failed to create directory %s" parent)
+
 let with_outchannel steps_path f =
+  ensure_parent_dir steps_path;
   let oc = open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_path in
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 

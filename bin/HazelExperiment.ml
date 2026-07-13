@@ -31,9 +31,9 @@ let mode_name dataset benchmark = dataset_mode_prefix dataset ^ benchmark_key be
 
 let steps_file dataset benchmark =
   match dataset with
-  | Mk -> Printf.sprintf "eval_steps_%s.json" (benchmark_key benchmark)
-  | Th -> Printf.sprintf "eval_steps_th_%s.json" (benchmark_key benchmark)
-  | At -> Printf.sprintf "eval_steps_at_%s.json" (benchmark_key benchmark)
+  | Mk -> Printf.sprintf "results/hazel/%s.json" (benchmark_key benchmark)
+  | Th -> Printf.sprintf "results/hazel/th_%s.json" (benchmark_key benchmark)
+  | At -> Printf.sprintf "results/hazel/at_%s.json" (benchmark_key benchmark)
 
 let program_path dataset benchmark =
   Printf.sprintf "data/%s_%s.json" (dataset_data_prefix dataset) (benchmark_data_suffix benchmark)

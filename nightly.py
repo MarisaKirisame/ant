@@ -193,24 +193,24 @@ hazel_modes = tuple(
 )
 hazel_bad = set(["th_ms", "th_pair"])
 hazel_modes = tuple(m for m in hazel_modes if m not in hazel_bad)
-hazel_compare_bad = set(["qs", "th_qs", "at_qs", "at_is", "at_ms", "is", "rev", "th_is"])
-hazel_compare_modes = tuple(m for m in hazel_modes if m not in hazel_compare_bad)
 arith_modes = ("arith",)
 modes = arith_modes + hazel_modes
 scaling_sizes = (10, 20, 40)
 entropy_scaling_sizes = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000, 10000, 20000, 40000)
 
-def _remove_eval_steps_files_for_modes(selected_modes: Iterable[str]) -> None:
+def _result_path_for_mode(mode: str) -> Path:
+    if mode == "arith":
+        return Path("results/arith/arith.json")
+    return Path("results/hazel") / f"{mode}.json"
+
+
+def _remove_result_files_for_modes(selected_modes: Iterable[str]) -> None:
     for mode in selected_modes:
-        path = f"eval_steps_{mode}.json"
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            continue
+        _result_path_for_mode(mode).unlink(missing_ok=True)
 
 
 def run_modes(selected_modes: tuple[str, ...]) -> None:
-    _remove_eval_steps_files_for_modes(selected_modes)
+    _remove_result_files_for_modes(selected_modes)
     ensure_switch()
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
@@ -220,7 +220,7 @@ def run_modes(selected_modes: tuple[str, ...]) -> None:
 
 
 def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
-    _remove_eval_steps_files_for_modes(selected_modes)
+    _remove_result_files_for_modes(selected_modes)
     ensure_switch()
     env = _opam_env_with_ocamlrunparam()
     generate_ml_files(env=env)
@@ -241,17 +241,14 @@ def _hazel_experiment_modes() -> tuple[str, ...]:
 
 
 def _hazel_compare_experiment_modes() -> tuple[str, ...]:
-    return hazel_compare_modes
+    return hazel_modes
 
 
 def hazel_experiment_project() -> None:
     selected_modes = _hazel_experiment_modes()
     compare_modes = _hazel_compare_experiment_modes()
-    compare_blacklisted_modes = tuple(m for m in selected_modes if m not in compare_modes)
     # Prevent stale rows from non-selected benchmarks from appearing in reports.
-    _remove_eval_steps_files_for_modes(hazel_modes)
-    if compare_blacklisted_modes:
-        run_modes(compare_blacklisted_modes)
+    _remove_result_files_for_modes(hazel_modes)
     run_compare_modes(compare_modes)
     report_module.generate_hazel_reports(include_hazel_compare=True, modes=selected_modes, hazel_compare_modes=compare_modes)
 
@@ -437,12 +434,9 @@ def _remove_perf_data_files() -> None:
             continue
 
 
-def _remove_eval_steps_files() -> None:
-    for path in glob.glob("eval_steps*.json"):
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            continue
+def _remove_result_files() -> None:
+    for path in [Path("results/arith/arith.json"), *Path("results/hazel").glob("*.json")]:
+        path.unlink(missing_ok=True)
 
 
 def main(argv: Iterable[str]) -> int:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot speedup ratios from eval_steps.json produced by RunLive.
+"""Plot speedup ratios from result JSON produced by RunLive.
 
 The metric plotted (wall-clock time vs evaluation steps) is controlled by
 ``REPORT_WALL_CLOCK_TIME`` below. Expected JSONL keys for each exec_time record:

@@ -666,23 +666,23 @@ let parse_program_with_test ~program_path test =
   let programs = programs |> List.mapi parse_candidate |> collapse_adjacent_candidates in
   (programs, !last_expr)
 
+let hazel_compare_item_of_candidate ~(program_name : string) ~(index : int) (candidate : collapsed_candidate) :
+    Yojson.Safe.t =
+  let source_nexpr, side_input_list = extract_side_input_list candidate.nexpr in
+  let input_int_list_json =
+    match side_input_list with None -> `Null | Some ints -> `List (List.map (fun x -> `Int x) ints)
+  in
+  let fields =
+    [
+      ("id", `String (Printf.sprintf "%s:%d" program_name index));
+      ("source", `String (ToHazel.source_of_nexpr source_nexpr));
+      ("input_int_list", input_int_list_json);
+    ]
+  in
+  `Assoc fields
+
 let hazel_compare_items_of_candidates ~(program_name : string) (candidates : collapsed_candidate list) : Yojson.Safe.t =
-  `List
-    (List.mapi
-       (fun i candidate ->
-         let source_nexpr, side_input_list = extract_side_input_list candidate.nexpr in
-         let input_int_list_json =
-           match side_input_list with None -> `Null | Some ints -> `List (List.map (fun x -> `Int x) ints)
-         in
-         let fields =
-           [
-             ("id", `String (Printf.sprintf "%s:%d" program_name i));
-             ("source", `String (ToHazel.source_of_nexpr source_nexpr));
-             ("input_int_list", input_int_list_json);
-           ]
-         in
-         `Assoc fields)
-       candidates)
+  `List (List.mapi (fun i candidate -> hazel_compare_item_of_candidate ~program_name ~index:i candidate) candidates)
 
 let hazel_compare_result_of_yojson json : hazel_compare_result =
   let open Yojson.Safe.Util in
@@ -700,6 +700,89 @@ let hazel_compare_result_of_yojson json : hazel_compare_result =
     error = json |> member "error" |> to_string;
   }
 
+let hazel_compare_timeout_seconds () =
+  match Sys.getenv_opt "ANT_HAZEL_COMPARE_TIMEOUT_SECONDS" with
+  | Some raw -> ( match int_of_string_opt raw with Some n when n > 0 -> n | _ -> 300)
+  | None -> 300
+
+let string_contains haystack needle =
+  let haystack_len = String.length haystack in
+  let needle_len = String.length needle in
+  if needle_len = 0 then true
+  else
+    let rec loop i = i + needle_len <= haystack_len && (String.sub haystack i needle_len = needle || loop (i + 1)) in
+    loop 0
+
+let read_file_truncated path max_len =
+  if not (Sys.file_exists path) then ""
+  else
+    let ic = open_in path in
+    Fun.protect
+      ~finally:(fun () -> close_in_noerr ic)
+      (fun () ->
+        let len = in_channel_length ic in
+        let len = min len max_len in
+        really_input_string ic len)
+
+let classify_hazel_failure ~status ~log =
+  if status = 124 || status = 137 then "timeout"
+  else
+    let lower_log = String.lowercase_ascii log in
+    if
+      string_contains lower_log "out of memory"
+      || string_contains lower_log "heap out of memory"
+      || string_contains lower_log "oom"
+      || string_contains lower_log "cannot enlarge memory"
+    then "oom"
+    else "error"
+
+let hazel_compare_failure ~status ~log =
+  let kind = classify_hazel_failure ~status ~log in
+  let detail =
+    if log = "" then Printf.sprintf "hazel eval-batch failed (exit=%d)" status
+    else Printf.sprintf "hazel eval-batch failed (exit=%d): %s" status log
+  in
+  { parse_eval_ns = 0; eval_only_ns = 0; status = kind; error = detail }
+
+let run_hazel_compare_candidate ~program_name ~index ~(candidate : collapsed_candidate) ~(cfg : hazel_compare_config) :
+    hazel_compare_result =
+  let input_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d" program_name index) ".json" in
+  let output_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d_out" program_name index) ".json" in
+  let log_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d_log" program_name index) ".txt" in
+  Fun.protect
+    ~finally:(fun () ->
+      (try Sys.remove input_path with _ -> ());
+      (try Sys.remove output_path with _ -> ());
+      try Sys.remove log_path with _ -> ())
+    (fun () ->
+      let oc = open_out input_path in
+      Fun.protect
+        ~finally:(fun () -> close_out_noerr oc)
+        (fun () ->
+          `List [ hazel_compare_item_of_candidate ~program_name ~index candidate ] |> Yojson.Safe.to_channel oc;
+          output_char oc '\n');
+      let timeout_seconds = hazel_compare_timeout_seconds () in
+      let quoted_input = Filename.quote input_path in
+      let quoted_output = Filename.quote output_path in
+      let quoted_log = Filename.quote log_path in
+      let cmd =
+        Printf.sprintf "timeout --kill-after=5s %ds %s eval-batch %s --output %s > %s 2>&1" timeout_seconds
+          cfg.hazel_cmd quoted_input quoted_output quoted_log
+      in
+      let status = Sys.command cmd in
+      let log = read_file_truncated log_path 2000 in
+      if status <> 0 then hazel_compare_failure ~status ~log
+      else
+        try
+          match Yojson.Safe.from_file output_path with
+          | `List [ item ] -> hazel_compare_result_of_yojson item
+          | `List [] -> hazel_compare_failure ~status:0 ~log:"hazel eval-batch produced no output rows"
+          | `List _ -> hazel_compare_failure ~status:0 ~log:"hazel eval-batch produced too many output rows"
+          | _ -> hazel_compare_failure ~status:0 ~log:"hazel eval-batch output was not a JSON list"
+        with exn ->
+          hazel_compare_failure ~status:0
+            ~log:(Printf.sprintf "hazel eval-batch output could not be parsed: %s" (Printexc.to_string exn)))
+
 let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(cfg : hazel_compare_config) :
     hazel_compare_result list =
   let candidates =
@@ -707,28 +790,7 @@ let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(c
     | None -> candidates
     | Some raw -> ( match int_of_string_opt raw with Some n when n >= 0 -> List.take n candidates | _ -> candidates)
   in
-  let input_path = Filename.temp_file (program_name ^ "_hazel_batch") ".json" in
-  let output_path = Filename.temp_file (program_name ^ "_hazel_batch_out") ".json" in
-  Fun.protect
-    ~finally:(fun () ->
-      (try Sys.remove input_path with _ -> ());
-      try Sys.remove output_path with _ -> ())
-    (fun () ->
-      let oc = open_out input_path in
-      Fun.protect
-        ~finally:(fun () -> close_out_noerr oc)
-        (fun () ->
-          hazel_compare_items_of_candidates ~program_name candidates |> Yojson.Safe.to_channel oc;
-          output_char oc '\n');
-      let quoted_input = Filename.quote input_path in
-      let quoted_output = Filename.quote output_path in
-      let cmd = Printf.sprintf "%s eval-batch %s --output %s" cfg.hazel_cmd quoted_input quoted_output in
-      let status = Sys.command cmd in
-      if status <> 0 then failwith (Printf.sprintf "hazel eval-batch failed for %s (exit=%d)" program_name status);
-      let results_json = Yojson.Safe.from_file output_path in
-      match results_json with
-      | `List items -> List.map hazel_compare_result_of_yojson items
-      | _ -> failwith (Printf.sprintf "hazel eval-batch output was not a JSON list for %s" program_name))
+  List.mapi (fun index candidate -> run_hazel_compare_candidate ~program_name ~index ~candidate ~cfg) candidates
 
 let run_with_test ?(hazel_compare = None) ?(input_size = RunLiveCommon.experiment_list_length) ~program_name
     ~program_path ~steps_file ~test () =
@@ -739,9 +801,9 @@ let run_with_test ?(hazel_compare = None) ?(input_size = RunLiveCommon.experimen
       let indexed_candidates =
         candidates
         |> List.mapi (fun i candidate ->
-            Format.printf "%s candidate %d: %a@." program_name i pp_nexpr candidate.nexpr;
+            (* Format.printf "%s candidate %d: %a@." program_name i pp_nexpr candidate.nexpr; *)
             let expr = expr_of_nexpr candidate.nexpr in
-            Format.printf "%s candidate %d expr: %a@." program_name i RunLiveCommon.pp_expr expr;
+            (* Format.printf "%s candidate %d expr: %a@." program_name i RunLiveCommon.pp_expr expr; *)
             (i, candidate, expr))
       in
       let hazel_compare_results =
@@ -810,7 +872,5 @@ let run_with_test ?(hazel_compare = None) ?(input_size = RunLiveCommon.experimen
             ~plain_profile:baseline_result.plain_profile ~cek_profile:baseline_result.cek_profile
             ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words:baseline_result.cek_heap_words ~extra_fields ())
         memo_pass baseline_pass;
-      (match last_expr with
-      | None -> failwith "why"
-      | Some expr -> Format.printf "%s last candidate parsed expr: %a@." program_name pp_expr expr);
+      (match last_expr with None -> failwith "why" | Some _expr -> ());
       write_memo_stats_json oc memo)

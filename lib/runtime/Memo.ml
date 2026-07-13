@@ -621,7 +621,7 @@ let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : 
         assert (Array.length evicted.entries = Array.length m.entries);
         m.entries <- evicted.entries;
         m.size <- evicted.size);
-    print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int !sc ^ " step.");
+    (* print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int !sc ^ " step."); *)
     { words = Dynarray.get_last state.e; step = !i; without_memo_step = !sc }
   in
   Gc.full_major ();

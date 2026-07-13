@@ -235,7 +235,14 @@ type baseline_run_result = {
   cek_heap_words : int;
 }
 
+let ensure_parent_dir path =
+  let parent = Filename.dirname path in
+  if (not (String.equal parent ".")) && not (Sys.file_exists parent) then
+    let cmd = Printf.sprintf "mkdir -p %s" (Filename.quote parent) in
+    if Sys.command cmd <> 0 then failwith (Printf.sprintf "failed to create directory %s" parent)
+
 let with_outchannel steps_path f =
+  ensure_parent_dir steps_path;
   let oc = open_out_gen [ Open_creat; Open_trunc; Open_text; Open_wronly ] 0o644 steps_path in
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 

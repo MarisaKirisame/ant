@@ -1,4 +1,4 @@
-let steps_file = "eval_steps_list_extend.json"
+let steps_file = "results/live/list_extend.json"
 
 module Common = RunLiveCommon
 module LC = Common.LC

@@ -84,7 +84,6 @@ let max_sc_of_trie (trie : trie) : int = match trie with Leaf { max_sc; _ } -> m
 let prune_memo_to_target ~kll_k ~evict_fraction memo =
   assert (evict_fraction >= 0.0);
   assert (evict_fraction <= 1.0);
-  let before_size = memo_size memo in
   let threshold = threshold_for_fraction_from_memo ~current_epoch:memo.epoch ~kll_k ~evict_fraction memo in
 
   (* TODO: compress trie paths after pruning to reduce depth and memory overhead. *)
@@ -130,7 +129,6 @@ let prune_memo_to_target ~kll_k ~evict_fraction memo =
                 (Some kept, kept_size)))
       memo.entries
   in
-  Printf.printf "batch_evict_memo: before_size=%d threshold=%d after_size=%d\n%!" before_size threshold !pruned_size;
   { entries; size = !pruned_size; epoch = memo.epoch; eviction_state = memo.eviction_state }
 
 let batch_evict_memo ~policy ~state memo =
@@ -145,9 +143,9 @@ let batch_evict_memo ~policy ~state memo =
     if evict_fraction < minimum_eviction_fraction then memo
     else (
       state.evict_count <- state.evict_count + 1;
-      let evict_rate_percent = 100.0 *. float_of_int state.evict_count /. float_of_int state.batch_count in
-      Printf.printf
-        "batch_evict_memo: evicting (count=%d/%d, rate=%.2f%%, current_size=%d, target_size=%d, evict_fraction=%.2f%%)\n\
-         %!"
-        state.evict_count state.batch_count evict_rate_percent current_size target_size (100.0 *. evict_fraction);
+      (* let evict_rate_percent = 100.0 *. float_of_int state.evict_count /. float_of_int state.batch_count in
+         Printf.printf
+           "batch_evict_memo: evicting (count=%d/%d, rate=%.2f%%, current_size=%d, target_size=%d, evict_fraction=%.2f%%)\n\
+            %!"
+           state.evict_count state.batch_count evict_rate_percent current_size target_size (100.0 *. evict_fraction); *)
       prune_memo_to_target ~kll_k:policy.kll_k ~evict_fraction memo)
