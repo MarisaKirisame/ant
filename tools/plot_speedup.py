@@ -281,6 +281,72 @@ def plot_speedup_cdf(ratios: Sequence[float], output_dir: Path) -> str:
     )
 
 
+def plot_speedup_vs_size(
+    points: Sequence[tuple[int, float]], output_dir: Path, *, output_name: str = "speedup-vs-size.png"
+) -> str:
+    if not points:
+        raise ValueError("points is empty")
+    if any(size <= 0 or speedup <= 0 for size, speedup in points):
+        raise ValueError("sizes and speedups must be positive")
+    ordered = sorted(points)
+    sizes = [size for size, _ in ordered]
+    speedups = [speedup for _, speedup in ordered]
+
+    def _plot(ax: plt.Axes) -> None:
+        ax.plot(sizes, speedups, marker="o", linewidth=1.5)
+        ax.axhline(1.0, color="black", linestyle="--", linewidth=1)
+
+    return _save_plot(
+        output_dir,
+        title="Memo vs CEK Speedup by Input Size",
+        xlabel="Input size",
+        ylabel="Geometric-mean speedup (CEK / memoized)",
+        xscale="log",
+        yscale="log",
+        output_name=output_name,
+        plotter=_plot,
+    )
+
+
+def plot_entropy_speedup_lines(
+    series: Sequence[tuple[str, Sequence[tuple[int, float]]]],
+    output_dir: Path,
+    *,
+    output_name: str = "speedup-vs-entropy.png",
+    title: str = "Memo vs CEK Speedup by Input Pattern",
+) -> str:
+    if not series:
+        raise ValueError("series is empty")
+    if any(not points for _, points in series):
+        raise ValueError("every series must contain points")
+    if any(size <= 0 or speedup <= 0 for _, points in series for size, speedup in points):
+        raise ValueError("sizes and speedups must be positive")
+
+    def _plot(ax: plt.Axes) -> None:
+        for label, points in series:
+            ordered = sorted(points)
+            ax.plot(
+                [size for size, _ in ordered],
+                [speedup for _, speedup in ordered],
+                marker="o",
+                linewidth=1.5,
+                label=label,
+            )
+        ax.axhline(1.0, color="black", linestyle="--", linewidth=1)
+
+    return _save_plot(
+        output_dir,
+        title=title,
+        xlabel="Input size",
+        ylabel="Geometric-mean speedup (CEK / memoized)",
+        xscale="log",
+        yscale="log",
+        legend=True,
+        output_name=output_name,
+        plotter=_plot,
+    )
+
+
 def plot_depth_breakdown(
     depth_breakdown: Sequence[MemoStatsNode], output_dir: Path
 ) -> str:

@@ -1,7 +1,12 @@
 open State
 
 type eviction_policy = { retain_ratio : float; kll_k : int }
-type eviction_state = { mutable max_tree_size_seen : int; mutable batch_count : int; mutable evict_count : int }
+
+type eviction_state = State.eviction_state = {
+  mutable max_tree_size_seen : int;
+  mutable batch_count : int;
+  mutable evict_count : int;
+}
 
 let make_eviction_policy ~retain_ratio ~kll_k =
   if retain_ratio < 0.0 || retain_ratio > 1.0 then
@@ -126,7 +131,7 @@ let prune_memo_to_target ~kll_k ~evict_fraction memo =
       memo.entries
   in
   Printf.printf "batch_evict_memo: before_size=%d threshold=%d after_size=%d\n%!" before_size threshold !pruned_size;
-  { entries; size = !pruned_size; epoch = memo.epoch }
+  { entries; size = !pruned_size; epoch = memo.epoch; eviction_state = memo.eviction_state }
 
 let batch_evict_memo ~policy ~state memo =
   let minimum_eviction_fraction = 0.20 in

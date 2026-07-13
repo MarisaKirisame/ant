@@ -23,4 +23,4 @@ let sorted_test_string =
     large_input_str
 
 let sorted_test = RunLiveCommon.parse_nexpr sorted_test_string
-let run () = FromHazel.run_with_test ~program_name:"is_sorted" ~program_path ~steps_file ~test:sorted_test
+let run () = FromHazel.run_with_test ~program_name:"is_sorted" ~program_path ~steps_file ~test:sorted_test ()

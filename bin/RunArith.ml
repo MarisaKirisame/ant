@@ -5,7 +5,9 @@ module Word = Ant.Word.Word
 module Json = Yojson.Safe
 module State = Ant.State
 
-let steps_file = "eval_steps_arith.json"
+let default_steps_file = "eval_steps_arith.json"
+let default_term_size = 400
+let default_sample_count = 20
 
 type step_writer = Memo.exec_result -> unit
 
@@ -92,7 +94,7 @@ let write_memo_stats_json oc (memo : State.memo) : unit =
   output_char oc '\n';
   flush oc
 
-let write_steps_json oc (r : Memo.exec_result) : unit =
+let write_steps_json oc ~(input_size : int) ~(sample_index : int) (r : Memo.exec_result) : unit =
   let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries) in
   let json =
     `Assoc
@@ -100,6 +102,8 @@ let write_steps_json oc (r : Memo.exec_result) : unit =
         ("name", `String "exec_time");
         ("step", `Int r.step);
         ("without_memo_step", `Int r.without_memo_step);
+        ("input_size", `Int input_size);
+        ("sample_index", `Int sample_index);
         ("memo_profile", Ant.Profile.dump_profile Ant.Profile.memo_profile |> json_of_profile);
         ("plain_profile", Ant.Profile.dump_profile Ant.Profile.plain_profile |> json_of_profile);
         ("cek_profile", Ant.Profile.dump_profile Ant.Profile.cek_profile |> json_of_profile);
@@ -139,15 +143,6 @@ let rec make_term size =
     | 4 -> LC.Const (2 + Random.int 3)
     | _ -> failwith "impossible"
   else
-    (*let split f =
-      let mid = size / 2 in
-      let slack = (size + 3) / 4 in
-      let low = max 0 (mid - slack) in
-      let width = min size ((slack * 2) + 1) in
-      let lsize = low + Random.int width in
-      let rsize = size - lsize - 1 in
-      f (make_term lsize) (make_term rsize)
-    in*)
     let split f =
       let lsize = Random.int size in
       let rsize = size - lsize - 1 in
@@ -155,28 +150,30 @@ let rec make_term size =
     in
     if Random.bool () then split (fun x y -> LC.Add (x, y)) else split (fun x y -> LC.Mul (x, y))
 
-let run_bench_cases () =
-  let cases =
-    [ 100; 105; 110; 115; 120; 125; 130; 135; 140; 145; 150; 155; 160; 165; 170; 175; 180; 185; 190; 195; 200 ]
-  in
+let run_bench_cases ~term_size ~sample_count =
   List.iter
-    (fun size ->
-      let size = size * 2 in
+    (fun sample_index ->
       Out_channel.flush Stdio.stdout;
-      let expr = make_term size in
-      print_endline ("Running arith case " ^ string_of_int size ^ "...");
+      let expr = make_term term_size in
+      Printf.printf "Running arith case %d/%d at size %d...\n" (sample_index + 1) sample_count term_size;
       ignore (eval_main_expr_with_details expr))
-    cases
+    (List.init sample_count Fun.id)
 
-let run () =
+let run ?(term_size = default_term_size) ?(sample_count = default_sample_count) ?(steps_file = default_steps_file) () =
+  if term_size <= 0 then invalid_arg "RunArith.run: term_size must be positive";
+  if sample_count <= 0 then invalid_arg "RunArith.run: sample_count must be positive";
   with_outchannel steps_file (fun oc ->
-      let write_steps = write_steps_json oc in
       init_random ();
       LC.populate_state ();
       let memo = Memo.init_memo () in
-      current_write_steps := Some write_steps;
+      let sample_index = ref 0 in
+      current_write_steps :=
+        Some
+          (fun result ->
+            write_steps_json oc ~input_size:term_size ~sample_index:!sample_index result;
+            incr sample_index);
       Fun.protect
         ~finally:(fun () -> current_write_steps := None)
         (fun () ->
-          run_bench_cases ();
+          run_bench_cases ~term_size ~sample_count;
           write_memo_stats_json oc memo))

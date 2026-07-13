@@ -76,7 +76,14 @@ and step = {
   mutable creation_epoch : int;
 }
 
-and memo = { mutable entries : (trie option * int) Array.t; mutable size : int; mutable epoch : int }
+and memo = {
+  mutable entries : (trie option * int) Array.t;
+  mutable size : int;
+  mutable epoch : int;
+  eviction_state : eviction_state;
+}
+
+and eviction_state = { mutable max_tree_size_seen : int; mutable batch_count : int; mutable evict_count : int }
 and trie = Leaf of { prefix : Pattern.pattern; step : step; max_sc : int } | Branch of branch
 
 and branch = {

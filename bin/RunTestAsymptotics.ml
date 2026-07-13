@@ -74,13 +74,15 @@ let total_ns_of_json json =
         0 inner
   end
 
-let write_steps_json oc memo_step without_memo_step memo_json cek_json plain_json =
+let write_steps_json oc ~program_name ~input_kind memo_step without_memo_step memo_json cek_json plain_json =
   let json =
     `Assoc
       [
         ("name", `String "exec_time");
         ("step", `Int memo_step);
         ("without_memo_step", `Int without_memo_step);
+        ("program_name", `String program_name);
+        ("input_kind", `String input_kind);
         ("memo_profile", memo_json);
         ("plain_profile", plain_json);
         ("cek_profile", cek_json);
@@ -90,16 +92,16 @@ let write_steps_json oc memo_step without_memo_step memo_json cek_json plain_jso
   output_char oc '\n';
   flush oc
 
-let run_case_then_write ~memo ~label ~filename ~run_memo ~run_cek ~run_plain =
+let run_case_then_write ~memo ~program_name ~input_kind ~filename ~run_memo ~run_cek ~run_plain =
   let memo_steps, without_memo_steps, memo_json, cek_json, plain_json =
-    run_case ~memo ~label ~run_memo ~run_cek ~run_plain
+    run_case ~memo ~label:input_kind ~run_memo ~run_cek ~run_plain
   in
   RunLiveCommon.with_outchannel filename (fun oc ->
-      write_steps_json oc memo_steps without_memo_steps memo_json cek_json plain_json;
+      write_steps_json oc ~program_name ~input_kind memo_steps without_memo_steps memo_json cek_json plain_json;
       RunLiveCommon.write_memo_stats_json oc memo);
   (total_ns_of_json memo_json, total_ns_of_json cek_json)
 
-let filename program suffix = Printf.sprintf "eval_steps_asymptotic_%s_%s.json" program suffix
+let filename program suffix length = Printf.sprintf "results/entropy/%s/%s/%d.json" program suffix length
 
 let run_all_cases ~program_name ~populate_state ~case_fn ~length =
   let random_input = random_input length in
@@ -109,18 +111,18 @@ let run_all_cases ~program_name ~populate_state ~case_fn ~length =
 
   populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let random_ns_memo, random_ns_cek = case_fn memo "Random" random_input (filename program_name "random") in
-  let mod_ns_memo, mod_ns_cek = case_fn memo "Random after remove" random_input_removed (filename program_name "mod") in
+  let random_ns_memo, random_ns_cek = case_fn memo "random" random_input (filename program_name "random" length) in
+  let mod_ns_memo, mod_ns_cek = case_fn memo "mod1" random_input_removed (filename program_name "mod1" length) in
 
   populate_state ();
   let memo = Ant.Memo.init_memo () in
   let low_entropy_ns_memo, low_entropy_ns_cek =
-    case_fn memo "Low entropy" low_entropy_input (filename program_name "low_entropy")
+    case_fn memo "block" low_entropy_input (filename program_name "block" length)
   in
 
   populate_state ();
   let memo = Ant.Memo.init_memo () in
-  let repeated_ns_memo, repeated_ns_cek = case_fn memo "Repeated" repeated_input (filename program_name "repeated") in
+  let repeated_ns_memo, repeated_ns_cek = case_fn memo "same" repeated_input (filename program_name "same" length) in
 
   Printf.printf
     {|\begin{tabular}{c|c|c|c|c}
@@ -134,77 +136,79 @@ Ratios      &        & %.3fx       & %.3fx   & %.3fx
     (float_of_int random_ns_memo /. float_of_int low_entropy_ns_memo)
     (float_of_int random_ns_memo /. float_of_int mod_ns_memo)
     (float_of_int random_ns_memo /. float_of_int repeated_ns_memo);
-  Printf.printf "\nProgram: %s\n%!" program_name;
+  Printf.printf "\nProgram: %s (length: %d)\n%!" program_name length;
   ()
 
-let run () =
-  run_all_cases ~length:65536 ~program_name:"map" ~populate_state:ListCEK.populate_state
+let run ~length () =
+  if length <= 0 then invalid_arg "RunTestAsymptotics.run: length must be positive";
+  run_all_cases ~length ~program_name:"map" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename
+      run_case_then_write ~memo ~program_name:"map" ~input_kind:label ~filename
         ~run_memo:(fun memo -> ListCEK.list_incr ~config:(Memo.memo_config memo) cek_list)
         ~run_cek:(fun () -> ListCEK.list_incr ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.list_incr plain_list)));
 
-  run_all_cases ~length:65536 ~program_name:"append" ~populate_state:ListCEK.populate_state
+  run_all_cases ~length ~program_name:"append" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename
+      run_case_then_write ~memo ~program_name:"append" ~input_kind:label ~filename
         ~run_memo:(fun memo -> ListCEK.append ~config:(Memo.memo_config memo) cek_list cek_list)
         ~run_cek:(fun () -> ListCEK.append ~config:Memo.cek_config cek_list cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.append plain_list plain_list)));
 
-  run_all_cases ~length:1024 ~program_name:"insertion_sort" ~populate_state:ListCEK.populate_state
+  run_all_cases ~length ~program_name:"insertion_sort" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename
+      run_case_then_write ~memo ~program_name:"insertion_sort" ~input_kind:label ~filename
         ~run_memo:(fun memo -> ListCEK.insertion_sort ~config:(Memo.memo_config memo) cek_list)
         ~run_cek:(fun () -> ListCEK.insertion_sort ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.insertion_sort plain_list)));
 
-  run_all_cases ~length:8192 ~program_name:"merge_sort" ~populate_state:ListCEK.populate_state
+  run_all_cases ~length ~program_name:"merge_sort" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename
+      run_case_then_write ~memo ~program_name:"merge_sort" ~input_kind:label ~filename
         ~run_memo:(fun memo -> ListCEK.mergesort ~config:(Memo.memo_config memo) cek_list)
         ~run_cek:(fun () -> ListCEK.mergesort ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.mergesort plain_list)));
 
-  (*run_all_cases ~length:8192 ~program_name:"quick_sort" ~populate_state:ListCEK.populate_state
+  run_all_cases ~length ~program_name:"quick_sort" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename
+      run_case_then_write ~memo ~program_name:"quick_sort" ~input_kind:label ~filename
         ~run_memo:(fun memo -> ListCEK.quicksort ~config:(Memo.memo_config memo) cek_list)
         ~run_cek:(fun () -> ListCEK.quicksort ~config:Memo.cek_config cek_list)
-        ~run_plain:(fun () -> ignore (ListPlain.quicksort plain_list)));*)
-  run_all_cases ~length:1024 ~program_name:"reverse" ~populate_state:ListCEK.populate_state
+        ~run_plain:(fun () -> ignore (ListPlain.quicksort plain_list)));
+
+  run_all_cases ~length ~program_name:"reverse" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename
+      run_case_then_write ~memo ~program_name:"reverse" ~input_kind:label ~filename
         ~run_memo:(fun memo -> ListCEK.reverse ~config:(Memo.memo_config memo) cek_list)
         ~run_cek:(fun () -> ListCEK.reverse ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.reverse plain_list)));
 
-  run_all_cases ~length:65536 ~program_name:"simple_filter" ~populate_state:ListCEK.populate_state
+  run_all_cases ~length ~program_name:"simple_filter" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename
+      run_case_then_write ~memo ~program_name:"simple_filter" ~input_kind:label ~filename
         ~run_memo:(fun memo -> ListCEK.filter_pos ~config:(Memo.memo_config memo) cek_list)
         ~run_cek:(fun () -> ListCEK.filter_pos ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.filter_pos plain_list)));
 
-  run_all_cases ~length:65536 ~program_name:"pair" ~populate_state:ListCEK.populate_state
+  run_all_cases ~length ~program_name:"pair" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
       let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~label ~filename
+      run_case_then_write ~memo ~program_name:"pair" ~input_kind:label ~filename
         ~run_memo:(fun memo -> ListCEK.pair ~config:(Memo.memo_config memo) cek_list)
         ~run_cek:(fun () -> ListCEK.pair ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.pair plain_list)));

@@ -730,7 +730,8 @@ let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(c
       | `List items -> List.map hazel_compare_result_of_yojson items
       | _ -> failwith (Printf.sprintf "hazel eval-batch output was not a JSON list for %s" program_name))
 
-let run_with_test ?(hazel_compare = None) ~program_name ~program_path ~steps_file ~test =
+let run_with_test ?(hazel_compare = None) ?(input_size = RunLiveCommon.experiment_list_length) ~program_name
+    ~program_path ~steps_file ~test () =
   with_outchannel steps_file (fun oc ->
       RunLiveCommon.LC.populate_state ();
       let memo = Ant.Memo.init_memo () in
@@ -796,6 +797,7 @@ let run_with_test ?(hazel_compare = None) ~program_name ~program_path ~steps_fil
           let extra_fields =
             [
               ("trace_exec_index", `Int memo_idx);
+              ("input_size", `Int input_size);
               ("trace_source_indices", source_indices_json);
               ("trace_source_count", `Int (List.length source_indices));
               ("trace_source_first_index", `Int source_first_index);

@@ -193,10 +193,12 @@ hazel_modes = tuple(
 )
 hazel_bad = set(["th_ms", "th_pair"])
 hazel_modes = tuple(m for m in hazel_modes if m not in hazel_bad)
-hazel_compare_bad = set(["qs", "th_qs", "at_qs", "at_is"])
+hazel_compare_bad = set(["qs", "th_qs", "at_qs", "at_is", "at_ms", "is", "rev", "th_is"])
 hazel_compare_modes = tuple(m for m in hazel_modes if m not in hazel_compare_bad)
 arith_modes = ("arith",)
 modes = arith_modes + hazel_modes
+scaling_sizes = (10, 20, 40)
+entropy_scaling_sizes = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000, 10000, 20000, 40000)
 
 def _remove_eval_steps_files_for_modes(selected_modes: Iterable[str]) -> None:
     for mode in selected_modes:
@@ -256,6 +258,72 @@ def hazel_experiment_project() -> None:
 
 def arith_project() -> None:
     run_modes(arith_modes)
+
+
+def _prepare_scaling_run() -> MutableMapping[str, str]:
+    ensure_switch()
+    env = _opam_env_with_ocamlrunparam()
+    generate_ml_files(env=env)
+    opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
+    return env
+
+
+def arith_scaling_project() -> None:
+    env = _prepare_scaling_run()
+    output_dir = Path("results/arith")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for size in scaling_sizes:
+        output_path = output_dir / f"{size}.json"
+        output_path.unlink(missing_ok=True)
+        opam_exec(
+            ["dune", "exec", "GeneratedMain", "--", "arith-scaling", str(size), str(output_path)],
+            env=env,
+        )
+
+
+def hazel_scaling_project() -> None:
+    env = _prepare_scaling_run()
+    for mode in hazel_modes:
+        output_dir = Path("results/hazel") / mode
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for size in scaling_sizes:
+            output_path = output_dir / f"{size}.json"
+            output_path.unlink(missing_ok=True)
+            opam_exec(
+                ["dune", "exec", "GeneratedMain", "--", "hazel-scaling", mode, str(size), str(output_path)],
+                env=env,
+            )
+
+
+def scaling_project() -> None:
+    arith_scaling_project()
+    hazel_scaling_project()
+    report_module.generate_scaling_reports(modes=hazel_modes)
+
+
+def scaling_report_project() -> None:
+    report_module.generate_scaling_reports(modes=hazel_modes)
+
+
+def entropy_scaling_project() -> None:
+    env = _prepare_scaling_run()
+    input_kinds = ("random", "mod1", "block", "same")
+    programs = ("map", "append", "insertion_sort", "merge_sort", "quick_sort", "reverse", "simple_filter", "pair")
+    for program in programs:
+        for input_kind in input_kinds:
+            (Path("results/entropy") / program / input_kind).mkdir(parents=True, exist_ok=True)
+    for size in entropy_scaling_sizes:
+        for program in programs:
+            for input_kind in input_kinds:
+                (Path("results/entropy") / program / input_kind / f"{size}.json").unlink(missing_ok=True)
+        opam_exec(["dune", "exec", "GeneratedMain", "--", "entropy-scaling", str(size)], env=env)
+    entropy_report_project()
+
+
+def entropy_report_project() -> None:
+    report_module.generate_entropy_scaling_report()
+    if Path("results/arith").exists() and Path("results/hazel").exists():
+        report_module.generate_scaling_reports(modes=hazel_modes)
 
 
 def profile_project() -> None:
@@ -382,7 +450,8 @@ def main(argv: Iterable[str]) -> int:
     usage = (
         "Usage: nightly.py "
         "[dependency|hazel-dependency|build|coverage|run|profile|hazel|hazel-experiment|hazel-report|arith|arith-report|"
-        "report|experiment|hazel-tex|arith-tex|compile-generated|all]"
+        "arith-scaling|hazel-scaling|scaling|scaling-report|entropy-scaling|entropy-report|report|experiment|"
+        "hazel-tex|arith-tex|compile-generated|all]"
     )
     if len(args) > 1:
         print("Only a single stage argument is supported.", file=sys.stderr)
@@ -413,6 +482,18 @@ def main(argv: Iterable[str]) -> int:
         arith_project()
     elif stage == "arith-report":
         arith_report_project()
+    elif stage == "arith-scaling":
+        arith_scaling_project()
+    elif stage == "hazel-scaling":
+        hazel_scaling_project()
+    elif stage == "scaling":
+        scaling_project()
+    elif stage == "scaling-report":
+        scaling_report_project()
+    elif stage == "entropy-scaling":
+        entropy_scaling_project()
+    elif stage == "entropy-report":
+        entropy_report_project()
     elif stage == "report":
         report_project()
     elif stage == "experiment":
@@ -428,6 +509,8 @@ def main(argv: Iterable[str]) -> int:
         hazel_dependency()
         build_project()
         run_project()
+        scaling_project()
+        entropy_scaling_project()
         report_module.generate_reports()
     else:
         print(f"Unknown stage: {stage}", file=sys.stderr)

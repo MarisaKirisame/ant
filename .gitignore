@@ -1,5 +1,6 @@
 output/*
 eval_steps_*.json
+results/
 tools/__pycache__/
 __pycache__/
 .DS_Store

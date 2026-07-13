@@ -25,6 +25,8 @@ from plot_speedup import (
     load_records,
     profile_totals_from_result,
     plot_speedup_cdf,
+    plot_entropy_speedup_lines,
+    plot_speedup_vs_size,
     plot_scatter_for_kind,
     pairs_from_profiles,
     pairs_from_steps,
@@ -41,6 +43,25 @@ BASE_EXPERIMENTS: list[tuple[str, str]] = [
     ("pair", "Pair"),
     ("rev", "Reverse"),
 ]
+
+SCALING_SIZES = (10, 20, 40)
+ENTROPY_SCALING_SIZES = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000, 10000, 20000, 40000)
+ENTROPY_CATEGORIES = (
+    ("random", "Random"),
+    ("mod1", "Mod1"),
+    ("block", "Block"),
+    ("same", "Same"),
+)
+ENTROPY_PROGRAMS = (
+    ("map", "Map"),
+    ("append", "Append"),
+    ("insertion_sort", "Insertion sort"),
+    ("merge_sort", "Merge sort"),
+    ("quick_sort", "Quick sort"),
+    ("reverse", "Reverse"),
+    ("simple_filter", "Filter"),
+    ("pair", "Pair"),
+)
 
 HAZEL_COMPARE_EXCLUDED_MODES = frozenset({"qs", "th_qs", "at_qs", "at_is"})
 
@@ -223,15 +244,164 @@ def generate_reports() -> None:
     generate_hazel_reports()
     generate_arith_reports()
     css_source = Path(__file__).with_name("style.css")
+    entries = [
+        ("Hazel Report", Path("output/hazel/index.html")),
+        ("Arith Report", Path("output/arith/index.html")),
+        ("Scaling Report", Path("output/scaling/index.html")),
+    ]
     generate_html(
         title="Benchmark Reports",
         output=Path("output/index.html"),
-        entries=[
-            ("Hazel Report", Path("output/hazel/index.html")),
-            ("Arith Report", Path("output/arith/index.html")),
-        ],
+        entries=entries,
         css_source=css_source,
     )
+
+
+def _scaling_points(data_dirs: Sequence[Path]) -> list[tuple[int, float, int]]:
+    if not data_dirs:
+        raise ValueError("data_dirs is empty")
+    points: list[tuple[int, float, int]] = []
+    for size in SCALING_SIZES:
+        pairs: list[tuple[float, float]] = []
+        for data_dir in data_dirs:
+            input_path = data_dir / f"{size}.json"
+            if not input_path.exists():
+                raise FileNotFoundError(f"missing scaling result: {input_path}")
+            result = load_records(input_path)
+            pairs.extend(pairs_from_profiles(result, baseline_key="cek_profile", memo_key="memo_profile"))
+        if not pairs:
+            raise ValueError(f"scaling results contain no executions for size {size}")
+        _, stats = compare_stats(pairs)
+        points.append((size, stats.geo_mean, stats.samples))
+    return points
+
+
+def _write_scaling_page(*, title: str, data_dirs: Sequence[Path], output_dir: Path, css_source: Path) -> None:
+    points = _scaling_points(data_dirs)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plot_name = plot_speedup_vs_size([(size, speedup) for size, speedup, _ in points], output_dir)
+    shutil.copyfile(css_source, output_dir / "style.css")
+    doc = document(title=title)
+    doc["lang"] = "en"
+    with doc.head:
+        tag.meta(charset="utf-8")
+        tag.link(rel="stylesheet", href="style.css")
+    with doc:
+        with tag.main(cls="panel"):
+            tag.h1(title)
+            tag.p("Each size is an independent experiment. Speedup is the existing geometric mean of CEK / memoized profile-time ratios.", cls="meta")
+            with tag.section(cls="plot"):
+                tag.img(src=plot_name, alt="Memo versus CEK geometric-mean speedup by input size")
+            with tag.table():
+                with tag.thead():
+                    with tag.tr():
+                        tag.th("Input size")
+                        tag.th("Geometric-mean speedup")
+                        tag.th("Samples")
+                with tag.tbody():
+                    for size, speedup, samples in points:
+                        with tag.tr():
+                            tag.td(str(size))
+                            tag.td(f"{fmt_speedup(speedup)}x")
+                            tag.td(str(samples))
+    (output_dir / "index.html").write_text(doc.render(), encoding="utf-8")
+
+
+def generate_scaling_reports(*, modes: Sequence[str] | None = None) -> None:
+    css_source = Path(__file__).with_name("style.css")
+    base_output = Path("output/scaling")
+    selected_modes = list(modes) if modes is not None else [
+        output_pattern.format(key=key)
+        for _, output_pattern, _ in VARIANTS
+        for key, _ in BASE_EXPERIMENTS
+    ]
+    entries: list[tuple[str, Path]] = []
+    arith_output = base_output / "arith"
+    _write_scaling_page(
+        title="Arithmetic Scaling",
+        data_dirs=[Path("results/arith")],
+        output_dir=arith_output,
+        css_source=css_source,
+    )
+    entries.append(("Arithmetic", arith_output / "index.html"))
+    hazel_output = base_output / "hazel"
+    _write_scaling_page(
+        title="Hazel Scaling (All Modes)",
+        data_dirs=[Path("results/hazel") / mode for mode in selected_modes],
+        output_dir=hazel_output,
+        css_source=css_source,
+    )
+    entries.append(("Hazel (all modes)", hazel_output / "index.html"))
+    entropy_index = base_output / "entropy" / "index.html"
+    if entropy_index.exists():
+        entries.append(("Input entropy (8 functions)", entropy_index))
+    generate_html(
+        title="Scaling Experiments",
+        output=base_output / "index.html",
+        entries=entries,
+        css_source=css_source,
+    )
+
+
+def generate_entropy_scaling_report() -> None:
+    output_dir = Path("output/scaling/entropy")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for stale_plot in output_dir.glob("*-speedup-vs-size.png"):
+        stale_plot.unlink()
+    plots: list[tuple[str, str, list[tuple[str, list[tuple[int, float]]]]]] = []
+    for program, label in ENTROPY_PROGRAMS:
+        series: list[tuple[str, list[tuple[int, float]]]] = []
+        for input_kind, input_label in ENTROPY_CATEGORIES:
+            points: list[tuple[int, float]] = []
+            for size in ENTROPY_SCALING_SIZES:
+                input_path = Path("results/entropy") / program / input_kind / f"{size}.json"
+                if not input_path.exists():
+                    raise FileNotFoundError(f"missing entropy result: {input_path}")
+                result = load_records(input_path)
+                pairs = pairs_from_profiles(result, baseline_key="cek_profile", memo_key="memo_profile")
+                if not pairs:
+                    raise ValueError(f"entropy result contains no executions: {input_path}")
+                _, stats = compare_stats(pairs)
+                points.append((size, stats.geo_mean))
+            series.append((input_label, points))
+        plot_name = plot_entropy_speedup_lines(
+            series,
+            output_dir,
+            output_name=f"{program}-speedup-vs-size.png",
+            title=f"{label}: Speedup by Input Pattern",
+        )
+        plots.append((label, plot_name, series))
+    css_source = Path(__file__).with_name("style.css")
+    shutil.copyfile(css_source, output_dir / "style.css")
+    doc = document(title="Input Entropy Scaling")
+    doc["lang"] = "en"
+    with doc.head:
+        tag.meta(charset="utf-8")
+        tag.link(rel="stylesheet", href="style.css")
+    with doc:
+        with tag.main(cls="panel"):
+            tag.h1("Input Entropy Scaling")
+            tag.p(
+                f"Eight predefined list functions. Each plot has Random, Mod1, Block, and Same lines over input size; this sweep ends at {ENTROPY_SCALING_SIZES[-1]:,}.",
+                cls="meta",
+            )
+            for label, plot_name, series in plots:
+                tag.h2(label)
+                with tag.section(cls="plot"):
+                    tag.img(src=plot_name, alt=f"{label} speedup by size and input pattern")
+                with tag.table():
+                    with tag.thead():
+                        with tag.tr():
+                            tag.th("Input pattern")
+                            for size in ENTROPY_SCALING_SIZES:
+                                tag.th(str(size))
+                    with tag.tbody():
+                        for input_label, points in series:
+                            with tag.tr():
+                                tag.td(input_label)
+                                for _, speedup in points:
+                                    tag.td(f"{fmt_speedup(speedup)}x")
+    (output_dir / "index.html").write_text(doc.render(), encoding="utf-8")
 
 
 def generate_hazel_reports(

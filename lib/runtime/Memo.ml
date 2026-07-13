@@ -206,7 +206,7 @@ let assert_env_length (w : world) (e : int) : unit =
 
 let init_memo () : memo =
   let len = Dynarray.length pc_map in
-  { entries = Array.create ~len (None, 0); size = 0; epoch = 0 }
+  { entries = Array.create ~len (None, 0); size = 0; epoch = 0; eviction_state = Eviction.init_eviction_state () }
 
 let string_of_trie (t : trie) : string = match t with Leaf _ -> "Leaf" | Branch _ -> "Branch"
 let choose_step x y = if x.sc > y.sc then x else y
@@ -504,7 +504,6 @@ type eviction_strategy = In_loop_hard_cap | Legacy_batch
 
 let global_eviction_strategy = Legacy_batch
 let eviction_policy = Eviction.make_eviction_policy ~retain_ratio:0.5 ~kll_k:100
-let eviction_state = Eviction.init_eviction_state ()
 let in_loop_eviction_trigger_size = 1000
 let in_loop_eviction_target_size = 500
 
@@ -618,7 +617,7 @@ let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : 
     (match global_eviction_strategy with
     | In_loop_hard_cap -> ()
     | Legacy_batch ->
-        let evicted = Eviction.batch_evict_memo ~policy:eviction_policy ~state:eviction_state m in
+        let evicted = Eviction.batch_evict_memo ~policy:eviction_policy ~state:m.eviction_state m in
         assert (Array.length evicted.entries = Array.length m.entries);
         m.entries <- evicted.entries;
         m.size <- evicted.size);

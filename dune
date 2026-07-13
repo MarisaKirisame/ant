@@ -3,5 +3,4 @@
   (flags
    (:standard -warn-error -A))))
 
-(dirs
- :standard \ hazel)
+(dirs :standard \ hazel)

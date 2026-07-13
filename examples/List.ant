@@ -6,6 +6,10 @@ type int_pair_list =
   | NilP
   | ConsP of int * int * int_pair_list;;
 
+type nat =
+  | Z
+  | S of nat;;
+
 let rec pair = fun x ->
   match x with
   | Nil -> NilP
@@ -46,20 +50,30 @@ let rec insertion_sort = fun x ->
 
 type pair_int_lists = P of int_list * int_list;;
 
-let rec my_split_aux = fun x y -> 
-  match y with
-  | Nil -> P Nil x
-  | Cons y0 yt ->
-    match yt with
-    | Nil -> P Nil x
-    | Cons y1 ys ->
-      match x with
-      | Nil -> P Nil Nil
-      | Cons xh xt ->
-        match (my_split_aux xt ys) with
-        | P l r -> P (Cons xh l) r;;
+let rec length = fun x ->
+  match x with
+  | Nil -> Z
+  | Cons xh xt -> S (length xt);;
 
-let my_split = fun x -> my_split_aux x x;;
+let rec half = fun n ->
+  match n with
+  | Z -> Z
+  | S n1 ->
+    match n1 with
+    | Z -> Z
+    | S n2 -> S (half n2);;
+
+let rec take = fun n x ->
+  match n with
+  | Z -> P Nil x
+  | S n1 ->
+    match x with
+    | Nil -> P Nil Nil
+    | Cons xh xt ->
+      match (take n1 xt) with
+      | P l r -> P (Cons xh l) r;;
+
+let my_split = fun x -> take (half (length x)) x;;
 let rec my_merge = fun x y ->
   match x with
   | Nil -> y
