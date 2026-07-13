@@ -39,6 +39,7 @@ def _resolve_switch() -> str:
 
 
 SWITCH = _resolve_switch()
+OPAM_ARCHIVE_REPOSITORY_URL = "git+https://github.com/ocaml/opam-repository-archive"
 TOOLCHAIN_PACKAGES = [
     "dune",
 ]
@@ -138,6 +139,25 @@ def opam_exec(
     return run(["opam", "exec", "--switch", SWITCH, "--", *args], env=env, **kwargs)
 
 
+def ensure_opam_archive_repository() -> None:
+    result = run(["opam", "repository", "list", "--switch", SWITCH, "--short"], capture=True)
+    repositories = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    if "archive" not in repositories:
+        run(
+            [
+                "opam",
+                "repository",
+                "add",
+                "--switch",
+                SWITCH,
+                "--rank=-1",
+                "archive",
+                OPAM_ARCHIVE_REPOSITORY_URL,
+                "-y",
+            ]
+        )
+
+
 def install_dependencies() -> None:
     ensure_switch()
     run(["opam", "update"])
@@ -150,6 +170,7 @@ def install_dependencies() -> None:
 def hazel_dependency() -> None:
     ensure_switch()
     run(["git", "submodule", "update", "--init", "--recursive", "hazel"])
+    ensure_opam_archive_repository()
     run(["opam", "install", "--switch", SWITCH, "-y", "--deps-only", "--locked", "."], cwd=REPO_ROOT / "hazel")
     opam_exec(
         ["dune", "build", "src/CLI/cli.bc.js", "--profile", "dev"],
