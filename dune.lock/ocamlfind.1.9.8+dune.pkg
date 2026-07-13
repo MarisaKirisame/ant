@@ -32,7 +32,7 @@
          (>= %{pkg:ocaml:version} 4.02.0))
         false)
        -no-camlp4)
-      (when (catch_undefined_var %{pkg:ocaml:preinstalled} false) -no-topfind))
+      -no-topfind)
      (run %{make} all)
      (when %{pkg:ocaml:native} (run %{make} opt)))))))
 
