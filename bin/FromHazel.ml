@@ -477,7 +477,7 @@ let rec subst_deepest_hole y x =
 
 type parsed_candidate = { source_index : int; source_exercise_id : int option; nexpr : nexpr }
 type collapsed_candidate = { nexpr : nexpr; source_indices : int list; source_exercise_ids : int option list }
-type hazel_compare_config = { hazel_cmd : string }
+type hazel_compare_config = { hazel_cmd : string; timeout_seconds : int; max_candidates : int option }
 type hazel_compare_result = { parse_eval_ns : int; eval_only_ns : int; status : string; error : string }
 
 let hazel_input_placeholder_name = "hazel_input_random_list"
@@ -700,11 +700,6 @@ let hazel_compare_result_of_yojson json : hazel_compare_result =
     error = json |> member "error" |> to_string;
   }
 
-let hazel_compare_timeout_seconds () =
-  match Sys.getenv_opt "ANT_HAZEL_COMPARE_TIMEOUT_SECONDS" with
-  | Some raw -> ( match int_of_string_opt raw with Some n when n > 0 -> n | _ -> 300)
-  | None -> 300
-
 let string_contains haystack needle =
   let haystack_len = String.length haystack in
   let needle_len = String.length needle in
@@ -761,12 +756,11 @@ let run_hazel_compare_candidate ~program_name ~index ~(candidate : collapsed_can
         (fun () ->
           `List [ hazel_compare_item_of_candidate ~program_name ~index candidate ] |> Yojson.Safe.to_channel oc;
           output_char oc '\n');
-      let timeout_seconds = hazel_compare_timeout_seconds () in
       let quoted_input = Filename.quote input_path in
       let quoted_output = Filename.quote output_path in
       let quoted_log = Filename.quote log_path in
       let cmd =
-        Printf.sprintf "timeout --kill-after=5s %ds %s eval-batch %s --output %s > %s 2>&1" timeout_seconds
+        Printf.sprintf "timeout --kill-after=5s %ds %s eval-batch %s --output %s > %s 2>&1" cfg.timeout_seconds
           cfg.hazel_cmd quoted_input quoted_output quoted_log
       in
       let status = Sys.command cmd in
@@ -785,19 +779,19 @@ let run_hazel_compare_candidate ~program_name ~index ~(candidate : collapsed_can
 
 let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(cfg : hazel_compare_config) :
     hazel_compare_result list =
-  let candidates =
-    match Sys.getenv_opt "ANT_HAZEL_COMPARE_MAX_CANDIDATES" with
-    | None -> candidates
-    | Some raw -> ( match int_of_string_opt raw with Some n when n >= 0 -> List.take n candidates | _ -> candidates)
-  in
+  let candidates = match cfg.max_candidates with None -> candidates | Some n -> List.take n candidates in
   List.mapi (fun index candidate -> run_hazel_compare_candidate ~program_name ~index ~candidate ~cfg) candidates
 
-let run_with_test ?(hazel_compare = None) ?(input_size = RunLiveCommon.experiment_list_length) ~program_name
-    ~program_path ~steps_file ~test () =
+let limit_candidates ?max_candidates (candidates : collapsed_candidate list) =
+  match max_candidates with None -> candidates | Some n -> List.take n candidates
+
+let run_with_test ?(hazel_compare = None) ?max_candidates ?(input_size = RunLiveCommon.experiment_list_length)
+    ~program_name ~program_path ~steps_file ~test () =
   with_outchannel steps_file (fun oc ->
       RunLiveCommon.LC.populate_state ();
       let memo = Ant.Memo.init_memo () in
       let candidates, last_expr = parse_program_with_test ~program_path test in
+      let candidates = limit_candidates ?max_candidates candidates in
       let indexed_candidates =
         candidates
         |> List.mapi (fun i candidate ->
@@ -821,7 +815,6 @@ let run_with_test ?(hazel_compare = None) ?(input_size = RunLiveCommon.experimen
         indexed_candidates
         |> List.map (fun (i, candidate, expr) ->
             let memo_result = eval_expression_memo_only ~memo expr in
-            Printf.printf "%s candidate %d value: %s\n" program_name i (value_to_string memo_result.value);
             (i, candidate, memo_result))
       in
       List.iter2

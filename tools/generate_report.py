@@ -257,11 +257,11 @@ def generate_reports() -> None:
     )
 
 
-def _scaling_points(data_dirs: Sequence[Path]) -> list[tuple[int, float, int]]:
+def _scaling_points(data_dirs: Sequence[Path], *, sizes: Sequence[int] = SCALING_SIZES) -> list[tuple[int, float, int]]:
     if not data_dirs:
         raise ValueError("data_dirs is empty")
     points: list[tuple[int, float, int]] = []
-    for size in SCALING_SIZES:
+    for size in sizes:
         pairs: list[tuple[float, float]] = []
         for data_dir in data_dirs:
             input_path = data_dir / f"{size}.json"
@@ -276,8 +276,10 @@ def _scaling_points(data_dirs: Sequence[Path]) -> list[tuple[int, float, int]]:
     return points
 
 
-def _write_scaling_page(*, title: str, data_dirs: Sequence[Path], output_dir: Path, css_source: Path) -> None:
-    points = _scaling_points(data_dirs)
+def _write_scaling_page(
+    *, title: str, data_dirs: Sequence[Path], output_dir: Path, css_source: Path, sizes: Sequence[int] = SCALING_SIZES
+) -> None:
+    points = _scaling_points(data_dirs, sizes=sizes)
     output_dir.mkdir(parents=True, exist_ok=True)
     plot_name = plot_speedup_vs_size([(size, speedup) for size, speedup, _ in points], output_dir)
     shutil.copyfile(css_source, output_dir / "style.css")
@@ -307,7 +309,7 @@ def _write_scaling_page(*, title: str, data_dirs: Sequence[Path], output_dir: Pa
     (output_dir / "index.html").write_text(doc.render(), encoding="utf-8")
 
 
-def generate_scaling_reports(*, modes: Sequence[str] | None = None) -> None:
+def generate_scaling_reports(*, modes: Sequence[str] | None = None, sizes: Sequence[int] = SCALING_SIZES) -> None:
     css_source = Path(__file__).with_name("style.css")
     base_output = Path("output/scaling")
     selected_modes = list(modes) if modes is not None else [
@@ -322,6 +324,7 @@ def generate_scaling_reports(*, modes: Sequence[str] | None = None) -> None:
         data_dirs=[Path("results/arith")],
         output_dir=arith_output,
         css_source=css_source,
+        sizes=sizes,
     )
     entries.append(("Arithmetic", arith_output / "index.html"))
     hazel_output = base_output / "hazel"
@@ -330,6 +333,7 @@ def generate_scaling_reports(*, modes: Sequence[str] | None = None) -> None:
         data_dirs=[Path("results/hazel") / mode for mode in selected_modes],
         output_dir=hazel_output,
         css_source=css_source,
+        sizes=sizes,
     )
     entries.append(("Hazel (all modes)", hazel_output / "index.html"))
     entropy_index = base_output / "entropy" / "index.html"
@@ -343,7 +347,7 @@ def generate_scaling_reports(*, modes: Sequence[str] | None = None) -> None:
     )
 
 
-def generate_entropy_scaling_report() -> None:
+def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SIZES) -> None:
     output_dir = Path("output/scaling/entropy")
     output_dir.mkdir(parents=True, exist_ok=True)
     for stale_plot in output_dir.glob("*-speedup-vs-size.png"):
@@ -353,7 +357,7 @@ def generate_entropy_scaling_report() -> None:
         series: list[tuple[str, list[tuple[int, float]]]] = []
         for input_kind, input_label in ENTROPY_CATEGORIES:
             points: list[tuple[int, float]] = []
-            for size in ENTROPY_SCALING_SIZES:
+            for size in sizes:
                 input_path = Path("results/entropy") / program / input_kind / f"{size}.json"
                 if not input_path.exists():
                     raise FileNotFoundError(f"missing entropy result: {input_path}")
@@ -384,7 +388,7 @@ def generate_entropy_scaling_report() -> None:
         with tag.main(cls="panel"):
             tag.h1("Input Entropy Scaling")
             tag.p(
-                f"Eight predefined list functions. Each plot has Random, Mod1, Block, and Same lines over input size; this sweep ends at {ENTROPY_SCALING_SIZES[-1]:,}.",
+                f"Eight predefined list functions. Each plot has Random, Mod1, Block, and Same lines over input size; this sweep ends at {sizes[-1]:,}.",
                 cls="meta",
             )
             with tag.section(cls="grid"):
@@ -469,9 +473,7 @@ def generate_hazel_reports(
 
     extra_entries: list[tuple[str, Path]] = []
     if include_hazel_compare:
-        hazel_compare_index = Path("output/hazel/hazel_compare/index.html")
-        if not hazel_compare_index.exists():
-            hazel_compare_index = generate_hazel_compare_reports(modes=hazel_compare_modes)
+        hazel_compare_index = generate_hazel_compare_reports(modes=hazel_compare_modes)
         if hazel_compare_index is not None:
             extra_entries.append(("Chordata vs Hazel Baseline", hazel_compare_index))
 

@@ -434,13 +434,7 @@ let quicksort_nexpr =
      greater = quicksort (filter (fun x -> x >= pivot) rest) in append smaller (pivot :: greater)"
 
 let quicksort_expr = expr_of_nexpr quicksort_nexpr
-
-let int_env_or_default ~name ~default =
-  match Sys.getenv_opt name with
-  | None -> default
-  | Some raw -> ( match int_of_string_opt raw with Some n when n > 0 -> n | _ -> default)
-
-let experiment_list_length = int_env_or_default ~name:"ANT_EXPERIMENT_LIST_LENGTH" ~default:400
+let experiment_list_length = 400
 let experiment_random_seed = 42
 let experiment_random_bound = 100
 

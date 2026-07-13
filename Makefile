@@ -1,5 +1,7 @@
 .DEFAULT_GOAL := all
 
+NIGHTLY_ARGS ?=
+
 .PHONY: dependency hazel-dependency build coverage run profile compile-generated nightly all report experiment hazel-experiment hazel-tex arith-tex hazel hazel-report arith arith-report arith-scaling hazel-scaling scaling scaling-report entropy-scaling entropy-report website website-check website-clean website-serve
 
 dependency:
@@ -82,5 +84,5 @@ website-serve:
 
 # Run the full pipeline and produce the HTML speedup report into output/.
 nightly all:
-	pipx install uv
-	PATH="$$(pipx environment --value PIPX_BIN_DIR):$$PATH" uv run ./nightly.py all
+	if ! command -v uv >/dev/null 2>&1; then pipx install uv; fi
+	uv run ./nightly.py all $(NIGHTLY_ARGS)

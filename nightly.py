@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import glob
 import os
 import shlex
@@ -10,7 +11,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable, Mapping, MutableMapping, Optional
+from typing import Iterable, Mapping, Optional
 
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -55,6 +56,18 @@ if str(TOOLS_DIR) not in sys.path:
 
 import generate_report as report_module  # noqa: E402
 import coverage_comment  # noqa: E402
+
+
+@dataclasses.dataclass(frozen=True)
+class RunOptions:
+    smoke: bool = False
+
+
+RUN_OPTIONS = RunOptions()
+
+
+def _smoke_run() -> bool:
+    return RUN_OPTIONS.smoke
 
 
 def run(
@@ -192,11 +205,10 @@ def hazel_dependency() -> None:
 
 def build_project() -> None:
     ensure_switch()
-    env = _opam_env_with_ocamlrunparam()
-    opam_exec(["dune", "build"], env=env)
+    opam_exec(["dune", "build", "--profile", "release"])
 
 
-def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
+def generate_ml_files() -> None:
     ensure_switch()
     files = ("Live", "Arith", "List")
     backends = (("memo", "CEK"), ("plain", "Plain"))
@@ -206,6 +218,8 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             command = [
                 "dune",
                 "exec",
+                "--profile",
+                "release",
                 "ant",
                 "--",
                 f"examples/{file}.ant",
@@ -216,7 +230,7 @@ def generate_ml_files(env: Optional[Mapping[str, str]] = None) -> None:
             ]
             if backend == "plain":
                 command.extend(["--type-alias", f"{file}CEK"])
-            opam_exec(command, env=env)
+            opam_exec(command)
 
 base_modes = ("append", "filter", "map", "qs", "is", "ms", "pair", "rev")
 variant_prefixes = ("", "th_", "at_")
@@ -229,8 +243,23 @@ hazel_bad = set(["th_ms", "th_pair"])
 hazel_modes = tuple(m for m in hazel_modes if m not in hazel_bad)
 arith_modes = ("arith",)
 modes = arith_modes + hazel_modes
-scaling_sizes = (10, 20, 40)
-entropy_scaling_sizes = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000, 10000, 20000, 40000)
+default_scaling_sizes = (10, 20, 40)
+smoke_scaling_sizes = (2,)
+default_entropy_scaling_sizes = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000, 10000, 20000, 40000)
+smoke_entropy_scaling_sizes = (2,)
+smoke_input_size = 2
+smoke_arith_sample_count = 1
+smoke_hazel_max_candidates = 1
+smoke_hazel_timeout_seconds = 5
+
+
+def _scaling_sizes() -> tuple[int, ...]:
+    return smoke_scaling_sizes if _smoke_run() else default_scaling_sizes
+
+
+def _entropy_scaling_sizes() -> tuple[int, ...]:
+    return smoke_entropy_scaling_sizes if _smoke_run() else default_entropy_scaling_sizes
+
 
 def _result_path_for_mode(mode: str) -> Path:
     if mode == "arith":
@@ -246,21 +275,59 @@ def _remove_result_files_for_modes(selected_modes: Iterable[str]) -> None:
 def run_modes(selected_modes: tuple[str, ...]) -> None:
     _remove_result_files_for_modes(selected_modes)
     ensure_switch()
-    env = _opam_env_with_ocamlrunparam()
-    generate_ml_files(env=env)
-    opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
+    generate_ml_files()
+    opam_exec(["dune", "fmt"], check=False, silent=True)
     for mode in selected_modes:
-        opam_exec(["dune", "exec", "GeneratedMain", mode], env=env)
+        if _smoke_run() and mode == "arith":
+            opam_exec(
+                [
+                    "dune",
+                    "exec",
+                    "--profile",
+                    "release",
+                    "GeneratedMain",
+                    "--",
+                    "arith",
+                    str(smoke_input_size),
+                    str(smoke_arith_sample_count),
+                    str(_result_path_for_mode(mode)),
+                ]
+            )
+        elif _smoke_run():
+            opam_exec(
+                [
+                    "dune",
+                    "exec",
+                    "--profile",
+                    "release",
+                    "GeneratedMain",
+                    "--",
+                    mode,
+                    str(smoke_input_size),
+                    str(smoke_hazel_max_candidates),
+                ]
+            )
+        else:
+            opam_exec(["dune", "exec", "--profile", "release", "GeneratedMain", mode])
 
 
 def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
     _remove_result_files_for_modes(selected_modes)
     ensure_switch()
-    env = _opam_env_with_ocamlrunparam()
-    generate_ml_files(env=env)
-    opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
+    generate_ml_files()
+    opam_exec(["dune", "fmt"], check=False, silent=True)
     for mode in selected_modes:
-        opam_exec(["dune", "exec", "GeneratedMain", "--", "hazel-compare", mode], env=env)
+        command = ["dune", "exec", "--profile", "release", "GeneratedMain", "--", "hazel-compare", mode]
+        if _smoke_run():
+            command.extend(
+                [
+                    str(smoke_input_size),
+                    str(smoke_hazel_max_candidates),
+                    str(smoke_hazel_timeout_seconds),
+                ]
+            )
+        opam_exec(command)
+
 
 def run_project() -> None:
     run_modes(modes)
@@ -291,107 +358,108 @@ def arith_project() -> None:
     run_modes(arith_modes)
 
 
-def _prepare_scaling_run() -> MutableMapping[str, str]:
+def _prepare_scaling_run() -> None:
     ensure_switch()
-    env = _opam_env_with_ocamlrunparam()
-    generate_ml_files(env=env)
-    opam_exec(["dune", "fmt"], env=env, check=False, silent=True)
-    return env
+    generate_ml_files()
+    opam_exec(["dune", "fmt"], check=False, silent=True)
 
 
 def arith_scaling_project() -> None:
-    env = _prepare_scaling_run()
+    _prepare_scaling_run()
     output_dir = Path("results/arith")
     output_dir.mkdir(parents=True, exist_ok=True)
-    for size in scaling_sizes:
+    for size in _scaling_sizes():
         output_path = output_dir / f"{size}.json"
         output_path.unlink(missing_ok=True)
-        opam_exec(
-            ["dune", "exec", "GeneratedMain", "--", "arith-scaling", str(size), str(output_path)],
-            env=env,
-        )
+        command = ["dune", "exec", "--profile", "release", "GeneratedMain", "--", "arith-scaling", str(size)]
+        if _smoke_run():
+            command.append(str(smoke_arith_sample_count))
+        command.append(str(output_path))
+        opam_exec(command)
 
 
 def hazel_scaling_project() -> None:
-    env = _prepare_scaling_run()
+    _prepare_scaling_run()
     for mode in hazel_modes:
         output_dir = Path("results/hazel") / mode
         output_dir.mkdir(parents=True, exist_ok=True)
-        for size in scaling_sizes:
+        for size in _scaling_sizes():
             output_path = output_dir / f"{size}.json"
             output_path.unlink(missing_ok=True)
-            opam_exec(
-                ["dune", "exec", "GeneratedMain", "--", "hazel-scaling", mode, str(size), str(output_path)],
-                env=env,
-            )
+            command = ["dune", "exec", "--profile", "release", "GeneratedMain", "--", "hazel-scaling", mode, str(size)]
+            if _smoke_run():
+                command.append(str(smoke_hazel_max_candidates))
+            command.append(str(output_path))
+            opam_exec(command)
 
 
 def scaling_project() -> None:
     arith_scaling_project()
     hazel_scaling_project()
-    report_module.generate_scaling_reports(modes=hazel_modes)
+    report_module.generate_scaling_reports(modes=hazel_modes, sizes=_scaling_sizes())
 
 
 def scaling_report_project() -> None:
-    report_module.generate_scaling_reports(modes=hazel_modes)
+    report_module.generate_scaling_reports(modes=hazel_modes, sizes=_scaling_sizes())
 
 
 def entropy_scaling_project() -> None:
-    env = _prepare_scaling_run()
+    _prepare_scaling_run()
     input_kinds = ("random", "mod1", "block", "same")
     programs = ("map", "append", "insertion_sort", "merge_sort", "quick_sort", "reverse", "simple_filter", "pair")
     for program in programs:
         for input_kind in input_kinds:
             (Path("results/entropy") / program / input_kind).mkdir(parents=True, exist_ok=True)
-    for size in entropy_scaling_sizes:
+    for size in _entropy_scaling_sizes():
         for program in programs:
             for input_kind in input_kinds:
                 (Path("results/entropy") / program / input_kind / f"{size}.json").unlink(missing_ok=True)
-        opam_exec(["dune", "exec", "GeneratedMain", "--", "entropy-scaling", str(size)], env=env)
+        opam_exec(["dune", "exec", "--profile", "release", "GeneratedMain", "--", "entropy-scaling", str(size)])
     entropy_report_project()
 
 
 def entropy_report_project() -> None:
-    report_module.generate_entropy_scaling_report()
+    report_module.generate_entropy_scaling_report(sizes=_entropy_scaling_sizes())
     if Path("results/arith").exists() and Path("results/hazel").exists():
-        report_module.generate_scaling_reports(modes=hazel_modes)
+        report_module.generate_scaling_reports(modes=hazel_modes, sizes=_scaling_sizes())
 
 
 def profile_project() -> None:
     _remove_perf_data_files()
     ensure_switch()
-    env = _opam_env_with_ocamlrunparam()
-    generate_ml_files(env=env)
-    opam_exec(["dune", "build", "bin/GeneratedMain.exe"], env=env)
+    generate_ml_files()
+    opam_exec(["dune", "build", "--profile", "release", "bin/GeneratedMain.exe"])
     binary = os.path.join("_build", "default", "bin", "GeneratedMain.exe")
     for mode in modes:
         if sys.platform == "darwin":
             # On macOS, use xctrace (modern replacement for instruments CLI)
             opam_exec(
-                ["xctrace", "record", "--template", "Time Profiler", "--output", f"perf-{mode}.trace", "--launch", "--", binary, mode],
-                env=env,
+                ["xctrace", "record", "--template", "Time Profiler", "--output", f"perf-{mode}.trace", "--launch", "--", binary, mode]
             )
         else:
-            opam_exec(
-                ["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode],
-                env=env,
-            )
+            opam_exec(["perf", "record", "-o", f"perf-{mode}.data", "--", binary, mode])
 
 
 def report_project() -> None:
+    clean_output()
     report_module.generate_reports()
 
 
 def hazel_report_project() -> None:
+    clean_output()
     report_module.generate_hazel_reports()
 
 
 def arith_report_project() -> None:
+    clean_output()
     report_module.generate_arith_reports()
 
 
 def experiment_project() -> None:
-    run_project()
+    clean_results()
+    clean_output()
+    arith_project()
+    hazel_experiment_project()
     report_module.generate_reports()
 
 
@@ -405,8 +473,7 @@ def arith_tex_project() -> None:
 
 def compile_generated() -> None:
     ensure_switch()
-    env = _opam_env_with_ocamlrunparam()
-    generate_ml_files(env=env)
+    generate_ml_files()
 
 
 def coverage_project() -> None:
@@ -449,13 +516,6 @@ def coverage_project() -> None:
     )
 
 
-def _opam_env_with_ocamlrunparam() -> MutableMapping[str, str]:
-    env: MutableMapping[str, str] = os.environ.copy()
-    env["OCAMLRUNPARAM"] = "b"
-    env["DUNE_PROFILE"] = "release"
-    return env
-
-
 def _remove_perf_data_files() -> None:
     patterns = glob.glob("perf-*.data") + glob.glob("perf-*.data.old") + glob.glob("perf-*.trace")
     for path in patterns:
@@ -473,20 +533,40 @@ def _remove_result_files() -> None:
         path.unlink(missing_ok=True)
 
 
+def clean_results() -> None:
+    shutil.rmtree(REPO_ROOT / "results", ignore_errors=True)
+
+
+def clean_output() -> None:
+    shutil.rmtree(REPO_ROOT / "output", ignore_errors=True)
+
+
 def main(argv: Iterable[str]) -> int:
+    global RUN_OPTIONS
     args = list(argv)
     usage = (
         "Usage: nightly.py "
         "[dependency|hazel-dependency|build|coverage|run|profile|hazel|hazel-experiment|hazel-report|arith|arith-report|"
         "arith-scaling|hazel-scaling|scaling|scaling-report|entropy-scaling|entropy-report|report|experiment|"
-        "hazel-tex|arith-tex|compile-generated|all]"
+        "hazel-tex|arith-tex|compile-generated|all] [--smoke]"
     )
+
+    smoke = False
+    if "--smoke" in args:
+        smoke = True
+        args.remove("--smoke")
+    if any(arg.startswith("-") for arg in args):
+        unknown = next(arg for arg in args if arg.startswith("-"))
+        print(f"Unknown option: {unknown}", file=sys.stderr)
+        print(usage, file=sys.stderr)
+        return 1
     if len(args) > 1:
-        print("Only a single stage argument is supported.", file=sys.stderr)
+        print("Only a single stage argument is supported before options.", file=sys.stderr)
         print(usage, file=sys.stderr)
         return 1
 
     stage = args[0] if args else "all"
+    RUN_OPTIONS = RunOptions(smoke=smoke)
 
     if stage == "dependency":
         install_dependencies()
@@ -517,10 +597,12 @@ def main(argv: Iterable[str]) -> int:
     elif stage == "scaling":
         scaling_project()
     elif stage == "scaling-report":
+        clean_output()
         scaling_report_project()
     elif stage == "entropy-scaling":
         entropy_scaling_project()
     elif stage == "entropy-report":
+        clean_output()
         entropy_report_project()
     elif stage == "report":
         report_project()
@@ -533,10 +615,13 @@ def main(argv: Iterable[str]) -> int:
     elif stage == "compile-generated":
         compile_generated()
     elif stage == "all":
+        clean_results()
+        clean_output()
         install_dependencies()
         hazel_dependency()
         build_project()
-        run_project()
+        arith_project()
+        hazel_experiment_project()
         scaling_project()
         entropy_scaling_project()
         report_module.generate_reports()

@@ -54,12 +54,12 @@ let benchmark_test_string ~input_size =
   | Rev -> Printf.sprintf {| my_reverse (%s) |} (list_to_cons_str large_input)
 
 let run ?hazel_compare ?(input_size = Common.experiment_list_length) ?steps_file:steps_file_override ~dataset ~benchmark
-    () =
+    ?max_candidates () =
   if input_size <= 0 then invalid_arg "HazelExperiment.run: input_size must be positive";
   let test = Common.parse_nexpr (benchmark_test_string ~input_size benchmark) in
   let steps_file = Option.value steps_file_override ~default:(steps_file dataset benchmark) in
   FromHazel.run_with_test ~program_name:(mode_name dataset benchmark) ~program_path:(program_path dataset benchmark)
-    ~steps_file ~input_size ~test ?hazel_compare ()
+    ~steps_file ~input_size ~test ?hazel_compare ?max_candidates ()
 
 let run_mk benchmark = run ~dataset:Mk ~benchmark ()
 let run_th benchmark = run ~dataset:Th ~benchmark ()
@@ -81,10 +81,12 @@ let hazel_compare_config =
       Printf.sprintf "node --max-old-space-size=8192 --stack-size=32768 -r %s %s"
         (Filename.quote (hazel_path "hazel/src/CLI/polyfill.js"))
         (Filename.quote (hazel_path "hazel/_build/default/src/CLI/cli.bc.js"));
+    timeout_seconds = 300;
+    max_candidates = None;
   }
 
-let run_compare ?(hazel_compare = hazel_compare_config) ~dataset ~benchmark () =
-  run ~hazel_compare:(Some hazel_compare) ~dataset ~benchmark ()
+let run_compare ?(hazel_compare = hazel_compare_config) ?input_size ?max_candidates ~dataset ~benchmark () =
+  run ~hazel_compare:(Some hazel_compare) ?input_size ?max_candidates ~dataset ~benchmark ()
 
 let decode_mode mode =
   let normalized = String.lowercase_ascii mode in
@@ -96,25 +98,33 @@ let decode_mode mode =
       else None)
     benchmarks
 
-let run_mode mode =
+let run_mode ?input_size ?max_candidates mode =
   match decode_mode mode with
   | None -> false
   | Some (dataset, benchmark) ->
-      run ~dataset ~benchmark ();
+      run ?input_size ?max_candidates ~dataset ~benchmark ();
       true
 
-let run_scaling_mode ~mode ~input_size ~steps_file =
+let run_scaling_mode ?max_candidates ~mode ~input_size ~steps_file () =
   match decode_mode mode with
   | None -> false
   | Some (dataset, benchmark) ->
-      run ~dataset ~benchmark ~input_size ~steps_file ();
+      run ~dataset ~benchmark ~input_size ~steps_file ?max_candidates ();
       true
 
-let run_compare_mode mode =
+let run_compare_mode ?input_size ?max_candidates ?hazel_compare_max_candidates
+    ?(hazel_compare_timeout_seconds = hazel_compare_config.timeout_seconds) mode =
   match decode_mode mode with
   | None -> false
   | Some (dataset, benchmark) ->
-      run_compare ~dataset ~benchmark ();
+      let hazel_compare =
+        {
+          hazel_compare_config with
+          timeout_seconds = hazel_compare_timeout_seconds;
+          max_candidates = hazel_compare_max_candidates;
+        }
+      in
+      run_compare ~hazel_compare ?input_size ?max_candidates ~dataset ~benchmark ();
       true
 
 let all_modes =
