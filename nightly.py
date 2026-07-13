@@ -150,6 +150,7 @@ def install_dependencies() -> None:
 def hazel_dependency() -> None:
     ensure_switch()
     run(["git", "submodule", "update", "--init", "--recursive", "hazel"])
+    run(["opam", "install", "--switch", SWITCH, "-y", "--deps-only", "."], cwd=REPO_ROOT / "hazel")
     opam_exec(
         ["dune", "build", "src/CLI/cli.bc.js", "--profile", "dev"],
         cwd=REPO_ROOT / "hazel",
