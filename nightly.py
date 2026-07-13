@@ -278,6 +278,7 @@ def run_modes(selected_modes: tuple[str, ...]) -> None:
     generate_ml_files()
     opam_exec(["dune", "fmt"], check=False, silent=True)
     for mode in selected_modes:
+        print(f"Running {mode}...", flush=True)
         if _smoke_run() and mode == "arith":
             opam_exec(
                 [
@@ -317,6 +318,7 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
     generate_ml_files()
     opam_exec(["dune", "fmt"], check=False, silent=True)
     for mode in selected_modes:
+        print(f"Running {mode}...", flush=True)
         command = ["dune", "exec", "--profile", "release", "GeneratedMain", "--", "hazel-compare", mode]
         if _smoke_run():
             command.extend(
