@@ -84,5 +84,10 @@ website-serve:
 
 # Run the full pipeline and produce the HTML speedup report into output/.
 nightly all:
-	if ! command -v uv >/dev/null 2>&1; then pipx install uv; fi
-	uv run ./nightly.py all $(NIGHTLY_ARGS)
+	UV_BIN="$$(command -v uv || true)"; \
+	if [ -z "$$UV_BIN" ]; then \
+		PIPX_BIN_DIR="$$(pipx environment --value PIPX_BIN_DIR)"; \
+		if [ ! -x "$$PIPX_BIN_DIR/uv" ]; then pipx install uv; fi; \
+		UV_BIN="$$PIPX_BIN_DIR/uv"; \
+	fi; \
+	"$$UV_BIN" run ./nightly.py all $(NIGHTLY_ARGS)
