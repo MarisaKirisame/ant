@@ -39,6 +39,7 @@ def _resolve_switch() -> str:
 
 
 SWITCH = _resolve_switch()
+HAZEL_SWITCH = _normalize_switch(os.environ.get("ANT_HAZEL_OPAM_SWITCH", "ant-hazel"))
 OPAM_ARCHIVE_REPOSITORY_URL = "git+https://github.com/ocaml/opam-repository-archive"
 TOOLCHAIN_PACKAGES = [
     "dune>=3.24.0",
@@ -112,18 +113,18 @@ def _switch_exists(switch: str) -> bool:
     return False
 
 
-def ensure_switch() -> None:
-    """Ensure the opam switch exists and enforces the invariant."""
+def ensure_opam_switch(switch: str) -> None:
+    """Ensure an opam switch exists and enforces the project OCaml invariant."""
 
-    if not _switch_exists(SWITCH):
-        run(["opam", "switch", "create", SWITCH, "--empty"])
+    if not _switch_exists(switch):
+        run(["opam", "switch", "create", switch, "--empty"])
     run(
         [
             "opam",
             "switch",
             "set-invariant",
             "--switch",
-            SWITCH,
+            switch,
             "--update-invariant",
             "ocaml>=5.2",
             "-y",
@@ -131,16 +132,26 @@ def ensure_switch() -> None:
     )
 
 
+def ensure_switch() -> None:
+    ensure_opam_switch(SWITCH)
+
+
+def opam_exec_in_switch(
+    switch: str, args: Iterable[str], *, env: Optional[Mapping[str, str]] = None, **kwargs
+) -> subprocess.CompletedProcess[str]:
+    return run(["opam", "exec", "--switch", switch, "--", *args], env=env, **kwargs)
+
+
 def opam_exec(
     args: Iterable[str], *, env: Optional[Mapping[str, str]] = None, **kwargs
 ) -> subprocess.CompletedProcess[str]:
     """Run a command inside the configured opam switch."""
 
-    return run(["opam", "exec", "--switch", SWITCH, "--", *args], env=env, **kwargs)
+    return opam_exec_in_switch(SWITCH, args, env=env, **kwargs)
 
 
-def ensure_opam_archive_repository() -> None:
-    result = run(["opam", "repository", "list", "--switch", SWITCH, "--short"], capture=True)
+def ensure_opam_archive_repository(switch: str) -> None:
+    result = run(["opam", "repository", "list", "--switch", switch, "--short"], capture=True)
     repositories = {line.strip() for line in result.stdout.splitlines() if line.strip()}
     if "archive" not in repositories:
         run(
@@ -149,7 +160,7 @@ def ensure_opam_archive_repository() -> None:
                 "repository",
                 "add",
                 "--switch",
-                SWITCH,
+                switch,
                 "--rank=-1",
                 "archive",
                 OPAM_ARCHIVE_REPOSITORY_URL,
@@ -168,11 +179,12 @@ def install_dependencies() -> None:
 
 
 def hazel_dependency() -> None:
-    ensure_switch()
+    ensure_opam_switch(HAZEL_SWITCH)
     run(["git", "submodule", "update", "--init", "--recursive", "hazel"])
-    ensure_opam_archive_repository()
-    run(["opam", "install", "--switch", SWITCH, "-y", "--deps-only", "--locked", "."], cwd=REPO_ROOT / "hazel")
-    opam_exec(
+    ensure_opam_archive_repository(HAZEL_SWITCH)
+    run(["opam", "install", "--switch", HAZEL_SWITCH, "-y", "--deps-only", "--locked", "."], cwd=REPO_ROOT / "hazel")
+    opam_exec_in_switch(
+        HAZEL_SWITCH,
         ["dune", "build", "src/CLI/cli.bc.js", "--profile", "dev"],
         cwd=REPO_ROOT / "hazel",
     )
