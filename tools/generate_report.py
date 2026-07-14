@@ -44,8 +44,8 @@ BASE_EXPERIMENTS: list[tuple[str, str]] = [
     ("rev", "Reverse"),
 ]
 
-SCALING_SIZES = (10, 20, 40)
-ENTROPY_SCALING_SIZES = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000, 10000, 20000, 40000)
+SCALING_SIZES = (10, 20, 40, 100, 200, 400)
+ENTROPY_SCALING_SIZES = (10, 20, 40, 100, 200, 400, 1000)
 ENTROPY_CATEGORIES = (
     ("random", "Random"),
     ("mod1", "Mod1"),

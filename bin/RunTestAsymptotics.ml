@@ -24,21 +24,17 @@ let repeated_input length = List.init length (Fun.const 1)
 
 let low_entropy_input length =
   let rng = Random.State.make [| 42 |] in
-
-  let max_chunk_length = length |> float_of_int |> Float.cbrt |> int_of_float in
-  let rec generate_chunks rng n =
-    match n with 0 -> [] | n -> (n, List.init n (fun _ -> Random.State.int rng 100)) :: generate_chunks rng (n - 1)
+  let block_length = max 1 (length |> float_of_int |> Float.sqrt |> int_of_float) in
+  let block_count = max 1 ((length + block_length - 1) / block_length) in
+  let blocks = Array.init 2 (fun _ -> List.init block_length (fun _ -> Random.State.int rng 100)) in
+  let rec make_list remaining_blocks current_list =
+    match remaining_blocks with
+    | 0 -> List.take length current_list
+    | _ ->
+        let block = blocks.(Random.State.int rng 2) in
+        make_list (remaining_blocks - 1) (List.append current_list block)
   in
-  let chunks = generate_chunks rng max_chunk_length in
-  let rec make_list current_size current_list =
-    match current_size > length with
-    | true -> List.take length current_list
-    | false ->
-        let random_index = Random.State.int rng max_chunk_length in
-        let n, l = List.nth chunks random_index in
-        make_list (current_size + n) (List.append current_list l)
-  in
-  make_list 0 []
+  make_list block_count []
 
 let json_of_profile entries = `List (List.map (fun (name, time) -> `List [ `String name; `Int time ]) entries)
 
