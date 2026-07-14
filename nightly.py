@@ -243,14 +243,16 @@ hazel_bad = set(["th_ms", "th_pair"])
 hazel_modes = tuple(m for m in hazel_modes if m not in hazel_bad)
 arith_modes = ("arith",)
 modes = arith_modes + hazel_modes
-default_scaling_sizes = (10, 20, 40)
+default_scaling_sizes = (10, 20, 40, 100, 200, 400, 1000)
 smoke_scaling_sizes = (2,)
 default_entropy_scaling_sizes = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000, 10000, 20000, 40000)
 smoke_entropy_scaling_sizes = (2,)
 smoke_input_size = 2
+default_arith_scaling_sample_count = 5
 smoke_arith_sample_count = 1
 smoke_hazel_max_candidates = 1
 smoke_hazel_timeout_seconds = 5
+hazel_compare_mode_timeout = "10m"
 
 
 def _scaling_sizes() -> tuple[int, ...]:
@@ -319,7 +321,19 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
     opam_exec(["dune", "fmt"], check=False, silent=True)
     for mode in selected_modes:
         print(f"Running {mode}...", flush=True)
-        command = ["dune", "exec", "--profile", "release", "GeneratedMain", "--", "hazel-compare", mode]
+        command = [
+            "timeout",
+            "--kill-after=5s",
+            hazel_compare_mode_timeout,
+            "dune",
+            "exec",
+            "--profile",
+            "release",
+            "GeneratedMain",
+            "--",
+            "hazel-compare",
+            mode,
+        ]
         if _smoke_run():
             command.extend(
                 [
@@ -328,7 +342,11 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
                     str(smoke_hazel_timeout_seconds),
                 ]
             )
-        opam_exec(command)
+        result = opam_exec(command, check=False)
+        if result.returncode != 0:
+            _result_path_for_mode(mode).unlink(missing_ok=True)
+            status = "timed out" if result.returncode in (124, 137) else f"failed with exit {result.returncode}"
+            print(f"Running {mode}... {status}; continuing", flush=True)
 
 
 def run_project() -> None:
@@ -374,8 +392,8 @@ def arith_scaling_project() -> None:
         output_path = output_dir / f"{size}.json"
         output_path.unlink(missing_ok=True)
         command = ["dune", "exec", "--profile", "release", "GeneratedMain", "--", "arith-scaling", str(size)]
-        if _smoke_run():
-            command.append(str(smoke_arith_sample_count))
+        sample_count = smoke_arith_sample_count if _smoke_run() else default_arith_scaling_sample_count
+        command.append(str(sample_count))
         command.append(str(output_path))
         opam_exec(command)
 
@@ -388,6 +406,7 @@ def hazel_scaling_project() -> None:
         for size in _scaling_sizes():
             output_path = output_dir / f"{size}.json"
             output_path.unlink(missing_ok=True)
+            print(f"Running {mode} scaling size {size}...", flush=True)
             command = ["dune", "exec", "--profile", "release", "GeneratedMain", "--", "hazel-scaling", mode, str(size)]
             if _smoke_run():
                 command.append(str(smoke_hazel_max_candidates))

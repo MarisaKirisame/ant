@@ -81,6 +81,7 @@ def _render_html(
     title: str,
     entries: Sequence[Tuple[str, str]],
     downloads: Sequence[Tuple[str, str]] | None,
+    description: str | None,
     summary: SpeedupStats | None,
     comparison_summaries: Sequence[Tuple[str, SpeedupStats]] | None,
     combined_scatter_rel: str | None,
@@ -95,7 +96,7 @@ def _render_html(
     with doc:
         with tag.main():
             tag.h1(title)
-            tag.p("Select a benchmark run to explore the detailed results.")
+            tag.p(description or "Select a benchmark run to explore the detailed results.")
             if downloads:
                 with tag.section(cls="grid"):
                     for label, rel in downloads:
@@ -136,6 +137,7 @@ def generate_html(
     entries: Sequence[Tuple[str, Path]],
     downloads: Sequence[Tuple[str, Path]] | None = None,
     data_paths: Sequence[Path] | None = None,
+    description: str | None = None,
     css_source: Path,
     report_kind: str = "hazel",
 ) -> SpeedupStats | None:
@@ -218,6 +220,7 @@ def generate_html(
             title,
             entries_with_rel,
             downloads_with_rel,
+            description,
             summary,
             comparison_summaries,
             combined_scatter_rel,
@@ -485,6 +488,12 @@ def generate_hazel_reports(
         css_source=css_source,
         report_kind="hazel",
         extra_entries=extra_entries,
+        description=(
+            "In the Chordata vs Hazel Baseline comparison, timeout and oom statuses refer to the external "
+            "Hazel baseline evaluator. A timeout means Hazel did not finish within the per-benchmark compare "
+            "budget; oom means the Hazel process exhausted memory. The comparison summary only aggregates "
+            "Hazel rows whose status is ok."
+        ),
     )
 
 
@@ -533,6 +542,7 @@ def _generate_reports_for_experiments(
     css_source: Path,
     report_kind: str,
     extra_entries: Sequence[tuple[str, Path]] | None = None,
+    description: str | None = None,
 ) -> None:
     generated_entries: list[tuple[str, Path]] = []
     for label, input_path, output_dir in experiments:
@@ -553,6 +563,7 @@ def _generate_reports_for_experiments(
         output=output,
         entries=generated_entries,
         downloads=downloads,
+        description=description,
         css_source=css_source,
         report_kind=report_kind,
     )
