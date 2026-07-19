@@ -24,6 +24,7 @@ from plot_speedup import (
     compare_stats,
     load_records,
     profile_totals_from_result,
+    plot_entropy_scatter,
     plot_speedup_cdf,
     plot_entropy_speedup_lines,
     plot_speedup_vs_size,
@@ -45,12 +46,12 @@ BASE_EXPERIMENTS: list[tuple[str, str]] = [
 ]
 
 SCALING_SIZES = (10, 20, 40, 100, 200, 400)
-ENTROPY_SCALING_SIZES = (10, 20, 40, 100, 200, 400, 1000)
+ENTROPY_SCALING_SIZES = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000)
 ENTROPY_CATEGORIES = (
-    ("random", "Random"),
-    ("mod1", "Mod1"),
-    ("block", "Block"),
-    ("same", "Same"),
+    ("random", "random"),
+    ("block", "block"),
+    ("same", "same"),
+    ("mod1", "mod1"),
 )
 ENTROPY_PROGRAMS = (
     ("map", "Map"),
@@ -71,10 +72,16 @@ VARIANTS: list[tuple[str, str, str]] = [
     ("results/hazel/at_{key}.json", "at_{key}", " (at)"),
 ]
 
+HAZEL_COMPARE_VARIANTS: list[tuple[str, str, str]] = [
+    ("results/hazel-compare/{key}.json", "{key}", ""),
+    ("results/hazel-compare/th_{key}.json", "th_{key}", " (th)"),
+    ("results/hazel-compare/at_{key}.json", "at_{key}", " (at)"),
+]
+
 TABLE_VARIANTS: list[tuple[str, str]] = [
-    ("Alice", "results/hazel/{key}.json"),
-    ("Bob", "results/hazel/at_{key}.json"),
-    ("Cam", "results/hazel/th_{key}.json"),
+    ("1", "results/hazel/{key}.json"),
+    ("2", "results/hazel/at_{key}.json"),
+    ("3", "results/hazel/th_{key}.json"),
 ]
 
 def _render_html(
@@ -296,12 +303,12 @@ def _write_scaling_page(
             tag.h1(title)
             tag.p("Each size is an independent experiment. Speedup is the existing geometric mean of CEK / memoized profile-time ratios.", cls="meta")
             with tag.section(cls="plot"):
-                tag.img(src=plot_name, alt="Memo versus CEK geometric-mean speedup by input size")
+                tag.img(src=plot_name, alt="Memo versus CEK speedup by input size")
             with tag.table():
                 with tag.thead():
                     with tag.tr():
                         tag.th("Input size")
-                        tag.th("Geometric-mean speedup")
+                        tag.th("Speedup")
                         tag.th("Samples")
                 with tag.tbody():
                     for size, speedup, samples in points:
@@ -353,9 +360,13 @@ def generate_scaling_reports(*, modes: Sequence[str] | None = None, sizes: Seque
 def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SIZES) -> None:
     output_dir = Path("output/scaling/entropy")
     output_dir.mkdir(parents=True, exist_ok=True)
-    for stale_plot in output_dir.glob("*-speedup-vs-size.png"):
+    for stale_plot in [*output_dir.glob("*speedup-vs-size.png"), *output_dir.glob("*-scatter.png")]:
         stale_plot.unlink()
     plots: list[tuple[str, str, list[tuple[str, list[tuple[int, float]]]]]] = []
+    geomean_by_category: dict[str, dict[int, list[float]]] = {
+        input_label: {size: [] for size in sizes} for _, input_label in ENTROPY_CATEGORIES
+    }
+    scatter_by_category: dict[str, list[tuple[float, float]]] = {input_label: [] for _, input_label in ENTROPY_CATEGORIES}
     for program, label in ENTROPY_PROGRAMS:
         series: list[tuple[str, list[tuple[int, float]]]] = []
         for input_kind, input_label in ENTROPY_CATEGORIES:
@@ -370,6 +381,8 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
                     raise ValueError(f"entropy result contains no executions: {input_path}")
                 _, stats = compare_stats(pairs)
                 points.append((size, stats.geo_mean))
+                geomean_by_category[input_label][size].append(stats.geo_mean)
+                scatter_by_category[input_label].extend(pairs)
             series.append((input_label, points))
         plot_name = plot_entropy_speedup_lines(
             series,
@@ -378,8 +391,27 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
             title=f"{label}: Speedup by Input Pattern",
         )
         plots.append((label, plot_name, series))
+    geomean_series = [
+        (
+            input_label,
+            [(size, _geometric_mean(geomean_by_category[input_label][size])) for size in sizes],
+        )
+        for _, input_label in ENTROPY_CATEGORIES
+    ]
+    geomean_plot_name = plot_entropy_speedup_lines(
+        geomean_series,
+        output_dir,
+        output_name="geomean-speedup-vs-size.png",
+        title="Geometric-Mean Speedup by Input Pattern",
+    )
+    scatter_plot_name = plot_entropy_scatter(
+        [(input_label, scatter_by_category[input_label]) for _, input_label in ENTROPY_CATEGORIES],
+        output_dir,
+        output_name="entropy-scatter.png",
+        title="Memo vs CEK by Input Pattern",
+    )
     tex_output = output_dir / "entropy_result.tex"
-    generate_entropy_scaling_tex(plots=plots, output_path=tex_output)
+    generate_entropy_scaling_tex(plots=plots, sizes=sizes, output_path=tex_output)
     css_source = Path(__file__).with_name("style.css")
     shutil.copyfile(css_source, output_dir / "style.css")
     doc = document(title="Input Entropy Scaling")
@@ -391,12 +423,18 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
         with tag.main(cls="panel"):
             tag.h1("Input Entropy Scaling")
             tag.p(
-                f"Eight predefined list functions. Each plot has Random, Mod1, Block, and Same lines over input size; this sweep ends at {sizes[-1]:,}.",
+                f"Eight predefined list functions. Each plot has random, block, same, and mod1 lines over input size; this sweep ends at {sizes[-1]:,}.",
                 cls="meta",
             )
             with tag.section(cls="grid"):
                 with tag.a(href=tex_output.name, cls="card", download=""):
                     tag.span("Download entropy_result.tex")
+            tag.h2("All Functions")
+            with tag.section(cls="plot"):
+                tag.img(src=scatter_plot_name, alt="Memo versus CEK scatter plot by input pattern")
+            tag.h2("Geometric Mean")
+            with tag.section(cls="plot"):
+                tag.img(src=geomean_plot_name, alt="Geometric-mean speedup by input pattern")
             for label, plot_name, series in plots:
                 tag.h2(label)
                 with tag.section(cls="plot"):
@@ -405,7 +443,7 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
                     with tag.thead():
                         with tag.tr():
                             tag.th("Input pattern")
-                            for size in ENTROPY_SCALING_SIZES:
+                            for size in sizes:
                                 tag.th(str(size))
                     with tag.tbody():
                         for input_label, points in series:
@@ -423,6 +461,7 @@ def _entropy_tex_macro_name(program: str) -> str:
 def generate_entropy_scaling_tex(
     *,
     plots: Sequence[tuple[str, str, list[tuple[str, list[tuple[int, float]]]]]],
+    sizes: Sequence[int] = ENTROPY_SCALING_SIZES,
     output_path: Path = Path("output/scaling/entropy/entropy_result.tex"),
 ) -> None:
     if len(plots) != len(ENTROPY_PROGRAMS):
@@ -432,8 +471,8 @@ def generate_entropy_scaling_tex(
     for (program, _), (label, _, series) in zip(ENTROPY_PROGRAMS, plots):
         macro_name = _entropy_tex_macro_name(program)
         macro_names.append((label, macro_name))
-        col_spec = "l|" + ("r" * len(ENTROPY_SCALING_SIZES))
-        header = " & ".join(["Input pattern", *(str(size) for size in ENTROPY_SCALING_SIZES)]) + r" \\"
+        col_spec = "l|" + ("r" * len(sizes))
+        header = " & ".join(["Input pattern", *(str(size) for size in sizes)]) + r" \\"
         lines.extend(
             [
                 f"\\newcommand{{\\entropy{macro_name}}}{{%",
@@ -763,14 +802,13 @@ def generate_tex_table(
 
     variant_labels = [variant_label for variant_label, _, _ in rows]
     escaped_variant_labels = [_escape_latex(label) for label in variant_labels]
-    group_header = " & ".join(
-        ["Benchmark", *escaped_variant_labels, *escaped_variant_labels]
-    ) + " \\\\"
     variant_count = len(variant_labels)
-    subheader = (
+    group_header = (
         f" & \\multicolumn{{{variant_count}}}{{c|}}{{time speedup}}"
         f" & \\multicolumn{{{variant_count}}}{{c}}{{memory overhead}} \\\\"
     )
+    user_labels = [f"User {label}" for label in escaped_variant_labels]
+    user_header = " & ".join(["Benchmark", *user_labels, *user_labels]) + " \\\\"
     col_spec = f"l|{'r' * variant_count}|{'r' * variant_count}"
     lines = [
         "% Auto-generated by tools/generate_report.py",
@@ -785,7 +823,7 @@ def generate_tex_table(
         "\\begin{tabular}{" + col_spec + "}",
         "\\hline",
         group_header,
-        subheader,
+        user_header,
         "\\hline",
     ]
     for benchmark_idx, (_, benchmark_label) in enumerate(BASE_EXPERIMENTS):
@@ -948,7 +986,7 @@ def generate_hazel_compare_reports(
 ) -> Path | None:
     selected = set(modes) if modes is not None else None
     input_paths: list[Path] = []
-    for steps_pattern, _, _ in VARIANTS:
+    for steps_pattern, _, _ in HAZEL_COMPARE_VARIANTS:
         for key, _ in BASE_EXPERIMENTS:
             mode = _mode_from_steps_pattern(steps_pattern, key)
             if selected is not None:

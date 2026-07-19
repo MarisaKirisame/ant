@@ -35,6 +35,12 @@ let steps_file dataset benchmark =
   | Th -> Printf.sprintf "results/hazel/th_%s.json" (benchmark_key benchmark)
   | At -> Printf.sprintf "results/hazel/at_%s.json" (benchmark_key benchmark)
 
+let compare_steps_file dataset benchmark =
+  match dataset with
+  | Mk -> Printf.sprintf "results/hazel-compare/%s.json" (benchmark_key benchmark)
+  | Th -> Printf.sprintf "results/hazel-compare/th_%s.json" (benchmark_key benchmark)
+  | At -> Printf.sprintf "results/hazel-compare/at_%s.json" (benchmark_key benchmark)
+
 let program_path dataset benchmark =
   Printf.sprintf "data/%s_%s.json" (dataset_data_prefix dataset) (benchmark_data_suffix benchmark)
 
@@ -85,8 +91,9 @@ let hazel_compare_config =
     max_candidates = None;
   }
 
-let run_compare ?(hazel_compare = hazel_compare_config) ?input_size ?max_candidates ~dataset ~benchmark () =
-  run ~hazel_compare:(Some hazel_compare) ?input_size ?max_candidates ~dataset ~benchmark ()
+let run_compare ?(hazel_compare = hazel_compare_config) ?input_size ?steps_file ?max_candidates ~dataset ~benchmark () =
+  let steps_file = Option.value steps_file ~default:(compare_steps_file dataset benchmark) in
+  run ~hazel_compare:(Some hazel_compare) ?input_size ~steps_file ?max_candidates ~dataset ~benchmark ()
 
 let decode_mode mode =
   let normalized = String.lowercase_ascii mode in
@@ -112,7 +119,7 @@ let run_scaling_mode ?max_candidates ~mode ~input_size ~steps_file () =
       run ~dataset ~benchmark ~input_size ~steps_file ?max_candidates ();
       true
 
-let run_compare_mode ?input_size ?max_candidates ?hazel_compare_max_candidates
+let run_compare_mode ?input_size ?steps_file ?max_candidates ?hazel_compare_max_candidates
     ?(hazel_compare_timeout_seconds = hazel_compare_config.timeout_seconds) mode =
   match decode_mode mode with
   | None -> false
@@ -124,7 +131,7 @@ let run_compare_mode ?input_size ?max_candidates ?hazel_compare_max_candidates
           max_candidates = hazel_compare_max_candidates;
         }
       in
-      run_compare ~hazel_compare ?input_size ?max_candidates ~dataset ~benchmark ();
+      run_compare ~hazel_compare ?input_size ?steps_file ?max_candidates ~dataset ~benchmark ();
       true
 
 let all_modes =

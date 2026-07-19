@@ -245,7 +245,7 @@ arith_modes = ("arith",)
 modes = arith_modes + hazel_modes
 default_scaling_sizes = (10, 20, 40, 100, 200, 400)
 smoke_scaling_sizes = (2,)
-default_entropy_scaling_sizes = (10, 20, 40, 100, 200, 400, 1000)
+default_entropy_scaling_sizes = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000)
 smoke_entropy_scaling_sizes = (2,)
 smoke_input_size = 2
 default_arith_scaling_sample_count = 5
@@ -269,9 +269,18 @@ def _result_path_for_mode(mode: str) -> Path:
     return Path("results/hazel") / f"{mode}.json"
 
 
+def _compare_result_path_for_mode(mode: str) -> Path:
+    return Path("results/hazel-compare") / f"{mode}.json"
+
+
 def _remove_result_files_for_modes(selected_modes: Iterable[str]) -> None:
     for mode in selected_modes:
         _result_path_for_mode(mode).unlink(missing_ok=True)
+
+
+def _remove_compare_result_files_for_modes(selected_modes: Iterable[str]) -> None:
+    for mode in selected_modes:
+        _compare_result_path_for_mode(mode).unlink(missing_ok=True)
 
 
 def run_modes(selected_modes: tuple[str, ...]) -> None:
@@ -315,7 +324,7 @@ def run_modes(selected_modes: tuple[str, ...]) -> None:
 
 
 def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
-    _remove_result_files_for_modes(selected_modes)
+    _remove_compare_result_files_for_modes(selected_modes)
     ensure_switch()
     generate_ml_files()
     opam_exec(["dune", "fmt"], check=False, silent=True)
@@ -335,16 +344,11 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
             mode,
         ]
         if _smoke_run():
-            command.extend(
-                [
-                    str(smoke_input_size),
-                    str(smoke_hazel_max_candidates),
-                    str(smoke_hazel_timeout_seconds),
-                ]
-            )
+            command.extend([str(smoke_input_size), str(smoke_hazel_max_candidates), str(smoke_hazel_timeout_seconds)])
+        command.append(str(_compare_result_path_for_mode(mode)))
         result = opam_exec(command, check=False)
         if result.returncode != 0:
-            _result_path_for_mode(mode).unlink(missing_ok=True)
+            _compare_result_path_for_mode(mode).unlink(missing_ok=True)
             status = "timed out" if result.returncode in (124, 137) else f"failed with exit {result.returncode}"
             print(f"Running {mode}... {status}; continuing", flush=True)
 
@@ -370,6 +374,7 @@ def hazel_experiment_project() -> None:
     compare_modes = _hazel_compare_experiment_modes()
     # Prevent stale rows from non-selected benchmarks from appearing in reports.
     _remove_result_files_for_modes(hazel_modes)
+    run_modes(selected_modes)
     run_compare_modes(compare_modes)
     report_module.generate_hazel_reports(include_hazel_compare=True, modes=selected_modes, hazel_compare_modes=compare_modes)
 

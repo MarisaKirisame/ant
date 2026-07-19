@@ -48,6 +48,12 @@ REPORT_DRAW_INTERPOLATION_LINE = False
 # Toggle drawing grid lines on plots.
 REPORT_DRAW_GRID_LINES = False
 DEFAULT_REPORT_KIND = "hazel"
+ENTROPY_CATEGORY_COLORS = {
+    "random": "tab:blue",
+    "block": "tab:orange",
+    "same": "tab:green",
+    "mod1": "tab:red",
+}
 
 if REPORT_WALL_CLOCK_TIME:
     MEMO_KEY = "memo_profile"
@@ -235,7 +241,7 @@ def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
         output_dir,
         title=f"Speedup per Execution ({METRIC_LABEL}, log scale)",
         xlabel="Execution number (nth run)",
-        ylabel=f"Speedup ({METRIC_LABEL}, baseline / memoized, log scale)",
+        ylabel="Speedup",
         yscale="log",
         plotter=lambda ax: ax.plot(xs, ratios, marker="o", linewidth=1.5),
     )
@@ -300,7 +306,7 @@ def plot_speedup_vs_size(
         output_dir,
         title="Memo vs CEK Speedup by Input Size",
         xlabel="Input size",
-        ylabel="Geometric-mean speedup (CEK / memoized)",
+        ylabel="Speedup",
         xscale="log",
         yscale="log",
         output_name=output_name,
@@ -323,7 +329,7 @@ def plot_entropy_speedup_lines(
         raise ValueError("sizes and speedups must be positive")
 
     def _plot(ax: plt.Axes) -> None:
-        for label, points in series:
+        for index, (label, points) in enumerate(series):
             ordered = sorted(points)
             ax.plot(
                 [size for size, _ in ordered],
@@ -331,6 +337,7 @@ def plot_entropy_speedup_lines(
                 marker="o",
                 linewidth=1.5,
                 label=label,
+                color=ENTROPY_CATEGORY_COLORS.get(label, f"C{index}"),
             )
         ax.axhline(1.0, color="black", linestyle="--", linewidth=1)
 
@@ -338,7 +345,75 @@ def plot_entropy_speedup_lines(
         output_dir,
         title=title,
         xlabel="Input size",
-        ylabel="Geometric-mean speedup (CEK / memoized)",
+        ylabel="Speedup",
+        xscale="log",
+        yscale="log",
+        legend=True,
+        output_name=output_name,
+        plotter=_plot,
+    )
+
+
+def plot_entropy_scatter(
+    series: Sequence[tuple[str, Sequence[tuple[float, float]]]],
+    output_dir: Path,
+    *,
+    output_name: str = "entropy-scatter.png",
+    title: str = "Memo vs CEK by Input Pattern",
+) -> str:
+    if not series:
+        raise ValueError("series is empty")
+    all_pairs = [pair for _, pairs in series for pair in pairs]
+    if not all_pairs:
+        raise ValueError("series contains no pairs")
+    if any(baseline <= 0 or memo <= 0 for baseline, memo in all_pairs):
+        raise ValueError("times must be positive")
+
+    baselines = [baseline for baseline, _ in all_pairs]
+    memos = [memo for _, memo in all_pairs]
+    min_time = min(min(baselines), min(memos))
+    max_time = max(max(baselines), max(memos))
+
+    def _plot(ax: plt.Axes) -> None:
+        for index, (label, pairs) in enumerate(series):
+            if not pairs:
+                continue
+            ax.scatter(
+                [baseline for baseline, _ in pairs],
+                [memo for _, memo in pairs],
+                alpha=0.2,
+                label=label,
+                color=ENTROPY_CATEGORY_COLORS.get(label, f"C{index}"),
+            )
+        ax.plot([min_time, max_time], [min_time, max_time], color="black", linestyle="--", linewidth=1)
+
+        for factor, linewidth, label, offset in [
+            (10.0, 0.5, "10x faster", (12, 10)),
+            (100.0, 0.2, "100x faster", (12, -12)),
+        ]:
+            x_start = factor * min_time
+            if x_start > max_time:
+                continue
+            ax.plot([x_start, max_time], [min_time, max_time / factor], color="black", linestyle="--", linewidth=linewidth)
+            x_anchor = x_start + 0.7 * (max_time - x_start)
+            y_anchor = x_anchor / factor
+            ax.annotate(
+                label,
+                xy=(x_anchor, y_anchor),
+                xytext=offset,
+                textcoords="offset points",
+                bbox={"boxstyle": "round,pad=0.25", "fc": "white", "ec": "black", "alpha": 1.0},
+                arrowprops={"arrowstyle": "->", "color": "black", "lw": 1},
+                fontsize=9,
+                ha="left",
+                va="center",
+            )
+
+    return _save_plot(
+        output_dir,
+        title=title,
+        xlabel="CEK time (ns)",
+        ylabel="Memoized time (ns)",
         xscale="log",
         yscale="log",
         legend=True,

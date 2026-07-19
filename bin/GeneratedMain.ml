@@ -15,26 +15,31 @@ let () =
   | [ _; "hazel-compare"; mode ] ->
       if not (HazelExperiment.run_compare_mode mode) then (
         prerr_endline
-          (Printf.sprintf "Usage: GeneratedMain hazel-compare <%s>" (String.concat "|" HazelExperiment.all_modes));
+          (Printf.sprintf "Usage: GeneratedMain hazel-compare <%s> [output]" (String.concat "|" HazelExperiment.all_modes));
         exit 1)
-  | [ _; "hazel-compare"; mode; input_size; max_candidates; timeout_seconds ] -> (
+  | [ _; "hazel-compare"; mode; output ] ->
+      if not (HazelExperiment.run_compare_mode ~steps_file:output mode) then (
+        prerr_endline
+          (Printf.sprintf "Usage: GeneratedMain hazel-compare <%s> <output>" (String.concat "|" HazelExperiment.all_modes));
+        exit 1)
+  | [ _; "hazel-compare"; mode; input_size; max_candidates; timeout_seconds; output ] -> (
       match (positive_int input_size, nonnegative_int max_candidates, positive_int timeout_seconds) with
       | Some input_size, Some max_candidates, Some timeout_seconds ->
           if
             not
               (HazelExperiment.run_compare_mode ~input_size ~max_candidates ~hazel_compare_max_candidates:max_candidates
-                 ~hazel_compare_timeout_seconds:timeout_seconds mode)
+                 ~hazel_compare_timeout_seconds:timeout_seconds ~steps_file:output mode)
           then (
             prerr_endline
               (Printf.sprintf
                  "Usage: GeneratedMain hazel-compare <%s> <positive-input-size> <nonnegative-max-candidates> \
-                  <positive-timeout-seconds>"
+                  <positive-timeout-seconds> <output>"
                  (String.concat "|" HazelExperiment.all_modes));
             exit 1)
       | _ ->
           prerr_endline
             "Usage: GeneratedMain hazel-compare <mode> <positive-input-size> <nonnegative-max-candidates> \
-             <positive-timeout-seconds>";
+             <positive-timeout-seconds> <output>";
           exit 1)
   | [ _; "arith"; term_size; sample_count; output ] -> (
       match (positive_int term_size, positive_int sample_count) with
