@@ -188,7 +188,6 @@ def install_dependencies() -> None:
     run(["opam", "upgrade", "--switch", SWITCH, "--fixup", "-y"])
     run(["opam", "install", "--switch", SWITCH, "-y", *TOOLCHAIN_PACKAGES])
     run(["opam", "install", "--switch", SWITCH, "-y", *DEV_PACKAGES])
-    opam_exec(["dune", "pkg", "lock"])
 
 
 def hazel_dependency() -> None:
@@ -332,6 +331,29 @@ def run_modes(selected_modes: tuple[str, ...]) -> None:
             opam_exec(["dune", "exec", "--profile", "release", "GeneratedMain", mode])
 
 
+def run_core_modes(selected_modes: tuple[str, ...]) -> None:
+    _remove_result_files_for_modes(selected_modes)
+    ensure_switch()
+    generate_ml_files()
+    opam_exec(["dune", "fmt"], check=False, silent=True)
+    for mode in selected_modes:
+        print(f"Running {mode} core...", flush=True)
+        command = [
+            "dune",
+            "exec",
+            "--profile",
+            "release",
+            "GeneratedMain",
+            "--",
+            "hazel-core",
+            mode,
+        ]
+        if _smoke_run():
+            command.extend([str(smoke_input_size), str(smoke_hazel_max_candidates)])
+        command.append(str(_result_path_for_mode(mode)))
+        opam_exec(command)
+
+
 def run_no_evict_modes(selected_modes: tuple[str, ...]) -> None:
     _remove_no_evict_result_files_for_modes(selected_modes)
     ensure_switch()
@@ -418,14 +440,15 @@ def _hazel_compare_experiment_modes() -> tuple[str, ...]:
 
 
 def hazel_experiment_project(*, generate_report: bool = True) -> None:
+    hazel_core_experiment_project(generate_report=generate_report)
+
+
+def hazel_core_experiment_project(*, generate_report: bool = True) -> None:
     selected_modes = _hazel_experiment_modes()
-    compare_modes = _hazel_compare_experiment_modes()
-    # Prevent stale rows from non-selected benchmarks from appearing in reports.
     _remove_result_files_for_modes(hazel_modes)
-    run_modes(selected_modes)
-    run_compare_modes(compare_modes)
+    run_core_modes(selected_modes)
     if generate_report:
-        report_module.generate_hazel_reports(include_hazel_compare=True, modes=selected_modes, hazel_compare_modes=compare_modes)
+        report_module.generate_hazel_reports(include_hazel_compare=False, modes=selected_modes)
 
 
 def hazel_no_evict_project(*, generate_report: bool = True) -> None:
@@ -556,7 +579,7 @@ def report_project() -> None:
 
 def hazel_report_project() -> None:
     clean_output()
-    report_module.generate_hazel_reports()
+    report_module.generate_hazel_reports(include_hazel_compare=False, modes=_hazel_experiment_modes())
 
 
 def arith_report_project() -> None:
@@ -567,14 +590,15 @@ def arith_report_project() -> None:
 def experiment_project() -> None:
     clean_results()
     clean_output()
-    arith_project()
-    hazel_experiment_project(generate_report=False)
-    hazel_no_evict_project(generate_report=False)
-    report_module.generate_reports()
+    hazel_core_experiment_project(generate_report=True)
 
 
 def hazel_tex_project() -> None:
-    report_module.generate_tex_table(output_path=Path("output/hazel/hazel_result.tex"))
+    report_module.generate_tex_table(
+        output_path=Path("output/hazel/hazel_result.tex"),
+        include_hazel_compare=False,
+        modes=_hazel_experiment_modes(),
+    )
 
 
 def arith_tex_project() -> None:
@@ -657,7 +681,7 @@ def main(argv: Iterable[str]) -> int:
     usage = (
         "Usage: nightly.py "
         "[dependency|hazel-dependency|build|coverage|run|profile|hazel|hazel-experiment|hazel-no-evict|"
-        "hazel-report|arith|arith-report|arith-scaling|hazel-scaling|"
+        "hazel-core-experiment|hazel-report|arith|arith-report|arith-scaling|hazel-scaling|"
         "hazel-no-evict-scaling|scaling|scaling-report|entropy-scaling|entropy-report|report|experiment|"
         "hazel-tex|arith-tex|compile-generated|all] [--smoke]"
     )
@@ -695,6 +719,8 @@ def main(argv: Iterable[str]) -> int:
         hazel_project()
     elif stage == "hazel-experiment":
         hazel_experiment_project()
+    elif stage == "hazel-core-experiment":
+        hazel_core_experiment_project()
     elif stage == "hazel-no-evict":
         hazel_no_evict_project()
     elif stage == "hazel-report":
@@ -733,14 +759,8 @@ def main(argv: Iterable[str]) -> int:
         clean_results()
         clean_output()
         install_dependencies()
-        hazel_dependency()
         build_project()
-        arith_project()
-        hazel_experiment_project(generate_report=False)
-        hazel_no_evict_project(generate_report=False)
-        scaling_project()
-        entropy_scaling_project()
-        report_module.generate_reports()
+        hazel_core_experiment_project(generate_report=True)
     else:
         print(f"Unknown stage: {stage}", file=sys.stderr)
         print(usage, file=sys.stderr)

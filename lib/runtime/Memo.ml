@@ -499,7 +499,6 @@ let exec_cek_slot = Profile.register_slot Profile.memo_profile "exec_cek"
 let step_through_slot = Profile.register_slot Profile.memo_profile "step_through"
 let insert_step_slot = Profile.register_slot Profile.memo_profile "insert_step"
 let lookup_step_slot = Profile.register_slot Profile.memo_profile "lookup_step"
-
 let eviction_policy = Eviction.make_eviction_policy ~retain_ratio:0.5 ~kll_k:100
 
 let instantiate (step : step) (state : state) : step =
@@ -597,11 +596,11 @@ let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) ~(
     let state = exec state in
     assert (Dynarray.length state.e = 1);
     ignore (fold_bin compose_slice None !hist);
-    (if evict then
-       let evicted = Eviction.batch_evict_memo ~policy:eviction_policy ~state:m.eviction_state m in
-       assert (Array.length evicted.entries = Array.length m.entries);
-       m.entries <- evicted.entries;
-       m.size <- evicted.size);
+    if evict then (
+      let evicted = Eviction.batch_evict_memo ~policy:eviction_policy ~state:m.eviction_state m in
+      assert (Array.length evicted.entries = Array.length m.entries);
+      m.entries <- evicted.entries;
+      m.size <- evicted.size);
     (* print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int !sc ^ " step."); *)
     { words = Dynarray.get_last state.e; step = !i; without_memo_step = !sc }
   in
