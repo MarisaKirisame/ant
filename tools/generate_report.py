@@ -48,10 +48,10 @@ BASE_EXPERIMENTS: list[tuple[str, str]] = [
 SCALING_SIZES = (10, 20, 40, 100, 200, 400)
 ENTROPY_SCALING_SIZES = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000)
 ENTROPY_CATEGORIES = (
-    ("random", "random"),
-    ("block", "block"),
-    ("same", "same"),
-    ("mod1", "mod1"),
+    ("random", "Baseline"),
+    ("block", "Block"),
+    ("mod1", "Mod1"),
+    ("same", "Repeat"),
 )
 ENTROPY_PROGRAMS = (
     ("map", "Map"),
@@ -439,7 +439,7 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
         with tag.main(cls="panel"):
             tag.h1("Input Entropy Scaling")
             tag.p(
-                f"Eight predefined list functions. Each plot has random, block, same, and mod1 lines over input size; this sweep ends at {sizes[-1]:,}.",
+                f"Eight predefined list functions. Each plot has Baseline, Block, Mod1, and Repeat lines over input size; this sweep ends at {sizes[-1]:,}.",
                 cls="meta",
             )
             with tag.section(cls="grid"):

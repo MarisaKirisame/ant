@@ -252,6 +252,7 @@ default_arith_scaling_sample_count = 5
 smoke_arith_sample_count = 1
 smoke_hazel_max_candidates = 1
 smoke_hazel_timeout_seconds = 5
+hazel_compare_input_size = 100
 hazel_compare_mode_timeout = "10m"
 
 
@@ -393,6 +394,8 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
         ]
         if _smoke_run():
             command.extend([str(smoke_input_size), str(smoke_hazel_max_candidates), str(smoke_hazel_timeout_seconds)])
+        else:
+            command.append(str(hazel_compare_input_size))
         command.append(str(_compare_result_path_for_mode(mode)))
         result = opam_exec(command, check=False)
         if result.returncode != 0:
@@ -505,7 +508,7 @@ def scaling_report_project() -> None:
 
 def entropy_scaling_project() -> None:
     _prepare_scaling_run()
-    input_kinds = ("random", "block", "same", "mod1")
+    input_kinds = ("random", "block", "mod1", "same")
     programs = (
         "map",
         "append",

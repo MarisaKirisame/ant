@@ -49,10 +49,10 @@ REPORT_DRAW_INTERPOLATION_LINE = False
 REPORT_DRAW_GRID_LINES = False
 DEFAULT_REPORT_KIND = "hazel"
 ENTROPY_CATEGORY_COLORS = {
-    "random": "tab:blue",
-    "block": "tab:orange",
-    "same": "tab:green",
-    "mod1": "tab:red",
+    "Baseline": "tab:blue",
+    "Block": "tab:orange",
+    "Mod1": "tab:red",
+    "Repeat": "tab:green",
 }
 
 if REPORT_WALL_CLOCK_TIME:
@@ -385,18 +385,20 @@ def plot_entropy_scatter(
                 label=label,
                 color=ENTROPY_CATEGORY_COLORS.get(label, f"C{index}"),
             )
-        ax.plot([min_time, max_time], [min_time, max_time], color="black", linestyle="--", linewidth=1)
-
-        for factor, linewidth, label, offset in [
-            (10.0, 0.5, "10x faster", (12, 10)),
-            (100.0, 0.2, "100x faster", (12, -12)),
+        for speedup, linewidth, label, offset in [
+            (0.1, 0.5, "10x slower", (12, 10)),
+            (1.0, 1.0, None, (0, 0)),
+            (10.0, 0.5, "10x faster", (12, -12)),
         ]:
-            x_start = factor * min_time
-            if x_start > max_time:
+            x_start = max(min_time, speedup * min_time)
+            x_end = min(max_time, speedup * max_time)
+            if x_start > x_end:
                 continue
-            ax.plot([x_start, max_time], [min_time, max_time / factor], color="black", linestyle="--", linewidth=linewidth)
-            x_anchor = x_start + 0.7 * (max_time - x_start)
-            y_anchor = x_anchor / factor
+            ax.plot([x_start, x_end], [x_start / speedup, x_end / speedup], color="black", linestyle="--", linewidth=linewidth)
+            if label is None:
+                continue
+            x_anchor = x_start + 0.7 * (x_end - x_start)
+            y_anchor = x_anchor / speedup
             ax.annotate(
                 label,
                 xy=(x_anchor, y_anchor),

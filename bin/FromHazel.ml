@@ -809,8 +809,8 @@ let run_with_test ?(hazel_compare = None) ?(evict = false) ?(baseline = true) ?m
           Some
             (indexed_candidates
             |> List.map (fun (i, candidate, expr) ->
-                   let baseline_result = eval_expression_baseline_only expr in
-                   (i, candidate, baseline_result))))
+                let baseline_result = eval_expression_baseline_only expr in
+                (i, candidate, baseline_result))))
         else None
       in
       record_resting_heap_size ();
@@ -829,7 +829,8 @@ let run_with_test ?(hazel_compare = None) ?(evict = false) ?(baseline = true) ?m
                 match List.nth_opt baseline_results memo_idx with
                 | None -> failwith "missing baseline result for memo candidate"
                 | Some (baseline_idx, baseline_candidate, baseline_result) ->
-                    if memo_idx <> baseline_idx then failwith "candidate order mismatch between memo and baseline passes";
+                    if memo_idx <> baseline_idx then
+                      failwith "candidate order mismatch between memo and baseline passes";
                     if memo_candidate.source_indices <> baseline_candidate.source_indices then
                       failwith "candidate source mapping mismatch between memo and baseline passes";
                     (baseline_result.plain_profile, baseline_result.cek_profile, baseline_result.cek_heap_words))

@@ -122,10 +122,10 @@ let run_all_cases ~program_name ~populate_state ~case_fn ~length =
 
   Printf.printf
     {|\begin{tabular}{c|c|c|c|c}
-            & Random & Low entropy & Modification & Repeated \\ \hline
-Baseline ns & %i     & %i          & %i      & %i \\ \hline
-Memo ns     & %i     & %i          & %i      & %i \\ \hline
-Ratios      &        & %.3fx       & %.3fx   & %.3fx
+            & Baseline & Block & Mod1 & Repeat \\ \hline
+CEK ns      & %i       & %i    & %i   & %i \\ \hline
+Memo ns     & %i       & %i    & %i   & %i \\ \hline
+Ratios      &          & %.3fx & %.3fx & %.3fx
 \end{tabular}|}
     random_ns_cek low_entropy_ns_cek mod_ns_cek repeated_ns_cek random_ns_memo low_entropy_ns_memo mod_ns_memo
     repeated_ns_memo
