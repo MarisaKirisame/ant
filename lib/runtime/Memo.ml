@@ -500,12 +500,7 @@ let step_through_slot = Profile.register_slot Profile.memo_profile "step_through
 let insert_step_slot = Profile.register_slot Profile.memo_profile "insert_step"
 let lookup_step_slot = Profile.register_slot Profile.memo_profile "lookup_step"
 
-type eviction_strategy = In_loop_hard_cap | Legacy_batch
-
-let global_eviction_strategy = Legacy_batch
 let eviction_policy = Eviction.make_eviction_policy ~retain_ratio:0.5 ~kll_k:100
-let in_loop_eviction_trigger_size = 1000
-let in_loop_eviction_target_size = 500
 
 let instantiate (step : step) (state : state) : step =
   let minimum_size_for_instantiation = 5 in
@@ -564,24 +559,12 @@ let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) ~(
     let i = ref 0 in
     let sc = ref 0 in
     let hist : history = ref [] in
-    let maybe_evict_in_loop () =
-      if evict then
-        match global_eviction_strategy with
-        | In_loop_hard_cap ->
-            if m.size > in_loop_eviction_trigger_size then (
-              let evict_fraction = Eviction.eviction_fraction_for_target ~target_size:in_loop_eviction_target_size m in
-              let evicted = Eviction.prune_memo_to_target ~kll_k:eviction_policy.kll_k ~evict_fraction m in
-              m.entries <- evicted.entries;
-              m.size <- evicted.size)
-        | Legacy_batch -> ()
-    in
     (* Binary counter that incrementally composes adjacent slices; arguments are
        reversed so the newest slice sits on the right-hand side during carry. *)
     let compose_slice (y : slice) (x : slice) =
       let step = Profile.with_slot Dependency.compose_step_slot (fun () -> Dependency.compose_step x.step y.step) in
       let step = Profile.with_slot instantiate_slot (fun () -> instantiate step x.state) in
       Profile.with_slot insert_step_slot (fun () -> insert_step m step);
-      maybe_evict_in_loop ();
       (*let lookuped = lookup_step x.state m |> Option.value_exn in
       if lookuped != step then
         failwith
@@ -607,7 +590,6 @@ let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) ~(
             let step = Dependency.make_step old w.resolved m in
             sc := !sc + step.sc;
             insert_step m step;
-            maybe_evict_in_loop ();
             hist := inc compose_slice { state = old; step } !hist;
             let st = dbg_step_through step old in
             exec st)
@@ -616,13 +598,10 @@ let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) ~(
     assert (Dynarray.length state.e = 1);
     ignore (fold_bin compose_slice None !hist);
     (if evict then
-       match global_eviction_strategy with
-       | In_loop_hard_cap -> ()
-       | Legacy_batch ->
-           let evicted = Eviction.batch_evict_memo ~policy:eviction_policy ~state:m.eviction_state m in
-           assert (Array.length evicted.entries = Array.length m.entries);
-           m.entries <- evicted.entries;
-           m.size <- evicted.size);
+       let evicted = Eviction.batch_evict_memo ~policy:eviction_policy ~state:m.eviction_state m in
+       assert (Array.length evicted.entries = Array.length m.entries);
+       m.entries <- evicted.entries;
+       m.size <- evicted.size);
     (* print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int !sc ^ " step."); *)
     { words = Dynarray.get_last state.e; step = !i; without_memo_step = !sc }
   in

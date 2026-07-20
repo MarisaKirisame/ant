@@ -407,18 +407,18 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
             title=f"{label}: Speedup by Input Pattern",
         )
         plots.append((label, plot_name, series))
-    geomean_series = [
+    pattern_series = [
         (
             input_label,
             [(size, _geometric_mean(geomean_by_category[input_label][size])) for size in sizes],
         )
         for _, input_label in ENTROPY_CATEGORIES
     ]
-    geomean_plot_name = plot_entropy_speedup_lines(
-        geomean_series,
+    pattern_plot_name = plot_entropy_speedup_lines(
+        pattern_series,
         output_dir,
-        output_name="geomean-speedup-vs-size.png",
-        title="Geometric-Mean Speedup by Input Pattern",
+        output_name="speedup-by-pattern.png",
+        title="Speedup by Input Pattern",
     )
     scatter_plot_name = plot_entropy_scatter(
         [(input_label, scatter_by_category[input_label]) for _, input_label in ENTROPY_CATEGORIES],
@@ -448,9 +448,9 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
             tag.h2("All Functions")
             with tag.section(cls="plot"):
                 tag.img(src=scatter_plot_name, alt="Memo versus CEK scatter plot by input pattern")
-            tag.h2("Geometric Mean")
+            tag.h2("Speedup by Input Pattern")
             with tag.section(cls="plot"):
-                tag.img(src=geomean_plot_name, alt="Geometric-mean speedup by input pattern")
+                tag.img(src=pattern_plot_name, alt="Speedup by input pattern")
             for label, plot_name, series in plots:
                 tag.h2(label)
                 with tag.section(cls="plot"):
@@ -522,18 +522,18 @@ def generate_hazel_reports(
 ) -> None:
     css_source = Path(__file__).with_name("style.css")
     tex_output = Path("output/hazel/hazel_result.tex")
-    generate_tex_table(
-        output_path=tex_output,
-        include_hazel_compare=include_hazel_compare,
-        modes=modes,
-        hazel_compare_modes=hazel_compare_modes,
-    )
-
     extra_entries: list[tuple[str, Path]] = []
     if include_hazel_compare:
         hazel_compare_index = generate_hazel_compare_reports(modes=hazel_compare_modes)
         if hazel_compare_index is not None:
             extra_entries.append(("Chordata vs Hazel Baseline", hazel_compare_index))
+    generate_tex_table(
+        output_path=tex_output,
+        include_hazel_compare=include_hazel_compare,
+        modes=modes,
+        hazel_compare_modes=hazel_compare_modes,
+        generate_hazel_compare_report=False,
+    )
 
     _generate_reports_for_experiments(
         title="Hazel Benchmark Index",
@@ -564,27 +564,10 @@ def generate_hazel_no_evict_reports(*, modes: Sequence[str] | None = None) -> No
         output=Path("output/hazel-no-evict/eviction_ablation/index.html"),
         modes=modes,
     )
-    generated_entries: list[tuple[str, Path]] = []
-    for label, input_path, output_dir in _hazel_experiments(
-        Path("output/hazel-no-evict"),
-        modes=modes,
-        variants=HAZEL_NO_EVICT_VARIANTS,
-    ):
-        if not input_path.exists():
-            print(f"[generate_report] skipping missing input: {input_path}", file=sys.stderr)
-            continue
-        speedup_module.generate_speedup_report(
-            input_path=input_path,
-            output_dir=output_dir,
-            css_source=css_source,
-            report_kind="hazel",
-        )
-        generated_entries.append((label, output_dir / "index.html"))
-    generated_entries.insert(0, ("Eviction Ablation", ablation_index))
     generate_html(
         title="Hazel No-Eviction Ablation Index",
         output=Path("output/hazel-no-evict/index.html"),
-        entries=generated_entries,
+        entries=[("Eviction Ablation", ablation_index)],
         downloads=[("Download hazel_no_evict_result.tex", tex_output)],
         data_paths=[],
         css_source=css_source,
@@ -777,6 +760,11 @@ def _collect_eviction_ablation(
     return (all_pairs, all_memory_ratios)
 
 
+def _eviction_overhead_stats(time_pairs: Sequence[tuple[float, float]]) -> tuple[list[float], SpeedupStats]:
+    """Compute evicting/no-eviction ratios from no-eviction, evicting time pairs."""
+    return compare_stats([(evict_time, no_evict_time) for no_evict_time, evict_time in time_pairs])
+
+
 def generate_hazel_eviction_ablation_report(
     *,
     output_dir: Path,
@@ -798,7 +786,7 @@ def generate_hazel_eviction_ablation_report(
     scatter_rel: str | None = None
     memory_overhead = None
     if time_pairs:
-        ratios, stats = compare_stats(time_pairs)
+        ratios, stats = _eviction_overhead_stats(time_pairs)
         scatter_name = plot_scatter_for_kind(
             time_pairs,
             output_dir,
@@ -815,9 +803,9 @@ def generate_hazel_eviction_ablation_report(
     summary_path = output_dir / "eviction_ablation_summary.json"
     summary_payload = {
         "samples": stats.samples if stats else 0,
-        "geo_mean_no_evict_over_evict_time": stats.geo_mean if stats else None,
-        "arith_mean_no_evict_over_evict_time": stats.arith_mean if stats else None,
-        "end_to_end_no_evict_over_evict_time": stats.end_to_end if stats else None,
+        "geo_mean_evict_over_no_evict_time": stats.geo_mean if stats else None,
+        "arith_mean_evict_over_no_evict_time": stats.arith_mean if stats else None,
+        "end_to_end_evict_over_no_evict_time": stats.end_to_end if stats else None,
         "geo_mean_no_evict_over_evict_memory": memory_overhead,
     }
     summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
@@ -837,12 +825,12 @@ def generate_hazel_eviction_ablation_report(
             with tag.section(cls="stats"):
                 if stats:
                     stat_card("Samples", str(stats.samples))
-                    stat_card("Time speedup", f"{fmt_speedup(stats.geo_mean)}x")
+                    stat_card("Time overhead", f"{fmt_speedup(stats.geo_mean)}x")
                     stat_card("Arithmetic mean", f"{fmt_speedup(stats.arith_mean)}x")
                     stat_card("End-to-end", f"{fmt_speedup(stats.end_to_end)}x")
                 else:
                     stat_card("Samples", "0")
-                    stat_card("Time speedup", "timeout")
+                    stat_card("Time overhead", "timeout")
                 if memory_overhead is not None:
                     stat_card("Memory overhead", f"{fmt_speedup(memory_overhead)}x")
                 else:
@@ -885,7 +873,7 @@ def generate_hazel_eviction_ablation_tex(
             no_evict_path = Path(no_evict_pattern.format(key=key))
             time_pairs, memory_ratios = _eviction_ablation_pairs(evict_path, no_evict_path)
             if time_pairs:
-                _, stats = compare_stats(time_pairs)
+                _, stats = _eviction_overhead_stats(time_pairs)
                 speedup_values.append(fmt_speedup(stats.geo_mean))
                 available_pairs.extend(time_pairs)
             else:
@@ -901,7 +889,7 @@ def generate_hazel_eviction_ablation_tex(
     total_speedup = "timeout"
     total_memory_overhead = "timeout"
     if available_pairs:
-        _, stats = compare_stats(available_pairs)
+        _, stats = _eviction_overhead_stats(available_pairs)
         total_speedup = _tex_ratio(stats.geo_mean, include_times_symbol=True)
     if available_memory_ratios:
         total_memory_overhead = _tex_ratio(
@@ -913,7 +901,7 @@ def generate_hazel_eviction_ablation_tex(
     escaped_variant_labels = [_escape_latex(label) for label in variant_labels]
     variant_count = len(variant_labels)
     group_header = (
-        f" & \\multicolumn{{{variant_count}}}{{c|}}{{time speedup}}"
+        f" & \\multicolumn{{{variant_count}}}{{c|}}{{time overhead}}"
         f" & \\multicolumn{{{variant_count}}}{{c}}{{memory overhead}} \\\\"
     )
     user_labels = [f"User {label}" for label in escaped_variant_labels]
@@ -1136,9 +1124,11 @@ def generate_tex_table(
     hazel_compare_modes: Sequence[str] | None = None,
     table_variants: Sequence[tuple[str, str]] = TABLE_VARIANTS,
     macro_prefix: str = "hazel",
+    generate_hazel_compare_report: bool = True,
 ) -> None:
     if include_hazel_compare:
-        generate_hazel_compare_reports(modes=hazel_compare_modes)
+        if generate_hazel_compare_report:
+            generate_hazel_compare_reports(modes=hazel_compare_modes)
         baseline_geomean = _hazel_baseline_geomean_for_tex()
     else:
         baseline_geomean = "timeout"

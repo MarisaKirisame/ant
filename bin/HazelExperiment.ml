@@ -59,13 +59,13 @@ let benchmark_test_string ~input_size =
   | Pair -> Printf.sprintf {| my_pair (%s) |} (list_to_cons_str large_input)
   | Rev -> Printf.sprintf {| my_reverse (%s) |} (list_to_cons_str large_input)
 
-let run ?hazel_compare ?(evict = true) ?(input_size = Common.experiment_list_length) ?steps_file:steps_file_override
-    ~dataset ~benchmark ?max_candidates () =
+let run ?hazel_compare ?(evict = true) ?(baseline = true) ?(input_size = Common.experiment_list_length)
+    ?steps_file:steps_file_override ~dataset ~benchmark ?max_candidates () =
   if input_size <= 0 then invalid_arg "HazelExperiment.run: input_size must be positive";
   let test = Common.parse_nexpr (benchmark_test_string ~input_size benchmark) in
   let steps_file = Option.value steps_file_override ~default:(steps_file dataset benchmark) in
   FromHazel.run_with_test ~program_name:(mode_name dataset benchmark) ~program_path:(program_path dataset benchmark)
-    ~steps_file ~input_size ~test ~evict ?hazel_compare ?max_candidates ()
+    ~steps_file ~input_size ~test ~evict ~baseline ?hazel_compare ?max_candidates ()
 
 let run_mk benchmark = run ~dataset:Mk ~benchmark ()
 let run_th benchmark = run ~dataset:Th ~benchmark ()
@@ -106,18 +106,18 @@ let decode_mode mode =
       else None)
     benchmarks
 
-let run_mode ?(evict = true) ?input_size ?steps_file ?max_candidates mode =
+let run_mode ?(evict = true) ?(baseline = true) ?input_size ?steps_file ?max_candidates mode =
   match decode_mode mode with
   | None -> false
   | Some (dataset, benchmark) ->
-      run ~evict ?input_size ?steps_file ?max_candidates ~dataset ~benchmark ();
+      run ~evict ~baseline ?input_size ?steps_file ?max_candidates ~dataset ~benchmark ();
       true
 
-let run_scaling_mode ?(evict = true) ?max_candidates ~mode ~input_size ~steps_file () =
+let run_scaling_mode ?(evict = true) ?(baseline = true) ?max_candidates ~mode ~input_size ~steps_file () =
   match decode_mode mode with
   | None -> false
   | Some (dataset, benchmark) ->
-      run ~evict ~dataset ~benchmark ~input_size ~steps_file ?max_candidates ();
+      run ~evict ~baseline ~dataset ~benchmark ~input_size ~steps_file ?max_candidates ();
       true
 
 let run_compare_mode ?(evict = true) ?input_size ?steps_file ?max_candidates ?hazel_compare_max_candidates

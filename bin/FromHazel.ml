@@ -785,7 +785,7 @@ let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(c
 let limit_candidates ?max_candidates (candidates : collapsed_candidate list) =
   match max_candidates with None -> candidates | Some n -> List.take n candidates
 
-let run_with_test ?(hazel_compare = None) ?(evict = false) ?max_candidates
+let run_with_test ?(hazel_compare = None) ?(evict = false) ?(baseline = true) ?max_candidates
     ?(input_size = RunLiveCommon.experiment_list_length) ~program_name ~program_path ~steps_file ~test () =
   with_outchannel steps_file (fun oc ->
       RunLiveCommon.LC.populate_state ();
@@ -803,12 +803,15 @@ let run_with_test ?(hazel_compare = None) ?(evict = false) ?max_candidates
       let hazel_compare_results =
         match hazel_compare with None -> None | Some cfg -> Some (run_hazel_compare ~program_name ~candidates ~cfg)
       in
-      record_resting_heap_size ();
       let baseline_pass =
-        indexed_candidates
-        |> List.map (fun (i, candidate, expr) ->
-            let baseline_result = eval_expression_baseline_only expr in
-            (i, candidate, baseline_result))
+        if baseline then (
+          record_resting_heap_size ();
+          Some
+            (indexed_candidates
+            |> List.map (fun (i, candidate, expr) ->
+                   let baseline_result = eval_expression_baseline_only expr in
+                   (i, candidate, baseline_result))))
+        else None
       in
       record_resting_heap_size ();
       let memo_pass =
@@ -817,11 +820,20 @@ let run_with_test ?(hazel_compare = None) ?(evict = false) ?max_candidates
             let memo_result = eval_expression_memo_only ~evict ~memo expr in
             (i, candidate, memo_result))
       in
-      List.iter2
-        (fun (memo_idx, memo_candidate, memo_result) (baseline_idx, baseline_candidate, baseline_result) ->
-          if memo_idx <> baseline_idx then failwith "candidate order mismatch between memo and baseline passes";
-          if memo_candidate.source_indices <> baseline_candidate.source_indices then
-            failwith "candidate source mapping mismatch between memo and baseline passes";
+      List.iter
+        (fun (memo_idx, memo_candidate, memo_result) ->
+          let plain_profile, cek_profile, cek_heap_words =
+            match baseline_pass with
+            | None -> ([], [], 0)
+            | Some baseline_results -> (
+                match List.nth_opt baseline_results memo_idx with
+                | None -> failwith "missing baseline result for memo candidate"
+                | Some (baseline_idx, baseline_candidate, baseline_result) ->
+                    if memo_idx <> baseline_idx then failwith "candidate order mismatch between memo and baseline passes";
+                    if memo_candidate.source_indices <> baseline_candidate.source_indices then
+                      failwith "candidate source mapping mismatch between memo and baseline passes";
+                    (baseline_result.plain_profile, baseline_result.cek_profile, baseline_result.cek_heap_words))
+          in
           let source_indices = memo_candidate.source_indices in
           let source_first_index, source_last_index =
             match source_indices with
@@ -862,8 +874,7 @@ let run_with_test ?(hazel_compare = None) ?(evict = false) ?max_candidates
             @ hazel_fields
           in
           write_steps_json_from_parts oc ~exec_res:memo_result.exec_res ~memo_profile:memo_result.memo_profile
-            ~plain_profile:baseline_result.plain_profile ~cek_profile:baseline_result.cek_profile
-            ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words:baseline_result.cek_heap_words ~extra_fields ())
-        memo_pass baseline_pass;
+            ~plain_profile ~cek_profile ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words ~extra_fields ())
+        memo_pass;
       (match last_expr with None -> failwith "why" | Some _expr -> ());
       write_memo_stats_json oc memo)

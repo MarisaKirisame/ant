@@ -25,26 +25,14 @@ let () =
           (Printf.sprintf "Usage: GeneratedMain hazel-compare <%s> [output]"
              (String.concat "|" HazelExperiment.all_modes));
         exit 1)
-  | [ _; "hazel-compare-no-evict"; mode ] ->
-      if not (HazelExperiment.run_compare_mode ~evict:false mode) then (
-        prerr_endline
-          (Printf.sprintf "Usage: GeneratedMain hazel-compare-no-evict <%s> [output]"
-             (String.concat "|" HazelExperiment.all_modes));
-        exit 1)
   | [ _; "hazel-compare"; mode; output ] ->
       if not (HazelExperiment.run_compare_mode ~steps_file:output mode) then (
         prerr_endline
           (Printf.sprintf "Usage: GeneratedMain hazel-compare <%s> <output>"
              (String.concat "|" HazelExperiment.all_modes));
         exit 1)
-  | [ _; "hazel-compare-no-evict"; mode; output ] ->
-      if not (HazelExperiment.run_compare_mode ~evict:false ~steps_file:output mode) then (
-        prerr_endline
-          (Printf.sprintf "Usage: GeneratedMain hazel-compare-no-evict <%s> <output>"
-             (String.concat "|" HazelExperiment.all_modes));
-        exit 1)
   | [ _; "hazel-no-evict"; mode; output ] ->
-      if not (HazelExperiment.run_mode ~evict:false ~steps_file:output mode) then (
+      if not (HazelExperiment.run_mode ~evict:false ~baseline:false ~steps_file:output mode) then (
         prerr_endline
           (Printf.sprintf "Usage: GeneratedMain hazel-no-evict <%s> <output>"
              (String.concat "|" HazelExperiment.all_modes));
@@ -52,7 +40,10 @@ let () =
   | [ _; "hazel-no-evict"; mode; input_size; max_candidates; output ] -> (
       match (positive_int input_size, nonnegative_int max_candidates) with
       | Some input_size, Some max_candidates ->
-          if not (HazelExperiment.run_mode ~evict:false ~input_size ~max_candidates ~steps_file:output mode) then (
+          if
+            not
+              (HazelExperiment.run_mode ~evict:false ~baseline:false ~input_size ~max_candidates ~steps_file:output mode)
+          then (
             prerr_endline
               (Printf.sprintf
                  "Usage: GeneratedMain hazel-no-evict <%s> <positive-input-size> <nonnegative-max-candidates> <output>"
@@ -79,26 +70,6 @@ let () =
       | _ ->
           prerr_endline
             "Usage: GeneratedMain hazel-compare <mode> <positive-input-size> <nonnegative-max-candidates> \
-             <positive-timeout-seconds> <output>";
-          exit 1)
-  | [ _; "hazel-compare-no-evict"; mode; input_size; max_candidates; timeout_seconds; output ] -> (
-      match (positive_int input_size, nonnegative_int max_candidates, positive_int timeout_seconds) with
-      | Some input_size, Some max_candidates, Some timeout_seconds ->
-          if
-            not
-              (HazelExperiment.run_compare_mode ~evict:false ~input_size ~max_candidates
-                 ~hazel_compare_max_candidates:max_candidates ~hazel_compare_timeout_seconds:timeout_seconds
-                 ~steps_file:output mode)
-          then (
-            prerr_endline
-              (Printf.sprintf
-                 "Usage: GeneratedMain hazel-compare-no-evict <%s> <positive-input-size> <nonnegative-max-candidates> \
-                  <positive-timeout-seconds> <output>"
-                 (String.concat "|" HazelExperiment.all_modes));
-            exit 1)
-      | _ ->
-          prerr_endline
-            "Usage: GeneratedMain hazel-compare-no-evict <mode> <positive-input-size> <nonnegative-max-candidates> \
              <positive-timeout-seconds> <output>";
           exit 1)
   | [ _; "arith"; term_size; sample_count; output ] -> (
@@ -134,7 +105,10 @@ let () =
   | [ _; "hazel-scaling-no-evict"; mode; size; output ] -> (
       match positive_int size with
       | Some size when size > 0 ->
-          if not (HazelExperiment.run_scaling_mode ~evict:false ~mode ~input_size:size ~steps_file:output ()) then (
+          if
+            not
+              (HazelExperiment.run_scaling_mode ~evict:false ~baseline:false ~mode ~input_size:size ~steps_file:output ())
+          then (
             prerr_endline
               (Printf.sprintf "Usage: GeneratedMain hazel-scaling-no-evict <%s> <positive-size> <output>"
                  (String.concat "|" HazelExperiment.all_modes));
@@ -159,8 +133,8 @@ let () =
       | Some size, Some max_candidates ->
           if
             not
-              (HazelExperiment.run_scaling_mode ~evict:false ~mode ~input_size:size ~max_candidates ~steps_file:output
-                 ())
+              (HazelExperiment.run_scaling_mode ~evict:false ~baseline:false ~mode ~input_size:size ~max_candidates
+                 ~steps_file:output ())
           then (
             prerr_endline
               (Printf.sprintf
@@ -183,7 +157,7 @@ let () =
           let evict, mode =
             match chop_suffix ~suffix:"-no-evict" mode with None -> (true, mode) | Some mode -> (false, mode)
           in
-          if not (HazelExperiment.run_mode ~evict ~input_size ~max_candidates mode) then (
+          if not (HazelExperiment.run_mode ~evict ~baseline:evict ~input_size ~max_candidates mode) then (
             prerr_endline usage;
             exit 1)
       | _ ->
@@ -196,7 +170,7 @@ let () =
           let evict, mode =
             match chop_suffix ~suffix:"-no-evict" mode with None -> (true, mode) | Some mode -> (false, mode)
           in
-          if not (HazelExperiment.run_mode ~evict mode) then (
+          if not (HazelExperiment.run_mode ~evict ~baseline:evict mode) then (
             prerr_endline usage;
             exit 1))
   | _ ->
