@@ -785,8 +785,8 @@ let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(c
 let limit_candidates ?max_candidates (candidates : collapsed_candidate list) =
   match max_candidates with None -> candidates | Some n -> List.take n candidates
 
-let run_with_test ?(hazel_compare = None) ?max_candidates ?(input_size = RunLiveCommon.experiment_list_length)
-    ~program_name ~program_path ~steps_file ~test () =
+let run_with_test ?(hazel_compare = None) ?(evict = false) ?max_candidates
+    ?(input_size = RunLiveCommon.experiment_list_length) ~program_name ~program_path ~steps_file ~test () =
   with_outchannel steps_file (fun oc ->
       RunLiveCommon.LC.populate_state ();
       let memo = Ant.Memo.init_memo () in
@@ -814,7 +814,7 @@ let run_with_test ?(hazel_compare = None) ?max_candidates ?(input_size = RunLive
       let memo_pass =
         indexed_candidates
         |> List.map (fun (i, candidate, expr) ->
-            let memo_result = eval_expression_memo_only ~memo expr in
+            let memo_result = eval_expression_memo_only ~evict ~memo expr in
             (i, candidate, memo_result))
       in
       List.iter2

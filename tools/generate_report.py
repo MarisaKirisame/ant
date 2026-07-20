@@ -56,10 +56,10 @@ ENTROPY_CATEGORIES = (
 ENTROPY_PROGRAMS = (
     ("map", "Map"),
     ("append", "Append"),
-    ("insertion_sort", "Insertion sort"),
+    # ("insertion_sort", "Insertion sort"),
     ("merge_sort", "Merge sort"),
     ("quick_sort", "Quick sort"),
-    ("reverse", "Reverse"),
+    # ("reverse", "Reverse"),
     ("simple_filter", "Filter"),
     ("pair", "Pair"),
 )
@@ -82,6 +82,18 @@ TABLE_VARIANTS: list[tuple[str, str]] = [
     ("1", "results/hazel/{key}.json"),
     ("2", "results/hazel/at_{key}.json"),
     ("3", "results/hazel/th_{key}.json"),
+]
+
+HAZEL_NO_EVICT_VARIANTS: list[tuple[str, str, str]] = [
+    ("results/hazel-no-evict/{key}.json", "{key}", ""),
+    ("results/hazel-no-evict/th_{key}.json", "th_{key}", " (th)"),
+    ("results/hazel-no-evict/at_{key}.json", "at_{key}", " (at)"),
+]
+
+HAZEL_NO_EVICT_TABLE_VARIANTS: list[tuple[str, str]] = [
+    ("1", "results/hazel-no-evict/{key}.json"),
+    ("2", "results/hazel-no-evict/at_{key}.json"),
+    ("3", "results/hazel-no-evict/th_{key}.json"),
 ]
 
 def _render_html(
@@ -157,7 +169,7 @@ def generate_html(
     css_href = os.path.relpath(css_path, output.parent)
 
     inferred_paths: list[Path] = []
-    if data_paths:
+    if data_paths is not None:
         inferred_paths.extend(data_paths)
     else:
         for _, report_path in entries:
@@ -193,7 +205,7 @@ def generate_html(
         ("Memo vs Plain", []),
         ("Memo vs Plain (steps)", []),
     ]
-    if entries:
+    if data_paths is None and entries:
         for _, report_path in entries:
             if report_path.exists():
                 inferred = _extract_data_path(report_path)
@@ -252,13 +264,17 @@ def generate_table() -> None:
 
 def generate_reports() -> None:
     generate_hazel_reports()
+    if Path("results/hazel-no-evict").exists():
+        generate_hazel_no_evict_reports()
     generate_arith_reports()
     css_source = Path(__file__).with_name("style.css")
     entries = [
         ("Hazel Report", Path("output/hazel/index.html")),
+        ("Hazel No-Eviction Ablation", Path("output/hazel-no-evict/index.html")),
         ("Arith Report", Path("output/arith/index.html")),
         ("Scaling Report", Path("output/scaling/index.html")),
     ]
+    entries = [(label, path) for label, path in entries if path.exists()]
     generate_html(
         title="Benchmark Reports",
         output=Path("output/index.html"),
@@ -536,6 +552,50 @@ def generate_hazel_reports(
     )
 
 
+def generate_hazel_no_evict_reports(*, modes: Sequence[str] | None = None) -> None:
+    css_source = Path(__file__).with_name("style.css")
+    tex_output = Path("output/hazel-no-evict/hazel_no_evict_result.tex")
+    generate_hazel_eviction_ablation_tex(
+        output_path=tex_output,
+        modes=modes,
+    )
+    ablation_index = generate_hazel_eviction_ablation_report(
+        output_dir=Path("output/hazel-no-evict/eviction_ablation"),
+        output=Path("output/hazel-no-evict/eviction_ablation/index.html"),
+        modes=modes,
+    )
+    generated_entries: list[tuple[str, Path]] = []
+    for label, input_path, output_dir in _hazel_experiments(
+        Path("output/hazel-no-evict"),
+        modes=modes,
+        variants=HAZEL_NO_EVICT_VARIANTS,
+    ):
+        if not input_path.exists():
+            print(f"[generate_report] skipping missing input: {input_path}", file=sys.stderr)
+            continue
+        speedup_module.generate_speedup_report(
+            input_path=input_path,
+            output_dir=output_dir,
+            css_source=css_source,
+            report_kind="hazel",
+        )
+        generated_entries.append((label, output_dir / "index.html"))
+    generated_entries.insert(0, ("Eviction Ablation", ablation_index))
+    generate_html(
+        title="Hazel No-Eviction Ablation Index",
+        output=Path("output/hazel-no-evict/index.html"),
+        entries=generated_entries,
+        downloads=[("Download hazel_no_evict_result.tex", tex_output)],
+        data_paths=[],
+        css_source=css_source,
+        report_kind="hazel",
+        description=(
+            "No-eviction ablation for the Hazel benchmark inputs. The ablation page compares Chordata "
+            "memoized evaluation with eviction against the same Chordata run without eviction."
+        ),
+    )
+
+
 def generate_arith_reports() -> None:
     css_source = Path(__file__).with_name("style.css")
     tex_output = Path("output/arith/arith_result.tex")
@@ -550,10 +610,15 @@ def generate_arith_reports() -> None:
     )
 
 
-def _hazel_experiments(base_dir: Path, *, modes: Sequence[str] | None = None) -> list[tuple[str, Path, Path]]:
+def _hazel_experiments(
+    base_dir: Path,
+    *,
+    modes: Sequence[str] | None = None,
+    variants: Sequence[tuple[str, str, str]] = VARIANTS,
+) -> list[tuple[str, Path, Path]]:
     selected = set(modes) if modes is not None else None
     experiments: list[tuple[str, Path, Path]] = []
-    for steps_pattern, output_pattern, label_suffix in VARIANTS:
+    for steps_pattern, output_pattern, label_suffix in variants:
         for key, label in BASE_EXPERIMENTS:
             mode = output_pattern.format(key=key)
             if selected is not None and mode not in selected:
@@ -570,6 +635,323 @@ def _hazel_experiments(base_dir: Path, *, modes: Sequence[str] | None = None) ->
 
 def _arith_experiments(base_dir: Path) -> list[tuple[str, Path, Path]]:
     return [("Arith Benchmark", Path("results/arith/arith.json"), base_dir / "arith")]
+
+
+def _exec_time_rows(path: Path) -> list[dict]:
+    rows: list[dict] = []
+    with path.open(encoding="utf-8") as f:
+        for line_no, line in enumerate(f, 1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(f"failed to parse {path}:{line_no}") from exc
+            if isinstance(row, dict) and row.get("name") == "exec_time":
+                rows.append(row)
+    if not rows:
+        raise RuntimeError(f"no exec_time rows found in {path}")
+    return rows
+
+
+def _exec_time_row_key(row: dict, *, path: Path, row_index: int) -> tuple[object, ...]:
+    missing = [
+        key
+        for key in (
+            "trace_exec_index",
+            "input_size",
+            "trace_source_indices",
+            "trace_source_exercise_ids",
+        )
+        if key not in row
+    ]
+    if missing:
+        missing_keys = ", ".join(missing)
+        raise RuntimeError(f"{path} row {row_index} is missing ablation alignment keys: {missing_keys}")
+    source_indices = row["trace_source_indices"]
+    source_exercise_ids = row["trace_source_exercise_ids"]
+    if not isinstance(source_indices, list) or not isinstance(source_exercise_ids, list):
+        raise RuntimeError(f"{path} row {row_index} has malformed ablation alignment keys")
+    return (
+        row["trace_exec_index"],
+        row["input_size"],
+        tuple(source_indices),
+        tuple(source_exercise_ids),
+    )
+
+
+def _profile_total_from_row(row: dict, key: str, *, path: Path) -> float:
+    entries = row.get(key)
+    if not isinstance(entries, list):
+        raise RuntimeError(f"{path} row is missing profile field {key}")
+    return _profile_sum(entries)
+
+
+def _eviction_ablation_pairs(
+    evict_path: Path,
+    no_evict_path: Path,
+) -> tuple[list[tuple[float, float]], list[float]]:
+    if not evict_path.exists() or not no_evict_path.exists():
+        return ([], [])
+    evict_rows = _exec_time_rows(evict_path)
+    no_evict_rows = _exec_time_rows(no_evict_path)
+    evict_by_key: dict[tuple[object, ...], dict] = {}
+    for index, row in enumerate(evict_rows):
+        key = _exec_time_row_key(row, path=evict_path, row_index=index)
+        if key in evict_by_key:
+            raise RuntimeError(f"duplicate ablation alignment key in {evict_path}: {key}")
+        evict_by_key[key] = row
+    no_evict_by_key: dict[tuple[object, ...], dict] = {}
+    for index, row in enumerate(no_evict_rows):
+        key = _exec_time_row_key(row, path=no_evict_path, row_index=index)
+        if key in no_evict_by_key:
+            raise RuntimeError(f"duplicate ablation alignment key in {no_evict_path}: {key}")
+        no_evict_by_key[key] = row
+    evict_keys = set(evict_by_key)
+    no_evict_keys = set(no_evict_by_key)
+    if evict_keys != no_evict_keys:
+        missing_no_evict = sorted(evict_keys - no_evict_keys, key=repr)
+        missing_evict = sorted(no_evict_keys - evict_keys, key=repr)
+        raise RuntimeError(
+            "eviction ablation inputs do not align: "
+            f"{evict_path} vs {no_evict_path}; "
+            f"missing no-evict keys={missing_no_evict[:3]}, missing evict keys={missing_evict[:3]}"
+        )
+    time_pairs: list[tuple[float, float]] = []
+    memory_ratios: list[float] = []
+    for key in sorted(evict_keys, key=repr):
+        evict_row = evict_by_key[key]
+        no_evict_row = no_evict_by_key[key]
+        evict_time = _profile_total_from_row(evict_row, "memo_profile", path=evict_path)
+        no_evict_time = _profile_total_from_row(no_evict_row, "memo_profile", path=no_evict_path)
+        if evict_time > 0 and no_evict_time > 0:
+            time_pairs.append((no_evict_time, evict_time))
+        evict_heap_words = evict_row.get("memo_heap_words")
+        no_evict_heap_words = no_evict_row.get("memo_heap_words")
+        if (
+            isinstance(evict_heap_words, int)
+            and isinstance(no_evict_heap_words, int)
+            and evict_heap_words > 0
+            and no_evict_heap_words > 0
+        ):
+            memory_ratios.append(float(no_evict_heap_words) / float(evict_heap_words))
+    return (time_pairs, memory_ratios)
+
+
+def _hazel_eviction_ablation_inputs(
+    *,
+    modes: Sequence[str] | None = None,
+) -> list[tuple[str, Path, Path]]:
+    selected = set(modes) if modes is not None else None
+    inputs: list[tuple[str, Path, Path]] = []
+    for (evict_label, evict_pattern), (no_evict_label, no_evict_pattern) in zip(
+        TABLE_VARIANTS,
+        HAZEL_NO_EVICT_TABLE_VARIANTS,
+    ):
+        if evict_label != no_evict_label:
+            raise ValueError("eviction ablation variants must stay aligned")
+        for key, benchmark_label in BASE_EXPERIMENTS:
+            mode = _mode_from_steps_pattern(evict_pattern, key)
+            if selected is not None and mode not in selected:
+                continue
+            inputs.append(
+                (
+                    f"{benchmark_label} / User {evict_label}",
+                    Path(evict_pattern.format(key=key)),
+                    Path(no_evict_pattern.format(key=key)),
+                )
+            )
+    return inputs
+
+
+def _collect_eviction_ablation(
+    *,
+    modes: Sequence[str] | None = None,
+) -> tuple[list[tuple[float, float]], list[float]]:
+    all_pairs: list[tuple[float, float]] = []
+    all_memory_ratios: list[float] = []
+    for _, evict_path, no_evict_path in _hazel_eviction_ablation_inputs(modes=modes):
+        time_pairs, memory_ratios = _eviction_ablation_pairs(evict_path, no_evict_path)
+        all_pairs.extend(time_pairs)
+        all_memory_ratios.extend(memory_ratios)
+    return (all_pairs, all_memory_ratios)
+
+
+def generate_hazel_eviction_ablation_report(
+    *,
+    output_dir: Path,
+    output: Path,
+    modes: Sequence[str] | None = None,
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    css_source = Path(__file__).with_name("style.css")
+    css_path = output.parent / css_source.name
+    shutil.copyfile(css_source, css_path)
+    css_href = os.path.relpath(css_path, output.parent)
+    for stale_plot in output_dir.glob("[0-9]*.png"):
+        stale_plot.unlink()
+    (output_dir / "eviction_ablation_scatter.png").unlink(missing_ok=True)
+
+    time_pairs, memory_ratios = _collect_eviction_ablation(modes=modes)
+    ratios: list[float] = []
+    stats: SpeedupStats | None = None
+    scatter_rel: str | None = None
+    memory_overhead = None
+    if time_pairs:
+        ratios, stats = compare_stats(time_pairs)
+        scatter_name = plot_scatter_for_kind(
+            time_pairs,
+            output_dir,
+            report_kind="hazel",
+            title="Cache Eviction Ablation",
+            xlabel="No-eviction Chordata time (ns)",
+            ylabel="Evicting Chordata time (ns)",
+            output_name="eviction_ablation_scatter.png",
+        )
+        scatter_rel = os.path.relpath(output_dir / scatter_name, output.parent)
+    if memory_ratios:
+        memory_overhead = _geometric_mean(memory_ratios)
+
+    summary_path = output_dir / "eviction_ablation_summary.json"
+    summary_payload = {
+        "samples": stats.samples if stats else 0,
+        "geo_mean_no_evict_over_evict_time": stats.geo_mean if stats else None,
+        "arith_mean_no_evict_over_evict_time": stats.arith_mean if stats else None,
+        "end_to_end_no_evict_over_evict_time": stats.end_to_end if stats else None,
+        "geo_mean_no_evict_over_evict_memory": memory_overhead,
+    }
+    summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
+
+    doc = document(title="Cache Eviction Ablation")
+    doc["lang"] = "en"
+    with doc.head:
+        tag.meta(charset="utf-8")
+        tag.link(rel="stylesheet", href=css_href)
+    with doc:
+        with tag.main():
+            tag.h1("Cache Eviction Ablation")
+            tag.p(
+                "Hazel benchmark Chordata memo runs with cache eviction compared against the same runs with eviction disabled.",
+                cls="meta",
+            )
+            with tag.section(cls="stats"):
+                if stats:
+                    stat_card("Samples", str(stats.samples))
+                    stat_card("Time speedup", f"{fmt_speedup(stats.geo_mean)}x")
+                    stat_card("Arithmetic mean", f"{fmt_speedup(stats.arith_mean)}x")
+                    stat_card("End-to-end", f"{fmt_speedup(stats.end_to_end)}x")
+                else:
+                    stat_card("Samples", "0")
+                    stat_card("Time speedup", "timeout")
+                if memory_overhead is not None:
+                    stat_card("Memory overhead", f"{fmt_speedup(memory_overhead)}x")
+                else:
+                    stat_card("Memory overhead", "timeout")
+            if scatter_rel:
+                with tag.section(cls="plot"):
+                    tag.img(src=scatter_rel, alt="Evicting Chordata versus no-eviction Chordata scatter plot")
+            with tag.section(cls="grid"):
+                with tag.a(href=os.path.relpath(summary_path, output.parent), cls="card", download=""):
+                    tag.span("Download eviction_ablation_summary.json")
+
+    output.write_text(doc.render(), encoding="utf-8")
+    return output
+
+
+def generate_hazel_eviction_ablation_tex(
+    *,
+    output_path: Path,
+    modes: Sequence[str] | None = None,
+) -> None:
+    selected = set(modes) if modes is not None else None
+    available_pairs: list[tuple[float, float]] = []
+    available_memory_ratios: list[float] = []
+    rows: list[tuple[str, list[str], list[str]]] = []
+    for (evict_label, evict_pattern), (no_evict_label, no_evict_pattern) in zip(
+        TABLE_VARIANTS,
+        HAZEL_NO_EVICT_TABLE_VARIANTS,
+    ):
+        if evict_label != no_evict_label:
+            raise ValueError("eviction ablation variants must stay aligned")
+        speedup_values: list[str] = []
+        memory_overhead_values: list[str] = []
+        for key, _ in BASE_EXPERIMENTS:
+            mode = _mode_from_steps_pattern(evict_pattern, key)
+            if selected is not None and mode not in selected:
+                speedup_values.append("timeout")
+                memory_overhead_values.append("timeout")
+                continue
+            evict_path = Path(evict_pattern.format(key=key))
+            no_evict_path = Path(no_evict_pattern.format(key=key))
+            time_pairs, memory_ratios = _eviction_ablation_pairs(evict_path, no_evict_path)
+            if time_pairs:
+                _, stats = compare_stats(time_pairs)
+                speedup_values.append(fmt_speedup(stats.geo_mean))
+                available_pairs.extend(time_pairs)
+            else:
+                speedup_values.append("timeout")
+            if memory_ratios:
+                memory_overhead_values.append(fmt_speedup(_geometric_mean(memory_ratios)))
+                available_memory_ratios.extend(memory_ratios)
+            else:
+                memory_overhead_values.append("timeout")
+        rows.append((evict_label, speedup_values, memory_overhead_values))
+
+    point_count = len(available_pairs)
+    total_speedup = "timeout"
+    total_memory_overhead = "timeout"
+    if available_pairs:
+        _, stats = compare_stats(available_pairs)
+        total_speedup = _tex_ratio(stats.geo_mean, include_times_symbol=True)
+    if available_memory_ratios:
+        total_memory_overhead = _tex_ratio(
+            _geometric_mean(available_memory_ratios),
+            include_times_symbol=True,
+        )
+
+    variant_labels = [variant_label for variant_label, _, _ in rows]
+    escaped_variant_labels = [_escape_latex(label) for label in variant_labels]
+    variant_count = len(variant_labels)
+    group_header = (
+        f" & \\multicolumn{{{variant_count}}}{{c|}}{{time speedup}}"
+        f" & \\multicolumn{{{variant_count}}}{{c}}{{memory overhead}} \\\\"
+    )
+    user_labels = [f"User {label}" for label in escaped_variant_labels]
+    user_header = " & ".join(["Benchmark", *user_labels, *user_labels]) + " \\\\"
+    col_spec = f"l|{'r' * variant_count}|{'r' * variant_count}"
+    lines = [
+        "% Auto-generated by tools/generate_report.py",
+        "\\newcommand{\\hazelNoEvictPointCount}{" + str(point_count) + "}",
+        "\\newcommand{\\hazelNoEvictTotalSpeedup}{" + total_speedup + "}",
+        "\\newcommand{\\hazelNoEvictTotalMemoryOverhead}{" + total_memory_overhead + "}",
+        "\\newcommand{\\hazelNoEvictBaselineGeoMean}{N/A}",
+        "\\newcommand{\\hazelNoEvictSpeedBreakdown}{N/A}",
+        "\\newcommand{\\hazelNoEvictSpeedupTable}{%",
+        "\\begin{tabular}{" + col_spec + "}",
+        "\\hline",
+        group_header,
+        user_header,
+        "\\hline",
+    ]
+    for benchmark_idx, (_, benchmark_label) in enumerate(BASE_EXPERIMENTS):
+        speedup_row: list[str] = []
+        memory_overhead_row: list[str] = []
+        for _, speedup_values, memory_overhead_values in rows:
+            speedup = speedup_values[benchmark_idx]
+            memory_overhead = memory_overhead_values[benchmark_idx]
+            speedup_row.append("X" if speedup == "timeout" else speedup)
+            memory_overhead_row.append("X" if memory_overhead == "timeout" else memory_overhead)
+        lines.append(" & ".join([benchmark_label, *speedup_row, *memory_overhead_row]) + " \\\\")
+    lines.extend(
+        [
+            "\\hline",
+            "\\end{tabular}%",
+            "}",
+            "",
+        ]
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def _generate_reports_for_experiments(
@@ -752,6 +1134,8 @@ def generate_tex_table(
     include_hazel_compare: bool = True,
     modes: Sequence[str] | None = None,
     hazel_compare_modes: Sequence[str] | None = None,
+    table_variants: Sequence[tuple[str, str]] = TABLE_VARIANTS,
+    macro_prefix: str = "hazel",
 ) -> None:
     if include_hazel_compare:
         generate_hazel_compare_reports(modes=hazel_compare_modes)
@@ -761,7 +1145,7 @@ def generate_tex_table(
     selected = set(modes) if modes is not None else None
     available_input_paths: list[Path] = []
     rows: list[tuple[str, list[str], list[str]]] = []
-    for variant_label, steps_pattern in TABLE_VARIANTS:
+    for variant_label, steps_pattern in table_variants:
         speedup_values: list[str] = []
         memory_overhead_values: list[str] = []
         for key, _ in BASE_EXPERIMENTS:
@@ -812,14 +1196,14 @@ def generate_tex_table(
     col_spec = f"l|{'r' * variant_count}|{'r' * variant_count}"
     lines = [
         "% Auto-generated by tools/generate_report.py",
-        "\\newcommand{\\hazelPointCount}{" + str(point_count) + "}",
-        "\\newcommand{\\hazelTotalSpeedup}{" + total_speedup + "}",
-        "\\newcommand{\\hazelTotalMemoryOverhead}{" + total_memory_overhead + "}",
-        "\\newcommand{\\hazelBaselineGeoMean}{" + baseline_geomean + "}",
-        "\\newcommand{\\hazelSpeedBreakdown}{%",
+        f"\\newcommand{{\\{macro_prefix}PointCount}}{{" + str(point_count) + "}",
+        f"\\newcommand{{\\{macro_prefix}TotalSpeedup}}{{" + total_speedup + "}",
+        f"\\newcommand{{\\{macro_prefix}TotalMemoryOverhead}}{{" + total_memory_overhead + "}",
+        f"\\newcommand{{\\{macro_prefix}BaselineGeoMean}}{{" + baseline_geomean + "}",
+        f"\\newcommand{{\\{macro_prefix}SpeedBreakdown}}{{%",
         *breakdown_lines,
         "}",
-        "\\newcommand{\\hazelSpeedupTable}{%",
+        f"\\newcommand{{\\{macro_prefix}SpeedupTable}}{{%",
         "\\begin{tabular}{" + col_spec + "}",
         "\\hline",
         group_header,

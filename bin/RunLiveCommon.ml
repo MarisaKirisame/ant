@@ -385,10 +385,10 @@ let eval_plain (expr : LC.expr) : LC.value * int =
   Gc.full_major ();
   (Profile.with_slot eval_plain_slot (fun () -> LP.eval expr env), cek_heap_stats.peak_heap_words)
 
-let eval_expression_memo_only ~memo expr : memo_run_result =
+let eval_expression_memo_only ?(evict = false) ~memo expr : memo_run_result =
   let exec_res, memo_heap_stats =
     measure_memory_consumption (fun () ->
-        LC.eval ~config:(Memo.memo_config memo) (LC.from_ocaml_expr expr)
+        LC.eval ~config:(Memo.memo_config ~evict memo) (LC.from_ocaml_expr expr)
           (LC.from_ocaml_list LC.from_ocaml_value LC.Nil))
   in
   let memo_profile = Profile.dump_profile Profile.memo_profile in

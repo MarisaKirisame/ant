@@ -155,15 +155,6 @@ let run ~length () =
         ~run_cek:(fun () -> ListCEK.append ~config:Memo.cek_config cek_list cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.append plain_list plain_list)));
 
-  run_all_cases ~length ~program_name:"insertion_sort" ~populate_state:ListCEK.populate_state
-    ~case_fn:(fun memo label xs filename ->
-      let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
-      let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~program_name:"insertion_sort" ~input_kind:label ~filename
-        ~run_memo:(fun memo -> ListCEK.insertion_sort ~config:(Memo.memo_config memo) cek_list)
-        ~run_cek:(fun () -> ListCEK.insertion_sort ~config:Memo.cek_config cek_list)
-        ~run_plain:(fun () -> ignore (ListPlain.insertion_sort plain_list)));
-
   run_all_cases ~length ~program_name:"merge_sort" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->
       let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
@@ -181,15 +172,6 @@ let run ~length () =
         ~run_memo:(fun memo -> ListCEK.quicksort ~config:(Memo.memo_config memo) cek_list)
         ~run_cek:(fun () -> ListCEK.quicksort ~config:Memo.cek_config cek_list)
         ~run_plain:(fun () -> ignore (ListPlain.quicksort plain_list)));
-
-  run_all_cases ~length ~program_name:"reverse" ~populate_state:ListCEK.populate_state
-    ~case_fn:(fun memo label xs filename ->
-      let cek_list = ListCEK.from_ocaml_int_list (to_listcek xs) in
-      let plain_list = to_listcek xs in
-      run_case_then_write ~memo ~program_name:"reverse" ~input_kind:label ~filename
-        ~run_memo:(fun memo -> ListCEK.reverse ~config:(Memo.memo_config memo) cek_list)
-        ~run_cek:(fun () -> ListCEK.reverse ~config:Memo.cek_config cek_list)
-        ~run_plain:(fun () -> ignore (ListPlain.reverse plain_list)));
 
   run_all_cases ~length ~program_name:"simple_filter" ~populate_state:ListCEK.populate_state
     ~case_fn:(fun memo label xs filename ->

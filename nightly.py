@@ -273,6 +273,14 @@ def _compare_result_path_for_mode(mode: str) -> Path:
     return Path("results/hazel-compare") / f"{mode}.json"
 
 
+def _no_evict_result_path_for_mode(mode: str) -> Path:
+    return Path("results/hazel-no-evict") / f"{mode}.json"
+
+
+def _no_evict_compare_result_path_for_mode(mode: str) -> Path:
+    return Path("results/hazel-no-evict-compare") / f"{mode}.json"
+
+
 def _remove_result_files_for_modes(selected_modes: Iterable[str]) -> None:
     for mode in selected_modes:
         _result_path_for_mode(mode).unlink(missing_ok=True)
@@ -281,6 +289,16 @@ def _remove_result_files_for_modes(selected_modes: Iterable[str]) -> None:
 def _remove_compare_result_files_for_modes(selected_modes: Iterable[str]) -> None:
     for mode in selected_modes:
         _compare_result_path_for_mode(mode).unlink(missing_ok=True)
+
+
+def _remove_no_evict_result_files_for_modes(selected_modes: Iterable[str]) -> None:
+    for mode in selected_modes:
+        _no_evict_result_path_for_mode(mode).unlink(missing_ok=True)
+
+
+def _remove_no_evict_compare_result_files_for_modes(selected_modes: Iterable[str]) -> None:
+    for mode in selected_modes:
+        _no_evict_compare_result_path_for_mode(mode).unlink(missing_ok=True)
 
 
 def run_modes(selected_modes: tuple[str, ...]) -> None:
@@ -323,6 +341,45 @@ def run_modes(selected_modes: tuple[str, ...]) -> None:
             opam_exec(["dune", "exec", "--profile", "release", "GeneratedMain", mode])
 
 
+def run_no_evict_modes(selected_modes: tuple[str, ...]) -> None:
+    _remove_no_evict_result_files_for_modes(selected_modes)
+    ensure_switch()
+    generate_ml_files()
+    opam_exec(["dune", "fmt"], check=False, silent=True)
+    for mode in selected_modes:
+        print(f"Running {mode} no-evict...", flush=True)
+        if _smoke_run():
+            opam_exec(
+                [
+                    "dune",
+                    "exec",
+                    "--profile",
+                    "release",
+                    "GeneratedMain",
+                    "--",
+                    "hazel-no-evict",
+                    mode,
+                    str(smoke_input_size),
+                    str(smoke_hazel_max_candidates),
+                    str(_no_evict_result_path_for_mode(mode)),
+                ]
+            )
+        else:
+            opam_exec(
+                [
+                    "dune",
+                    "exec",
+                    "--profile",
+                    "release",
+                    "GeneratedMain",
+                    "--",
+                    "hazel-no-evict",
+                    mode,
+                    str(_no_evict_result_path_for_mode(mode)),
+                ]
+            )
+
+
 def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
     _remove_compare_result_files_for_modes(selected_modes)
     ensure_switch()
@@ -353,6 +410,36 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
             print(f"Running {mode}... {status}; continuing", flush=True)
 
 
+def run_no_evict_compare_modes(selected_modes: tuple[str, ...]) -> None:
+    _remove_no_evict_compare_result_files_for_modes(selected_modes)
+    ensure_switch()
+    generate_ml_files()
+    opam_exec(["dune", "fmt"], check=False, silent=True)
+    for mode in selected_modes:
+        print(f"Running {mode} no-evict compare...", flush=True)
+        command = [
+            "timeout",
+            "--kill-after=5s",
+            hazel_compare_mode_timeout,
+            "dune",
+            "exec",
+            "--profile",
+            "release",
+            "GeneratedMain",
+            "--",
+            "hazel-compare-no-evict",
+            mode,
+        ]
+        if _smoke_run():
+            command.extend([str(smoke_input_size), str(smoke_hazel_max_candidates), str(smoke_hazel_timeout_seconds)])
+        command.append(str(_no_evict_compare_result_path_for_mode(mode)))
+        result = opam_exec(command, check=False)
+        if result.returncode != 0:
+            _no_evict_compare_result_path_for_mode(mode).unlink(missing_ok=True)
+            status = "timed out" if result.returncode in (124, 137) else f"failed with exit {result.returncode}"
+            print(f"Running {mode} no-evict compare... {status}; continuing", flush=True)
+
+
 def run_project() -> None:
     run_modes(modes)
 
@@ -377,6 +464,19 @@ def hazel_experiment_project() -> None:
     run_modes(selected_modes)
     run_compare_modes(compare_modes)
     report_module.generate_hazel_reports(include_hazel_compare=True, modes=selected_modes, hazel_compare_modes=compare_modes)
+
+
+def hazel_no_evict_project() -> None:
+    selected_modes = _hazel_experiment_modes()
+    _remove_no_evict_result_files_for_modes(hazel_modes)
+    run_no_evict_modes(selected_modes)
+    report_module.generate_hazel_no_evict_reports(modes=selected_modes)
+
+
+def hazel_no_evict_compare_project() -> None:
+    selected_modes = _hazel_compare_experiment_modes()
+    _remove_no_evict_compare_result_files_for_modes(hazel_modes)
+    run_no_evict_compare_modes(selected_modes)
 
 
 def arith_project() -> None:
@@ -419,9 +519,26 @@ def hazel_scaling_project() -> None:
             opam_exec(command)
 
 
+def hazel_no_evict_scaling_project() -> None:
+    _prepare_scaling_run()
+    for mode in hazel_modes:
+        output_dir = Path("results/hazel-no-evict") / mode
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for size in _scaling_sizes():
+            output_path = output_dir / f"{size}.json"
+            output_path.unlink(missing_ok=True)
+            print(f"Running {mode} no-evict scaling size {size}...", flush=True)
+            command = ["dune", "exec", "--profile", "release", "GeneratedMain", "--", "hazel-scaling-no-evict", mode, str(size)]
+            if _smoke_run():
+                command.append(str(smoke_hazel_max_candidates))
+            command.append(str(output_path))
+            opam_exec(command)
+
+
 def scaling_project() -> None:
     arith_scaling_project()
     hazel_scaling_project()
+    hazel_no_evict_scaling_project()
     report_module.generate_scaling_reports(modes=hazel_modes, sizes=_scaling_sizes())
 
 
@@ -431,8 +548,17 @@ def scaling_report_project() -> None:
 
 def entropy_scaling_project() -> None:
     _prepare_scaling_run()
-    input_kinds = ("random", "mod1", "block", "same")
-    programs = ("map", "append", "insertion_sort", "merge_sort", "quick_sort", "reverse", "simple_filter", "pair")
+    input_kinds = ("random", "block", "same", "mod1")
+    programs = (
+        "map",
+        "append",
+        # "insertion_sort",
+        "merge_sort",
+        "quick_sort",
+        # "reverse",
+        "simple_filter",
+        "pair",
+    )
     for program in programs:
         for input_kind in input_kinds:
             (Path("results/entropy") / program / input_kind).mkdir(parents=True, exist_ok=True)
@@ -486,6 +612,8 @@ def experiment_project() -> None:
     clean_output()
     arith_project()
     hazel_experiment_project()
+    hazel_no_evict_project()
+    hazel_no_evict_compare_project()
     report_module.generate_reports()
 
 
@@ -572,8 +700,9 @@ def main(argv: Iterable[str]) -> int:
     args = list(argv)
     usage = (
         "Usage: nightly.py "
-        "[dependency|hazel-dependency|build|coverage|run|profile|hazel|hazel-experiment|hazel-report|arith|arith-report|"
-        "arith-scaling|hazel-scaling|scaling|scaling-report|entropy-scaling|entropy-report|report|experiment|"
+        "[dependency|hazel-dependency|build|coverage|run|profile|hazel|hazel-experiment|hazel-no-evict|"
+        "hazel-no-evict-compare|hazel-report|arith|arith-report|arith-scaling|hazel-scaling|"
+        "hazel-no-evict-scaling|scaling|scaling-report|entropy-scaling|entropy-report|report|experiment|"
         "hazel-tex|arith-tex|compile-generated|all] [--smoke]"
     )
 
@@ -610,6 +739,10 @@ def main(argv: Iterable[str]) -> int:
         hazel_project()
     elif stage == "hazel-experiment":
         hazel_experiment_project()
+    elif stage == "hazel-no-evict":
+        hazel_no_evict_project()
+    elif stage == "hazel-no-evict-compare":
+        hazel_no_evict_compare_project()
     elif stage == "hazel-report":
         hazel_report_project()
     elif stage == "arith":
@@ -620,6 +753,8 @@ def main(argv: Iterable[str]) -> int:
         arith_scaling_project()
     elif stage == "hazel-scaling":
         hazel_scaling_project()
+    elif stage == "hazel-no-evict-scaling":
+        hazel_no_evict_scaling_project()
     elif stage == "scaling":
         scaling_project()
     elif stage == "scaling-report":
@@ -648,6 +783,8 @@ def main(argv: Iterable[str]) -> int:
         build_project()
         arith_project()
         hazel_experiment_project()
+        hazel_no_evict_project()
+        hazel_no_evict_compare_project()
         scaling_project()
         entropy_scaling_project()
         report_module.generate_reports()

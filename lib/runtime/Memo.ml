@@ -19,7 +19,7 @@ let log x = ignore x
 (* Just have Word.t. We could make Word a finger tree of Word.t but that would cost lots of conversion between two representation. *)
 type words = seq
 type exec_result = { words : words; step : int; without_memo_step : int }
-type exec_config = Cek | Memoized of memo
+type exec_config = Cek | Memoized of { memo : memo; evict : bool }
 
 let source_to_string (src : source) = match src with E i -> "E" ^ string_of_int i | K -> "K"
 
@@ -534,7 +534,7 @@ let instantiate (step : step) (state : state) : step =
 
 let instantiate_slot = Profile.register_slot Profile.memo_profile "instantiate"
 
-let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : exec_result =
+let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) ~(evict : bool) : exec_result =
   let run () =
     m.epoch <- m.epoch + 1;
     let dbg_step_through step state =
@@ -565,14 +565,15 @@ let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : 
     let sc = ref 0 in
     let hist : history = ref [] in
     let maybe_evict_in_loop () =
-      match global_eviction_strategy with
-      | In_loop_hard_cap ->
-          if m.size > in_loop_eviction_trigger_size then (
-            let evict_fraction = Eviction.eviction_fraction_for_target ~target_size:in_loop_eviction_target_size m in
-            let evicted = Eviction.prune_memo_to_target ~kll_k:eviction_policy.kll_k ~evict_fraction m in
-            m.entries <- evicted.entries;
-            m.size <- evicted.size)
-      | Legacy_batch -> ()
+      if evict then
+        match global_eviction_strategy with
+        | In_loop_hard_cap ->
+            if m.size > in_loop_eviction_trigger_size then (
+              let evict_fraction = Eviction.eviction_fraction_for_target ~target_size:in_loop_eviction_target_size m in
+              let evicted = Eviction.prune_memo_to_target ~kll_k:eviction_policy.kll_k ~evict_fraction m in
+              m.entries <- evicted.entries;
+              m.size <- evicted.size)
+        | Legacy_batch -> ()
     in
     (* Binary counter that incrementally composes adjacent slices; arguments are
        reversed so the newest slice sits on the right-hand side during carry. *)
@@ -614,13 +615,14 @@ let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) : 
     let state = exec state in
     assert (Dynarray.length state.e = 1);
     ignore (fold_bin compose_slice None !hist);
-    (match global_eviction_strategy with
-    | In_loop_hard_cap -> ()
-    | Legacy_batch ->
-        let evicted = Eviction.batch_evict_memo ~policy:eviction_policy ~state:m.eviction_state m in
-        assert (Array.length evicted.entries = Array.length m.entries);
-        m.entries <- evicted.entries;
-        m.size <- evicted.size);
+    (if evict then
+       match global_eviction_strategy with
+       | In_loop_hard_cap -> ()
+       | Legacy_batch ->
+           let evicted = Eviction.batch_evict_memo ~policy:eviction_policy ~state:m.eviction_state m in
+           assert (Array.length evicted.entries = Array.length m.entries);
+           m.entries <- evicted.entries;
+           m.size <- evicted.size);
     (* print_endline ("took " ^ string_of_int !i ^ " step, but without memo take " ^ string_of_int !sc ^ " step."); *)
     { words = Dynarray.get_last state.e; step = !i; without_memo_step = !sc }
   in
@@ -646,15 +648,15 @@ let exec_cek_without_memo (c : exp) (e : words Dynarray.t) (k : words) : exec_re
   let steps = !step_count in
   { words = Dynarray.get_last state.e; step = steps; without_memo_step = steps }
 
-let memo_config (memo : memo) : exec_config = Memoized memo
+let memo_config ?(evict = false) (memo : memo) : exec_config = Memoized { memo; evict }
 let cek_config : exec_config = Cek
 let default_exec_config () : exec_config = memo_config (init_memo ())
 
 let exec_cek ?config (c : exp) (e : words Dynarray.t) (k : words) : exec_result =
   match config with
   | Some Cek -> exec_cek_without_memo c e k
-  | Some (Memoized memo) -> exec_cek_memoized c e k memo
-  | None -> exec_cek_memoized c e k (init_memo ())
+  | Some (Memoized { memo; evict }) -> exec_cek_memoized c e k memo ~evict
+  | None -> exec_cek_memoized c e k (init_memo ()) ~evict:false
 
 let exec_cek_raw (c : exp) (e : words Dynarray.t) (k : words) = (exec_cek_without_memo c e k).words
 let exec_done _ = failwith "exec is done, should not call step anymore"
