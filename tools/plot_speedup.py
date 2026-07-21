@@ -51,8 +51,8 @@ DEFAULT_REPORT_KIND = "hazel"
 ENTROPY_CATEGORY_COLORS = {
     "Baseline": "tab:blue",
     "Block": "tab:orange",
-    "Mod1": "tab:red",
-    "Repeat": "tab:green",
+    "Change1": "tab:red",
+    "Constant": "tab:green",
 }
 
 if REPORT_WALL_CLOCK_TIME:

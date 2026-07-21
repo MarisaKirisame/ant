@@ -22,7 +22,8 @@
  (synopsis "A short synopsis")
  (description "A longer description")
  (depends
-  ocaml
+  (ocaml (= 5.4.1))
+  (ocaml-base-compiler (= 5.4.1))
   dune
   menhir
   pprint
@@ -34,8 +35,7 @@
   sexplib
   yojson
   ppx_deriving
-  ppxlib
-  (bisect_ppx :with-test))
+  ppxlib)
  (tags
   (topics "to describe" your project)))
 

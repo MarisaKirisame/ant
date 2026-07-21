@@ -681,8 +681,12 @@ let hazel_compare_item_of_candidate ~(program_name : string) ~(index : int) (can
   in
   `Assoc fields
 
-let hazel_compare_items_of_candidates ~(program_name : string) (candidates : collapsed_candidate list) : Yojson.Safe.t =
-  `List (List.mapi (fun i candidate -> hazel_compare_item_of_candidate ~program_name ~index:i candidate) candidates)
+let hazel_compare_items_of_candidates ~(program_name : string) ~(start_index : int)
+    (candidates : collapsed_candidate list) : Yojson.Safe.t =
+  `List
+    (List.mapi
+       (fun i candidate -> hazel_compare_item_of_candidate ~program_name ~index:(start_index + i) candidate)
+       candidates)
 
 let hazel_compare_result_of_yojson json : hazel_compare_result =
   let open Yojson.Safe.Util in
@@ -739,11 +743,15 @@ let hazel_compare_failure ~status ~log =
   in
   { parse_eval_ns = 0; eval_only_ns = 0; status = kind; error = detail }
 
-let run_hazel_compare_candidate ~program_name ~index ~(candidate : collapsed_candidate) ~(cfg : hazel_compare_config) :
-    hazel_compare_result =
-  let input_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d" program_name index) ".json" in
-  let output_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d_out" program_name index) ".json" in
-  let log_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d_log" program_name index) ".txt" in
+let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_candidate list)
+    ~(cfg : hazel_compare_config) : hazel_compare_result list =
+  let input_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d" program_name start_index) ".json" in
+  let output_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d_out" program_name start_index) ".json" in
+  let log_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d_log" program_name start_index) ".txt" in
+  let batch_failure ~status ~log =
+    let failure = hazel_compare_failure ~status ~log in
+    List.init (List.length candidates) (fun _ -> failure)
+  in
   Fun.protect
     ~finally:(fun () ->
       (try Sys.remove input_path with _ -> ());
@@ -754,7 +762,7 @@ let run_hazel_compare_candidate ~program_name ~index ~(candidate : collapsed_can
       Fun.protect
         ~finally:(fun () -> close_out_noerr oc)
         (fun () ->
-          `List [ hazel_compare_item_of_candidate ~program_name ~index candidate ] |> Yojson.Safe.to_channel oc;
+          hazel_compare_items_of_candidates ~program_name ~start_index candidates |> Yojson.Safe.to_channel oc;
           output_char oc '\n');
       let quoted_input = Filename.quote input_path in
       let quoted_output = Filename.quote output_path in
@@ -765,22 +773,37 @@ let run_hazel_compare_candidate ~program_name ~index ~(candidate : collapsed_can
       in
       let status = Sys.command cmd in
       let log = read_file_truncated log_path 2000 in
-      if status <> 0 then hazel_compare_failure ~status ~log
+      if status <> 0 then batch_failure ~status ~log
       else
         try
           match Yojson.Safe.from_file output_path with
-          | `List [ item ] -> hazel_compare_result_of_yojson item
-          | `List [] -> hazel_compare_failure ~status:0 ~log:"hazel eval-batch produced no output rows"
-          | `List _ -> hazel_compare_failure ~status:0 ~log:"hazel eval-batch produced too many output rows"
-          | _ -> hazel_compare_failure ~status:0 ~log:"hazel eval-batch output was not a JSON list"
+          | `List items when List.length items = List.length candidates -> List.map hazel_compare_result_of_yojson items
+          | `List items ->
+              batch_failure ~status:0
+                ~log:
+                  (Printf.sprintf "hazel eval-batch produced %d rows for %d candidates" (List.length items)
+                     (List.length candidates))
+          | _ -> batch_failure ~status:0 ~log:"hazel eval-batch output was not a JSON list"
         with exn ->
-          hazel_compare_failure ~status:0
+          batch_failure ~status:0
             ~log:(Printf.sprintf "hazel eval-batch output could not be parsed: %s" (Printexc.to_string exn)))
 
 let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(cfg : hazel_compare_config) :
     hazel_compare_result list =
   let candidates = match cfg.max_candidates with None -> candidates | Some n -> List.take n candidates in
-  List.mapi (fun index candidate -> run_hazel_compare_candidate ~program_name ~index ~candidate ~cfg) candidates
+  let rec take_batch n rev_batch rest =
+    if n = 0 then (List.rev rev_batch, rest)
+    else match rest with [] -> (List.rev rev_batch, []) | x :: xs -> take_batch (n - 1) (x :: rev_batch) xs
+  in
+  let rec run_batches start_index remaining =
+    match remaining with
+    | [] -> []
+    | _ ->
+        let batch, rest = take_batch 64 [] remaining in
+        run_hazel_compare_batch ~program_name ~start_index ~candidates:batch ~cfg
+        :: run_batches (start_index + List.length batch) rest
+  in
+  List.concat (run_batches 0 candidates)
 
 let limit_candidates ?max_candidates (candidates : collapsed_candidate list) =
   match max_candidates with None -> candidates | Some n -> List.take n candidates
@@ -814,68 +837,84 @@ let run_with_test ?(hazel_compare = None) ?(evict = false) ?(baseline = true) ?m
         else None
       in
       record_resting_heap_size ();
-      let memo_pass =
-        indexed_candidates
-        |> List.map (fun (i, candidate, expr) ->
-            let memo_result = eval_expression_memo_only ~evict ~memo expr in
-            (i, candidate, memo_result))
-      in
       List.iter
-        (fun (memo_idx, memo_candidate, memo_result) ->
-          let plain_profile, cek_profile, cek_heap_words =
-            match baseline_pass with
-            | None -> ([], [], 0)
-            | Some baseline_results -> (
-                match List.nth_opt baseline_results memo_idx with
-                | None -> failwith "missing baseline result for memo candidate"
-                | Some (baseline_idx, baseline_candidate, baseline_result) ->
-                    if memo_idx <> baseline_idx then
-                      failwith "candidate order mismatch between memo and baseline passes";
-                    if memo_candidate.source_indices <> baseline_candidate.source_indices then
-                      failwith "candidate source mapping mismatch between memo and baseline passes";
-                    (baseline_result.plain_profile, baseline_result.cek_profile, baseline_result.cek_heap_words))
+        (fun (memo_idx, memo_candidate, expr) ->
+          (* Process and emit each memo result before moving to the next trace.
+             Retaining the whole pass keeps every returned value and execution
+             result alive, which obscures the memory retained by the memo cache. *)
+          let () =
+            let memo_result = eval_expression_memo_only ~evict ~memo expr in
+            let plain_profile, cek_profile, cek_heap_words, cek_start_live_words, cek_peak_live_words =
+              match baseline_pass with
+              | None -> ([], [], 0, 0, 0)
+              | Some baseline_results -> (
+                  match List.nth_opt baseline_results memo_idx with
+                  | None -> failwith "missing baseline result for memo candidate"
+                  | Some (baseline_idx, baseline_candidate, baseline_result) ->
+                      if memo_idx <> baseline_idx then
+                        failwith "candidate order mismatch between memo and baseline passes";
+                      if memo_candidate.source_indices <> baseline_candidate.source_indices then
+                        failwith "candidate source mapping mismatch between memo and baseline passes";
+                      ( baseline_result.plain_profile,
+                        baseline_result.cek_profile,
+                        baseline_result.cek_heap_words,
+                        baseline_result.cek_start_live_words,
+                        baseline_result.cek_peak_live_words ))
+            in
+            let source_indices = memo_candidate.source_indices in
+            let source_first_index, source_last_index =
+              match source_indices with
+              | [] -> failwith "candidate source index list unexpectedly empty"
+              | first :: _ -> (first, List.hd (List.rev source_indices))
+            in
+            let source_indices_json = `List (List.map (fun idx -> `Int idx) source_indices) in
+            let source_exercise_ids_json =
+              `List
+                (List.map
+                   (function Some exercise_id -> `Int exercise_id | None -> `Null)
+                   memo_candidate.source_exercise_ids)
+            in
+            let hazel_fields =
+              match hazel_compare_results with
+              | None -> []
+              | Some results -> (
+                  match List.nth_opt results memo_idx with
+                  | None -> []
+                  | Some result ->
+                      [
+                        ("hazel_parse_eval_ns", `Int result.parse_eval_ns);
+                        ("hazel_eval_only_ns", `Int result.eval_only_ns);
+                        ("hazel_status", `String result.status);
+                        ("hazel_error", `String result.error);
+                      ])
+            in
+            let extra_fields =
+              [
+                ("trace_exec_index", `Int memo_idx);
+                ("input_size", `Int input_size);
+                ("memo_start_live_words", `Int memo_result.memo_start_live_words);
+                ("memo_peak_live_words", `Int memo_result.memo_peak_live_words);
+                ("memo_resting_adjusted_live_words", `Int memo_result.memo_peak_live_words_above_resting);
+                ("cek_resting_adjusted_live_words", `Int (cek_peak_live_words - cek_start_live_words));
+                ("cek_peak_live_words", `Int cek_peak_live_words);
+                ("trace_source_indices", source_indices_json);
+                ("trace_source_count", `Int (List.length source_indices));
+                ("trace_source_first_index", `Int source_first_index);
+                ("trace_source_last_index", `Int source_last_index);
+                ("trace_source_exercise_ids", source_exercise_ids_json);
+              ]
+              @ hazel_fields
+            in
+            write_steps_json_from_parts oc ~exec_res:memo_result.exec_res ~memo_profile:memo_result.memo_profile
+              ~plain_profile ~cek_profile ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words ~extra_fields ()
           in
-          let source_indices = memo_candidate.source_indices in
-          let source_first_index, source_last_index =
-            match source_indices with
-            | [] -> failwith "candidate source index list unexpectedly empty"
-            | first :: _ -> (first, List.hd (List.rev source_indices))
-          in
-          let source_indices_json = `List (List.map (fun idx -> `Int idx) source_indices) in
-          let source_exercise_ids_json =
-            `List
-              (List.map
-                 (function Some exercise_id -> `Int exercise_id | None -> `Null)
-                 memo_candidate.source_exercise_ids)
-          in
-          let hazel_fields =
-            match hazel_compare_results with
-            | None -> []
-            | Some results -> (
-                match List.nth_opt results memo_idx with
-                | None -> []
-                | Some result ->
-                    [
-                      ("hazel_parse_eval_ns", `Int result.parse_eval_ns);
-                      ("hazel_eval_only_ns", `Int result.eval_only_ns);
-                      ("hazel_status", `String result.status);
-                      ("hazel_error", `String result.error);
-                    ])
-          in
-          let extra_fields =
-            [
-              ("trace_exec_index", `Int memo_idx);
-              ("input_size", `Int input_size);
-              ("trace_source_indices", source_indices_json);
-              ("trace_source_count", `Int (List.length source_indices));
-              ("trace_source_first_index", `Int source_first_index);
-              ("trace_source_last_index", `Int source_last_index);
-              ("trace_source_exercise_ids", source_exercise_ids_json);
-            ]
-            @ hazel_fields
-          in
-          write_steps_json_from_parts oc ~exec_res:memo_result.exec_res ~memo_profile:memo_result.memo_profile
-            ~plain_profile ~cek_profile ~memo_heap_words:memo_result.memo_heap_words ~cek_heap_words ~extra_fields ())
-        memo_pass;
+          Gc.full_major ())
+        indexed_candidates;
+      (* The fixed memo resting snapshot includes these structures.  Keep them
+         reachable through the complete pass so resting subtraction isolates
+         cache growth plus the current execution. *)
+      ignore (Sys.opaque_identity candidates);
+      ignore (Sys.opaque_identity indexed_candidates);
+      ignore (Sys.opaque_identity baseline_pass);
       (match last_expr with None -> failwith "why" | Some _expr -> ());
       write_memo_stats_json oc memo)

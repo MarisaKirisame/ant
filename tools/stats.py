@@ -75,6 +75,8 @@ class ExecTimeRecord:
     plain_profile: list[ProfileEntry]
     memo_heap_words: int | None
     cek_heap_words: int | None
+    memo_resting_adjusted_live_words: int | None
+    cek_resting_adjusted_live_words: int | None
 
 
 @dataclass(frozen=True)
@@ -168,6 +170,14 @@ def load_records(
                     cek_heap_words = _optional_int(
                         rec.get("cek_heap_words"), ctx="exec_time.cek_heap_words"
                     )
+                    memo_resting_adjusted_live_words = _optional_int(
+                        rec.get("memo_resting_adjusted_live_words"),
+                        ctx="exec_time.memo_resting_adjusted_live_words",
+                    )
+                    cek_resting_adjusted_live_words = _optional_int(
+                        rec.get("cek_resting_adjusted_live_words"),
+                        ctx="exec_time.cek_resting_adjusted_live_words",
+                    )
                     exec_times.append(
                         ExecTimeRecord(
                             step=step,
@@ -177,6 +187,8 @@ def load_records(
                             plain_profile=plain_profile,
                             memo_heap_words=memo_heap_words,
                             cek_heap_words=cek_heap_words,
+                            memo_resting_adjusted_live_words=memo_resting_adjusted_live_words,
+                            cek_resting_adjusted_live_words=cek_resting_adjusted_live_words,
                         )
                     )
                 elif name == "memo_stats":

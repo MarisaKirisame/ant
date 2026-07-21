@@ -46,6 +46,7 @@ TOOLCHAIN_PACKAGES = [
     "dune>=3.24.0",
 ]
 DEV_PACKAGES = [
+    "bisect_ppx=2.8.3",
     "ocaml-lsp-server",
     "ocamlformat",
 ]
@@ -252,7 +253,7 @@ default_arith_scaling_sample_count = 5
 smoke_arith_sample_count = 1
 smoke_hazel_max_candidates = 1
 smoke_hazel_timeout_seconds = 5
-hazel_compare_input_size = 100
+hazel_compare_input_size = 10
 hazel_compare_mode_timeout = "10m"
 
 
@@ -602,6 +603,7 @@ def coverage_project() -> None:
         [
             "dune",
             "runtest",
+            "--ignore-lock-dir",
             "--instrument-with",
             "bisect_ppx",
             "--force",

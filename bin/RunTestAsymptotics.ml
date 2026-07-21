@@ -122,7 +122,7 @@ let run_all_cases ~program_name ~populate_state ~case_fn ~length =
 
   Printf.printf
     {|\begin{tabular}{c|c|c|c|c}
-            & Baseline & Block & Mod1 & Repeat \\ \hline
+            & Baseline & Block & Change1 & Constant \\ \hline
 CEK ns      & %i       & %i    & %i   & %i \\ \hline
 Memo ns     & %i       & %i    & %i   & %i \\ \hline
 Ratios      &          & %.3fx & %.3fx & %.3fx

@@ -390,25 +390,21 @@ let patterns_pvar_length (p : Pattern.pattern cek) : int =
 let rec list_to_pattern (x : Pattern.pattern list) : Pattern.pattern =
   match x with [] -> Generic.empty | [ h ] -> h | h :: t -> Pattern.pattern_append h (list_to_pattern t)
 
-let insertion_sc_threshold = 0
-
 let insert_step (m : memo) (step : step) : unit =
-  if step.sc < insertion_sc_threshold then ()
-  else
-    let start_time = Timer.create () in
-    let end_time = Timer.create () in
-    Timer.record start_time;
-    step.creation_epoch <- m.epoch;
-    let pc = step.src.c.pc in
-    let existing, old_tree_size = Array.get m.entries pc in
-    let size = ref old_tree_size in
-    let updated = insert_option existing (list_to_pattern (ek_to_list step.src)) step size in
-    Array.set m.entries pc (Some updated, !size);
-    m.size <- m.size + (!size - old_tree_size);
-    assert (m.size >= 0);
-    Timer.record end_time;
-    let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
-    step.insert_time <- elapsed_time
+  let start_time = Timer.create () in
+  let end_time = Timer.create () in
+  Timer.record start_time;
+  step.creation_epoch <- m.epoch;
+  let pc = step.src.c.pc in
+  let existing, old_tree_size = Array.get m.entries pc in
+  let size = ref old_tree_size in
+  let updated = insert_option existing (list_to_pattern (ek_to_list step.src)) step size in
+  Array.set m.entries pc (Some updated, !size);
+  m.size <- m.size + (!size - old_tree_size);
+  assert (m.size >= 0);
+  Timer.record end_time;
+  let elapsed_time = Timer.diff_nanoseconds start_time end_time |> Int64.to_int_exn in
+  step.insert_time <- elapsed_time
 
 let step_sc (step : (step * Value.value Rev.t) option) : int = match step with None -> 0 | Some (step, _) -> step.sc
 

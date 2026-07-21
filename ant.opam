@@ -10,7 +10,8 @@ homepage: "https://github.com/username/reponame"
 doc: "https://url/to/documentation"
 bug-reports: "https://github.com/username/reponame/issues"
 depends: [
-  "ocaml"
+  "ocaml" {= "5.4.1"}
+  "ocaml-base-compiler" {= "5.4.1"}
   "dune" {>= "3.16"}
   "menhir" {>= "20180523"}
   "pprint"
@@ -23,7 +24,6 @@ depends: [
   "yojson"
   "ppx_deriving"
   "ppxlib"
-  "bisect_ppx" {with-test}
   "odoc" {with-doc}
 ]
 build: [

@@ -50,8 +50,8 @@ ENTROPY_SCALING_SIZES = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000)
 ENTROPY_CATEGORIES = (
     ("random", "Baseline"),
     ("block", "Block"),
-    ("mod1", "Mod1"),
-    ("same", "Repeat"),
+    ("mod1", "Change1"),
+    ("same", "Constant"),
 )
 ENTROPY_PROGRAMS = (
     ("map", "Map"),
@@ -256,8 +256,8 @@ def generate_table() -> None:
         to_compares=[
             ("Random", Path("results/entropy/map/random/65536.json")),
             ("Low entropy", Path("results/entropy/map/block/65536.json")),
-            ("Modification", Path("results/entropy/map/mod1/65536.json")),
-            ("Repeated", Path("results/entropy/map/same/65536.json")),
+            ("Change1", Path("results/entropy/map/mod1/65536.json")),
+            ("Constant", Path("results/entropy/map/same/65536.json")),
         ],
         output_dir=Path("")
     )
@@ -364,7 +364,7 @@ def generate_scaling_reports(*, modes: Sequence[str] | None = None, sizes: Seque
     entries.append(("Hazel (all modes)", hazel_output / "index.html"))
     entropy_index = base_output / "entropy" / "index.html"
     if entropy_index.exists():
-        entries.append(("Input entropy (8 functions)", entropy_index))
+        entries.append(("Input entropy (6 functions)", entropy_index))
     generate_html(
         title="Scaling Experiments",
         output=base_output / "index.html",
@@ -439,7 +439,7 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
         with tag.main(cls="panel"):
             tag.h1("Input Entropy Scaling")
             tag.p(
-                f"Eight predefined list functions. Each plot has Baseline, Block, Mod1, and Repeat lines over input size; this sweep ends at {sizes[-1]:,}.",
+                f"Six predefined list functions. Each plot has Baseline, Block, Change1, and Constant lines over input size; this sweep ends at {sizes[-1]:,}.",
                 cls="meta",
             )
             with tag.section(cls="grid"):
@@ -526,7 +526,7 @@ def generate_hazel_reports(
     if include_hazel_compare:
         hazel_compare_index = generate_hazel_compare_reports(modes=hazel_compare_modes)
         if hazel_compare_index is not None:
-            extra_entries.append(("Chordata vs Hazel Baseline", hazel_compare_index))
+            extra_entries.append(("CEK vs Hazel Baseline", hazel_compare_index))
     generate_tex_table(
         output_path=tex_output,
         include_hazel_compare=include_hazel_compare,
@@ -544,7 +544,7 @@ def generate_hazel_reports(
         report_kind="hazel",
         extra_entries=extra_entries,
         description=(
-            "In the Chordata vs Hazel Baseline comparison, timeout and oom statuses refer to the external "
+            "In the CEK vs Hazel Baseline comparison, timeout and oom statuses refer to the external "
             "Hazel baseline evaluator. A timeout means Hazel did not finish within the per-benchmark compare "
             "budget; oom means the Hazel process exhausted memory. The comparison summary only aggregates "
             "Hazel rows whose status is ok."
@@ -701,8 +701,8 @@ def _eviction_ablation_pairs(
             f"missing no-evict keys={missing_no_evict[:3]}, missing evict keys={missing_evict[:3]}"
         )
     time_pairs: list[tuple[float, float]] = []
-    evict_heap_words_values: list[int] = []
-    no_evict_heap_words_values: list[int] = []
+    evict_live_words_values: list[int] = []
+    no_evict_live_words_values: list[int] = []
     for key in sorted(evict_keys, key=repr):
         evict_row = evict_by_key[key]
         no_evict_row = no_evict_by_key[key]
@@ -710,24 +710,24 @@ def _eviction_ablation_pairs(
         no_evict_time = _profile_total_from_row(no_evict_row, "memo_profile", path=no_evict_path)
         if evict_time > 0 and no_evict_time > 0:
             time_pairs.append((no_evict_time, evict_time))
-        evict_heap_words = evict_row.get("memo_heap_words")
-        no_evict_heap_words = no_evict_row.get("memo_heap_words")
+        evict_live_words = evict_row.get("memo_resting_adjusted_live_words")
+        no_evict_live_words = no_evict_row.get("memo_resting_adjusted_live_words")
         if (
-            isinstance(evict_heap_words, int)
-            and isinstance(no_evict_heap_words, int)
-            and evict_heap_words > 0
-            and no_evict_heap_words > 0
+            isinstance(evict_live_words, int)
+            and isinstance(no_evict_live_words, int)
+            and evict_live_words > 0
+            and no_evict_live_words > 0
         ):
-            evict_heap_words_values.append(evict_heap_words)
-            no_evict_heap_words_values.append(no_evict_heap_words)
+            evict_live_words_values.append(evict_live_words)
+            no_evict_live_words_values.append(no_evict_live_words)
 
     # Memory is a benchmark-level peak, not a per-trace statistic.  Compute
     # each configuration's peak independently so every benchmark contributes
     # exactly one ratio to the cross-benchmark geometric mean.
     memory_ratios = []
-    if evict_heap_words_values and no_evict_heap_words_values:
+    if evict_live_words_values and no_evict_live_words_values:
         memory_ratios.append(
-            float(max(no_evict_heap_words_values)) / float(max(evict_heap_words_values))
+            float(max(no_evict_live_words_values)) / float(max(evict_live_words_values))
         )
     return (time_pairs, memory_ratios)
 
@@ -1003,40 +1003,40 @@ def _tex_ratio(value: float, *, include_times_symbol: bool) -> str:
     return formatted
 
 
-def _memo_vs_cek_max_heap_words(input_path: Path) -> tuple[int, int] | None:
+def _memo_vs_cek_max_live_words(input_path: Path) -> tuple[int, int] | None:
     result = load_records(input_path)
-    memo_heap_words_values: list[int] = []
-    cek_heap_words_values: list[int] = []
+    memo_live_words_values: list[int] = []
+    cek_live_words_values: list[int] = []
     for record in result.exec_times:
-        memo_heap_words = record.memo_heap_words
-        cek_heap_words = record.cek_heap_words
-        if memo_heap_words is None or cek_heap_words is None:
+        memo_live_words = record.memo_resting_adjusted_live_words
+        cek_live_words = record.cek_resting_adjusted_live_words
+        if memo_live_words is None or cek_live_words is None:
             continue
-        if memo_heap_words <= 0 or cek_heap_words <= 0:
+        if memo_live_words <= 0 or cek_live_words <= 0:
             continue
-        memo_heap_words_values.append(memo_heap_words)
-        cek_heap_words_values.append(cek_heap_words)
-    if not memo_heap_words_values or not cek_heap_words_values:
+        memo_live_words_values.append(memo_live_words)
+        cek_live_words_values.append(cek_live_words)
+    if not memo_live_words_values or not cek_live_words_values:
         return None
-    return (max(memo_heap_words_values), max(cek_heap_words_values))
+    return (max(memo_live_words_values), max(cek_live_words_values))
 
 
 def _max_memo_vs_cek_memory_overhead(input_path: Path) -> str:
-    max_heap_words = _memo_vs_cek_max_heap_words(input_path)
-    if not max_heap_words:
+    max_live_words = _memo_vs_cek_max_live_words(input_path)
+    if not max_live_words:
         return "timeout"
-    max_memo_heap_words, max_cek_heap_words = max_heap_words
-    return fmt_speedup(float(max_memo_heap_words) / float(max_cek_heap_words))
+    max_memo_live_words, max_cek_live_words = max_live_words
+    return fmt_speedup(float(max_memo_live_words) / float(max_cek_live_words))
 
 
 def _max_memo_vs_cek_memory_overhead_ratio(input_path: Path) -> float | None:
-    max_heap_words = _memo_vs_cek_max_heap_words(input_path)
-    if not max_heap_words:
+    max_live_words = _memo_vs_cek_max_live_words(input_path)
+    if not max_live_words:
         return None
-    max_memo_heap_words, max_cek_heap_words = max_heap_words
-    if max_memo_heap_words <= 0 or max_cek_heap_words <= 0:
+    max_memo_live_words, max_cek_live_words = max_live_words
+    if max_memo_live_words <= 0 or max_cek_live_words <= 0:
         return None
-    return float(max_memo_heap_words) / float(max_cek_heap_words)
+    return float(max_memo_live_words) / float(max_cek_live_words)
 
 
 def _geometric_mean(values: Sequence[float]) -> float:
@@ -1331,23 +1331,23 @@ def _collect_hazel_compare_pairs(
                 continue
             if row.get("hazel_status") != "ok":
                 continue
-            chordata = _profile_sum(row.get("memo_profile"))
+            cek = _profile_sum(row.get("cek_profile"))
             hazel_value = row.get(hazel_key)
             if not isinstance(hazel_value, (int, float)):
                 continue
             hazel = float(hazel_value)
-            if chordata > 0 and hazel > 0:
-                pairs.append((chordata, hazel))
+            if cek > 0 and hazel > 0:
+                pairs.append((cek, hazel))
     return pairs
 
 
 def _hazel_compare_summary(pairs: Sequence[tuple[float, float]]) -> dict[str, float]:
-    hazel_over_chordata_ratios = [hz / chordata for chordata, hz in pairs]
+    hazel_over_cek_ratios = [hz / cek for cek, hz in pairs]
     return {
-        "samples": float(len(hazel_over_chordata_ratios)),
-        "geo_mean_hazel_over_chordata": math.exp(statistics.mean(math.log(r) for r in hazel_over_chordata_ratios)),
-        "arith_mean_hazel_over_chordata": statistics.mean(hazel_over_chordata_ratios),
-        "end_to_end_hazel_over_chordata": sum(hz for _, hz in pairs) / sum(chordata for chordata, _ in pairs),
+        "samples": float(len(hazel_over_cek_ratios)),
+        "geo_mean_hazel_over_cek": math.exp(statistics.mean(math.log(r) for r in hazel_over_cek_ratios)),
+        "arith_mean_hazel_over_cek": statistics.mean(hazel_over_cek_ratios),
+        "end_to_end_hazel_over_cek": sum(hz for _, hz in pairs) / sum(cek for cek, _ in pairs),
     }
 
 
@@ -1382,8 +1382,8 @@ def generate_hazel_compare_reports(
             input_paths.append(Path(steps_pattern.format(key=key)))
 
     eval_only_pairs = _collect_hazel_compare_pairs(input_paths, hazel_key="hazel_eval_only_ns")
-    eval_only_summary_path = output_dir / "hazel_vs_chordata_eval_only_summary.json"
-    stale_summary_path = output_dir / "hazel_vs_ant_cek_eval_only_summary.json"
+    eval_only_summary_path = output_dir / "hazel_vs_cek_eval_only_summary.json"
+    stale_summary_path = output_dir / "hazel_vs_chordata_eval_only_summary.json"
     if not eval_only_pairs:
         eval_only_summary_path.unlink(missing_ok=True)
         stale_summary_path.unlink(missing_ok=True)
@@ -1403,49 +1403,49 @@ def generate_hazel_compare_reports(
     if eval_only_pairs:
         eval_only_summary = _hazel_compare_summary(eval_only_pairs)
         eval_only_summary_path.write_text(json.dumps(eval_only_summary, indent=2), encoding="utf-8")
-        hazel_baseline_pairs = [(hazel, chordata) for chordata, hazel in eval_only_pairs]
+        hazel_baseline_pairs = [(hazel, cek) for cek, hazel in eval_only_pairs]
         scatter_name = plot_scatter_for_kind(
             hazel_baseline_pairs,
             output_dir,
             report_kind="hazel",
-            title="Chordata vs Hazel Baseline",
+            title="CEK vs Hazel Baseline",
             xlabel="Hazel baseline time (ns)",
-            ylabel="Chordata time (ns)",
-            output_name="hazel_vs_chordata_scatter.png",
+            ylabel="CEK time (ns)",
+            output_name="hazel_vs_cek_scatter.png",
         )
         eval_only_scatter_rel = os.path.relpath(output_dir / scatter_name, output.parent)
 
-    doc = document(title="Chordata vs Hazel Baseline")
+    doc = document(title="CEK vs Hazel Baseline")
     doc["lang"] = "en"
     with doc.head:
         tag.meta(charset="utf-8")
         tag.link(rel="stylesheet", href=css_href)
     with doc:
         with tag.main():
-            tag.h1("Chordata vs Hazel Baseline")
-            tag.p("Summary of Hazel baseline time divided by Chordata time from hazel-compare result data.")
+            tag.h1("CEK vs Hazel Baseline")
+            tag.p("Summary of Hazel baseline time divided by CEK time from hazel-compare result data.")
 
             if eval_only_summary:
-                tag.h2("Hazel baseline / Chordata")
+                tag.h2("Hazel baseline / CEK")
                 with tag.section(cls="stats"):
                     stat_card("Samples", str(int(eval_only_summary["samples"])))
                     stat_card(
                         "Geometric mean",
-                        f"{fmt_speedup(eval_only_summary['geo_mean_hazel_over_chordata'])}x",
+                        f"{fmt_speedup(eval_only_summary['geo_mean_hazel_over_cek'])}x",
                     )
                     stat_card(
                         "Arithmetic mean",
-                        f"{fmt_speedup(eval_only_summary['arith_mean_hazel_over_chordata'])}x",
+                        f"{fmt_speedup(eval_only_summary['arith_mean_hazel_over_cek'])}x",
                     )
                     stat_card(
                         "End-to-end",
-                        f"{fmt_speedup(eval_only_summary['end_to_end_hazel_over_chordata'])}x",
+                        f"{fmt_speedup(eval_only_summary['end_to_end_hazel_over_cek'])}x",
                     )
                 if eval_only_scatter_rel:
                     with tag.section(cls="plot"):
                         tag.img(
                             src=eval_only_scatter_rel,
-                            alt="Chordata versus Hazel baseline scatter plot",
+                            alt="CEK versus Hazel baseline scatter plot",
                         )
 
     output.write_text(doc.render(), encoding="utf-8")
@@ -1453,12 +1453,12 @@ def generate_hazel_compare_reports(
 
 
 def _hazel_baseline_geomean_for_tex(
-    summary_path: Path = Path("output/hazel/hazel_compare/hazel_vs_chordata_eval_only_summary.json"),
+    summary_path: Path = Path("output/hazel/hazel_compare/hazel_vs_cek_eval_only_summary.json"),
 ) -> str:
     summary = _summary_json(summary_path)
     if summary is None:
         return "timeout"
-    geo = summary.get("geo_mean_hazel_over_chordata")
+    geo = summary.get("geo_mean_hazel_over_cek")
     if not isinstance(geo, (int, float)):
         return "timeout"
     if float(geo) <= 0:

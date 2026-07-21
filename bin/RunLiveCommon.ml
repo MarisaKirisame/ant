@@ -220,19 +220,32 @@ and pp_vtype fmt = function
 let value_to_string value = Format.asprintf "%a" pp_value value
 
 type step_writer = Memo.exec_result -> memo_heap_words:int -> cek_heap_words:int -> unit
-type heap_words_stats = { start_heap_words : int; end_heap_words : int; peak_heap_words : int }
+
+type heap_words_stats = {
+  start_heap_words : int;
+  end_heap_words : int;
+  peak_heap_words : int;
+  start_live_words : int;
+  peak_live_words : int;
+  peak_live_words_above_resting : int;
+}
 
 type memo_run_result = {
   exec_res : Memo.exec_result;
   value : LC.value;
   memo_profile : (string * int) list;
   memo_heap_words : int;
+  memo_start_live_words : int;
+  memo_peak_live_words : int;
+  memo_peak_live_words_above_resting : int;
 }
 
 type baseline_run_result = {
   plain_profile : (string * int) list;
   cek_profile : (string * int) list;
   cek_heap_words : int;
+  cek_start_live_words : int;
+  cek_peak_live_words : int;
 }
 
 let ensure_parent_dir path =
@@ -247,21 +260,30 @@ let with_outchannel steps_path f =
   Fun.protect ~finally:(fun () -> close_out_noerr oc) (fun () -> f oc)
 
 let resting_heap_words : int option ref = ref None
+let resting_live_words : int option ref = ref None
 
 let record_resting_heap_size () : unit =
   Gc.full_major ();
-  resting_heap_words := Some (Gc.quick_stat ()).heap_words
+  let stat = Gc.quick_stat () in
+  resting_heap_words := Some stat.heap_words;
+  resting_live_words := Some stat.live_words
 
 let subtract_resting_heap_size (heap_words : int) : int =
   match !resting_heap_words with None -> heap_words | Some resting -> max 0 (heap_words - resting)
 
+let subtract_resting_live_size (live_words : int) : int =
+  match !resting_live_words with None -> live_words | Some resting -> live_words - resting
+
 let measure_memory_consumption (f : unit -> 'a) : 'a * heap_words_stats =
   Gc.full_major ();
-  let start_heap_words = (Gc.quick_stat ()).heap_words in
+  let start_stat = Gc.quick_stat () in
+  let start_heap_words = start_stat.heap_words in
   let peak_heap_words = ref start_heap_words in
+  let peak_live_words = ref start_stat.live_words in
   let update_peak () =
-    let heap_words = (Gc.quick_stat ()).heap_words in
-    if heap_words > !peak_heap_words then peak_heap_words := heap_words
+    let stat = Gc.quick_stat () in
+    if stat.heap_words > !peak_heap_words then peak_heap_words := stat.heap_words;
+    if stat.live_words > !peak_live_words then peak_live_words := stat.live_words
   in
   let alarm = Gc.create_alarm update_peak in
   update_peak ();
@@ -269,6 +291,9 @@ let measure_memory_consumption (f : unit -> 'a) : 'a * heap_words_stats =
     ~finally:(fun () -> Gc.delete_alarm alarm)
     (fun () ->
       let result = f () in
+      (* Timing has ended, but [result] remains live.  Complete a major cycle so
+         [live_words] describes this execution rather than the preceding one. *)
+      Gc.full_major ();
       update_peak ();
       let end_heap_words = (Gc.quick_stat ()).heap_words in
       ( result,
@@ -276,6 +301,9 @@ let measure_memory_consumption (f : unit -> 'a) : 'a * heap_words_stats =
           start_heap_words = subtract_resting_heap_size start_heap_words;
           end_heap_words = subtract_resting_heap_size end_heap_words;
           peak_heap_words = subtract_resting_heap_size !peak_heap_words;
+          start_live_words = start_stat.live_words;
+          peak_live_words = !peak_live_words;
+          peak_live_words_above_resting = subtract_resting_live_size !peak_live_words;
         } ))
 
 let write_steps_json_from_parts oc ~(exec_res : Memo.exec_result) ~(memo_profile : (string * int) list)
@@ -397,6 +425,9 @@ let eval_expression_memo_only ?(evict = false) ~memo expr : memo_run_result =
     value = LC.to_ocaml_value exec_res.words;
     memo_profile;
     memo_heap_words = memo_heap_stats.peak_heap_words;
+    memo_start_live_words = memo_heap_stats.start_live_words;
+    memo_peak_live_words = memo_heap_stats.peak_live_words;
+    memo_peak_live_words_above_resting = memo_heap_stats.peak_live_words_above_resting;
   }
 
 let eval_expression_baseline_only expr : baseline_run_result =
@@ -414,6 +445,8 @@ let eval_expression_baseline_only expr : baseline_run_result =
     plain_profile = Profile.dump_profile Profile.plain_profile;
     cek_profile = Profile.dump_profile Profile.cek_profile;
     cek_heap_words = cek_heap_stats.peak_heap_words;
+    cek_start_live_words = cek_heap_stats.start_live_words;
+    cek_peak_live_words = cek_heap_stats.peak_live_words;
   }
 
 let eval_expression ~memo ~write_steps expr =

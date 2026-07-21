@@ -1,4 +1,4 @@
-(version 5.3.1.20251109.1)
+(version 5.4.1.20251109.1)
 
 (install
  (all_platforms
@@ -116,9 +116,9 @@
 (source
  (fetch
   (url
-   https://github.com/dra27/ocaml/archive/56da1dd907cf6db509c1e8c42457f4f345158a7d.tar.gz)
+   https://github.com/dra27/ocaml/archive/b74c645ef30c6060dcc293a73811a9ae9ceefd57.tar.gz)
   (checksum
-   sha256=c46a298659ff33fb168450ed4ec0545d3f3e7844d294312d86504b492688f6f2)))
+   sha256=b461d60f5b542bbd3315d3d984efaef9113d1672b5f6bfdd46efd5e96060d17a)))
 
 (extra_sources
  (process.sh
