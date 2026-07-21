@@ -701,7 +701,8 @@ def _eviction_ablation_pairs(
             f"missing no-evict keys={missing_no_evict[:3]}, missing evict keys={missing_evict[:3]}"
         )
     time_pairs: list[tuple[float, float]] = []
-    memory_ratios: list[float] = []
+    evict_heap_words_values: list[int] = []
+    no_evict_heap_words_values: list[int] = []
     for key in sorted(evict_keys, key=repr):
         evict_row = evict_by_key[key]
         no_evict_row = no_evict_by_key[key]
@@ -717,7 +718,17 @@ def _eviction_ablation_pairs(
             and evict_heap_words > 0
             and no_evict_heap_words > 0
         ):
-            memory_ratios.append(float(no_evict_heap_words) / float(evict_heap_words))
+            evict_heap_words_values.append(evict_heap_words)
+            no_evict_heap_words_values.append(no_evict_heap_words)
+
+    # Memory is a benchmark-level peak, not a per-trace statistic.  Compute
+    # each configuration's peak independently so every benchmark contributes
+    # exactly one ratio to the cross-benchmark geometric mean.
+    memory_ratios = []
+    if evict_heap_words_values and no_evict_heap_words_values:
+        memory_ratios.append(
+            float(max(no_evict_heap_words_values)) / float(max(evict_heap_words_values))
+        )
     return (time_pairs, memory_ratios)
 
 
