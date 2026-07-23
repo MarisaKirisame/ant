@@ -12,7 +12,7 @@
   ((source
     https://github.com/ocaml-dune/opam-repository-relocatable.git#d64df82c7e16de819a770cabf4066a06243ed80b))
   ((source
-    https://github.com/ocaml/opam-repository.git#080b1a01e84987ad2f77e87075ea70cadfa5cb7e))))
+    https://github.com/ocaml/opam-repository.git#49f6d620cf20ae0168cfcbeb2c33932e06cb4b74))))
 
 (expanded_solver_variable_bindings
  (variable_values
