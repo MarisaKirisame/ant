@@ -140,7 +140,7 @@ def ensure_opam_switch(switch: str) -> None:
             "--switch",
             switch,
             "--update-invariant",
-            "ocaml>=5.2",
+            "ocaml-base-compiler=5.4.1",
             "-y",
         ]
     )
@@ -234,13 +234,13 @@ def generate_ml_files() -> None:
             opam_exec(command)
 
 base_modes = ("append", "filter", "map", "qs", "is", "ms", "pair", "rev")
-variant_prefixes = ("", "th_", "at_")
+variant_prefixes = ("user1_", "user2_", "user3_")
 hazel_modes = tuple(
-    f"{prefix}{mode}" if prefix else mode
+    f"{prefix}{mode}"
     for prefix in variant_prefixes
     for mode in base_modes
 )
-hazel_bad = set(["th_ms", "th_pair"])
+hazel_bad = set(["user3_ms", "user3_pair"])
 hazel_modes = tuple(m for m in hazel_modes if m not in hazel_bad)
 arith_modes = ("arith",)
 modes = arith_modes + hazel_modes

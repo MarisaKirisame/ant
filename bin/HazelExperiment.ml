@@ -1,6 +1,6 @@
 module Common = RunLiveCommon
 
-type dataset = Mk | Th | At
+type dataset = User1 | User2 | User3
 type benchmark = Append | Filter | Map | QS | IS | MS | Pair | Rev
 
 let benchmarks = [ Append; Filter; Map; QS; IS; MS; Pair; Rev ]
@@ -25,24 +25,14 @@ let benchmark_data_suffix = function
   | Pair -> "Pair"
   | Rev -> "Rev"
 
-let dataset_data_prefix = function Mk -> "mk" | Th -> "th" | At -> "at"
-let dataset_mode_prefix = function Mk -> "" | Th -> "th_" | At -> "at_"
+let dataset_prefix = function User1 -> "user1" | User2 -> "user2" | User3 -> "user3"
+let dataset_mode_prefix dataset = dataset_prefix dataset ^ "_"
 let mode_name dataset benchmark = dataset_mode_prefix dataset ^ benchmark_key benchmark
-
-let steps_file dataset benchmark =
-  match dataset with
-  | Mk -> Printf.sprintf "results/hazel/%s.json" (benchmark_key benchmark)
-  | Th -> Printf.sprintf "results/hazel/th_%s.json" (benchmark_key benchmark)
-  | At -> Printf.sprintf "results/hazel/at_%s.json" (benchmark_key benchmark)
-
-let compare_steps_file dataset benchmark =
-  match dataset with
-  | Mk -> Printf.sprintf "results/hazel-compare/%s.json" (benchmark_key benchmark)
-  | Th -> Printf.sprintf "results/hazel-compare/th_%s.json" (benchmark_key benchmark)
-  | At -> Printf.sprintf "results/hazel-compare/at_%s.json" (benchmark_key benchmark)
+let steps_file dataset benchmark = Printf.sprintf "results/hazel/%s.json" (mode_name dataset benchmark)
+let compare_steps_file dataset benchmark = Printf.sprintf "results/hazel-compare/%s.json" (mode_name dataset benchmark)
 
 let program_path dataset benchmark =
-  Printf.sprintf "data/%s_%s.json" (dataset_data_prefix dataset) (benchmark_data_suffix benchmark)
+  Printf.sprintf "data/%s_%s.json" (dataset_prefix dataset) (benchmark_data_suffix benchmark)
 
 let list_to_cons_str xs = match xs with [] -> "[]" | _ -> String.concat " :: " (List.map string_of_int xs) ^ " :: []"
 
@@ -67,9 +57,9 @@ let run ?hazel_compare ?(evict = true) ?(baseline = true) ?(input_size = Common.
   FromHazel.run_with_test ~program_name:(mode_name dataset benchmark) ~program_path:(program_path dataset benchmark)
     ~steps_file ~input_size ~test ~evict ~baseline ?hazel_compare ?max_candidates ()
 
-let run_mk benchmark = run ~dataset:Mk ~benchmark ()
-let run_th benchmark = run ~dataset:Th ~benchmark ()
-let run_at benchmark = run ~dataset:At ~benchmark ()
+let run_user1 benchmark = run ~dataset:User1 ~benchmark ()
+let run_user2 benchmark = run ~dataset:User2 ~benchmark ()
+let run_user3 benchmark = run ~dataset:User3 ~benchmark ()
 
 let rec find_repo_root dir =
   let marker = Filename.concat dir "hazel/src/CLI/polyfill.js" in
@@ -100,9 +90,9 @@ let decode_mode mode =
   let normalized = String.lowercase_ascii mode in
   List.find_map
     (fun benchmark ->
-      if String.equal normalized (mode_name Mk benchmark) then Some (Mk, benchmark)
-      else if String.equal normalized (mode_name Th benchmark) then Some (Th, benchmark)
-      else if String.equal normalized (mode_name At benchmark) then Some (At, benchmark)
+      if String.equal normalized (mode_name User1 benchmark) then Some (User1, benchmark)
+      else if String.equal normalized (mode_name User2 benchmark) then Some (User2, benchmark)
+      else if String.equal normalized (mode_name User3 benchmark) then Some (User3, benchmark)
       else None)
     benchmarks
 
@@ -137,7 +127,7 @@ let run_compare_mode ?(evict = true) ?input_size ?steps_file ?max_candidates ?ha
 
 let all_modes =
   List.concat_map
-    (fun benchmark -> [ mode_name Mk benchmark; mode_name Th benchmark; mode_name At benchmark ])
+    (fun benchmark -> [ mode_name User1 benchmark; mode_name User2 benchmark; mode_name User3 benchmark ])
     benchmarks
 
 let usage = Printf.sprintf "Usage: GeneratedMain <%s>" (String.concat "|" all_modes)

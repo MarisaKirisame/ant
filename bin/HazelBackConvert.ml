@@ -46,9 +46,9 @@ let usage =
       "  GeneratedMain hazel-convert <program_path> <output_path> [test_expr] [candidate_index] [json|text]";
       "";
       "Examples:";
-      "  GeneratedMain hazel-convert data/mk_Append.json out.json";
-      "  GeneratedMain hazel-convert data/mk_Append.json out.hz \"my_append (1 :: []) (2 :: [])\"";
-      "  GeneratedMain hazel-convert data/mk_Append.json out.hz \"my_append (1 :: []) (2 :: [])\" 0 text";
+      "  GeneratedMain hazel-convert data/user1_Append.json out.json";
+      "  GeneratedMain hazel-convert data/user1_Append.json out.hz \"my_append (1 :: []) (2 :: [])\"";
+      "  GeneratedMain hazel-convert data/user1_Append.json out.hz \"my_append (1 :: []) (2 :: [])\" 0 text";
     ]
 
 let parse_bool_mode = function

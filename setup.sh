@@ -1,6 +1,6 @@
 #!/bin/sh
 
-opam switch create ant 5.4.0+options ocaml-option-fp
+opam switch create ant ocaml-base-compiler.5.4.1
 eval "$(opam env --switch=ant)"
 opam install \
   core dune menhir \

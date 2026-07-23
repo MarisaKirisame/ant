@@ -67,33 +67,33 @@ ENTROPY_PROGRAMS = (
 HAZEL_COMPARE_EXCLUDED_MODES = frozenset()
 
 VARIANTS: list[tuple[str, str, str]] = [
-    ("results/hazel/{key}.json", "{key}", ""),
-    ("results/hazel/th_{key}.json", "th_{key}", " (th)"),
-    ("results/hazel/at_{key}.json", "at_{key}", " (at)"),
+    ("results/hazel/user1_{key}.json", "user1_{key}", " (User 1)"),
+    ("results/hazel/user2_{key}.json", "user2_{key}", " (User 2)"),
+    ("results/hazel/user3_{key}.json", "user3_{key}", " (User 3)"),
 ]
 
 HAZEL_COMPARE_VARIANTS: list[tuple[str, str, str]] = [
-    ("results/hazel-compare/{key}.json", "{key}", ""),
-    ("results/hazel-compare/th_{key}.json", "th_{key}", " (th)"),
-    ("results/hazel-compare/at_{key}.json", "at_{key}", " (at)"),
+    ("results/hazel-compare/user1_{key}.json", "user1_{key}", " (User 1)"),
+    ("results/hazel-compare/user2_{key}.json", "user2_{key}", " (User 2)"),
+    ("results/hazel-compare/user3_{key}.json", "user3_{key}", " (User 3)"),
 ]
 
 TABLE_VARIANTS: list[tuple[str, str]] = [
-    ("1", "results/hazel/{key}.json"),
-    ("2", "results/hazel/at_{key}.json"),
-    ("3", "results/hazel/th_{key}.json"),
+    ("1", "results/hazel/user1_{key}.json"),
+    ("2", "results/hazel/user2_{key}.json"),
+    ("3", "results/hazel/user3_{key}.json"),
 ]
 
 HAZEL_NO_EVICT_VARIANTS: list[tuple[str, str, str]] = [
-    ("results/hazel-no-evict/{key}.json", "{key}", ""),
-    ("results/hazel-no-evict/th_{key}.json", "th_{key}", " (th)"),
-    ("results/hazel-no-evict/at_{key}.json", "at_{key}", " (at)"),
+    ("results/hazel-no-evict/user1_{key}.json", "user1_{key}", " (User 1)"),
+    ("results/hazel-no-evict/user2_{key}.json", "user2_{key}", " (User 2)"),
+    ("results/hazel-no-evict/user3_{key}.json", "user3_{key}", " (User 3)"),
 ]
 
 HAZEL_NO_EVICT_TABLE_VARIANTS: list[tuple[str, str]] = [
-    ("1", "results/hazel-no-evict/{key}.json"),
-    ("2", "results/hazel-no-evict/at_{key}.json"),
-    ("3", "results/hazel-no-evict/th_{key}.json"),
+    ("1", "results/hazel-no-evict/user1_{key}.json"),
+    ("2", "results/hazel-no-evict/user2_{key}.json"),
+    ("3", "results/hazel-no-evict/user3_{key}.json"),
 ]
 
 def _render_html(
@@ -1120,11 +1120,10 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
 
 def _mode_from_steps_pattern(steps_pattern: str, key: str) -> str:
     name = Path(steps_pattern.format(key=key)).name
-    if name.startswith("th_"):
-        return f"th_{key}"
-    if name.startswith("at_"):
-        return f"at_{key}"
-    return key
+    for participant in ("user1", "user2", "user3"):
+        if name.startswith(f"{participant}_"):
+            return f"{participant}_{key}"
+    raise ValueError(f"steps pattern does not identify a participant: {steps_pattern}")
 
 
 def generate_tex_table(

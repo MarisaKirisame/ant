@@ -1,5 +1,5 @@
 let steps_file = "results/hazel/is_sorted.json"
-let program_path = "data/mk_program.json"
+let program_path = "data/user1_program.json"
 let large_input = [ 1; 2; 3; 4; 5; 6; 7; 8; 9; 10 ]
 let large_input = large_input @ large_input
 let large_input = large_input @ large_input
