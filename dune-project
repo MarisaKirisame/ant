@@ -6,21 +6,15 @@
 
 (generate_opam_files true)
 
-(source
- (github username/reponame))
+(maintainers "Marisa Kirisame <marisa@cs.utah.edu>")
 
-(authors "Author Name")
-
-(maintainers "Maintainer Name")
-
-(license LICENSE)
-
-(documentation https://url/to/documentation)
+(license Apache-2.0)
 
 (package
  (name ant)
- (synopsis "A short synopsis")
- (description "A longer description")
+ (synopsis "Incremental live programming via shortcut memoization")
+ (description
+  "The Chordata compiler, runtime, benchmarks, and artifact evaluation")
  (depends
   (ocaml (= 5.4.1))
   (ocaml-base-compiler (= 5.4.1))
@@ -35,8 +29,4 @@
   sexplib
   yojson
   ppx_deriving
-  ppxlib)
- (tags
-  (topics "to describe" your project)))
-
-; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html
+  ppxlib))

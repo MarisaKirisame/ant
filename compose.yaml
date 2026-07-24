@@ -1,0 +1,12 @@
+services:
+  artifact:
+    build:
+      context: .
+      args:
+        ARTIFACT_UID: ${ARTIFACT_UID:-1000}
+        ARTIFACT_GID: ${ARTIFACT_GID:-1000}
+    image: chordata-artifact
+    network_mode: none
+    volumes:
+      - ./docker-output/results:/workspace/results
+      - ./docker-output/output:/workspace/output

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import glob
+import json
 import os
 import shlex
 import shutil
@@ -41,6 +42,8 @@ def _resolve_switch() -> str:
 
 SWITCH = _resolve_switch()
 HAZEL_SWITCH = _normalize_switch(os.environ.get("ANT_HAZEL_OPAM_SWITCH", "ant-hazel"))
+CHORDATA_OCAML_INVARIANT = "ocaml-base-compiler=5.4.1"
+HAZEL_OCAML_INVARIANT = "ocaml-base-compiler=5.2.0"
 OPAM_ARCHIVE_REPOSITORY_URL = "git+https://github.com/ocaml/opam-repository-archive"
 TOOLCHAIN_PACKAGES = [
     "dune>=3.24.0",
@@ -62,6 +65,8 @@ import coverage_comment  # noqa: E402
 @dataclasses.dataclass(frozen=True)
 class RunOptions:
     smoke: bool = False
+    skip_dependencies: bool = False
+    skip_dev_tools: bool = False
 
 
 RUN_OPTIONS = RunOptions()
@@ -127,7 +132,7 @@ def _switch_exists(switch: str) -> bool:
     return False
 
 
-def ensure_opam_switch(switch: str) -> None:
+def ensure_opam_switch(switch: str, *, invariant: str = CHORDATA_OCAML_INVARIANT) -> None:
     """Ensure an opam switch exists and enforces the project OCaml invariant."""
 
     if not _switch_exists(switch):
@@ -140,7 +145,7 @@ def ensure_opam_switch(switch: str) -> None:
             "--switch",
             switch,
             "--update-invariant",
-            "ocaml-base-compiler=5.4.1",
+            invariant,
             "-y",
         ]
     )
@@ -188,13 +193,16 @@ def install_dependencies() -> None:
     run(["opam", "update"])
     run(["opam", "upgrade", "--switch", SWITCH, "--fixup", "-y"])
     run(["opam", "install", "--switch", SWITCH, "-y", *TOOLCHAIN_PACKAGES])
-    run(["opam", "install", "--switch", SWITCH, "-y", *DEV_PACKAGES])
+    if not RUN_OPTIONS.skip_dev_tools:
+        run(["opam", "install", "--switch", SWITCH, "-y", *DEV_PACKAGES])
     opam_exec(["dune", "pkg", "lock"])
 
 
 def hazel_dependency() -> None:
-    ensure_opam_switch(HAZEL_SWITCH)
-    run(["git", "submodule", "update", "--init", "--recursive", "hazel"])
+    ensure_opam_switch(HAZEL_SWITCH, invariant=HAZEL_OCAML_INVARIANT)
+    hazel_marker = REPO_ROOT / "hazel" / "src" / "CLI" / "polyfill.js"
+    if not hazel_marker.exists():
+        run(["git", "submodule", "update", "--init", "--recursive", "hazel"])
     ensure_opam_archive_repository(HAZEL_SWITCH)
     run(["opam", "install", "--switch", HAZEL_SWITCH, "-y", "--deps-only", "--locked", "."], cwd=REPO_ROOT / "hazel")
     opam_exec_in_switch(
@@ -400,9 +408,31 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
         command.append(str(_compare_result_path_for_mode(mode)))
         result = opam_exec(command, check=False)
         if result.returncode != 0:
-            _compare_result_path_for_mode(mode).unlink(missing_ok=True)
-            status = "timed out" if result.returncode in (124, 137) else f"failed with exit {result.returncode}"
-            print(f"Running {mode} compare... {status}; continuing", flush=True)
+            output_path = _compare_result_path_for_mode(mode)
+            output_path.unlink(missing_ok=True)
+            timed_out = result.returncode in (124, 137)
+            status = "timeout" if timed_out else "failed"
+            message = (
+                f"mode timed out after {hazel_compare_mode_timeout}"
+                if timed_out
+                else f"mode failed with exit {result.returncode}"
+            )
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(
+                json.dumps(
+                    {
+                        "name": "hazel_compare_status",
+                        "mode": mode,
+                        "input_size": smoke_input_size if _smoke_run() else hazel_compare_input_size,
+                        "hazel_status": status,
+                        "hazel_error": message,
+                    },
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            print(f"Running {mode} compare... {message}; continuing", flush=True)
 
 
 def run_project() -> None:
@@ -555,6 +585,10 @@ def profile_project() -> None:
 
 def report_project() -> None:
     clean_output()
+    if Path("results/entropy").exists():
+        report_module.generate_entropy_scaling_report(sizes=_entropy_scaling_sizes())
+    if Path("results/arith").exists() and Path("results/hazel").exists():
+        report_module.generate_scaling_reports(modes=hazel_modes, sizes=_scaling_sizes())
     report_module.generate_reports()
 
 
@@ -664,13 +698,21 @@ def main(argv: Iterable[str]) -> int:
         "[dependency|hazel-dependency|build|coverage|run|profile|hazel|hazel-experiment|hazel-no-evict|"
         "hazel-report|arith|arith-report|arith-scaling|hazel-scaling|"
         "hazel-no-evict-scaling|scaling|scaling-report|entropy-scaling|entropy-report|report|experiment|"
-        "hazel-tex|arith-tex|compile-generated|all] [--smoke]"
+        "hazel-tex|arith-tex|compile-generated|all] [--smoke] [--skip-dependencies] [--skip-dev-tools]"
     )
 
     smoke = False
     if "--smoke" in args:
         smoke = True
         args.remove("--smoke")
+    skip_dependencies = False
+    if "--skip-dependencies" in args:
+        skip_dependencies = True
+        args.remove("--skip-dependencies")
+    skip_dev_tools = False
+    if "--skip-dev-tools" in args:
+        skip_dev_tools = True
+        args.remove("--skip-dev-tools")
     if any(arg.startswith("-") for arg in args):
         unknown = next(arg for arg in args if arg.startswith("-"))
         print(f"Unknown option: {unknown}", file=sys.stderr)
@@ -682,7 +724,11 @@ def main(argv: Iterable[str]) -> int:
         return 1
 
     stage = args[0] if args else "all"
-    RUN_OPTIONS = RunOptions(smoke=smoke)
+    RUN_OPTIONS = RunOptions(
+        smoke=smoke,
+        skip_dependencies=skip_dependencies,
+        skip_dev_tools=skip_dev_tools,
+    )
 
     if stage == "dependency":
         install_dependencies()
@@ -737,8 +783,9 @@ def main(argv: Iterable[str]) -> int:
     elif stage == "all":
         clean_results()
         clean_output()
-        install_dependencies()
-        hazel_dependency()
+        if not RUN_OPTIONS.skip_dependencies:
+            install_dependencies()
+            hazel_dependency()
         build_project()
         arith_project()
         hazel_experiment_project(generate_report=False)

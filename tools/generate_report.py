@@ -1081,7 +1081,7 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
         if slot_name == "compose_step":
             return "compose rule"
         if slot_name == "instantiate":
-            return "intantiation"
+            return "instantiation"
         if slot_name == "insert_step":
             return "insert rule"
         if slot_name == "step_through":
@@ -1340,6 +1340,49 @@ def _collect_hazel_compare_pairs(
     return pairs
 
 
+def _collect_hazel_compare_mode_statuses(
+    input_paths: Sequence[Path],
+) -> list[tuple[str, str, int]]:
+    mode_statuses: list[tuple[str, str, int]] = []
+    for path in input_paths:
+        if not path.exists():
+            mode_statuses.append((path.stem, "missing", 0))
+            continue
+
+        status_counts: dict[str, int] = {}
+        mode_status: str | None = None
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(row, dict):
+                continue
+            status = row.get("hazel_status")
+            if not isinstance(status, str):
+                continue
+            if row.get("name") == "hazel_compare_status":
+                mode_status = status
+            elif row.get("name") == "exec_time":
+                status_counts[status] = status_counts.get(status, 0) + 1
+
+        successful_samples = status_counts.get("ok", 0)
+        if mode_status is not None:
+            display_status = mode_status
+        elif not status_counts:
+            display_status = "no timing data"
+        elif set(status_counts) == {"ok"}:
+            display_status = "ok"
+        else:
+            display_status = ", ".join(
+                f"{status}: {count}" for status, count in sorted(status_counts.items())
+            )
+        mode_statuses.append((path.stem, display_status, successful_samples))
+    return mode_statuses
+
+
 def _hazel_compare_summary(pairs: Sequence[tuple[float, float]]) -> dict[str, float]:
     hazel_over_cek_ratios = [hz / cek for cek, hz in pairs]
     return {
@@ -1381,9 +1424,10 @@ def generate_hazel_compare_reports(
             input_paths.append(Path(steps_pattern.format(key=key)))
 
     eval_only_pairs = _collect_hazel_compare_pairs(input_paths, hazel_key="hazel_eval_only_ns")
+    mode_statuses = _collect_hazel_compare_mode_statuses(input_paths)
     eval_only_summary_path = output_dir / "hazel_vs_cek_eval_only_summary.json"
     stale_summary_path = output_dir / "hazel_vs_chordata_eval_only_summary.json"
-    if not eval_only_pairs:
+    if not eval_only_pairs and all(status == "missing" for _, status, _ in mode_statuses):
         eval_only_summary_path.unlink(missing_ok=True)
         stale_summary_path.unlink(missing_ok=True)
         return None
@@ -1446,6 +1490,20 @@ def generate_hazel_compare_reports(
                             src=eval_only_scatter_rel,
                             alt="CEK versus Hazel baseline scatter plot",
                         )
+            tag.h2("Per-mode status")
+            tag.p("Only successful (ok) samples contribute to the aggregate statistics above.")
+            with tag.table():
+                with tag.thead():
+                    with tag.tr():
+                        tag.th("Mode")
+                        tag.th("Status")
+                        tag.th("Successful samples")
+                with tag.tbody():
+                    for mode, status, successful_samples in mode_statuses:
+                        with tag.tr():
+                            tag.td(mode)
+                            tag.td(status)
+                            tag.td(str(successful_samples))
 
     output.write_text(doc.render(), encoding="utf-8")
     return output
