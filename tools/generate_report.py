@@ -1140,8 +1140,12 @@ def generate_tex_table(
         if generate_hazel_compare_report:
             generate_hazel_compare_reports(modes=hazel_compare_modes)
         baseline_geomean = _hazel_baseline_geomean_for_tex()
+        baseline_memory_overhead = _hazel_baseline_memory_overhead_for_tex()
+        baseline_memory_table_lines = _hazel_baseline_memory_table_lines(hazel_compare_modes)
     else:
         baseline_geomean = "timeout"
+        baseline_memory_overhead = "timeout"
+        baseline_memory_table_lines = []
     selected = set(modes) if modes is not None else None
     available_input_paths: list[Path] = []
     rows: list[tuple[str, list[str], list[str]]] = []
@@ -1200,6 +1204,16 @@ def generate_tex_table(
         f"\\newcommand{{\\{macro_prefix}TotalSpeedup}}{{" + total_speedup + "}",
         f"\\newcommand{{\\{macro_prefix}TotalMemoryOverhead}}{{" + total_memory_overhead + "}",
         f"\\newcommand{{\\{macro_prefix}BaselineGeoMean}}{{" + baseline_geomean + "}",
+        f"\\newcommand{{\\{macro_prefix}BaselineMemoryOverhead}}{{" + baseline_memory_overhead + "}",
+        f"\\newcommand{{\\{macro_prefix}BaselineMemoryTable}}{{%",
+        "\\begin{tabular}{l|rrr}",
+        "\\hline",
+        "Benchmark & User 1 & User 2 & User 3 \\\\",
+        "\\hline",
+        *baseline_memory_table_lines,
+        "\\hline",
+        "\\end{tabular}%",
+        "}",
         f"\\newcommand{{\\{macro_prefix}SpeedBreakdown}}{{%",
         *breakdown_lines,
         "}",
@@ -1628,15 +1642,49 @@ def generate_hazel_compare_reports(
     return output
 
 
-def _hazel_baseline_geomean_for_tex(
-    summary_path: Path = Path("output/hazel/hazel_compare/hazel_vs_cek_eval_only_summary.json"),
-) -> str:
-    summary = _summary_json(summary_path)
+def _memo_summary_ratio_for_tex(key: str) -> str:
+    summary = _summary_json(Path("output/hazel/hazel_compare/hazel_vs_memo_summary.json"))
     if summary is None:
         return "timeout"
-    geo = summary.get("geo_mean_hazel_over_cek")
-    if not isinstance(geo, (int, float)):
+    value = summary.get(key)
+    if not isinstance(value, (int, float)):
         return "timeout"
-    if float(geo) <= 0:
+    if float(value) <= 0:
         return "timeout"
-    return _tex_ratio(float(geo), include_times_symbol=True)
+    return _tex_ratio(float(value), include_times_symbol=True)
+
+
+def _hazel_baseline_geomean_for_tex() -> str:
+    """Official Hazel over memoized Chordata time geomean.
+
+    The paper's baseline comparison is against memoized Chordata; the
+    CEK-versus-Hazel numbers remain on the HTML compare page only.
+    """
+    return _memo_summary_ratio_for_tex("geo_mean_hazel_over_memo")
+
+
+def _hazel_baseline_memory_overhead_for_tex() -> str:
+    return _memo_summary_ratio_for_tex("geo_mean_memory_hazel_over_memo")
+
+
+def _hazel_baseline_memory_table_lines(modes: Sequence[str] | None) -> list[str]:
+    """Rows of the Hazel-baseline/memo peak-memory ratio table (benchmark x user)."""
+    selected = set(modes) if modes is not None else None
+    lines: list[str] = []
+    for key, benchmark_label in BASE_EXPERIMENTS:
+        cells: list[str] = []
+        for steps_pattern, mode_pattern, _ in HAZEL_COMPARE_VARIANTS:
+            mode = mode_pattern.format(key=key)
+            path = Path(steps_pattern.format(key=key))
+            if selected is not None:
+                included = mode in selected
+            else:
+                included = mode not in HAZEL_COMPARE_EXCLUDED_MODES
+            value = "X"
+            if included and path.exists():
+                table = _memo_hazel_memory_rows(_collect_memo_hazel_rows([path]))
+                if table:
+                    value = _tex_ratio(table[0][4], include_times_symbol=True)
+            cells.append(value)
+        lines.append(" & ".join([benchmark_label, *cells]) + " \\\\")
+    return lines
