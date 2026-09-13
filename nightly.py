@@ -41,6 +41,8 @@ def _resolve_switch() -> str:
 
 SWITCH = _resolve_switch()
 HAZEL_SWITCH = _normalize_switch(os.environ.get("ANT_HAZEL_OPAM_SWITCH", "ant-hazel"))
+CHORDATA_OCAML_INVARIANT = "ocaml-base-compiler=5.4.1"
+HAZEL_OCAML_INVARIANT = "ocaml-base-compiler=5.2.0"
 OPAM_ARCHIVE_REPOSITORY_URL = "git+https://github.com/ocaml/opam-repository-archive"
 TOOLCHAIN_PACKAGES = [
     "dune>=3.24.0",
@@ -125,8 +127,8 @@ def _switch_exists(switch: str) -> bool:
     return False
 
 
-def ensure_opam_switch(switch: str) -> None:
-    """Ensure an opam switch exists and enforces the project OCaml invariant."""
+def ensure_opam_switch(switch: str, *, invariant: str = CHORDATA_OCAML_INVARIANT) -> None:
+    """Ensure an opam switch exists and enforces the given OCaml invariant."""
 
     if not _switch_exists(switch):
         run(["opam", "switch", "create", switch, "--empty"])
@@ -138,7 +140,7 @@ def ensure_opam_switch(switch: str) -> None:
             "--switch",
             switch,
             "--update-invariant",
-            "ocaml-base-compiler=5.4.1",
+            invariant,
             "-y",
         ]
     )
@@ -191,7 +193,7 @@ def install_dependencies() -> None:
 
 
 def hazel_dependency() -> None:
-    ensure_opam_switch(HAZEL_SWITCH)
+    ensure_opam_switch(HAZEL_SWITCH, invariant=HAZEL_OCAML_INVARIANT)
     run(["git", "submodule", "update", "--init", "--recursive", "hazel"])
     ensure_opam_archive_repository(HAZEL_SWITCH)
     run(["opam", "install", "--switch", HAZEL_SWITCH, "-y", "--deps-only", "--locked", "."], cwd=REPO_ROOT / "hazel")
