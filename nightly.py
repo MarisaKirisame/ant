@@ -46,7 +46,6 @@ TOOLCHAIN_PACKAGES = [
     "dune>=3.24.0",
 ]
 DEV_PACKAGES = [
-    "bisect_ppx=2.8.3",
     "ocaml-lsp-server",
     "ocamlformat",
 ]
@@ -56,7 +55,6 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 import generate_report as report_module  # noqa: E402
-import coverage_comment  # noqa: E402
 
 
 @dataclasses.dataclass(frozen=True)
@@ -585,47 +583,6 @@ def compile_generated() -> None:
     generate_ml_files()
 
 
-def coverage_project() -> None:
-    ensure_switch()
-    coverage_dir = REPO_ROOT / "_coverage"
-    shutil.rmtree(coverage_dir, ignore_errors=True)
-    coverage_dir.mkdir(parents=True, exist_ok=True)
-
-    env = os.environ.copy()
-    env["BISECT_FILE"] = str(coverage_dir / "bisect")
-
-    opam_exec(
-        [
-            "dune",
-            "runtest",
-            "--ignore-lock-dir",
-            "--instrument-with",
-            "bisect_ppx",
-            "--force",
-        ],
-        env=env,
-    )
-
-    summary = opam_exec(
-        ["bisect-ppx-report", "summary", "--coverage-path", str(coverage_dir)],
-        capture=True,
-    ).stdout
-    per_file = opam_exec(
-        ["bisect-ppx-report", "summary", "--coverage-path", str(coverage_dir), "--per-file"],
-        capture=True,
-    ).stdout
-
-    summary_path = coverage_dir / "coverage-summary.txt"
-    per_file_path = coverage_dir / "coverage-per-file.txt"
-    comment_path = coverage_dir / "coverage-comment.md"
-    summary_path.write_text(summary, encoding="utf-8")
-    per_file_path.write_text(per_file, encoding="utf-8")
-    comment_path.write_text(
-        coverage_comment.render_comment(summary, per_file),
-        encoding="utf-8",
-    )
-
-
 def _remove_perf_data_files() -> None:
     patterns = glob.glob("perf-*.data") + glob.glob("perf-*.data.old") + glob.glob("perf-*.trace")
     for path in patterns:
@@ -656,7 +613,7 @@ def main(argv: Iterable[str]) -> int:
     args = list(argv)
     usage = (
         "Usage: nightly.py "
-        "[dependency|hazel-dependency|build|coverage|run|profile|hazel|hazel-experiment|hazel-no-evict|"
+        "[dependency|hazel-dependency|build|run|profile|hazel|hazel-experiment|hazel-no-evict|"
         "hazel-report|arith|arith-report|arith-scaling|hazel-scaling|"
         "hazel-no-evict-scaling|scaling|scaling-report|entropy-scaling|entropy-report|report|experiment|"
         "hazel-tex|arith-tex|compile-generated|all] [--smoke]"
@@ -685,8 +642,6 @@ def main(argv: Iterable[str]) -> int:
         hazel_dependency()
     elif stage == "build":
         build_project()
-    elif stage == "coverage":
-        coverage_project()
     elif stage == "run":
         run_project()
     elif stage == "profile":

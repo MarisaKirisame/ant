@@ -2,7 +2,7 @@
 
 NIGHTLY_ARGS ?=
 
-.PHONY: dependency hazel-dependency build coverage run profile compile-generated nightly all report experiment hazel-experiment hazel-no-evict hazel-tex arith-tex hazel hazel-report arith arith-report arith-scaling hazel-scaling hazel-no-evict-scaling scaling scaling-report entropy-scaling entropy-report website website-check website-clean website-serve
+.PHONY: dependency hazel-dependency build run profile compile-generated nightly all report experiment hazel-experiment hazel-no-evict hazel-tex arith-tex hazel hazel-report arith arith-report arith-scaling hazel-scaling hazel-no-evict-scaling scaling scaling-report entropy-scaling entropy-report website website-check website-clean website-serve
 
 dependency:
 	uv run ./nightly.py dependency
@@ -12,9 +12,6 @@ hazel-dependency:
 
 build:
 	uv run ./nightly.py build
-
-coverage:
-	uv run ./nightly.py coverage
 
 compile-generated:
 	uv run ./nightly.py compile-generated
