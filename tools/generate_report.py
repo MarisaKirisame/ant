@@ -1350,6 +1350,107 @@ def _hazel_compare_summary(pairs: Sequence[tuple[float, float]]) -> dict[str, fl
     }
 
 
+def _geo_mean(values: Sequence[float]) -> float:
+    return math.exp(statistics.mean(math.log(v) for v in values))
+
+
+def _collect_memo_hazel_rows(
+    input_paths: Sequence[Path],
+) -> dict[str, list[tuple[float, float, float, float]]]:
+    """Per-mode rows of (memo_ns, hazel_ns, memo_live_bytes, hazel_heap_bytes).
+
+    Only rows with hazel_status == "ok" contribute.  Memory entries are NaN
+    when the memory pass did not measure them (fields absent or negative).
+    Memo memory is resting-adjusted peak live words converted to bytes; Hazel
+    memory is the JS heap allocated by one evaluation started from a
+    collected heap.
+    """
+    per_mode: dict[str, list[tuple[float, float, float, float]]] = {}
+    for path in input_paths:
+        if not path.exists():
+            continue
+        rows: list[tuple[float, float, float, float]] = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(row, dict):
+                continue
+            if row.get("name") != "exec_time":
+                continue
+            if row.get("hazel_status") != "ok":
+                continue
+            memo_ns = _profile_sum(row.get("memo_profile"))
+            hazel_ns = row.get("hazel_eval_only_ns")
+            if not isinstance(hazel_ns, (int, float)) or memo_ns <= 0 or hazel_ns <= 0:
+                continue
+            memo_words = row.get("memo_resting_adjusted_live_words")
+            memo_bytes = (
+                float(memo_words) * 8.0
+                if isinstance(memo_words, (int, float)) and memo_words > 0
+                else math.nan
+            )
+            before = row.get("hazel_heap_used_before_bytes")
+            after = row.get("hazel_heap_used_after_bytes")
+            hazel_bytes = (
+                float(after) - float(before)
+                if isinstance(before, (int, float))
+                and isinstance(after, (int, float))
+                and before >= 0
+                and after > before
+                else math.nan
+            )
+            rows.append((float(memo_ns), float(hazel_ns), memo_bytes, hazel_bytes))
+        if rows:
+            per_mode[path.stem] = rows
+    return per_mode
+
+
+def _memo_hazel_time_summary(
+    per_mode: dict[str, list[tuple[float, float, float, float]]],
+) -> dict[str, float] | None:
+    memo_times = [memo for rows in per_mode.values() for memo, _, _, _ in rows]
+    hazel_times = [hz for rows in per_mode.values() for _, hz, _, _ in rows]
+    if not memo_times:
+        return None
+    ratios = [hz / memo for memo, hz in zip(memo_times, hazel_times)]
+    return {
+        "samples": float(len(ratios)),
+        "geo_mean_hazel_over_memo": _geo_mean(ratios),
+        "arith_mean_hazel_over_memo": statistics.mean(ratios),
+        "end_to_end_hazel_over_memo": sum(hazel_times) / sum(memo_times),
+    }
+
+
+def _memo_hazel_memory_rows(
+    per_mode: dict[str, list[tuple[float, float, float, float]]],
+) -> list[tuple[str, int, float, float, float]]:
+    """Per-mode peaks: (mode, measured_samples, memo_peak_bytes, hazel_peak_bytes, hazel/memo).
+
+    Mirrors the paper's memory methodology: one peak per
+    participant/benchmark/configuration, ratios aggregated geometrically.
+    """
+    table: list[tuple[str, int, float, float, float]] = []
+    for mode, rows in sorted(per_mode.items()):
+        memo_vals = [m for _, _, m, _ in rows if not math.isnan(m)]
+        hazel_vals = [h for _, _, _, h in rows if not math.isnan(h)]
+        if not memo_vals or not hazel_vals:
+            continue
+        memo_peak = max(memo_vals)
+        hazel_peak = max(hazel_vals)
+        table.append((mode, len(hazel_vals), memo_peak, hazel_peak, hazel_peak / memo_peak))
+    return table
+
+
+def _fmt_bytes(value: float) -> str:
+    if value >= 1e6:
+        return f"{value / 1e6:.2f} MB"
+    return f"{value / 1e3:.1f} KB"
+
+
 def _summary_json(path: Path) -> dict[str, object] | None:
     if not path.exists():
         return None
@@ -1382,9 +1483,11 @@ def generate_hazel_compare_reports(
 
     eval_only_pairs = _collect_hazel_compare_pairs(input_paths, hazel_key="hazel_eval_only_ns")
     eval_only_summary_path = output_dir / "hazel_vs_cek_eval_only_summary.json"
+    memo_summary_path = output_dir / "hazel_vs_memo_summary.json"
     stale_summary_path = output_dir / "hazel_vs_chordata_eval_only_summary.json"
     if not eval_only_pairs:
         eval_only_summary_path.unlink(missing_ok=True)
+        memo_summary_path.unlink(missing_ok=True)
         stale_summary_path.unlink(missing_ok=True)
         return None
 
@@ -1413,6 +1516,31 @@ def generate_hazel_compare_reports(
             output_name="hazel_vs_cek_scatter.png",
         )
         eval_only_scatter_rel = os.path.relpath(output_dir / scatter_name, output.parent)
+
+    memo_rows = _collect_memo_hazel_rows(input_paths)
+    memo_time_summary = _memo_hazel_time_summary(memo_rows)
+    memory_table = _memo_hazel_memory_rows(memo_rows)
+    memory_overhead = _geo_mean([ratio for *_, ratio in memory_table]) if memory_table else None
+    memo_scatter_rel: str | None = None
+    if memo_time_summary is not None:
+        memo_pairs = [(hz, memo) for rows in memo_rows.values() for memo, hz, _, _ in rows]
+        memo_scatter_name = plot_scatter_for_kind(
+            memo_pairs,
+            output_dir,
+            report_kind="hazel",
+            title="Memo vs Hazel Baseline",
+            xlabel="Hazel baseline time (ns)",
+            ylabel="Memo time (ns)",
+            output_name="hazel_vs_memo_scatter.png",
+        )
+        memo_scatter_rel = os.path.relpath(output_dir / memo_scatter_name, output.parent)
+        memo_summary_json: dict[str, object] = dict(memo_time_summary)
+        if memory_overhead is not None:
+            memo_summary_json["geo_mean_memory_hazel_over_memo"] = memory_overhead
+            memo_summary_json["memory_modes"] = len(memory_table)
+        memo_summary_path.write_text(json.dumps(memo_summary_json, indent=2), encoding="utf-8")
+    else:
+        memo_summary_path.unlink(missing_ok=True)
 
     doc = document(title="CEK vs Hazel Baseline")
     doc["lang"] = "en"
@@ -1446,6 +1574,55 @@ def generate_hazel_compare_reports(
                             src=eval_only_scatter_rel,
                             alt="CEK versus Hazel baseline scatter plot",
                         )
+
+            if memo_time_summary is not None:
+                tag.h2("Memoized Chordata vs Hazel baseline")
+                tag.p(
+                    "Time compares hazel_eval_only_ns against the memoized Chordata "
+                    "execution of the same program state. Memory compares one peak per "
+                    "benchmark: the largest resting-adjusted memoized live heap (bytes) "
+                    "against the largest JS heap allocation of a single official-Hazel "
+                    "evaluation started from a collected heap."
+                )
+                with tag.section(cls="stats"):
+                    stat_card("Samples", str(int(memo_time_summary["samples"])))
+                    stat_card(
+                        "Time geometric mean",
+                        f"{fmt_speedup(memo_time_summary['geo_mean_hazel_over_memo'])}x",
+                    )
+                    stat_card(
+                        "Time end-to-end",
+                        f"{fmt_speedup(memo_time_summary['end_to_end_hazel_over_memo'])}x",
+                    )
+                    if memory_overhead is not None:
+                        stat_card(
+                            "Memory overhead (peak geomean)",
+                            f"{fmt_speedup(memory_overhead)}x",
+                        )
+                if memo_scatter_rel:
+                    with tag.section(cls="plot"):
+                        tag.img(
+                            src=memo_scatter_rel,
+                            alt="Memoized Chordata versus Hazel baseline scatter plot",
+                        )
+                if memory_table:
+                    tag.h3("Peak memory by benchmark")
+                    with tag.table():
+                        with tag.thead():
+                            with tag.tr():
+                                tag.th("Benchmark")
+                                tag.th("Measured samples")
+                                tag.th("Memo peak")
+                                tag.th("Hazel peak")
+                                tag.th("Hazel / Memo")
+                        with tag.tbody():
+                            for mode, count, memo_peak, hazel_peak, ratio in memory_table:
+                                with tag.tr():
+                                    tag.td(mode)
+                                    tag.td(str(count))
+                                    tag.td(_fmt_bytes(memo_peak))
+                                    tag.td(_fmt_bytes(hazel_peak))
+                                    tag.td(f"{fmt_speedup(ratio)}x")
 
     output.write_text(doc.render(), encoding="utf-8")
     return output

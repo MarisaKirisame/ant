@@ -478,7 +478,16 @@ let rec subst_deepest_hole y x =
 type parsed_candidate = { source_index : int; source_exercise_id : int option; nexpr : nexpr }
 type collapsed_candidate = { nexpr : nexpr; source_indices : int list; source_exercise_ids : int option list }
 type hazel_compare_config = { hazel_cmd : string; timeout_seconds : int; max_candidates : int option }
-type hazel_compare_result = { parse_eval_ns : int; eval_only_ns : int; status : string; error : string }
+
+type hazel_compare_result = {
+  parse_eval_ns : int;
+  eval_only_ns : int;
+  heap_used_before_bytes : int;
+  heap_used_after_bytes : int;
+  process_max_rss_kb : int;
+  status : string;
+  error : string;
+}
 
 let hazel_input_placeholder_name = "hazel_input_random_list"
 
@@ -700,6 +709,9 @@ let hazel_compare_result_of_yojson json : hazel_compare_result =
   {
     parse_eval_ns = int_of_int_or_float "parse_eval_ns";
     eval_only_ns = int_of_int_or_float "eval_only_ns";
+    heap_used_before_bytes = int_of_int_or_float "heap_used_before_bytes";
+    heap_used_after_bytes = int_of_int_or_float "heap_used_after_bytes";
+    process_max_rss_kb = int_of_int_or_float "process_max_rss_kb";
     status = json |> member "status" |> to_string;
     error = json |> member "error" |> to_string;
   }
@@ -741,12 +753,21 @@ let hazel_compare_failure ~status ~log =
     if log = "" then Printf.sprintf "hazel eval-batch failed (exit=%d)" status
     else Printf.sprintf "hazel eval-batch failed (exit=%d): %s" status log
   in
-  { parse_eval_ns = 0; eval_only_ns = 0; status = kind; error = detail }
+  {
+    parse_eval_ns = 0;
+    eval_only_ns = 0;
+    heap_used_before_bytes = 0;
+    heap_used_after_bytes = 0;
+    process_max_rss_kb = 0;
+    status = kind;
+    error = detail;
+  }
 
 let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_candidate list)
     ~(cfg : hazel_compare_config) : hazel_compare_result list =
   let input_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d" program_name start_index) ".json" in
   let output_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d_out" program_name start_index) ".json" in
+  let memory_output_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d_mem" program_name start_index) ".json" in
   let log_path = Filename.temp_file (Printf.sprintf "%s_hazel_%d_log" program_name start_index) ".txt" in
   let batch_failure ~status ~log =
     let failure = hazel_compare_failure ~status ~log in
@@ -756,6 +777,7 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
     ~finally:(fun () ->
       (try Sys.remove input_path with _ -> ());
       (try Sys.remove output_path with _ -> ());
+      (try Sys.remove memory_output_path with _ -> ());
       try Sys.remove log_path with _ -> ())
     (fun () ->
       let oc = open_out input_path in
@@ -765,28 +787,56 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
           hazel_compare_items_of_candidates ~program_name ~start_index candidates |> Yojson.Safe.to_channel oc;
           output_char oc '\n');
       let quoted_input = Filename.quote input_path in
-      let quoted_output = Filename.quote output_path in
       let quoted_log = Filename.quote log_path in
-      let cmd =
-        Printf.sprintf "timeout --kill-after=5s %ds %s eval-batch %s --output %s > %s 2>&1" cfg.timeout_seconds
-          cfg.hazel_cmd quoted_input quoted_output quoted_log
+      let run_pass ~extra_args ~output =
+        let timeout_prefix =
+          if cfg.timeout_seconds > 0 then Printf.sprintf "timeout --kill-after=5s %ds " cfg.timeout_seconds else ""
+        in
+        let cmd =
+          Printf.sprintf "%s%s eval-batch %s%s --output %s > %s 2>&1" timeout_prefix cfg.hazel_cmd quoted_input
+            extra_args (Filename.quote output) quoted_log
+        in
+        Sys.command cmd
       in
-      let status = Sys.command cmd in
+      let parse_output output : (hazel_compare_result list, string) result =
+        try
+          match Yojson.Safe.from_file output with
+          | `List items when List.length items = List.length candidates ->
+              Ok (List.map hazel_compare_result_of_yojson items)
+          | `List items ->
+              Error
+                (Printf.sprintf "hazel eval-batch produced %d rows for %d candidates" (List.length items)
+                   (List.length candidates))
+          | _ -> Error "hazel eval-batch output was not a JSON list"
+        with exn -> Error (Printf.sprintf "hazel eval-batch output could not be parsed: %s" (Printexc.to_string exn))
+      in
+      (* Timing pass: probe-free, so forced GCs cannot perturb the timed
+         evaluations.  Its memory fields come back as -1 (unmeasured). *)
+      let status = run_pass ~extra_args:"" ~output:output_path in
       let log = read_file_truncated log_path 2000 in
       if status <> 0 then batch_failure ~status ~log
       else
-        try
-          match Yojson.Safe.from_file output_path with
-          | `List items when List.length items = List.length candidates -> List.map hazel_compare_result_of_yojson items
-          | `List items ->
-              batch_failure ~status:0
-                ~log:
-                  (Printf.sprintf "hazel eval-batch produced %d rows for %d candidates" (List.length items)
-                     (List.length candidates))
-          | _ -> batch_failure ~status:0 ~log:"hazel eval-batch output was not a JSON list"
-        with exn ->
-          batch_failure ~status:0
-            ~log:(Printf.sprintf "hazel eval-batch output could not be parsed: %s" (Printexc.to_string exn)))
+        match parse_output output_path with
+        | Error log -> batch_failure ~status:0 ~log
+        | Ok timing_results -> (
+            (* Memory pass: a separate node invocation re-runs the batch with
+               per-item GC and heap probes.  Only its memory fields are kept;
+               if it fails, timing rows survive with unmeasured (-1) memory. *)
+            let memory_status = run_pass ~extra_args:" --measure-memory" ~output:memory_output_path in
+            if memory_status <> 0 then timing_results
+            else
+              match parse_output memory_output_path with
+              | Error _ -> timing_results
+              | Ok memory_results ->
+                  List.map2
+                    (fun timing memory ->
+                      {
+                        timing with
+                        heap_used_before_bytes = memory.heap_used_before_bytes;
+                        heap_used_after_bytes = memory.heap_used_after_bytes;
+                        process_max_rss_kb = memory.process_max_rss_kb;
+                      })
+                    timing_results memory_results))
 
 let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(cfg : hazel_compare_config) :
     hazel_compare_result list =
@@ -884,6 +934,9 @@ let run_with_test ?(hazel_compare = None) ?(evict = false) ?(baseline = true) ?m
                       [
                         ("hazel_parse_eval_ns", `Int result.parse_eval_ns);
                         ("hazel_eval_only_ns", `Int result.eval_only_ns);
+                        ("hazel_heap_used_before_bytes", `Int result.heap_used_before_bytes);
+                        ("hazel_heap_used_after_bytes", `Int result.heap_used_after_bytes);
+                        ("hazel_process_max_rss_kb", `Int result.process_max_rss_kb);
                         ("hazel_status", `String result.status);
                         ("hazel_error", `String result.error);
                       ])

@@ -74,10 +74,11 @@ let hazel_path path = Filename.concat (find_repo_root (Sys.getcwd ())) path
 let hazel_compare_config =
   {
     FromHazel.hazel_cmd =
-      Printf.sprintf "node --max-old-space-size=8192 --stack-size=32768 -r %s %s"
+      Printf.sprintf "node --max-old-space-size=24576 --stack-size=32768 --expose-gc -r %s %s"
         (Filename.quote (hazel_path "hazel/src/CLI/polyfill.js"))
         (Filename.quote (hazel_path "hazel/_build/default/src/CLI/cli.bc.js"));
-    timeout_seconds = 300;
+    (* 0 disables the per-batch timeout wrapper. *)
+    timeout_seconds = 0;
     max_candidates = None;
   }
 

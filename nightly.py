@@ -199,7 +199,7 @@ def hazel_dependency() -> None:
     run(["opam", "install", "--switch", HAZEL_SWITCH, "-y", "--deps-only", "--locked", "."], cwd=REPO_ROOT / "hazel")
     opam_exec_in_switch(
         HAZEL_SWITCH,
-        ["dune", "build", "src/CLI/cli.bc.js", "--profile", "dev"],
+        ["dune", "build", "src/CLI/cli.bc.js", "--profile", "release"],
         cwd=REPO_ROOT / "hazel",
     )
 
@@ -253,8 +253,6 @@ default_arith_scaling_sample_count = 5
 smoke_arith_sample_count = 1
 smoke_hazel_max_candidates = 1
 smoke_hazel_timeout_seconds = 5
-hazel_compare_input_size = 10
-hazel_compare_mode_timeout = "10m"
 
 
 def _scaling_sizes() -> tuple[int, ...]:
@@ -381,9 +379,6 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
     for mode in selected_modes:
         print(f"Running {mode} compare...", flush=True)
         command = [
-            "timeout",
-            "--kill-after=5s",
-            hazel_compare_mode_timeout,
             "dune",
             "exec",
             "--profile",
@@ -395,14 +390,14 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
         ]
         if _smoke_run():
             command.extend([str(smoke_input_size), str(smoke_hazel_max_candidates), str(smoke_hazel_timeout_seconds)])
-        else:
-            command.append(str(hazel_compare_input_size))
+        # Non-smoke runs omit the input size so the OCaml default applies:
+        # hazel-compare then uses the same input size as the main experiment
+        # (RunLiveCommon.experiment_list_length), with no time limit.
         command.append(str(_compare_result_path_for_mode(mode)))
         result = opam_exec(command, check=False)
         if result.returncode != 0:
             _compare_result_path_for_mode(mode).unlink(missing_ok=True)
-            status = "timed out" if result.returncode in (124, 137) else f"failed with exit {result.returncode}"
-            print(f"Running {mode} compare... {status}; continuing", flush=True)
+            print(f"Running {mode} compare... failed with exit {result.returncode}; continuing", flush=True)
 
 
 def run_project() -> None:
