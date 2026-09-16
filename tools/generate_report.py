@@ -14,7 +14,7 @@ import shutil
 import statistics
 import sys
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import Iterable, Iterator, List, Sequence, Tuple
 
 from dominate import document
 from dominate import tags as tag
@@ -1323,6 +1323,30 @@ def _profile_sum(entries: object) -> float:
     return total
 
 
+def _iter_hazel_ok_rows(path: Path) -> Iterator[dict]:
+    """Yield exec_time rows with a successful official-Hazel measurement.
+
+    The typed loader in stats.py drops the hazel_* fields (ExecTimeRecord has
+    a fixed schema), so hazel-compare reporting reads the raw rows.
+    """
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        if row.get("name") != "exec_time":
+            continue
+        if row.get("hazel_status") != "ok":
+            continue
+        yield row
+
+
 def _collect_hazel_compare_pairs(
     input_paths: Sequence[Path],
     *,
@@ -1330,21 +1354,7 @@ def _collect_hazel_compare_pairs(
 ) -> list[tuple[float, float]]:
     pairs: list[tuple[float, float]] = []
     for path in input_paths:
-        if not path.exists():
-            continue
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(row, dict):
-                continue
-            if row.get("name") != "exec_time":
-                continue
-            if row.get("hazel_status") != "ok":
-                continue
+        for row in _iter_hazel_ok_rows(path):
             cek = _profile_sum(row.get("cek_profile"))
             hazel_value = row.get(hazel_key)
             if not isinstance(hazel_value, (int, float)):
@@ -1382,22 +1392,8 @@ def _collect_memo_hazel_rows(
     """
     per_mode: dict[str, list[tuple[float, float, float, float]]] = {}
     for path in input_paths:
-        if not path.exists():
-            continue
         rows: list[tuple[float, float, float, float]] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(row, dict):
-                continue
-            if row.get("name") != "exec_time":
-                continue
-            if row.get("hazel_status") != "ok":
-                continue
+        for row in _iter_hazel_ok_rows(path):
             memo_ns = _profile_sum(row.get("memo_profile"))
             hazel_ns = row.get("hazel_eval_only_ns")
             if not isinstance(hazel_ns, (int, float)) or memo_ns <= 0 or hazel_ns <= 0:
@@ -1443,9 +1439,11 @@ def _memo_hazel_time_summary(
 def _memo_hazel_memory_rows(
     per_mode: dict[str, list[tuple[float, float, float, float]]],
 ) -> list[tuple[str, int, float, float, float]]:
-    """Per-mode peaks: (mode, measured_samples, memo_peak_bytes, hazel_peak_bytes, hazel/memo).
+    """Per-mode peaks: (mode, measured_samples, memo_peak_bytes, hazel_peak_bytes, memo/hazel).
 
-    Mirrors the paper's memory methodology: one peak per
+    Memory overhead follows the paper's us-over-them convention (like
+    memo/CEK in the main table): below 1 means memoized Chordata uses
+    less memory than the Hazel baseline.  One peak per
     participant/benchmark/configuration, ratios aggregated geometrically.
     """
     table: list[tuple[str, int, float, float, float]] = []
@@ -1456,7 +1454,7 @@ def _memo_hazel_memory_rows(
             continue
         memo_peak = max(memo_vals)
         hazel_peak = max(hazel_vals)
-        table.append((mode, len(hazel_vals), memo_peak, hazel_peak, hazel_peak / memo_peak))
+        table.append((mode, len(hazel_vals), memo_peak, hazel_peak, memo_peak / hazel_peak))
     return table
 
 
@@ -1551,7 +1549,7 @@ def generate_hazel_compare_reports(
         memo_scatter_rel = os.path.relpath(output_dir / memo_scatter_name, output.parent)
         memo_summary_json: dict[str, object] = dict(memo_time_summary)
         if memory_overhead is not None:
-            memo_summary_json["geo_mean_memory_hazel_over_memo"] = memory_overhead
+            memo_summary_json["geo_mean_memory_memo_over_hazel"] = memory_overhead
             memo_summary_json["memory_modes"] = len(memory_table)
         memo_summary_path.write_text(json.dumps(memo_summary_json, indent=2), encoding="utf-8")
     else:
@@ -1629,7 +1627,7 @@ def generate_hazel_compare_reports(
                                 tag.th("Measured samples")
                                 tag.th("Memo peak")
                                 tag.th("Hazel peak")
-                                tag.th("Hazel / Memo")
+                                tag.th("Memo / Hazel")
                         with tag.tbody():
                             for mode, count, memo_peak, hazel_peak, ratio in memory_table:
                                 with tag.tr():
@@ -1665,7 +1663,7 @@ def _hazel_baseline_geomean_for_tex() -> str:
 
 
 def _hazel_baseline_memory_overhead_for_tex() -> str:
-    return _memo_summary_ratio_for_tex("geo_mean_memory_hazel_over_memo")
+    return _memo_summary_ratio_for_tex("geo_mean_memory_memo_over_hazel")
 
 
 def _hazel_baseline_table_lines(modes: Sequence[str] | None) -> list[str]:
