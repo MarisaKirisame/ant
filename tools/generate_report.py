@@ -1141,11 +1141,11 @@ def generate_tex_table(
             generate_hazel_compare_reports(modes=hazel_compare_modes)
         baseline_geomean = _hazel_baseline_geomean_for_tex()
         baseline_memory_overhead = _hazel_baseline_memory_overhead_for_tex()
-        baseline_memory_table_lines = _hazel_baseline_memory_table_lines(hazel_compare_modes)
+        baseline_table_lines = _hazel_baseline_table_lines(hazel_compare_modes)
     else:
         baseline_geomean = "timeout"
         baseline_memory_overhead = "timeout"
-        baseline_memory_table_lines = []
+        baseline_table_lines = []
     selected = set(modes) if modes is not None else None
     available_input_paths: list[Path] = []
     rows: list[tuple[str, list[str], list[str]]] = []
@@ -1205,12 +1205,13 @@ def generate_tex_table(
         f"\\newcommand{{\\{macro_prefix}TotalMemoryOverhead}}{{" + total_memory_overhead + "}",
         f"\\newcommand{{\\{macro_prefix}BaselineGeoMean}}{{" + baseline_geomean + "}",
         f"\\newcommand{{\\{macro_prefix}BaselineMemoryOverhead}}{{" + baseline_memory_overhead + "}",
-        f"\\newcommand{{\\{macro_prefix}BaselineMemoryTable}}{{%",
-        "\\begin{tabular}{l|rrr}",
+        f"\\newcommand{{\\{macro_prefix}BaselineSpeedupTable}}{{%",
+        "\\begin{tabular}{l|rrr|rrr}",
         "\\hline",
-        "Benchmark & User 1 & User 2 & User 3 \\\\",
+        " & \\multicolumn{3}{c|}{time speedup} & \\multicolumn{3}{c}{memory overhead} \\\\",
+        "Benchmark & User 1 & User 2 & User 3 & User 1 & User 2 & User 3 \\\\",
         "\\hline",
-        *baseline_memory_table_lines,
+        *baseline_table_lines,
         "\\hline",
         "\\end{tabular}%",
         "}",
@@ -1667,12 +1668,15 @@ def _hazel_baseline_memory_overhead_for_tex() -> str:
     return _memo_summary_ratio_for_tex("geo_mean_memory_hazel_over_memo")
 
 
-def _hazel_baseline_memory_table_lines(modes: Sequence[str] | None) -> list[str]:
-    """Rows of the Hazel-baseline/memo peak-memory ratio table (benchmark x user)."""
+def _hazel_baseline_table_lines(modes: Sequence[str] | None) -> list[str]:
+    """Rows of the Hazel-baseline-over-memo table, in the \\hazelSpeedupTable
+    layout: per benchmark, per-user time-ratio geomeans, then per-user
+    peak-memory ratios (X when unavailable)."""
     selected = set(modes) if modes is not None else None
     lines: list[str] = []
     for key, benchmark_label in BASE_EXPERIMENTS:
-        cells: list[str] = []
+        time_cells: list[str] = []
+        memory_cells: list[str] = []
         for steps_pattern, mode_pattern, _ in HAZEL_COMPARE_VARIANTS:
             mode = mode_pattern.format(key=key)
             path = Path(steps_pattern.format(key=key))
@@ -1680,11 +1684,18 @@ def _hazel_baseline_memory_table_lines(modes: Sequence[str] | None) -> list[str]
                 included = mode in selected
             else:
                 included = mode not in HAZEL_COMPARE_EXCLUDED_MODES
-            value = "X"
+            time_value = "X"
+            memory_value = "X"
             if included and path.exists():
-                table = _memo_hazel_memory_rows(_collect_memo_hazel_rows([path]))
-                if table:
-                    value = _tex_ratio(table[0][4], include_times_symbol=True)
-            cells.append(value)
-        lines.append(" & ".join([benchmark_label, *cells]) + " \\\\")
+                per_mode = _collect_memo_hazel_rows([path])
+                rows = per_mode.get(path.stem, [])
+                time_ratios = [hz / memo for memo, hz, _, _ in rows]
+                if time_ratios:
+                    time_value = fmt_speedup(_geo_mean(time_ratios))
+                memory_table = _memo_hazel_memory_rows(per_mode)
+                if memory_table:
+                    memory_value = fmt_speedup(memory_table[0][4])
+            time_cells.append(time_value)
+            memory_cells.append(memory_value)
+        lines.append(" & ".join([benchmark_label, *time_cells, *memory_cells]) + " \\\\")
     return lines
