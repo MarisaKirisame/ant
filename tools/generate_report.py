@@ -1,8 +1,52 @@
 #!/usr/bin/env python3
-"""Render a small index.html that links to multiple benchmark reports.
+"""Render the benchmark report tree (HTML + LaTeX macros) from results/.
 
-If the underlying data files are available, the page also shows combined
-speedup summaries (geometric + arithmetic means) for key comparisons.
+Data flow
+=========
+
+Inputs (written by bin/GeneratedMain via nightly.py; all JSONL, one
+``exec_time`` row per measured program state plus a trailing ``memo_stats``
+row):
+
+- results/hazel/<mode>.json            memo + CEK + plain profiles
+- results/hazel-compare/<mode>.json    same rows plus hazel_* fields from the
+                                       official-Hazel baseline (timing pass)
+                                       and its memory pass (heap/live/RSS)
+- results/hazel-no-evict/<mode>.json   memo profiles with eviction disabled
+- results/arith/arith.json, results/arith/<size>.json
+- results/hazel/<mode>/<size>.json, results/hazel-no-evict/<mode>/<size>.json
+- results/entropy/<program>/<kind>/<size>.json
+
+where <mode> = user{1,2,3}_<benchmark key> (see USERS / BASE_EXPERIMENTS).
+
+Outputs:
+
+- output/index.html                     top index (generate_reports)
+- output/hazel/…                        per-benchmark pages + hazel_result.tex
+                                        (\\hazelTotalSpeedup, \\hazelSpeedupTable,
+                                        \\hazelBaselineGeoMean,
+                                        \\hazelBaselineMemoryOverhead,
+                                        \\hazelBaselineSpeedupTable, …)
+- output/hazel/hazel_compare/…          CEK-vs-Hazel page (HTML only) and the
+                                        memo-vs-Hazel summaries the tex reads
+- output/hazel-no-evict/…               eviction ablation page +
+                                        hazel_no_evict_result.tex
+- output/arith/…                        arith pages + arith_result.tex
+- output/scaling/…                      scaling + entropy pages and tex
+
+Conventions
+===========
+
+- Time ratios are speedups: baseline over ours, bigger is better for us.
+- Memory overheads are ours over the baseline: below 1 means we use less.
+- Per-benchmark memory uses one peak per configuration, ratios aggregated
+  geometrically (matches the paper's methodology everywhere memory appears).
+- MISSING_VALUE marks unavailable cells; tables render it as X, scalar
+  macros emit it literally.
+
+Loading paths: typed rows go through stats.load_records (fixed schema —
+hazel_* fields are not in ExecTimeRecord), so everything hazel-compare
+related reads raw JSON rows via _iter_hazel_ok_rows instead.
 """
 
 from __future__ import annotations
@@ -64,37 +108,39 @@ ENTROPY_PROGRAMS = (
     ("pair", "Pair"),
 )
 
+# Modes listed here are dropped from hazel-compare reporting even when no
+# explicit mode selection is passed.  Currently empty; kept as the single
+# knob for excluding a trace from the baseline comparison.
 HAZEL_COMPARE_EXCLUDED_MODES = frozenset()
 
-VARIANTS: list[tuple[str, str, str]] = [
-    ("results/hazel/user1_{key}.json", "user1_{key}", " (User 1)"),
-    ("results/hazel/user2_{key}.json", "user2_{key}", " (User 2)"),
-    ("results/hazel/user3_{key}.json", "user3_{key}", " (User 3)"),
-]
+# Sentinel for a cell or macro whose data is unavailable (missing file,
+# deselected mode, or a run that never produced rows).  Tables render it as
+# X; scalar macros emit it literally.
+MISSING_VALUE = "timeout"
 
-HAZEL_COMPARE_VARIANTS: list[tuple[str, str, str]] = [
-    ("results/hazel-compare/user1_{key}.json", "user1_{key}", " (User 1)"),
-    ("results/hazel-compare/user2_{key}.json", "user2_{key}", " (User 2)"),
-    ("results/hazel-compare/user3_{key}.json", "user3_{key}", " (User 3)"),
-]
+# The three anonymized trace contributors.  Every per-user structure below
+# derives from this list; nightly.py's mode list must agree with
+# USERS x BASE_EXPERIMENTS minus its excluded modes.
+USERS: tuple[str, ...] = ("1", "2", "3")
 
-TABLE_VARIANTS: list[tuple[str, str]] = [
-    ("1", "results/hazel/user1_{key}.json"),
-    ("2", "results/hazel/user2_{key}.json"),
-    ("3", "results/hazel/user3_{key}.json"),
-]
 
-HAZEL_NO_EVICT_VARIANTS: list[tuple[str, str, str]] = [
-    ("results/hazel-no-evict/user1_{key}.json", "user1_{key}", " (User 1)"),
-    ("results/hazel-no-evict/user2_{key}.json", "user2_{key}", " (User 2)"),
-    ("results/hazel-no-evict/user3_{key}.json", "user3_{key}", " (User 3)"),
-]
+def _user_variants(results_dir: str) -> list[tuple[str, str, str]]:
+    """(steps-file pattern, mode pattern, page-label suffix) per user."""
+    return [
+        (f"{results_dir}/user{user}_{{key}}.json", f"user{user}_{{key}}", f" (User {user})")
+        for user in USERS
+    ]
 
-HAZEL_NO_EVICT_TABLE_VARIANTS: list[tuple[str, str]] = [
-    ("1", "results/hazel-no-evict/user1_{key}.json"),
-    ("2", "results/hazel-no-evict/user2_{key}.json"),
-    ("3", "results/hazel-no-evict/user3_{key}.json"),
-]
+
+def _user_table_variants(results_dir: str) -> list[tuple[str, str]]:
+    """(user label, steps-file pattern) per user, for table columns."""
+    return [(user, f"{results_dir}/user{user}_{{key}}.json") for user in USERS]
+
+
+VARIANTS = _user_variants("results/hazel")
+HAZEL_COMPARE_VARIANTS = _user_variants("results/hazel-compare")
+TABLE_VARIANTS = _user_table_variants("results/hazel")
+HAZEL_NO_EVICT_TABLE_VARIANTS = _user_table_variants("results/hazel-no-evict")
 
 def _render_html(
     title: str,
@@ -250,17 +296,6 @@ def generate_html(
     )
     shutil.copyfile(css_source, css_path)
     return summary
-
-def generate_table() -> None:
-    speedup_module.generate_table(
-        to_compares=[
-            ("Random", Path("results/entropy/map/random/65536.json")),
-            ("Low entropy", Path("results/entropy/map/block/65536.json")),
-            ("Change1", Path("results/entropy/map/mod1/65536.json")),
-            ("Constant", Path("results/entropy/map/same/65536.json")),
-        ],
-        output_dir=Path("")
-    )
 
 def generate_reports() -> None:
     generate_hazel_reports()
@@ -841,11 +876,11 @@ def generate_hazel_eviction_ablation_report(
                     stat_card("End-to-end", f"{fmt_speedup(stats.end_to_end)}x")
                 else:
                     stat_card("Samples", "0")
-                    stat_card("Time overhead", "timeout")
+                    stat_card("Time overhead", MISSING_VALUE)
                 if memory_overhead is not None:
                     stat_card("Memory overhead", f"{fmt_speedup(memory_overhead)}x")
                 else:
-                    stat_card("Memory overhead", "timeout")
+                    stat_card("Memory overhead", MISSING_VALUE)
             if scatter_rel:
                 with tag.section(cls="plot"):
                     tag.img(src=scatter_rel, alt="Evicting Chordata versus no-eviction Chordata scatter plot")
@@ -877,8 +912,8 @@ def generate_hazel_eviction_ablation_tex(
         for key, _ in BASE_EXPERIMENTS:
             mode = _mode_from_steps_pattern(evict_pattern, key)
             if selected is not None and mode not in selected:
-                speedup_values.append("timeout")
-                memory_overhead_values.append("timeout")
+                speedup_values.append(MISSING_VALUE)
+                memory_overhead_values.append(MISSING_VALUE)
                 continue
             evict_path = Path(evict_pattern.format(key=key))
             no_evict_path = Path(no_evict_pattern.format(key=key))
@@ -888,17 +923,17 @@ def generate_hazel_eviction_ablation_tex(
                 speedup_values.append(fmt_speedup(stats.geo_mean))
                 available_pairs.extend(time_pairs)
             else:
-                speedup_values.append("timeout")
+                speedup_values.append(MISSING_VALUE)
             if memory_ratios:
                 memory_overhead_values.append(fmt_speedup(_geometric_mean(memory_ratios)))
                 available_memory_ratios.extend(memory_ratios)
             else:
-                memory_overhead_values.append("timeout")
+                memory_overhead_values.append(MISSING_VALUE)
         rows.append((evict_label, speedup_values, memory_overhead_values))
 
     point_count = len(available_pairs)
-    total_speedup = "timeout"
-    total_memory_overhead = "timeout"
+    total_speedup = MISSING_VALUE
+    total_memory_overhead = MISSING_VALUE
     if available_pairs:
         _, stats = _eviction_overhead_stats(available_pairs)
         total_speedup = _tex_ratio(stats.geo_mean, include_times_symbol=True)
@@ -908,16 +943,18 @@ def generate_hazel_eviction_ablation_tex(
             include_times_symbol=True,
         )
 
-    variant_labels = [variant_label for variant_label, _, _ in rows]
-    escaped_variant_labels = [_escape_latex(label) for label in variant_labels]
-    variant_count = len(variant_labels)
-    group_header = (
-        f" & \\multicolumn{{{variant_count}}}{{c|}}{{time overhead}}"
-        f" & \\multicolumn{{{variant_count}}}{{c}}{{memory overhead}} \\\\"
-    )
-    user_labels = [f"User {label}" for label in escaped_variant_labels]
-    user_header = " & ".join(["Benchmark", *user_labels, *user_labels]) + " \\\\"
-    col_spec = f"l|{'r' * variant_count}|{'r' * variant_count}"
+    body_rows: list[str] = []
+    for benchmark_idx, (_, benchmark_label) in enumerate(BASE_EXPERIMENTS):
+        speedup_row: list[str] = []
+        memory_overhead_row: list[str] = []
+        for _, speedup_values, memory_overhead_values in rows:
+            speedup = speedup_values[benchmark_idx]
+            memory_overhead = memory_overhead_values[benchmark_idx]
+            speedup_row.append("X" if speedup == MISSING_VALUE else speedup)
+            memory_overhead_row.append("X" if memory_overhead == MISSING_VALUE else memory_overhead)
+        body_rows.append(" & ".join([benchmark_label, *speedup_row, *memory_overhead_row]) + " \\\\")
+
+    escaped_variant_labels = [_escape_latex(variant_label) for variant_label, _, _ in rows]
     lines = [
         "% Auto-generated by tools/generate_report.py",
         "\\newcommand{\\hazelNoEvictPointCount}{" + str(point_count) + "}",
@@ -926,29 +963,15 @@ def generate_hazel_eviction_ablation_tex(
         "\\newcommand{\\hazelNoEvictBaselineGeoMean}{N/A}",
         "\\newcommand{\\hazelNoEvictSpeedBreakdown}{N/A}",
         "\\newcommand{\\hazelNoEvictSpeedupTable}{%",
-        "\\begin{tabular}{" + col_spec + "}",
-        "\\hline",
-        group_header,
-        user_header,
-        "\\hline",
+        *_grouped_table_lines(
+            group1="time overhead",
+            group2="memory overhead",
+            user_labels=escaped_variant_labels,
+            body_rows=body_rows,
+        ),
+        "}",
+        "",
     ]
-    for benchmark_idx, (_, benchmark_label) in enumerate(BASE_EXPERIMENTS):
-        speedup_row: list[str] = []
-        memory_overhead_row: list[str] = []
-        for _, speedup_values, memory_overhead_values in rows:
-            speedup = speedup_values[benchmark_idx]
-            memory_overhead = memory_overhead_values[benchmark_idx]
-            speedup_row.append("X" if speedup == "timeout" else speedup)
-            memory_overhead_row.append("X" if memory_overhead == "timeout" else memory_overhead)
-        lines.append(" & ".join([benchmark_label, *speedup_row, *memory_overhead_row]) + " \\\\")
-    lines.extend(
-        [
-            "\\hline",
-            "\\end{tabular}%",
-            "}",
-            "",
-        ]
-    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -1022,11 +1045,10 @@ def _memo_vs_cek_max_live_words(input_path: Path) -> tuple[int, int] | None:
 
 
 def _max_memo_vs_cek_memory_overhead(input_path: Path) -> str:
-    max_live_words = _memo_vs_cek_max_live_words(input_path)
-    if not max_live_words:
-        return "timeout"
-    max_memo_live_words, max_cek_live_words = max_live_words
-    return fmt_speedup(float(max_memo_live_words) / float(max_cek_live_words))
+    ratio = _max_memo_vs_cek_memory_overhead_ratio(input_path)
+    if ratio is None:
+        return MISSING_VALUE
+    return fmt_speedup(ratio)
 
 
 def _max_memo_vs_cek_memory_overhead_ratio(input_path: Path) -> float | None:
@@ -1059,6 +1081,36 @@ def _escape_latex(value: str) -> str:
     return escaped
 
 
+def _grouped_table_lines(
+    *,
+    group1: str,
+    group2: str,
+    user_labels: Sequence[str],
+    body_rows: Sequence[str],
+) -> list[str]:
+    """The shared two-group tabular layout: benchmark rows with one column
+    per user under each group header.  Used by every generated LaTeX table
+    (main speedup, baseline comparison, eviction ablation)."""
+    count = len(user_labels)
+    group_header = (
+        f" & \\multicolumn{{{count}}}{{c|}}{{{group1}}}"
+        f" & \\multicolumn{{{count}}}{{c}}{{{group2}}} \\\\"
+    )
+    users = [f"User {label}" for label in user_labels]
+    user_header = " & ".join(["Benchmark", *users, *users]) + " \\\\"
+    col_spec = f"l|{'r' * count}|{'r' * count}"
+    return [
+        "\\begin{tabular}{" + col_spec + "}",
+        "\\hline",
+        group_header,
+        user_header,
+        "\\hline",
+        *body_rows,
+        "\\hline",
+        "\\end{tabular}%",
+    ]
+
+
 def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
     if not data_paths:
         return ["timeout%"]
@@ -1081,7 +1133,7 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
         if slot_name == "compose_step":
             return "compose rule"
         if slot_name == "instantiate":
-            return "intantiation"
+            return "instantiation"
         if slot_name == "insert_step":
             return "insert rule"
         if slot_name == "step_through":
@@ -1120,9 +1172,9 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
 
 def _mode_from_steps_pattern(steps_pattern: str, key: str) -> str:
     name = Path(steps_pattern.format(key=key)).name
-    for participant in ("user1", "user2", "user3"):
-        if name.startswith(f"{participant}_"):
-            return f"{participant}_{key}"
+    for user in USERS:
+        if name.startswith(f"user{user}_"):
+            return f"user{user}_{key}"
     raise ValueError(f"steps pattern does not identify a participant: {steps_pattern}")
 
 
@@ -1143,8 +1195,8 @@ def generate_tex_table(
         baseline_memory_overhead = _hazel_baseline_memory_overhead_for_tex()
         baseline_table_lines = _hazel_baseline_table_lines(hazel_compare_modes)
     else:
-        baseline_geomean = "timeout"
-        baseline_memory_overhead = "timeout"
+        baseline_geomean = MISSING_VALUE
+        baseline_memory_overhead = MISSING_VALUE
         baseline_table_lines = []
     selected = set(modes) if modes is not None else None
     available_input_paths: list[Path] = []
@@ -1155,13 +1207,13 @@ def generate_tex_table(
         for key, _ in BASE_EXPERIMENTS:
             mode = _mode_from_steps_pattern(steps_pattern, key)
             if selected is not None and mode not in selected:
-                speedup_values.append("timeout")
-                memory_overhead_values.append("timeout")
+                speedup_values.append(MISSING_VALUE)
+                memory_overhead_values.append(MISSING_VALUE)
                 continue
             input_path = Path(steps_pattern.format(key=key))
             if not input_path.exists():
-                speedup_values.append("timeout")
-                memory_overhead_values.append("timeout")
+                speedup_values.append(MISSING_VALUE)
+                memory_overhead_values.append(MISSING_VALUE)
                 continue
             available_input_paths.append(input_path)
             speedup_values.append(_geomean_memo_vs_cek_speedup(input_path))
@@ -1169,8 +1221,8 @@ def generate_tex_table(
         rows.append((variant_label, speedup_values, memory_overhead_values))
 
     point_count = 0
-    total_speedup = "timeout"
-    total_memory_overhead = "timeout"
+    total_speedup = MISSING_VALUE
+    total_memory_overhead = MISSING_VALUE
     if available_input_paths:
         pairs = _collect_pairs(available_input_paths)
         point_count = len(pairs)
@@ -1188,16 +1240,18 @@ def generate_tex_table(
             )
     breakdown_lines = _memo_speed_breakdown_lines(available_input_paths)
 
-    variant_labels = [variant_label for variant_label, _, _ in rows]
-    escaped_variant_labels = [_escape_latex(label) for label in variant_labels]
-    variant_count = len(variant_labels)
-    group_header = (
-        f" & \\multicolumn{{{variant_count}}}{{c|}}{{time speedup}}"
-        f" & \\multicolumn{{{variant_count}}}{{c}}{{memory overhead}} \\\\"
-    )
-    user_labels = [f"User {label}" for label in escaped_variant_labels]
-    user_header = " & ".join(["Benchmark", *user_labels, *user_labels]) + " \\\\"
-    col_spec = f"l|{'r' * variant_count}|{'r' * variant_count}"
+    body_rows: list[str] = []
+    for benchmark_idx, (_, benchmark_label) in enumerate(BASE_EXPERIMENTS):
+        speedup_row: list[str] = []
+        memory_overhead_row: list[str] = []
+        for _, speedup_values, memory_overhead_values in rows:
+            speedup = speedup_values[benchmark_idx]
+            memory_overhead = memory_overhead_values[benchmark_idx]
+            speedup_row.append("X" if speedup == MISSING_VALUE else speedup)
+            memory_overhead_row.append("X" if memory_overhead == MISSING_VALUE else memory_overhead)
+        body_rows.append(" & ".join([benchmark_label, *speedup_row, *memory_overhead_row]) + " \\\\")
+
+    escaped_variant_labels = [_escape_latex(variant_label) for variant_label, _, _ in rows]
     lines = [
         "% Auto-generated by tools/generate_report.py",
         f"\\newcommand{{\\{macro_prefix}PointCount}}{{" + str(point_count) + "}",
@@ -1206,45 +1260,26 @@ def generate_tex_table(
         f"\\newcommand{{\\{macro_prefix}BaselineGeoMean}}{{" + baseline_geomean + "}",
         f"\\newcommand{{\\{macro_prefix}BaselineMemoryOverhead}}{{" + baseline_memory_overhead + "}",
         f"\\newcommand{{\\{macro_prefix}BaselineSpeedupTable}}{{%",
-        "\\begin{tabular}{l|rrr|rrr}",
-        "\\hline",
-        " & \\multicolumn{3}{c|}{time speedup} & \\multicolumn{3}{c}{memory overhead} \\\\",
-        "Benchmark & User 1 & User 2 & User 3 & User 1 & User 2 & User 3 \\\\",
-        "\\hline",
-        *baseline_table_lines,
-        "\\hline",
-        "\\end{tabular}%",
+        *_grouped_table_lines(
+            group1="time speedup",
+            group2="memory overhead",
+            user_labels=USERS,
+            body_rows=baseline_table_lines,
+        ),
         "}",
         f"\\newcommand{{\\{macro_prefix}SpeedBreakdown}}{{%",
         *breakdown_lines,
         "}",
         f"\\newcommand{{\\{macro_prefix}SpeedupTable}}{{%",
-        "\\begin{tabular}{" + col_spec + "}",
-        "\\hline",
-        group_header,
-        user_header,
-        "\\hline",
+        *_grouped_table_lines(
+            group1="time speedup",
+            group2="memory overhead",
+            user_labels=escaped_variant_labels,
+            body_rows=body_rows,
+        ),
+        "}",
+        "",
     ]
-    for benchmark_idx, (_, benchmark_label) in enumerate(BASE_EXPERIMENTS):
-        speedup_row: list[str] = []
-        memory_overhead_row: list[str] = []
-        for _, speedup_values, memory_overhead_values in rows:
-            speedup = speedup_values[benchmark_idx]
-            memory_overhead = memory_overhead_values[benchmark_idx]
-            display_speedup = "X" if speedup == "timeout" else speedup
-            display_memory_overhead = "X" if memory_overhead == "timeout" else memory_overhead
-            speedup_row.append(display_speedup)
-            memory_overhead_row.append(display_memory_overhead)
-        benchmark_values = [*speedup_row, *memory_overhead_row]
-        lines.append(" & ".join([benchmark_label, *benchmark_values]) + " \\\\")
-    lines.extend(
-        [
-            "\\hline",
-            "\\end{tabular}%",
-            "}",
-            "",
-        ]
-    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -1254,7 +1289,7 @@ def generate_arith_tex(
     input_path: Path = Path("results/arith/arith.json"),
     output_path: Path = Path("output/arith/arith_result.tex"),
 ) -> None:
-    speedup = "timeout"
+    speedup = MISSING_VALUE
     if input_path.exists():
         result = load_records(input_path)
         pairs = pairs_from_profiles(result, baseline_key="cek_profile", memo_key="memo_profile")
@@ -1375,10 +1410,6 @@ def _hazel_compare_summary(pairs: Sequence[tuple[float, float]]) -> dict[str, fl
     }
 
 
-def _geo_mean(values: Sequence[float]) -> float:
-    return math.exp(statistics.mean(math.log(v) for v in values))
-
-
 def _collect_memo_hazel_rows(
     input_paths: Sequence[Path],
 ) -> dict[str, list[tuple[float, float, float, float]]]:
@@ -1434,7 +1465,7 @@ def _memo_hazel_time_summary(
     ratios = [hz / memo for memo, hz in zip(memo_times, hazel_times)]
     return {
         "samples": float(len(ratios)),
-        "geo_mean_hazel_over_memo": _geo_mean(ratios),
+        "geo_mean_hazel_over_memo": _geometric_mean(ratios),
         "arith_mean_hazel_over_memo": statistics.mean(ratios),
         "end_to_end_hazel_over_memo": sum(hazel_times) / sum(memo_times),
     }
@@ -1537,7 +1568,7 @@ def generate_hazel_compare_reports(
     memo_rows = _collect_memo_hazel_rows(input_paths)
     memo_time_summary = _memo_hazel_time_summary(memo_rows)
     memory_table = _memo_hazel_memory_rows(memo_rows)
-    memory_overhead = _geo_mean([ratio for *_, ratio in memory_table]) if memory_table else None
+    memory_overhead = _geometric_mean([ratio for *_, ratio in memory_table]) if memory_table else None
     memo_scatter_rel: str | None = None
     if memo_time_summary is not None:
         memo_pairs = [(hz, memo) for rows in memo_rows.values() for memo, hz, _, _ in rows]
@@ -1650,12 +1681,12 @@ def generate_hazel_compare_reports(
 def _memo_summary_ratio_for_tex(key: str) -> str:
     summary = _summary_json(Path("output/hazel/hazel_compare/hazel_vs_memo_summary.json"))
     if summary is None:
-        return "timeout"
+        return MISSING_VALUE
     value = summary.get(key)
     if not isinstance(value, (int, float)):
-        return "timeout"
+        return MISSING_VALUE
     if float(value) <= 0:
-        return "timeout"
+        return MISSING_VALUE
     return _tex_ratio(float(value), include_times_symbol=True)
 
 
@@ -1695,7 +1726,7 @@ def _hazel_baseline_table_lines(modes: Sequence[str] | None) -> list[str]:
                 rows = per_mode.get(path.stem, [])
                 time_ratios = [hz / memo for memo, hz, _, _ in rows]
                 if time_ratios:
-                    time_value = fmt_speedup(_geo_mean(time_ratios))
+                    time_value = fmt_speedup(_geometric_mean(time_ratios))
                 memory_table = _memo_hazel_memory_rows(per_mode)
                 if memory_table:
                     memory_value = fmt_speedup(memory_table[0][4])
