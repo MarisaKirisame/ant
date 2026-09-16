@@ -1405,13 +1405,17 @@ def _collect_memo_hazel_rows(
                 else math.nan
             )
             before = row.get("hazel_heap_used_before_bytes")
-            after = row.get("hazel_heap_used_after_bytes")
+            live_peak = row.get("hazel_heap_live_peak_bytes")
+            # Peak live above the pre-eval collected baseline: the same
+            # sampling discipline as memo_resting_adjusted_live_words on the
+            # Chordata side (live size at full-collection boundaries plus a
+            # final collection with the result retained).
             hazel_bytes = (
-                float(after) - float(before)
+                float(live_peak) - float(before)
                 if isinstance(before, (int, float))
-                and isinstance(after, (int, float))
+                and isinstance(live_peak, (int, float))
                 and before >= 0
-                and after > before
+                and live_peak > before
                 else math.nan
             )
             rows.append((float(memo_ns), float(hazel_ns), memo_bytes, hazel_bytes))
@@ -1593,9 +1597,11 @@ def generate_hazel_compare_reports(
                 tag.p(
                     "Time compares hazel_eval_only_ns against the memoized Chordata "
                     "execution of the same program state. Memory compares one peak per "
-                    "benchmark: the largest resting-adjusted memoized live heap (bytes) "
-                    "against the largest JS heap allocation of a single official-Hazel "
-                    "evaluation started from a collected heap."
+                    "benchmark, measured identically on both sides as peak live heap "
+                    "above the pre-evaluation baseline: live size sampled at every "
+                    "full-collection boundary plus a final forced collection with the "
+                    "result retained (Gc.alarm on the OCaml side; --gc-global with "
+                    "--trace-gc on the V8 side)."
                 )
                 with tag.section(cls="stats"):
                     stat_card("Samples", str(int(memo_time_summary["samples"])))

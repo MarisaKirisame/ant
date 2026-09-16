@@ -484,6 +484,8 @@ type hazel_compare_result = {
   eval_only_ns : int;
   heap_used_before_bytes : int;
   heap_used_after_bytes : int;
+  heap_used_after_gc_bytes : int;
+  heap_live_peak_bytes : int;
   process_max_rss_kb : int;
   status : string;
   error : string;
@@ -711,6 +713,9 @@ let hazel_compare_result_of_yojson json : hazel_compare_result =
     eval_only_ns = int_of_int_or_float "eval_only_ns";
     heap_used_before_bytes = int_of_int_or_float "heap_used_before_bytes";
     heap_used_after_bytes = int_of_int_or_float "heap_used_after_bytes";
+    heap_used_after_gc_bytes = int_of_int_or_float "heap_used_after_gc_bytes";
+    (* Not reported by the CLI; derived from the memory pass GC trace. *)
+    heap_live_peak_bytes = -1;
     process_max_rss_kb = int_of_int_or_float "process_max_rss_kb";
     status = json |> member "status" |> to_string;
     error = json |> member "error" |> to_string;
@@ -758,10 +763,63 @@ let hazel_compare_failure ~status ~log =
     eval_only_ns = 0;
     heap_used_before_bytes = 0;
     heap_used_after_bytes = 0;
+    heap_used_after_gc_bytes = 0;
+    heap_live_peak_bytes = 0;
     process_max_rss_kb = 0;
     status = kind;
     error = detail;
   }
+
+let index_of_sub (s : string) (sub : string) : int option =
+  let n = String.length s and m = String.length sub in
+  let rec loop i = if i + m > n then None else if String.sub s i m = sub then Some i else loop (i + 1) in
+  loop 0
+
+(* Parse the post-collection heap size from a --trace-gc line, e.g.
+   "[pid] 123 ms: Mark-Compact 45.3 (58.2) -> 30.1 (58.2) MB, ...".
+   Only full collections count: their after-size is the live size at that
+   boundary.  Scavenge lines leave old-space garbage uncollected, so their
+   after-sizes overstate live and are skipped (with --gc-global none should
+   occur). *)
+let parse_gc_after_mb (line : string) : float option =
+  if (not (string_contains line " ms: ")) || string_contains line "Scavenge" || string_contains line "Minor" then None
+  else
+    match index_of_sub line " -> " with
+    | None -> None
+    | Some i ->
+        let start = i + 4 in
+        let n = String.length line in
+        let rec finish j =
+          if j < n && (line.[j] = '.' || (line.[j] >= '0' && line.[j] <= '9')) then finish (j + 1) else j
+        in
+        let stop = finish start in
+        if stop = start then None else float_of_string_opt (String.sub line start (stop - start))
+
+(* Per-item peak live sizes from a memory-pass log: for each ANTMEM
+   begin/end pair, the maximum post-collection size among the enclosed
+   full-GC trace lines, in bytes. *)
+let parse_memory_pass_peaks (log_text : string) : (string * int) list =
+  let current = ref None in
+  let cur_peak = ref 0 in
+  let acc = ref [] in
+  String.split_on_char '\n' log_text
+  |> List.iter (fun line ->
+      let begin_prefix = "ANTMEM begin " in
+      let end_prefix = "ANTMEM end " in
+      if String.length line > String.length begin_prefix && String.sub line 0 (String.length begin_prefix) = begin_prefix
+      then (
+        current := Some (String.sub line (String.length begin_prefix) (String.length line - String.length begin_prefix));
+        cur_peak := 0)
+      else if String.length line > String.length end_prefix && String.sub line 0 (String.length end_prefix) = end_prefix
+      then (
+        (match !current with Some id when !cur_peak > 0 -> acc := (id, !cur_peak) :: !acc | _ -> ());
+        current := None;
+        cur_peak := 0)
+      else
+        match (!current, parse_gc_after_mb line) with
+        | Some _, Some mb -> cur_peak := max !cur_peak (int_of_float (mb *. 1048576.))
+        | _ -> ());
+  !acc
 
 let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_candidate list)
     ~(cfg : hazel_compare_config) : hazel_compare_result list =
@@ -788,13 +846,25 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
           output_char oc '\n');
       let quoted_input = Filename.quote input_path in
       let quoted_log = Filename.quote log_path in
-      let run_pass ~extra_args ~output =
+      let run_pass ?(node_flags = "") ~extra_args ~output () =
         let timeout_prefix =
           if cfg.timeout_seconds > 0 then Printf.sprintf "timeout --kill-after=5s %ds " cfg.timeout_seconds else ""
         in
+        let node_prefix = "node " in
+        let hazel_cmd =
+          if node_flags = "" then cfg.hazel_cmd
+          else if
+            String.length cfg.hazel_cmd >= String.length node_prefix
+            && String.sub cfg.hazel_cmd 0 (String.length node_prefix) = node_prefix
+          then
+            node_prefix ^ node_flags ^ " "
+            ^ String.sub cfg.hazel_cmd (String.length node_prefix)
+                (String.length cfg.hazel_cmd - String.length node_prefix)
+          else cfg.hazel_cmd
+        in
         let cmd =
-          Printf.sprintf "%s%s eval-batch %s%s --output %s > %s 2>&1" timeout_prefix cfg.hazel_cmd quoted_input
-            extra_args (Filename.quote output) quoted_log
+          Printf.sprintf "%s%s eval-batch %s%s --output %s > %s 2>&1" timeout_prefix hazel_cmd quoted_input extra_args
+            (Filename.quote output) quoted_log
         in
         Sys.command cmd
       in
@@ -812,7 +882,7 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
       in
       (* Timing pass: probe-free, so forced GCs cannot perturb the timed
          evaluations.  Its memory fields come back as -1 (unmeasured). *)
-      let status = run_pass ~extra_args:"" ~output:output_path in
+      let status = run_pass ~extra_args:"" ~output:output_path () in
       let log = read_file_truncated log_path 2000 in
       if status <> 0 then batch_failure ~status ~log
       else
@@ -820,23 +890,39 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
         | Error log -> batch_failure ~status:0 ~log
         | Ok timing_results -> (
             (* Memory pass: a separate node invocation re-runs the batch with
-               per-item GC and heap probes.  Only its memory fields are kept;
-               if it fails, timing rows survive with unmeasured (-1) memory. *)
-            let memory_status = run_pass ~extra_args:" --measure-memory" ~output:memory_output_path in
+               per-item GC and heap probes.  --gc-global makes every
+               collection a mark-compact and --trace-gc logs its post-GC
+               (live) size, mirroring the OCaml side's Gc.alarm sampling in
+               RunLiveCommon.measure_memory_consumption.  Only memory fields
+               are kept; if the pass fails, timing rows survive with
+               unmeasured (-1) memory. *)
+            let memory_status =
+              run_pass ~node_flags:"--trace-gc --gc-global" ~extra_args:" --measure-memory"
+                ~output:memory_output_path ()
+            in
             if memory_status <> 0 then timing_results
             else
               match parse_output memory_output_path with
               | Error _ -> timing_results
               | Ok memory_results ->
-                  List.map2
-                    (fun timing memory ->
+                  let trace_peaks = parse_memory_pass_peaks (read_file_truncated log_path max_int) in
+                  let indexed = List.mapi (fun i pair -> (start_index + i, pair)) (List.combine timing_results memory_results) in
+                  List.map
+                    (fun (index, (timing, memory)) ->
+                      let item_id = Printf.sprintf "%s:%d" program_name index in
+                      let trace_peak = Option.value ~default:0 (List.assoc_opt item_id trace_peaks) in
                       {
                         timing with
                         heap_used_before_bytes = memory.heap_used_before_bytes;
                         heap_used_after_bytes = memory.heap_used_after_bytes;
+                        heap_used_after_gc_bytes = memory.heap_used_after_gc_bytes;
+                        (* Peak live at collection boundaries; the final
+                           forced GC with the result retained is inside the
+                           markers, so this is at least the retained size. *)
+                        heap_live_peak_bytes = max trace_peak memory.heap_used_after_gc_bytes;
                         process_max_rss_kb = memory.process_max_rss_kb;
                       })
-                    timing_results memory_results))
+                    indexed))
 
 let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(cfg : hazel_compare_config) :
     hazel_compare_result list =
@@ -936,6 +1022,8 @@ let run_with_test ?(hazel_compare = None) ?(evict = false) ?(baseline = true) ?m
                         ("hazel_eval_only_ns", `Int result.eval_only_ns);
                         ("hazel_heap_used_before_bytes", `Int result.heap_used_before_bytes);
                         ("hazel_heap_used_after_bytes", `Int result.heap_used_after_bytes);
+                        ("hazel_heap_used_after_gc_bytes", `Int result.heap_used_after_gc_bytes);
+                        ("hazel_heap_live_peak_bytes", `Int result.heap_live_peak_bytes);
                         ("hazel_process_max_rss_kb", `Int result.process_max_rss_kb);
                         ("hazel_status", `String result.status);
                         ("hazel_error", `String result.error);
