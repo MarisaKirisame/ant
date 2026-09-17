@@ -844,9 +844,8 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
         (fun () ->
           hazel_compare_items_of_candidates ~program_name ~start_index candidates |> Yojson.Safe.to_channel oc;
           output_char oc '\n');
-      let quoted_input = Filename.quote input_path in
       let quoted_log = Filename.quote log_path in
-      let run_pass ?(node_flags = "") ~extra_args ~output () =
+      let run_pass ?(node_flags = "") ?(input = input_path) ~extra_args ~output () =
         let timeout_prefix =
           if cfg.timeout_seconds > 0 then Printf.sprintf "timeout --kill-after=5s %ds " cfg.timeout_seconds else ""
         in
@@ -863,20 +862,18 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
           else cfg.hazel_cmd
         in
         let cmd =
-          Printf.sprintf "%s%s eval-batch %s%s --output %s > %s 2>&1" timeout_prefix hazel_cmd quoted_input extra_args
-            (Filename.quote output) quoted_log
+          Printf.sprintf "%s%s eval-batch %s%s --output %s > %s 2>&1" timeout_prefix hazel_cmd
+            (Filename.quote input) extra_args (Filename.quote output) quoted_log
         in
         Sys.command cmd
       in
-      let parse_output output : (hazel_compare_result list, string) result =
+      let parse_output ~expected output : (hazel_compare_result list, string) result =
         try
           match Yojson.Safe.from_file output with
-          | `List items when List.length items = List.length candidates ->
-              Ok (List.map hazel_compare_result_of_yojson items)
+          | `List items when List.length items = expected -> Ok (List.map hazel_compare_result_of_yojson items)
           | `List items ->
               Error
-                (Printf.sprintf "hazel eval-batch produced %d rows for %d candidates" (List.length items)
-                   (List.length candidates))
+                (Printf.sprintf "hazel eval-batch produced %d rows for %d candidates" (List.length items) expected)
           | _ -> Error "hazel eval-batch output was not a JSON list"
         with exn -> Error (Printf.sprintf "hazel eval-batch output could not be parsed: %s" (Printexc.to_string exn))
       in
@@ -886,27 +883,33 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
       let log = read_file_truncated log_path 2000 in
       if status <> 0 then batch_failure ~status ~log
       else
-        match parse_output output_path with
+        match parse_output ~expected:(List.length candidates) output_path with
         | Error log -> batch_failure ~status:0 ~log
-        | Ok timing_results -> (
-            (* Memory pass: a separate node invocation re-runs the batch with
-               per-item GC and heap probes.  --gc-global makes every
-               collection a mark-compact and --trace-gc logs its post-GC
-               (live) size, mirroring the OCaml side's Gc.alarm sampling in
-               RunLiveCommon.measure_memory_consumption.  Only memory fields
-               are kept; if the pass fails, timing rows survive with
-               unmeasured (-1) memory. *)
+        | Ok timing_results ->
+            (* Memory pass: a separate node invocation re-runs the batch
+               with per-item GC and heap probes.  --heap-growing-percent=10
+               makes V8 run a mark-compact whenever the old generation grows
+               10% past its post-GC size, so majors pace with live-heap
+               growth -- the OCaml side's space_overhead discipline -- while
+               young-dying churn stays in cheap scavenges (forcing every
+               collection with --gc-global made sorting traces take hours).
+               --trace-gc logs each collection; the harness keeps the
+               post-mark-compact (live) sizes.  Only memory fields are kept;
+               if the pass fails, timing rows survive with unmeasured (-1)
+               memory. *)
             let memory_status =
-              run_pass ~node_flags:"--trace-gc --gc-global" ~extra_args:" --measure-memory"
+              run_pass ~node_flags:"--trace-gc --heap-growing-percent=10" ~extra_args:" --measure-memory"
                 ~output:memory_output_path ()
             in
             if memory_status <> 0 then timing_results
             else
-              match parse_output memory_output_path with
+              match parse_output ~expected:(List.length candidates) memory_output_path with
               | Error _ -> timing_results
               | Ok memory_results ->
                   let trace_peaks = parse_memory_pass_peaks (read_file_truncated log_path max_int) in
-                  let indexed = List.mapi (fun i pair -> (start_index + i, pair)) (List.combine timing_results memory_results) in
+                  let indexed =
+                    List.mapi (fun i pair -> (start_index + i, pair)) (List.combine timing_results memory_results)
+                  in
                   List.map
                     (fun (index, (timing, memory)) ->
                       let item_id = Printf.sprintf "%s:%d" program_name index in
@@ -916,13 +919,13 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
                         heap_used_before_bytes = memory.heap_used_before_bytes;
                         heap_used_after_bytes = memory.heap_used_after_bytes;
                         heap_used_after_gc_bytes = memory.heap_used_after_gc_bytes;
-                        (* Peak live at collection boundaries; the final
-                           forced GC with the result retained is inside the
-                           markers, so this is at least the retained size. *)
+                        (* Peak live at collection boundaries; the final forced
+                           GC with the result retained is inside the markers,
+                           so this is at least the retained size. *)
                         heap_live_peak_bytes = max trace_peak memory.heap_used_after_gc_bytes;
                         process_max_rss_kb = memory.process_max_rss_kb;
                       })
-                    indexed))
+                    indexed)
 
 let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(cfg : hazel_compare_config) :
     hazel_compare_result list =
