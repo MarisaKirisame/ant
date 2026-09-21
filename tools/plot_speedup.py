@@ -49,11 +49,78 @@ REPORT_DRAW_INTERPOLATION_LINE = False
 REPORT_DRAW_GRID_LINES = False
 DEFAULT_REPORT_KIND = "hazel"
 ENTROPY_CATEGORY_COLORS = {
-    "Baseline": "tab:blue",
+    "Random": "tab:blue",
     "Block": "tab:orange",
     "Change1": "tab:red",
     "Constant": "tab:green",
 }
+
+# A guide line on a time-vs-time scatter: (factor, linewidth, label, offset).
+# The line is y = x / factor, so factor > 1 marks "ours faster by factor",
+# factor < 1 "ours slower", and factor 1.0 break-even.  label None draws the
+# line without an annotation; offset positions the annotation in points.
+GuideLine = tuple[float, float, "str | None", tuple[float, float]]
+
+ARITH_GUIDE_LINES: list[GuideLine] = [
+    (1.0, 1.0, None, (0, 0)),
+    (2.0, 0.5, "2x faster", (12, 10)),
+    (4.0, 0.2, "4x faster", (12, -12)),
+]
+
+HAZEL_GUIDE_LINES: list[GuideLine] = [
+    (1.0, 1.0, None, (0, 0)),
+    (10.0, 0.5, "10x faster", (12, 10)),
+    (100.0, 0.2, "100x faster", (12, -12)),
+]
+
+# For comparisons clustered around parity (e.g. the eviction ablation).
+ABLATION_GUIDE_LINES: list[GuideLine] = [
+    (0.25, 0.5, "4x slower", (12, 10)),
+    (1.0, 1.0, None, (0, 0)),
+    (4.0, 0.5, "4x faster", (12, -12)),
+]
+
+ENTROPY_GUIDE_LINES: list[GuideLine] = [
+    (0.1, 0.5, "10x slower", (12, 10)),
+    (1.0, 1.0, None, (0, 0)),
+    (10.0, 0.5, "10x faster", (12, -12)),
+]
+
+
+def _draw_guide_lines(
+    ax: plt.Axes,
+    *,
+    min_time: float,
+    max_time: float,
+    guide_lines: Sequence[GuideLine],
+) -> None:
+    for factor, linewidth, label, offset in guide_lines:
+        x_start = max(min_time, factor * min_time)
+        x_end = min(max_time, factor * max_time)
+        if x_start > x_end:
+            continue
+        ax.plot(
+            [x_start, x_end],
+            [x_start / factor, x_end / factor],
+            color="black",
+            linestyle="--",
+            linewidth=linewidth,
+        )
+        if label is None:
+            continue
+        x_anchor = x_start + 0.7 * (x_end - x_start)
+        y_anchor = x_anchor / factor
+        ax.annotate(
+            label,
+            xy=(x_anchor, y_anchor),
+            xytext=offset,
+            textcoords="offset points",
+            bbox={"boxstyle": "round,pad=0.25", "fc": "white", "ec": "black", "alpha": 1.0},
+            arrowprops={"arrowstyle": "->", "color": "black", "lw": 1},
+            fontsize=9,
+            ha="left",
+            va="center",
+        )
 
 if REPORT_WALL_CLOCK_TIME:
     MEMO_KEY = "memo_profile"
@@ -137,6 +204,7 @@ def plot_scatter_for_kind(
     xlabel: str = "Baseline time (ns)",
     ylabel: str = "Chordata time (ns)",
     output_name: str | None = None,
+    guide_lines: Sequence[GuideLine] | None = None,
 ) -> str:
     pairs_list = list(pairs)
     baselines = [baseline for baseline, _ in pairs_list]
@@ -144,19 +212,13 @@ def plot_scatter_for_kind(
     use_arith_style = report_kind == "arith"
     use_hazel_style = report_kind == "hazel"
     point_alpha = 1.0 if use_arith_style else 0.15
-    annotation_alpha = 1.0
-    if use_arith_style:
-        guide_lines = [
-            (2.0, 0.5, "2x faster", (12, 10)),
-            (4.0, 0.2, "4x faster", (12, -12)),
-        ]
-    elif use_hazel_style:
-        guide_lines = [
-            (10.0, 0.5, "10x faster", (12, 10)),
-            (100.0, 0.2, "100x faster", (12, -12)),
-        ]
-    else:
-        assert False
+    if guide_lines is None:
+        if use_arith_style:
+            guide_lines = ARITH_GUIDE_LINES
+        elif use_hazel_style:
+            guide_lines = HAZEL_GUIDE_LINES
+        else:
+            assert False
     min_time = min(min(baselines), min(memos))
     max_time = max(max(baselines), max(memos))
     reg_x = np.array([min_time, max_time])
@@ -179,48 +241,10 @@ def plot_scatter_for_kind(
     yscale = xscale
 
     def _plot(ax: plt.Axes) -> None:
-        def draw_ratio_line(factor: float, *, linewidth: float, label: str, offset: tuple[float, float]) -> None:
-            x_start = factor * min_time
-            if x_start > max_time:
-                return
-            ax.plot(
-                [x_start, max_time],
-                [min_time, max_time / factor],
-                color="black",
-                linestyle="--",
-                linewidth=linewidth,
-            )
-            x_anchor = x_start + 0.7 * (max_time - x_start)
-            y_anchor = x_anchor / factor
-            ax.annotate(
-                label,
-                xy=(x_anchor, y_anchor),
-                xytext=offset,
-                textcoords="offset points",
-                bbox={
-                    "boxstyle": "round,pad=0.25",
-                    "fc": "white",
-                    "ec": "black",
-                    "alpha": annotation_alpha,
-                },
-                arrowprops={"arrowstyle": "->", "color": "black", "lw": 1},
-                fontsize=9,
-                ha="left",
-                va="center",
-            )
-
         ax.scatter(baselines, memos, alpha=point_alpha)
         if reg_y is not None:
             ax.plot(reg_x, reg_y, color="tab:blue", linewidth=1.5, label="Linear fit")
-        ax.plot(
-            [min_time, max_time],
-            [min_time, max_time],
-            color="black",
-            linestyle="--",
-            linewidth=1,
-        )
-        for factor, linewidth, label, offset in guide_lines:
-            draw_ratio_line(factor, linewidth=linewidth, label=label, offset=offset)
+        _draw_guide_lines(ax, min_time=min_time, max_time=max_time, guide_lines=guide_lines)
 
     return _save_plot(
         output_dir,
@@ -360,7 +384,10 @@ def plot_entropy_scatter(
     *,
     output_name: str = "entropy-scatter.png",
     title: str = "Memo vs CEK by Input Pattern",
+    guide_lines: Sequence[GuideLine] | None = None,
 ) -> str:
+    if guide_lines is None:
+        guide_lines = ENTROPY_GUIDE_LINES
     if not series:
         raise ValueError("series is empty")
     all_pairs = [pair for _, pairs in series for pair in pairs]
@@ -385,31 +412,7 @@ def plot_entropy_scatter(
                 label=label,
                 color=ENTROPY_CATEGORY_COLORS.get(label, f"C{index}"),
             )
-        for speedup, linewidth, label, offset in [
-            (0.1, 0.5, "10x slower", (12, 10)),
-            (1.0, 1.0, None, (0, 0)),
-            (10.0, 0.5, "10x faster", (12, -12)),
-        ]:
-            x_start = max(min_time, speedup * min_time)
-            x_end = min(max_time, speedup * max_time)
-            if x_start > x_end:
-                continue
-            ax.plot([x_start, x_end], [x_start / speedup, x_end / speedup], color="black", linestyle="--", linewidth=linewidth)
-            if label is None:
-                continue
-            x_anchor = x_start + 0.7 * (x_end - x_start)
-            y_anchor = x_anchor / speedup
-            ax.annotate(
-                label,
-                xy=(x_anchor, y_anchor),
-                xytext=offset,
-                textcoords="offset points",
-                bbox={"boxstyle": "round,pad=0.25", "fc": "white", "ec": "black", "alpha": 1.0},
-                arrowprops={"arrowstyle": "->", "color": "black", "lw": 1},
-                fontsize=9,
-                ha="left",
-                va="center",
-            )
+        _draw_guide_lines(ax, min_time=min_time, max_time=max_time, guide_lines=guide_lines)
 
     return _save_plot(
         output_dir,

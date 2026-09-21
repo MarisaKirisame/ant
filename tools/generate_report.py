@@ -64,6 +64,7 @@ from dominate import document
 from dominate import tags as tag
 from common import fmt_speedup, stat_card
 from plot_speedup import (
+    ABLATION_GUIDE_LINES,
     SpeedupStats,
     compare_stats,
     load_records,
@@ -92,7 +93,7 @@ BASE_EXPERIMENTS: list[tuple[str, str]] = [
 SCALING_SIZES = (10, 20, 40, 100, 200, 400)
 ENTROPY_SCALING_SIZES = (10, 20, 40, 100, 200, 400, 1000, 2000, 4000)
 ENTROPY_CATEGORIES = (
-    ("random", "Baseline"),
+    ("random", "Random"),
     ("block", "Block"),
     ("mod1", "Change1"),
     ("same", "Constant"),
@@ -474,7 +475,7 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
         with tag.main(cls="panel"):
             tag.h1("Input Entropy Scaling")
             tag.p(
-                f"Six predefined list functions. Each plot has Baseline, Block, Change1, and Constant lines over input size; this sweep ends at {sizes[-1]:,}.",
+                f"Six predefined list functions. Each plot has Random, Block, Change1, and Constant lines over input size; this sweep ends at {sizes[-1]:,}.",
                 cls="meta",
             )
             with tag.section(cls="grid"):
@@ -841,6 +842,7 @@ def generate_hazel_eviction_ablation_report(
             xlabel="No-eviction Chordata time (ns)",
             ylabel="Evicting Chordata time (ns)",
             output_name="eviction_ablation_scatter.png",
+            guide_lines=ABLATION_GUIDE_LINES,
         )
         scatter_rel = os.path.relpath(output_dir / scatter_name, output.parent)
     if memory_ratios:
