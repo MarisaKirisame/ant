@@ -65,8 +65,8 @@ adds the new fragment to the memo list.
    code reorganisations.
 2. **Language back-ends.**  Extend the generator so more front-ends can target the
    memoising CEK VM.
-3. **Adaptive memo policies.**  Explore heuristics that decide when to persist or
-   evict fragments based on observed hit rates.
+3. **Adaptive memo policies.**  Explore heuristics that decide which fragments to
+   record based on observed reuse.
 
 If you care about making “instant feedback” the default for large-scale programs,
 Ant is the sandbox where we are trying to make it happen.  Dive in, experiment,

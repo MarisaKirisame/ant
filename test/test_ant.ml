@@ -1,5 +1,52 @@
 open Ant
 
+let test_eviction_disabled () =
+  Words.reset ();
+  Words.set_constructor_degree 0 1;
+  Memo.reset ();
+  let done_exp : State.exp = { pc = 0; step = (fun _ -> failwith "already done") } in
+  let executed = ref 0 in
+  let step (w : State.world) =
+    incr executed;
+    let word, _ = Memo.resolve w (Reference.Source.E 0) in
+    (match word with Word.Word.Int n -> Dynarray.set w.state.e 0 (Memo.from_int (n + 1)) | _ -> assert false);
+    w.state.c <- done_exp
+  in
+  Memo.add_exp done_exp.step 0;
+  Memo.add_exp step 1;
+  let start = Memo.pc_to_exp (Common.Pc 1) in
+  let memo = Memo.init_memo () in
+  let run config =
+    let result = Memo.exec_cek ?config start (Dynarray.of_list [ Memo.from_int 41 ]) (Memo.from_constructor 0) in
+    assert (Memo.to_word result.words = Word.Word.Int 42);
+    assert (result.step = 1 && result.without_memo_step = 1)
+  in
+  run None;
+  run (Some Memo.cek_config);
+  let executed_before_rejection = !executed in
+  let expect_rejection f =
+    match f () with
+    | _ -> failwith "evict:true should be rejected"
+    | exception Invalid_argument message ->
+        assert (message = "Memo.exec_cek_memoized: cache eviction is disabled; evict:true is unsupported")
+  in
+  expect_rejection (fun () -> run (Some (Memo.memo_config ~evict:true memo)));
+  expect_rejection (fun () ->
+      Memo.exec_cek_memoized start (Dynarray.of_list [ Memo.from_int 41 ]) (Memo.from_constructor 0) memo ~evict:true);
+  assert (!executed = executed_before_rejection);
+  assert (memo.size = 0 && memo.epoch = 0);
+  run (Some (Memo.memo_config memo));
+  let executed_after_first = !executed in
+  run (Some (Memo.memo_config memo));
+  assert (!executed = executed_after_first);
+  run (Some (Memo.memo_config memo));
+  assert (memo.size > 0 && memo.epoch = 3);
+  assert (memo.eviction_state.batch_count = 0);
+  assert (memo.eviction_state.evict_count = 0);
+  assert (memo.eviction_state.max_tree_size_seen = 0);
+  Memo.reset ();
+  Words.reset ()
+
 let assert_same_set expected actual =
   let normalize = List.sort compare in
   assert (normalize expected = normalize actual)
@@ -77,6 +124,7 @@ module TestMonoidHash (M : Hash.MonoidHash) = struct
 end
 
 let _ =
+  test_eviction_disabled ();
   test_mfvs ();
   let x = Intmap.create 32 in
   for i = 0 to 9 do

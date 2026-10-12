@@ -73,13 +73,6 @@ HAZEL_GUIDE_LINES: list[GuideLine] = [
     (100.0, 0.2, "100x faster", (12, -12)),
 ]
 
-# For comparisons clustered around parity (e.g. the eviction ablation).
-ABLATION_GUIDE_LINES: list[GuideLine] = [
-    (0.25, 0.5, "4x slower", (12, 10)),
-    (1.0, 1.0, None, (0, 0)),
-    (4.0, 0.5, "4x faster", (12, -12)),
-]
-
 ENTROPY_GUIDE_LINES: list[GuideLine] = [
     (0.1, 0.5, "10x slower", (12, 10)),
     (1.0, 1.0, None, (0, 0)),
@@ -678,8 +671,8 @@ def render_profile_table(totals: dict[str, float], total_time: float) -> str:
                 percent = 100.0 * value / total_time
                 with tag.tr():
                     tag.td(name)
-                    tag.td(f"{value:.0f}")
-                    tag.td(f"{percent:.2f}%")
+                    tag.td(f"{value:.1f}")
+                    tag.td(f"{percent:.1f}%")
     return tbl.render()
 
 

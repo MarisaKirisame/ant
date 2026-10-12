@@ -11,8 +11,8 @@ def fresh() -> int:
 
 
 def fmt_speedup(value: float) -> str:
-    """Format a speedup value with sensible precision for very small numbers."""
-    return f"{value:.4g}"
+    """Format a ratio with one decimal place for reports and paper output."""
+    return f"{value:.1f}"
 
 
 def stat_card(label: str, value: str) -> None:

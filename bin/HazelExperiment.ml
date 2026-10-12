@@ -49,7 +49,7 @@ let benchmark_test_string ~input_size =
   | Pair -> Printf.sprintf {| my_pair (%s) |} (list_to_cons_str large_input)
   | Rev -> Printf.sprintf {| my_reverse (%s) |} (list_to_cons_str large_input)
 
-let run ?hazel_compare ?(evict = true) ?(baseline = true) ?(input_size = Common.experiment_list_length)
+let run ?hazel_compare ?(evict = false) ?(baseline = true) ?(input_size = Common.experiment_list_length)
     ?steps_file:steps_file_override ~dataset ~benchmark ?max_candidates () =
   if input_size <= 0 then invalid_arg "HazelExperiment.run: input_size must be positive";
   let test = Common.parse_nexpr (benchmark_test_string ~input_size benchmark) in
@@ -82,7 +82,7 @@ let hazel_compare_config =
     max_candidates = None;
   }
 
-let run_compare ?(hazel_compare = hazel_compare_config) ?(evict = true) ?input_size ?steps_file ?max_candidates ~dataset
+let run_compare ?(hazel_compare = hazel_compare_config) ?(evict = false) ?input_size ?steps_file ?max_candidates ~dataset
     ~benchmark () =
   let steps_file = Option.value steps_file ~default:(compare_steps_file dataset benchmark) in
   run ~hazel_compare:(Some hazel_compare) ~evict ?input_size ~steps_file ?max_candidates ~dataset ~benchmark ()
@@ -97,21 +97,21 @@ let decode_mode mode =
       else None)
     benchmarks
 
-let run_mode ?(evict = true) ?(baseline = true) ?input_size ?steps_file ?max_candidates mode =
+let run_mode ?(evict = false) ?(baseline = true) ?input_size ?steps_file ?max_candidates mode =
   match decode_mode mode with
   | None -> false
   | Some (dataset, benchmark) ->
       run ~evict ~baseline ?input_size ?steps_file ?max_candidates ~dataset ~benchmark ();
       true
 
-let run_scaling_mode ?(evict = true) ?(baseline = true) ?max_candidates ~mode ~input_size ~steps_file () =
+let run_scaling_mode ?(evict = false) ?(baseline = true) ?max_candidates ~mode ~input_size ~steps_file () =
   match decode_mode mode with
   | None -> false
   | Some (dataset, benchmark) ->
       run ~evict ~baseline ~dataset ~benchmark ~input_size ~steps_file ?max_candidates ();
       true
 
-let run_compare_mode ?(evict = true) ?input_size ?steps_file ?max_candidates ?hazel_compare_max_candidates
+let run_compare_mode ?(evict = false) ?input_size ?steps_file ?max_candidates ?hazel_compare_max_candidates
     ?(hazel_compare_timeout_seconds = hazel_compare_config.timeout_seconds) mode =
   match decode_mode mode with
   | None -> false

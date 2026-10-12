@@ -111,8 +111,8 @@ generalized input `Recurse (Pair (S Z) (Pair Z ?l2))`.
 
 ## Limitations and Next Work
 
-- The memo store is a flat list; lookup is linear in the number of steps. An
-  index or eviction policy will eventually be needed for larger programs.
+- The memo store uses a trie index; further lookup optimisations may help with
+  larger programs.
 - Composition currently requires matching program counters; broader partial
   overlaps are not yet exploited.
 - Resolved-slot tracking is coarse-grained (per environment/continuation entry),
