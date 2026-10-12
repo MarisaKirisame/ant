@@ -9,5 +9,5 @@
         url = https://github.com/waterlens/hashtbl.git
 [submodule "hazel"]
 	path = hazel
-	url = git@github.com:MarisaKirisame/hazel.git
+	url = https://github.com/MarisaKirisame/hazel.git
 	branch = hazel-eval-batch
