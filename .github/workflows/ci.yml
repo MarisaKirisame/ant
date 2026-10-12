@@ -11,28 +11,82 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      DUNE_CACHE: enabled
+      DUNE_CACHE_STORAGE_MODE: copy
 
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
-      - name: Cache opam switch
-        uses: actions/cache@v4
         with:
-          path: |
-            ~/.opam
-            ~/.cache/opam
-          key: ${{ runner.os }}-ocaml-5.2-${{ hashFiles('dune-project', 'dune.lock/**', '**/*.opam', 'nightly.py') }}
-          restore-keys: |
-            ${{ runner.os }}-ocaml-5.2-
+          submodules: recursive
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Test pipeline commands
+        run: uv run --locked python -m unittest discover -s test -p 'test_*.py'
 
       - uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: 5.2
+          ocaml-compiler: '5.4.1'
           opam-pin: false
+          cache-prefix: ant-build-v1
 
-      - run: git submodule update --init
-      - name: Reset dune state
-        run: rm -rf ~/.cache/dune/toolchains _build
+      # Restore after setup-ocaml so its base cache cannot replace dependencies.
+      - name: Restore opam dependencies
+        id: opam-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.opam
+            _opam
+          key: ant-build-opam-v1-ubuntu-24.04-${{ runner.arch }}-5.4.1-hazel-5.2.0-${{ hashFiles('dune-project', 'dune.lock/**', 'hazel/**/*.opam*', 'nightly.py') }}
+          restore-keys: |
+            ant-build-opam-v1-ubuntu-24.04-${{ runner.arch }}-5.4.1-hazel-5.2.0-
+
+      - name: Install Chordata tools
+        if: steps.opam-cache.outputs.cache-hit != 'true'
+        run: uv run --locked ./nightly.py dependency --locked
+
+      - name: Install Hazel dependencies
+        if: steps.opam-cache.outputs.cache-hit != 'true'
+        run: uv run --locked ./nightly.py hazel-install
+
+      - name: Save opam dependencies
+        if: steps.opam-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.opam
+            _opam
+          key: ${{ steps.opam-cache.outputs.cache-primary-key }}
+
+      - name: Restore Dune builds
+        id: dune-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/dune
+            _build
+            hazel/_build
+          key: ant-build-dune-v1-ubuntu-24.04-${{ runner.arch }}-${{ hashFiles('dune-project', 'dune.lock/**', 'hazel/**/*.opam*', 'nightly.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ant-build-dune-v1-ubuntu-24.04-${{ runner.arch }}-${{ hashFiles('dune-project', 'dune.lock/**', 'hazel/**/*.opam*', 'nightly.py') }}-
+
+      - name: Build Hazel
+        run: uv run --locked ./nightly.py hazel-build
+
+      - name: Build Chordata
+        run: uv run --locked ./nightly.py build
+
+      # Save before benchmarks so a later failure does not discard the builds.
+      - name: Save Dune builds
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/dune
+            _build
+            hazel/_build
+          key: ${{ steps.dune-cache.outputs.cache-primary-key }}
+
       - name: Run pipeline
-        run: make all
+        run: uv run --locked ./nightly.py all --locked --skip-dependencies

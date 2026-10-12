@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   ocamlformat:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -17,33 +17,52 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
 
-      - name: Cache opam switch
-        uses: actions/cache@v4
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: '5.4.1'
+          opam-pin: false
+          cache-prefix: ant-format-v1
+
+      - name: Read formatter version
+        id: formatter
+        run: |
+          version=$(sed -n 's/^version=//p' .ocamlformat)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore formatter
+        id: formatter-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.opam
-            ~/.cache/opam
-          key: ${{ runner.os }}-ocaml-5.2-${{ hashFiles('dune-project', 'dune.lock/**', '**/*.opam', 'nightly.py') }}
+            _opam
+          key: ant-format-v1-ubuntu-24.04-${{ runner.arch }}-5.4.1-${{ hashFiles('.ocamlformat', '.github/workflows/autofix.yml') }}
           restore-keys: |
-            ${{ runner.os }}-ocaml-5.2-
-
-      - uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: 5.2
-          opam-pin: false
-
-      - name: Reset dune state
-        run: rm -rf ~/.cache/dune/toolchains _build
+            ant-format-v1-ubuntu-24.04-${{ runner.arch }}-5.4.1-
 
       - name: Install formatter
-        run: opam install -y dune ocamlformat.0.28.1
+        if: steps.formatter-cache.outputs.cache-hit != 'true'
+        env:
+          OCAMLFORMAT_VERSION: ${{ steps.formatter.outputs.version }}
+        run: opam install -y 'dune>=3.24.0' "ocamlformat.$OCAMLFORMAT_VERSION"
 
-      - name: lock
-        run: opam exec -- dune pkg lock
+      - name: Save formatter
+        if: steps.formatter-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.opam
+            _opam
+          key: ${{ steps.formatter-cache.outputs.cache-primary-key }}
 
       - name: Format OCaml sources
+        # Dune returns 1 when it promotes formatting changes.
         continue-on-error: true
-        run: opam exec -- dune fmt
+        run: opam exec -- dune fmt --pkg=disabled
+
+      - name: Verify formatting
+        run: opam exec -- dune fmt --pkg=disabled
 
       - uses: autofix-ci/action@v1
         with:

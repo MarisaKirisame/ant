@@ -62,6 +62,7 @@ import generate_report as report_module  # noqa: E402
 @dataclasses.dataclass(frozen=True)
 class RunOptions:
     smoke: bool = False
+    locked: bool = False
 
 
 RUN_OPTIONS = RunOptions()
@@ -183,8 +184,14 @@ def ensure_opam_archive_repository(switch: str) -> None:
         )
 
 
-def install_dependencies() -> None:
+def install_dependencies(*, locked: bool = False) -> None:
+    if locked and not (REPO_ROOT / "dune.lock" / "lock.dune").is_file():
+        raise FileNotFoundError("--locked requires dune.lock/lock.dune. Generate and commit the lock directory first.")
     ensure_switch()
+    if locked:
+        # CI uses the committed lock directory and needs no editor tools.
+        run(["opam", "install", "--switch", SWITCH, "-y", *TOOLCHAIN_PACKAGES])
+        return
     run(["opam", "update"])
     run(["opam", "upgrade", "--switch", SWITCH, "--fixup", "-y"])
     run(["opam", "install", "--switch", SWITCH, "-y", *TOOLCHAIN_PACKAGES])
@@ -192,16 +199,24 @@ def install_dependencies() -> None:
     opam_exec(["dune", "pkg", "lock"])
 
 
-def hazel_dependency() -> None:
+def install_hazel_dependencies() -> None:
     ensure_opam_switch(HAZEL_SWITCH, invariant=HAZEL_OCAML_INVARIANT)
     run(["git", "submodule", "update", "--init", "--recursive", "hazel"])
     ensure_opam_archive_repository(HAZEL_SWITCH)
     run(["opam", "install", "--switch", HAZEL_SWITCH, "-y", "--deps-only", "--locked", "."], cwd=REPO_ROOT / "hazel")
+
+
+def build_hazel() -> None:
     opam_exec_in_switch(
         HAZEL_SWITCH,
         ["dune", "build", "src/CLI/cli.bc.js", "--profile", "release"],
         cwd=REPO_ROOT / "hazel",
     )
+
+
+def hazel_dependency() -> None:
+    install_hazel_dependencies()
+    build_hazel()
 
 
 def build_project() -> None:
@@ -287,7 +302,8 @@ def run_modes(selected_modes: tuple[str, ...]) -> None:
     _remove_result_files_for_modes(selected_modes)
     ensure_switch()
     generate_ml_files()
-    opam_exec(["dune", "fmt"], check=False, silent=True)
+    if not RUN_OPTIONS.locked:
+        opam_exec(["dune", "fmt"], check=False, silent=True)
     for mode in selected_modes:
         print(f"Running {mode}...", flush=True)
         if _smoke_run() and mode == "arith":
@@ -327,7 +343,8 @@ def run_compare_modes(selected_modes: tuple[str, ...]) -> None:
     _remove_compare_result_files_for_modes(selected_modes)
     ensure_switch()
     generate_ml_files()
-    opam_exec(["dune", "fmt"], check=False, silent=True)
+    if not RUN_OPTIONS.locked:
+        opam_exec(["dune", "fmt"], check=False, silent=True)
     for mode in selected_modes:
         print(f"Running {mode} compare...", flush=True)
         command = [
@@ -386,7 +403,8 @@ def arith_project() -> None:
 def _prepare_scaling_run() -> None:
     ensure_switch()
     generate_ml_files()
-    opam_exec(["dune", "fmt"], check=False, silent=True)
+    if not RUN_OPTIONS.locked:
+        opam_exec(["dune", "fmt"], check=False, silent=True)
 
 
 def arith_scaling_project() -> None:
@@ -541,16 +559,24 @@ def main(argv: Iterable[str]) -> int:
     args = list(argv)
     usage = (
         "Usage: nightly.py "
-        "[dependency|hazel-dependency|build|run|profile|hazel|hazel-experiment|"
+        "[dependency|hazel-dependency|hazel-install|hazel-build|build|run|profile|hazel|hazel-experiment|"
         "hazel-report|arith|arith-report|arith-scaling|hazel-scaling|"
         "scaling|scaling-report|entropy-scaling|entropy-report|report|experiment|"
-        "hazel-tex|arith-tex|compile-generated|all] [--smoke]"
+        "hazel-tex|arith-tex|compile-generated|all] [--smoke] [--locked] [--skip-dependencies]\n"
+        "--locked: use the committed dependencies without editor tools or source formatting.\n"
+        "--skip-dependencies: run all stages with dependencies and the Hazel CLI already prepared."
     )
 
     smoke = False
     if "--smoke" in args:
         smoke = True
         args.remove("--smoke")
+    locked = "--locked" in args
+    if locked:
+        args.remove("--locked")
+    skip_dependencies = "--skip-dependencies" in args
+    if skip_dependencies:
+        args.remove("--skip-dependencies")
     if any(arg.startswith("-") for arg in args):
         unknown = next(arg for arg in args if arg.startswith("-"))
         print(f"Unknown option: {unknown}", file=sys.stderr)
@@ -562,12 +588,19 @@ def main(argv: Iterable[str]) -> int:
         return 1
 
     stage = args[0] if args else "all"
-    RUN_OPTIONS = RunOptions(smoke=smoke)
+    if skip_dependencies and stage != "all":
+        print("--skip-dependencies requires the all stage.", file=sys.stderr)
+        return 1
+    RUN_OPTIONS = RunOptions(smoke=smoke, locked=locked)
 
     if stage == "dependency":
-        install_dependencies()
+        install_dependencies(locked=locked)
     elif stage == "hazel-dependency":
         hazel_dependency()
+    elif stage == "hazel-install":
+        install_hazel_dependencies()
+    elif stage == "hazel-build":
+        build_hazel()
     elif stage == "build":
         build_project()
     elif stage == "run":
@@ -611,8 +644,9 @@ def main(argv: Iterable[str]) -> int:
     elif stage == "all":
         clean_results()
         clean_output()
-        install_dependencies()
-        hazel_dependency()
+        if not skip_dependencies:
+            install_dependencies(locked=locked)
+            hazel_dependency()
         build_project()
         arith_project()
         hazel_experiment_project(generate_report=False)
