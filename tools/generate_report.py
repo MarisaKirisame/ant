@@ -26,8 +26,9 @@ Outputs:
                                         \\hazelBaselineGeoMean,
                                         \\hazelBaselineMemoryOverhead,
                                         \\hazelBaselineSpeedupTable, …)
-- output/hazel/hazel_compare/…          CEK-vs-Hazel page (HTML only) and the
-                                        memo-vs-Hazel summaries the tex reads
+- output/hazel/hazel_compare/…          Chordata and Chordata (no memo) versus
+                                        Hazel (no memo): scatter plots, CDFs,
+                                        and summaries read by the paper macros
 - output/arith/…                        arith pages + arith_result.tex
 - output/scaling/…                      scaling + entropy pages and tex
 
@@ -554,7 +555,7 @@ def generate_hazel_reports(
     if include_hazel_compare:
         hazel_compare_index = generate_hazel_compare_reports(modes=hazel_compare_modes)
         if hazel_compare_index is not None:
-            extra_entries.append(("CEK vs Hazel Baseline", hazel_compare_index))
+            extra_entries.append(("Chordata and Chordata (no memo) vs Hazel (no memo)", hazel_compare_index))
     generate_tex_table(
         output_path=tex_output,
         include_hazel_compare=include_hazel_compare,
@@ -572,7 +573,7 @@ def generate_hazel_reports(
         report_kind="hazel",
         extra_entries=extra_entries,
         description=(
-            "In the CEK vs Hazel Baseline comparison, timeout and oom statuses refer to the external "
+            "In comparisons against Hazel (no memo), timeout and oom statuses refer to the external "
             "Hazel baseline evaluator. A timeout means Hazel did not finish within the per-benchmark compare "
             "budget; oom means the Hazel process exhausted memory. The comparison summary only aggregates "
             "Hazel rows whose status is ok."
@@ -839,10 +840,20 @@ def generate_tex_table(
         baseline_geomean = _hazel_baseline_geomean_for_tex()
         baseline_memory_overhead = _hazel_baseline_memory_overhead_for_tex()
         baseline_table_lines = _hazel_baseline_table_lines(hazel_compare_modes)
+        no_memo_baseline_table_lines = _hazel_baseline_table_lines(
+            hazel_compare_modes, profile_key="cek_profile", live_key="cek_resting_adjusted_live_words",
+        )
+        no_memo_summary = _summary_json(Path("output/hazel/hazel_compare/hazel_vs_cek_eval_only_summary.json"))
+        no_memo_baseline_geomean = (
+            _tex_ratio(float(no_memo_summary["geo_mean_hazel_over_cek"]), include_times_symbol=True)
+            if no_memo_summary else MISSING_VALUE
+        )
     else:
         baseline_geomean = MISSING_VALUE
         baseline_memory_overhead = MISSING_VALUE
         baseline_table_lines = []
+        no_memo_baseline_table_lines = []
+        no_memo_baseline_geomean = MISSING_VALUE
     selected = set(modes) if modes is not None else None
     available_input_paths: list[Path] = []
     rows: list[tuple[str, list[str], list[str]]] = []
@@ -910,6 +921,13 @@ def generate_tex_table(
             group2="memory overhead",
             user_labels=USERS,
             body_rows=baseline_table_lines,
+        ),
+        "}",
+        f"\\newcommand{{\\{macro_prefix}NoMemoBaselineGeoMean}}{{" + no_memo_baseline_geomean + "}",
+        f"\\newcommand{{\\{macro_prefix}NoMemoBaselineSpeedupTable}}{{%",
+        *_grouped_table_lines(
+            group1="time speedup", group2="memory overhead",
+            user_labels=USERS, body_rows=no_memo_baseline_table_lines,
         ),
         "}",
         f"\\newcommand{{\\{macro_prefix}SpeedBreakdown}}{{%",
@@ -1032,6 +1050,7 @@ def _collect_hazel_compare_pairs(
     *,
     hazel_key: str,
 ) -> list[tuple[float, float]]:
+    """Return (Hazel baseline, Chordata without memoisation) timing pairs."""
     pairs: list[tuple[float, float]] = []
     for path in input_paths:
         for row in _iter_hazel_ok_rows(path):
@@ -1041,28 +1060,30 @@ def _collect_hazel_compare_pairs(
                 continue
             hazel = float(hazel_value)
             if cek > 0 and hazel > 0:
-                pairs.append((cek, hazel))
+                pairs.append((hazel, cek))
     return pairs
 
 
 def _hazel_compare_summary(pairs: Sequence[tuple[float, float]]) -> dict[str, float]:
-    hazel_over_cek_ratios = [hz / cek for cek, hz in pairs]
+    _, stats = compare_stats(pairs)
     return {
-        "samples": float(len(hazel_over_cek_ratios)),
-        "geo_mean_hazel_over_cek": math.exp(statistics.mean(math.log(r) for r in hazel_over_cek_ratios)),
-        "arith_mean_hazel_over_cek": statistics.mean(hazel_over_cek_ratios),
-        "end_to_end_hazel_over_cek": sum(hz for _, hz in pairs) / sum(cek for cek, _ in pairs),
+        "samples": float(stats.samples),
+        "geo_mean_hazel_over_cek": stats.geo_mean,
+        "arith_mean_hazel_over_cek": stats.arith_mean,
+        "end_to_end_hazel_over_cek": stats.end_to_end,
     }
 
 
 def _collect_memo_hazel_rows(
     input_paths: Sequence[Path],
+    *, profile_key: str = "memo_profile", live_key: str = "memo_resting_adjusted_live_words",
 ) -> dict[str, list[tuple[float, float, float, float]]]:
-    """Per-mode rows of (memo_ns, hazel_ns, memo_live_bytes, hazel_heap_bytes).
+    """Per-mode rows of (ours_ns, hazel_ns, ours_live_bytes, hazel_heap_bytes).
 
     Only rows with hazel_status == "ok" contribute.  Memory entries are NaN
     when the memory pass did not measure them (fields absent or negative).
-    Memo memory is resting-adjusted peak live words converted to bytes; Hazel
+    Select memoised or uncached Chordata with profile_key and live_key.
+    Chordata memory is resting-adjusted peak live words converted to bytes; Hazel
     memory is the JS heap allocated by one evaluation started from a
     collected heap.
     """
@@ -1070,11 +1091,11 @@ def _collect_memo_hazel_rows(
     for path in input_paths:
         rows: list[tuple[float, float, float, float]] = []
         for row in _iter_hazel_ok_rows(path):
-            memo_ns = _profile_sum(row.get("memo_profile"))
+            memo_ns = _profile_sum(row.get(profile_key))
             hazel_ns = row.get("hazel_eval_only_ns")
             if not isinstance(hazel_ns, (int, float)) or memo_ns <= 0 or hazel_ns <= 0:
                 continue
-            memo_words = row.get("memo_resting_adjusted_live_words")
+            memo_words = row.get(live_key)
             memo_bytes = (
                 float(memo_words) * 8.0
                 if isinstance(memo_words, (int, float)) and memo_words > 0
@@ -1195,38 +1216,56 @@ def generate_hazel_compare_reports(
 
     eval_only_summary: dict[str, float] | None = None
     eval_only_scatter_rel: str | None = None
+    eval_only_cdf_rel: str | None = None
     if eval_only_pairs:
         eval_only_summary = _hazel_compare_summary(eval_only_pairs)
         eval_only_summary_path.write_text(json.dumps(eval_only_summary, indent=2), encoding="utf-8")
-        hazel_baseline_pairs = [(hazel, cek) for cek, hazel in eval_only_pairs]
+        hazel_baseline_pairs = eval_only_pairs
         scatter_name = plot_scatter_for_kind(
             hazel_baseline_pairs,
             output_dir,
             report_kind="hazel",
-            title="CEK vs Hazel Baseline",
-            xlabel="Hazel baseline time (ns)",
-            ylabel="CEK time (ns)",
+            title="Chordata (no memo) vs Hazel (no memo)",
+            xlabel="Hazel (no memo) baseline time (ns)",
+            ylabel="Chordata (no memo) time (ns)",
             output_name="hazel_vs_cek_scatter.png",
         )
         eval_only_scatter_rel = os.path.relpath(output_dir / scatter_name, output.parent)
+        ratios, _ = compare_stats(hazel_baseline_pairs)
+        cdf_name = plot_speedup_cdf(
+            ratios, output_dir,
+            title="Chordata (no memo) vs Hazel (no memo): Speedup CDF",
+            xlabel="Speedup (Hazel (no memo) / Chordata (no memo))",
+            output_name="hazel_vs_cek_cdf.png",
+        )
+        eval_only_cdf_rel = os.path.relpath(output_dir / cdf_name, output.parent)
 
     memo_rows = _collect_memo_hazel_rows(input_paths)
     memo_time_summary = _memo_hazel_time_summary(memo_rows)
     memory_table = _memo_hazel_memory_rows(memo_rows)
     memory_overhead = _geometric_mean([ratio for *_, ratio in memory_table]) if memory_table else None
     memo_scatter_rel: str | None = None
+    memo_cdf_rel: str | None = None
     if memo_time_summary is not None:
         memo_pairs = [(hz, memo) for rows in memo_rows.values() for memo, hz, _, _ in rows]
         memo_scatter_name = plot_scatter_for_kind(
             memo_pairs,
             output_dir,
             report_kind="hazel",
-            title="Memo vs Hazel Baseline",
-            xlabel="Hazel baseline time (ns)",
-            ylabel="Memo time (ns)",
+            title="Chordata vs Hazel (no memo)",
+            xlabel="Hazel (no memo) baseline time (ns)",
+            ylabel="Chordata time (ns)",
             output_name="hazel_vs_memo_scatter.png",
         )
         memo_scatter_rel = os.path.relpath(output_dir / memo_scatter_name, output.parent)
+        ratios, _ = compare_stats(memo_pairs)
+        cdf_name = plot_speedup_cdf(
+            ratios, output_dir,
+            title="Chordata vs Hazel (no memo): Speedup CDF",
+            xlabel="Speedup (Hazel (no memo) / Chordata)",
+            output_name="hazel_vs_memo_cdf.png",
+        )
+        memo_cdf_rel = os.path.relpath(output_dir / cdf_name, output.parent)
         memo_summary_json: dict[str, object] = dict(memo_time_summary)
         if memory_overhead is not None:
             memo_summary_json["geo_mean_memory_memo_over_hazel"] = memory_overhead
@@ -1235,18 +1274,18 @@ def generate_hazel_compare_reports(
     else:
         memo_summary_path.unlink(missing_ok=True)
 
-    doc = document(title="CEK vs Hazel Baseline")
+    doc = document(title="Chordata (no memo) vs Hazel (no memo)")
     doc["lang"] = "en"
     with doc.head:
         tag.meta(charset="utf-8")
         tag.link(rel="stylesheet", href=css_href)
     with doc:
         with tag.main():
-            tag.h1("CEK vs Hazel Baseline")
-            tag.p("Summary of Hazel baseline time divided by CEK time from hazel-compare result data.")
+            tag.h1("Chordata and Chordata (no memo) vs Hazel (no memo)")
+            tag.p("Hazel (no memo) is the baseline. Scatter plots show baseline time on x and Chordata time on y; CDFs show baseline / Chordata speedup on x and executions (%) on y.")
 
             if eval_only_summary:
-                tag.h2("Hazel baseline / CEK")
+                tag.h2("Chordata (no memo) vs Hazel (no memo)")
                 with tag.section(cls="stats"):
                     stat_card("Samples", str(int(eval_only_summary["samples"])))
                     stat_card(
@@ -1265,11 +1304,15 @@ def generate_hazel_compare_reports(
                     with tag.section(cls="plot"):
                         tag.img(
                             src=eval_only_scatter_rel,
-                            alt="CEK versus Hazel baseline scatter plot",
+                            alt="Chordata (no memo) versus Hazel (no memo) scatter plot",
                         )
 
+            if eval_only_cdf_rel:
+                with tag.section(cls="plot"):
+                    tag.img(src=eval_only_cdf_rel, alt="Chordata (no memo) versus Hazel (no memo) speedup CDF")
+
             if memo_time_summary is not None:
-                tag.h2("Memoized Chordata vs Hazel baseline")
+                tag.h2("Chordata vs Hazel (no memo)")
                 tag.p(
                     "Time compares hazel_eval_only_ns against the memoized Chordata "
                     "execution of the same program state. Memory compares one peak per "
@@ -1300,6 +1343,9 @@ def generate_hazel_compare_reports(
                             src=memo_scatter_rel,
                             alt="Memoized Chordata versus Hazel baseline scatter plot",
                         )
+                if memo_cdf_rel:
+                    with tag.section(cls="plot"):
+                        tag.img(src=memo_cdf_rel, alt="Chordata versus Hazel (no memo) speedup CDF")
                 if memory_table:
                     tag.h3("Peak memory by benchmark")
                     with tag.table():
@@ -1348,7 +1394,10 @@ def _hazel_baseline_memory_overhead_for_tex() -> str:
     return _memo_summary_ratio_for_tex("geo_mean_memory_memo_over_hazel")
 
 
-def _hazel_baseline_table_lines(modes: Sequence[str] | None) -> list[str]:
+def _hazel_baseline_table_lines(
+    modes: Sequence[str] | None, *, profile_key: str = "memo_profile",
+    live_key: str = "memo_resting_adjusted_live_words",
+) -> list[str]:
     """Rows of the Hazel-baseline-over-memo table, in the \\hazelSpeedupTable
     layout: per benchmark, per-user time-ratio geomeans, then per-user
     peak-memory ratios (X when unavailable)."""
@@ -1367,7 +1416,7 @@ def _hazel_baseline_table_lines(modes: Sequence[str] | None) -> list[str]:
             time_value = "X"
             memory_value = "X"
             if included and path.exists():
-                per_mode = _collect_memo_hazel_rows([path])
+                per_mode = _collect_memo_hazel_rows([path], profile_key=profile_key, live_key=live_key)
                 rows = per_mode.get(path.stem, [])
                 time_ratios = [hz / memo for memo, hz, _, _ in rows]
                 if time_ratios:

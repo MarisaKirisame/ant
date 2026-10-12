@@ -12,6 +12,8 @@ from dominate.util import raw
 from common import fmt_speedup, stat_card
 from plot_speedup import (
     generate_plot_for_pairs,
+    compare_stats,
+    plot_speedup_cdf,
     load_records,
     pairs_from_profiles,
     pairs_from_steps,
@@ -112,7 +114,7 @@ def render_html(
             _render_speedup_comparison(
                 records,
                 output_dir,
-                label="Memo vs Plain (steps)",
+                label="Chordata vs Chordata (no memo) (steps)",
                 pairs=pairs_from_steps(records),
                 report_kind=report_kind,
             )
@@ -166,8 +168,18 @@ def _render_speedup_comparison(
         if baseline_key is None or memo_key is None:
             raise ValueError("baseline_key and memo_key are required when pairs is None")
         pairs = pairs_from_profiles(records, baseline_key=baseline_key, memo_key=memo_key)
+    labels = {"cek_profile": "Chordata (no memo)", "memo_profile": "Chordata", "plain_profile": "Plain OCaml"}
+    baseline_label = labels.get(baseline_key, "Chordata (no memo)")
+    ours_label = labels.get(memo_key, "Chordata")
     stats, line_plot, scatter_plot = generate_plot_for_pairs(
-        pairs, output_dir, report_kind=report_kind
+        pairs, output_dir, report_kind=report_kind,
+        baseline_label=baseline_label, ours_label=ours_label,
+        metric_label="time (ns)" if baseline_key else "evaluation steps",
+    )
+    ratios, _ = compare_stats(pairs)
+    cdf_plot = plot_speedup_cdf(
+        ratios, output_dir, title=f"{ours_label} vs {baseline_label}: Speedup CDF",
+        xlabel=f"Speedup ({baseline_label} / {ours_label})",
     )
     with tag.section(cls="comparison"):
         with tag.details():
@@ -181,6 +193,7 @@ def _render_speedup_comparison(
                 stat_card("Lowest speedup", f"{fmt_speedup(stats.minimum)}x")
             _plot_image(line_plot, f"{label} speedup per run plot")
             _plot_image(scatter_plot, f"{label} scatter plot")
+            _plot_image(cdf_plot, f"{label} speedup CDF")
     return None
 
 

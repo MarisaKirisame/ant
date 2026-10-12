@@ -193,8 +193,8 @@ def plot_scatter_for_kind(
     output_dir: Path,
     *,
     report_kind: str,
-    title: str = "Chordata vs Baseline",
-    xlabel: str = "Baseline time (ns)",
+    title: str = "Chordata vs Chordata (no memo)",
+    xlabel: str = "Chordata (no memo) baseline time (ns)",
     ylabel: str = "Chordata time (ns)",
     output_name: str | None = None,
     guide_lines: Sequence[GuideLine] | None = None,
@@ -264,7 +264,12 @@ def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
     )
 
 
-def plot_speedup_cdf(ratios: Sequence[float], output_dir: Path) -> str:
+def plot_speedup_cdf(
+    ratios: Sequence[float], output_dir: Path, *,
+    title: str = "Chordata vs Chordata (no memo): Speedup CDF",
+    xlabel: str = "Speedup (baseline / ours)",
+    output_name: str | None = None,
+) -> str:
     if not ratios:
         raise ValueError("ratios is empty")
     if any(r <= 0 for r in ratios):
@@ -296,10 +301,11 @@ def plot_speedup_cdf(ratios: Sequence[float], output_dir: Path) -> str:
 
     return _save_plot(
         output_dir,
-        title="Speedup CDF",
-        xlabel="Speedup",
+        title=title,
+        xlabel=xlabel,
         ylabel="Executions (%)",
         xscale="log",
+        output_name=output_name,
         plotter=_plot,
     )
 
@@ -693,8 +699,16 @@ def generate_plot_for_pairs(
     output_dir: Path,
     *,
     report_kind: str = DEFAULT_REPORT_KIND,
+    baseline_label: str = "Chordata (no memo)",
+    ours_label: str = "Chordata",
+    metric_label: str = "time (ns)",
 ) -> tuple[SpeedupStats, str, str]:
     ratios, stats = compare_stats(pairs)
     line_plot = plot_speedup_line(ratios, output_dir)
-    scatter_plot = plot_scatter_for_kind(pairs, output_dir, report_kind=report_kind)
+    scatter_plot = plot_scatter_for_kind(
+        pairs, output_dir, report_kind=report_kind,
+        title=f"{ours_label} vs {baseline_label}",
+        xlabel=f"{baseline_label} baseline {metric_label}",
+        ylabel=f"{ours_label} {metric_label}",
+    )
     return stats, line_plot, scatter_plot
