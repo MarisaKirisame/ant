@@ -10,9 +10,13 @@ def fresh() -> int:
     return ret
 
 
+def fmt_number(value: float) -> str:
+    """Format report measurements to three significant digits, retaining zeros."""
+    return f"{value:#.3g}".removesuffix(".")
+
+
 def fmt_speedup(value: float) -> str:
-    """Format a ratio with one decimal place for reports and paper output."""
-    return f"{value:.1f}"
+    return fmt_number(value)
 
 
 def stat_card(label: str, value: str) -> None:

@@ -27,7 +27,7 @@ from dominate import tags as tag
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import fresh
+from common import fmt_number, fresh
 from stats import (
     MemoHashtableStat,
     MemoNodeStat,
@@ -288,7 +288,7 @@ def plot_speedup_cdf(
         ax.axvline(100.0, color="gray", linestyle="--", linewidth=0.2)
         ax.scatter([1.0], [break_even_pct], color="black", s=20, zorder=3)
         ax.annotate(
-            f"{break_even_pct:.1f}%",
+            f"{fmt_number(break_even_pct)}%",
             xy=(1.0, break_even_pct),
             xytext=(2.0, label_y),
             textcoords="data",
@@ -677,8 +677,8 @@ def render_profile_table(totals: dict[str, float], total_time: float) -> str:
                 percent = 100.0 * value / total_time
                 with tag.tr():
                     tag.td(name)
-                    tag.td(f"{value:.1f}")
-                    tag.td(f"{percent:.1f}%")
+                    tag.td(f"{fmt_number(value)}")
+                    tag.td(f"{fmt_number(percent)}%")
     return tbl.render()
 
 

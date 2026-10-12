@@ -60,7 +60,7 @@ from typing import Iterable, Iterator, List, Sequence, Tuple
 
 from dominate import document
 from dominate import tags as tag
-from common import fmt_speedup, stat_card
+from common import fmt_number, fmt_speedup, stat_card
 from plot_speedup import (
     SpeedupStats,
     compare_stats,
@@ -806,7 +806,7 @@ def _memo_speed_breakdown_lines(data_paths: Sequence[Path]) -> list[str]:
     ]
     for name in ordered_names:
         percent = 100.0 * bucket_totals[name] / total_ns
-        lines.append(f"{_escape_latex(name)} & {percent:.1f}\\% \\\\")
+        lines.append(f"{_escape_latex(name)} & {fmt_number(percent)}\\% \\\\")
     lines.extend(
         [
             "\\hline",
@@ -1161,8 +1161,8 @@ def _memo_hazel_memory_rows(
 
 def _fmt_bytes(value: float) -> str:
     if value >= 1e6:
-        return f"{value / 1e6:.1f} MB"
-    return f"{value / 1e3:.1f} KB"
+        return f"{fmt_number(value / 1e6)} MB"
+    return f"{fmt_number(value / 1e3)} KB"
 
 
 def _summary_json(path: Path) -> dict[str, object] | None:
