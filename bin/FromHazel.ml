@@ -806,7 +806,8 @@ let parse_memory_pass_peaks (log_text : string) : (string * int) list =
   |> List.iter (fun line ->
       let begin_prefix = "ANTMEM begin " in
       let end_prefix = "ANTMEM end " in
-      if String.length line > String.length begin_prefix && String.sub line 0 (String.length begin_prefix) = begin_prefix
+      if
+        String.length line > String.length begin_prefix && String.sub line 0 (String.length begin_prefix) = begin_prefix
       then (
         current := Some (String.sub line (String.length begin_prefix) (String.length line - String.length begin_prefix));
         cur_peak := 0)
@@ -862,8 +863,8 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
           else cfg.hazel_cmd
         in
         let cmd =
-          Printf.sprintf "%s%s eval-batch %s%s --output %s > %s 2>&1" timeout_prefix hazel_cmd
-            (Filename.quote input) extra_args (Filename.quote output) quoted_log
+          Printf.sprintf "%s%s eval-batch %s%s --output %s > %s 2>&1" timeout_prefix hazel_cmd (Filename.quote input)
+            extra_args (Filename.quote output) quoted_log
         in
         Sys.command cmd
       in
@@ -872,8 +873,7 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
           match Yojson.Safe.from_file output with
           | `List items when List.length items = expected -> Ok (List.map hazel_compare_result_of_yojson items)
           | `List items ->
-              Error
-                (Printf.sprintf "hazel eval-batch produced %d rows for %d candidates" (List.length items) expected)
+              Error (Printf.sprintf "hazel eval-batch produced %d rows for %d candidates" (List.length items) expected)
           | _ -> Error "hazel eval-batch output was not a JSON list"
         with exn -> Error (Printf.sprintf "hazel eval-batch output could not be parsed: %s" (Printexc.to_string exn))
       in
@@ -885,7 +885,7 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
       else
         match parse_output ~expected:(List.length candidates) output_path with
         | Error log -> batch_failure ~status:0 ~log
-        | Ok timing_results ->
+        | Ok timing_results -> (
             (* Memory pass: a separate node invocation re-runs the batch
                with per-item GC and heap probes.  --heap-growing-percent=10
                makes V8 run a mark-compact whenever the old generation grows
@@ -925,7 +925,7 @@ let run_hazel_compare_batch ~program_name ~start_index ~(candidates : collapsed_
                         heap_live_peak_bytes = max trace_peak memory.heap_used_after_gc_bytes;
                         process_max_rss_kb = memory.process_max_rss_kb;
                       })
-                    indexed)
+                    indexed))
 
 let run_hazel_compare ~program_name ~(candidates : collapsed_candidate list) ~(cfg : hazel_compare_config) :
     hazel_compare_result list =

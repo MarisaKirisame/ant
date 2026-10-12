@@ -82,8 +82,8 @@ let hazel_compare_config =
     max_candidates = None;
   }
 
-let run_compare ?(hazel_compare = hazel_compare_config) ?(evict = false) ?input_size ?steps_file ?max_candidates ~dataset
-    ~benchmark () =
+let run_compare ?(hazel_compare = hazel_compare_config) ?(evict = false) ?input_size ?steps_file ?max_candidates
+    ~dataset ~benchmark () =
   let steps_file = Option.value steps_file ~default:(compare_steps_file dataset benchmark) in
   run ~hazel_compare:(Some hazel_compare) ~evict ?input_size ~steps_file ?max_candidates ~dataset ~benchmark ()
 
