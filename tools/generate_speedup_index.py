@@ -9,7 +9,7 @@ from pathlib import Path
 from dominate import document
 from dominate import tags as tag
 from dominate.util import raw
-from common import fmt_speedup, stat_card
+from common import BASELINE, CHORDATA, IMPLEMENTATION_LABELS, comparison_title, speedup_label, fmt_speedup, stat_card
 from plot_speedup import (
     generate_plot_for_pairs,
     compare_stats,
@@ -86,11 +86,12 @@ def render_html(
         with tag.main(cls="panel"):
             tag.h1("Memoization Speedup")
             tag.p(f"Data source: {data_label}", cls="meta")
+            tag.p("Chordata: our memoising evaluator. Baseline: our evaluator without memoisation. Plain OCaml: direct OCaml backend.", cls="meta")
             _render_node_counts(records)
             _render_speedup_comparison(
                 records,
                 output_dir,
-                label="Memo vs CEK",
+                label="Chordata vs Baseline",
                 baseline_key="cek_profile",
                 memo_key="memo_profile",
                 report_kind=report_kind,
@@ -98,7 +99,7 @@ def render_html(
             _render_speedup_comparison(
                 records,
                 output_dir,
-                label="CEK vs Plain",
+                label="Baseline vs Plain OCaml",
                 baseline_key="plain_profile",
                 memo_key="cek_profile",
                 report_kind=report_kind,
@@ -106,7 +107,7 @@ def render_html(
             _render_speedup_comparison(
                 records,
                 output_dir,
-                label="Memo vs Plain",
+                label="Chordata vs Plain OCaml",
                 baseline_key="plain_profile",
                 memo_key="memo_profile",
                 report_kind=report_kind,
@@ -114,28 +115,28 @@ def render_html(
             _render_speedup_comparison(
                 records,
                 output_dir,
-                label="Chordata vs Chordata (no memo) (steps)",
+                label="Chordata vs Baseline (steps)",
                 pairs=pairs_from_steps(records),
                 report_kind=report_kind,
             )
             if memo_plot is not None:
-                _plot_image(memo_plot, "Memo stats depth vs node count plot")
+                _plot_image(memo_plot, "Chordata memo trie: Node count by depth")
             if memo_cdf_plot is not None:
-                _plot_image(memo_cdf_plot, "Memo stats CDF plot")
+                _plot_image(memo_cdf_plot, "Chordata memo trie: Node-depth CDF")
             if size_scatter_plot is not None:
-                _plot_image(size_scatter_plot, "Memo rule size vs sc scatter plot")
+                _plot_image(size_scatter_plot, "Chordata memo rules: Step count vs pattern size")
             if hit_scatter_plot is not None:
-                _plot_image(hit_scatter_plot, "Memo rule size vs hit count scatter plot")
+                _plot_image(hit_scatter_plot, "Chordata memo rules: Hit count vs pattern size")
             if insert_time_scatter_plot is not None:
-                _plot_image(insert_time_scatter_plot, "Memo rule size vs insert time scatter plot")
+                _plot_image(insert_time_scatter_plot, "Chordata memo rules: Insertion time vs pattern size")
             if pvar_insert_time_scatter_plot is not None:
-                _plot_image(pvar_insert_time_scatter_plot, "Memo rule pvar length vs insert time scatter plot")
+                _plot_image(pvar_insert_time_scatter_plot, "Chordata memo rules: Insertion time vs total hole size")
             if depth_insert_time_scatter_plot is not None:
-                _plot_image(depth_insert_time_scatter_plot, "Memo rule depth vs insert time scatter plot")
+                _plot_image(depth_insert_time_scatter_plot, "Chordata memo rules: Insertion time vs depth")
             if hashtable_depth_size_scatter_plot is not None:
                 _plot_image(
                     hashtable_depth_size_scatter_plot,
-                    "Memo hashtable size vs depth scatter plot",
+                    "Chordata memo trie: Hash-table size vs depth",
                 )
             _render_large_rule_stats(records, min_size=40, limit=5)
             with tag.section(cls="profile"):
@@ -168,9 +169,8 @@ def _render_speedup_comparison(
         if baseline_key is None or memo_key is None:
             raise ValueError("baseline_key and memo_key are required when pairs is None")
         pairs = pairs_from_profiles(records, baseline_key=baseline_key, memo_key=memo_key)
-    labels = {"cek_profile": "Chordata (no memo)", "memo_profile": "Chordata", "plain_profile": "Plain OCaml"}
-    baseline_label = labels.get(baseline_key, "Chordata (no memo)")
-    ours_label = labels.get(memo_key, "Chordata")
+    baseline_label = IMPLEMENTATION_LABELS.get(baseline_key, BASELINE)
+    ours_label = IMPLEMENTATION_LABELS.get(memo_key, CHORDATA)
     stats, line_plot, scatter_plot = generate_plot_for_pairs(
         pairs, output_dir, report_kind=report_kind,
         baseline_label=baseline_label, ours_label=ours_label,
@@ -178,8 +178,9 @@ def _render_speedup_comparison(
     )
     ratios, _ = compare_stats(pairs)
     cdf_plot = plot_speedup_cdf(
-        ratios, output_dir, title=f"{ours_label} vs {baseline_label}: Speedup CDF",
-        xlabel=f"Speedup ({baseline_label} / {ours_label})",
+        ratios, output_dir,
+        title=comparison_title("Speedup CDF" if baseline_key else "Step speedup CDF", ours=ours_label, baseline=baseline_label),
+        xlabel=speedup_label(ours=ours_label, baseline=baseline_label),
     )
     with tag.section(cls="comparison"):
         with tag.details():
@@ -191,9 +192,10 @@ def _render_speedup_comparison(
                 stat_card("End-to-end speedup", f"{fmt_speedup(stats.end_to_end)}x")
                 stat_card("Best speedup", f"{fmt_speedup(stats.maximum)}x")
                 stat_card("Lowest speedup", f"{fmt_speedup(stats.minimum)}x")
-            _plot_image(line_plot, f"{label} speedup per run plot")
-            _plot_image(scatter_plot, f"{label} scatter plot")
-            _plot_image(cdf_plot, f"{label} speedup CDF")
+            prefix = "" if baseline_key else "Step "
+            _plot_image(line_plot, comparison_title(f"{prefix}speedup by execution".capitalize(), ours=ours_label, baseline=baseline_label))
+            _plot_image(scatter_plot, comparison_title("Timing scatter" if baseline_key else "Step-count scatter", ours=ours_label, baseline=baseline_label))
+            _plot_image(cdf_plot, comparison_title("Speedup CDF" if baseline_key else "Step speedup CDF", ours=ours_label, baseline=baseline_label))
     return None
 
 

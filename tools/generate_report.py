@@ -28,8 +28,8 @@ Outputs:
                                         \\hazelNoMemoBaselineGeoMean,
                                         \\hazelNoMemoBaselineOverhead,
                                         \\hazelBaselineSpeedupTable, …)
-- output/hazel/hazel_compare/…          Chordata and Chordata (no memo) versus
-                                        Hazel (no memo): scatter plots, CDFs,
+- output/hazel/hazel_compare/…          Chordata and Baseline versus
+                                        Hazel: scatter plots, CDFs,
                                         and summaries read by the paper macros
 - output/arith/…                        arith pages + arith_result.tex
 - output/scaling/…                      scaling + entropy pages and tex
@@ -62,7 +62,7 @@ from typing import Iterable, Iterator, List, Sequence, Tuple
 
 from dominate import document
 from dominate import tags as tag
-from common import fmt_number, fmt_speedup, stat_card
+from common import BASELINE, CHORDATA, HAZEL, comparison_title, speedup_label, fmt_number, fmt_speedup, stat_card
 from plot_speedup import (
     SpeedupStats,
     compare_stats,
@@ -238,17 +238,18 @@ def generate_html(
             all_pairs,
             output.parent,
             report_kind=report_kind,
+            title=comparison_title("Timing scatter", context=title),
         )
         combined_scatter_rel = os.path.relpath(output.parent / scatter_name, output.parent)
     if ratios:
-        cdf_name = plot_speedup_cdf(ratios, output.parent)
+        cdf_name = plot_speedup_cdf(ratios, output.parent, title=comparison_title("Speedup CDF", context=title))
         combined_cdf_rel = os.path.relpath(output.parent / cdf_name, output.parent)
 
     comparisons: list[tuple[str, list[tuple[float, float]]]] = [
-        ("Memo vs CEK", []),
-        ("CEK vs Plain", []),
-        ("Memo vs Plain", []),
-        ("Memo vs Plain (steps)", []),
+        ("Chordata vs Baseline", []),
+        ("Baseline vs Plain OCaml", []),
+        ("Chordata vs Plain OCaml", []),
+        ("Chordata vs Baseline (steps)", []),
     ]
     if data_paths is None and entries:
         for _, report_path in entries:
@@ -338,7 +339,10 @@ def _write_scaling_page(
 ) -> None:
     points = _scaling_points(data_dirs, sizes=sizes)
     output_dir.mkdir(parents=True, exist_ok=True)
-    plot_name = plot_speedup_vs_size([(size, speedup) for size, speedup, _ in points], output_dir)
+    plot_name = plot_speedup_vs_size(
+        [(size, speedup) for size, speedup, _ in points], output_dir,
+        title=comparison_title("Speedup by input size", context=title),
+    )
     shutil.copyfile(css_source, output_dir / "style.css")
     doc = document(title=title)
     doc["lang"] = "en"
@@ -348,9 +352,9 @@ def _write_scaling_page(
     with doc:
         with tag.main(cls="panel"):
             tag.h1(title)
-            tag.p("Each size is an independent experiment. Speedup is the existing geometric mean of CEK / memoized profile-time ratios.", cls="meta")
+            tag.p("Each size is an independent experiment. Speedup is the existing geometric mean of Baseline / Chordata profile-time ratios.", cls="meta")
             with tag.section(cls="plot"):
-                tag.img(src=plot_name, alt="Memo versus CEK speedup by input size")
+                tag.img(src=plot_name, alt="Chordata vs Baseline: Speedup by input size")
             with tag.table():
                 with tag.thead():
                     with tag.tr():
@@ -435,7 +439,7 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
             series,
             output_dir,
             output_name=f"{program}-speedup-vs-size.png",
-            title=f"{label}: Speedup by Input Pattern",
+            title=comparison_title("Speedup by input size and pattern", context=label),
         )
         plots.append((label, plot_name, series))
     pattern_series = [
@@ -449,13 +453,13 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
         pattern_series,
         output_dir,
         output_name="speedup-by-pattern.png",
-        title="Speedup by Input Pattern",
+        title=comparison_title("Speedup by input size and pattern", context="All programs"),
     )
     scatter_plot_name = plot_entropy_scatter(
         [(input_label, scatter_by_category[input_label]) for _, input_label in ENTROPY_CATEGORIES],
         output_dir,
         output_name="entropy-scatter.png",
-        title="Memo vs CEK by Input Pattern",
+        title=comparison_title("Timing scatter by input pattern", context="All programs"),
     )
     tex_output = output_dir / "entropy_result.tex"
     generate_entropy_scaling_tex(plots=plots, sizes=sizes, output_path=tex_output)
@@ -478,14 +482,14 @@ def generate_entropy_scaling_report(*, sizes: Sequence[int] = ENTROPY_SCALING_SI
                     tag.span("Download entropy_result.tex")
             tag.h2("All Functions")
             with tag.section(cls="plot"):
-                tag.img(src=scatter_plot_name, alt="Memo versus CEK scatter plot by input pattern")
+                tag.img(src=scatter_plot_name, alt="Chordata vs Baseline: Timing scatter by input pattern")
             tag.h2("Speedup by Input Pattern")
             with tag.section(cls="plot"):
-                tag.img(src=pattern_plot_name, alt="Speedup by input pattern")
+                tag.img(src=pattern_plot_name, alt="Chordata vs Baseline: Speedup by input size and pattern")
             for label, plot_name, series in plots:
                 tag.h2(label)
                 with tag.section(cls="plot"):
-                    tag.img(src=plot_name, alt=f"{label} speedup by size and input pattern")
+                    tag.img(src=plot_name, alt=comparison_title("Speedup by input size and pattern", context=label))
                 with tag.table():
                     with tag.thead():
                         with tag.tr():
@@ -557,7 +561,7 @@ def generate_hazel_reports(
     if include_hazel_compare:
         hazel_compare_index = generate_hazel_compare_reports(modes=hazel_compare_modes)
         if hazel_compare_index is not None:
-            extra_entries.append(("Chordata and Chordata (no memo) vs Hazel (no memo)", hazel_compare_index))
+            extra_entries.append(("Chordata and Baseline vs Hazel", hazel_compare_index))
     generate_tex_table(
         output_path=tex_output,
         include_hazel_compare=include_hazel_compare,
@@ -575,7 +579,7 @@ def generate_hazel_reports(
         report_kind="hazel",
         extra_entries=extra_entries,
         description=(
-            "In comparisons against Hazel (no memo), timeout and oom statuses refer to the external "
+            "In comparisons against Hazel, timeout and oom statuses refer to the external "
             "Hazel baseline evaluator. A timeout means Hazel did not finish within the per-benchmark compare "
             "budget; oom means the Hazel process exhausted memory. The comparison summary only aggregates "
             "Hazel rows whose status is ok."
@@ -1240,17 +1244,17 @@ def generate_hazel_compare_reports(
             hazel_baseline_pairs,
             output_dir,
             report_kind="hazel",
-            title="Chordata (no memo) vs Hazel (no memo)",
-            xlabel="Hazel (no memo) baseline time (ns)",
-            ylabel="Chordata (no memo) time (ns)",
+            title=comparison_title("Timing scatter", ours=BASELINE, baseline=HAZEL),
+            xlabel=f"{HAZEL} time (ns)",
+            ylabel=f"{BASELINE} time (ns)",
             output_name="hazel_vs_cek_scatter.png",
         )
         eval_only_scatter_rel = os.path.relpath(output_dir / scatter_name, output.parent)
         ratios, _ = compare_stats(hazel_baseline_pairs)
         cdf_name = plot_speedup_cdf(
             ratios, output_dir,
-            title="Chordata (no memo) vs Hazel (no memo): Speedup CDF",
-            xlabel="Speedup (Hazel (no memo) / Chordata (no memo))",
+            title=comparison_title("Speedup CDF", ours=BASELINE, baseline=HAZEL),
+            xlabel=speedup_label(ours=BASELINE, baseline=HAZEL),
             output_name="hazel_vs_cek_cdf.png",
         )
         eval_only_cdf_rel = os.path.relpath(output_dir / cdf_name, output.parent)
@@ -1267,17 +1271,17 @@ def generate_hazel_compare_reports(
             memo_pairs,
             output_dir,
             report_kind="hazel",
-            title="Chordata vs Hazel (no memo)",
-            xlabel="Hazel (no memo) baseline time (ns)",
-            ylabel="Chordata time (ns)",
+            title=comparison_title("Timing scatter", ours=CHORDATA, baseline=HAZEL),
+            xlabel=f"{HAZEL} time (ns)",
+            ylabel=f"{CHORDATA} time (ns)",
             output_name="hazel_vs_memo_scatter.png",
         )
         memo_scatter_rel = os.path.relpath(output_dir / memo_scatter_name, output.parent)
         ratios, _ = compare_stats(memo_pairs)
         cdf_name = plot_speedup_cdf(
             ratios, output_dir,
-            title="Chordata vs Hazel (no memo): Speedup CDF",
-            xlabel="Speedup (Hazel (no memo) / Chordata)",
+            title=comparison_title("Speedup CDF", ours=CHORDATA, baseline=HAZEL),
+            xlabel=speedup_label(ours=CHORDATA, baseline=HAZEL),
             output_name="hazel_vs_memo_cdf.png",
         )
         memo_cdf_rel = os.path.relpath(output_dir / cdf_name, output.parent)
@@ -1289,18 +1293,18 @@ def generate_hazel_compare_reports(
     else:
         memo_summary_path.unlink(missing_ok=True)
 
-    doc = document(title="Chordata (no memo) vs Hazel (no memo)")
+    doc = document(title="Chordata and Baseline vs Hazel")
     doc["lang"] = "en"
     with doc.head:
         tag.meta(charset="utf-8")
         tag.link(rel="stylesheet", href=css_href)
     with doc:
         with tag.main():
-            tag.h1("Chordata and Chordata (no memo) vs Hazel (no memo)")
-            tag.p("Hazel (no memo) is the baseline. Scatter plots show baseline time on x and Chordata time on y; CDFs show baseline / Chordata speedup on x and executions (%) on y.")
+            tag.h1("Chordata and Baseline vs Hazel")
+            tag.p("Chordata is our memoising evaluator; Baseline is our evaluator without memoisation; Hazel is the external evaluator without memoisation. Hazel is the reference for these comparisons. Scatter plots show reference time on x and the compared implementation on y; CDFs show reference / implementation speedup on x and executions (%) on y.")
 
             if eval_only_summary:
-                tag.h2("Chordata (no memo) vs Hazel (no memo)")
+                tag.h2("Baseline vs Hazel")
                 with tag.section(cls="stats"):
                     stat_card("Samples", str(int(eval_only_summary["samples"])))
                     stat_card(
@@ -1323,15 +1327,15 @@ def generate_hazel_compare_reports(
                     with tag.section(cls="plot"):
                         tag.img(
                             src=eval_only_scatter_rel,
-                            alt="Chordata (no memo) versus Hazel (no memo) scatter plot",
+                            alt="Baseline vs Hazel: Timing scatter",
                         )
 
             if eval_only_cdf_rel:
                 with tag.section(cls="plot"):
-                    tag.img(src=eval_only_cdf_rel, alt="Chordata (no memo) versus Hazel (no memo) speedup CDF")
+                    tag.img(src=eval_only_cdf_rel, alt="Baseline vs Hazel: Speedup CDF")
 
             if memo_time_summary is not None:
-                tag.h2("Chordata vs Hazel (no memo)")
+                tag.h2("Chordata vs Hazel")
                 tag.p(
                     "Time compares hazel_eval_only_ns against the memoized Chordata "
                     "execution of the same program state. Memory compares one peak per "
@@ -1359,11 +1363,11 @@ def generate_hazel_compare_reports(
                     with tag.section(cls="plot"):
                         tag.img(
                             src=memo_scatter_rel,
-                            alt="Memoized Chordata versus Hazel baseline scatter plot",
+                            alt="Chordata vs Hazel: Timing scatter",
                         )
                 if memo_cdf_rel:
                     with tag.section(cls="plot"):
-                        tag.img(src=memo_cdf_rel, alt="Chordata versus Hazel (no memo) speedup CDF")
+                        tag.img(src=memo_cdf_rel, alt="Chordata vs Hazel: Speedup CDF")
                 if memory_table:
                     tag.h3("Peak memory by benchmark")
                     with tag.table():
@@ -1371,9 +1375,9 @@ def generate_hazel_compare_reports(
                             with tag.tr():
                                 tag.th("Benchmark")
                                 tag.th("Measured samples")
-                                tag.th("Memo peak")
+                                tag.th("Chordata peak")
                                 tag.th("Hazel peak")
-                                tag.th("Memo / Hazel")
+                                tag.th("Chordata / Hazel")
                         with tag.tbody():
                             for mode, count, memo_peak, hazel_peak, ratio in memory_table:
                                 with tag.tr():

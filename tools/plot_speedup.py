@@ -27,7 +27,7 @@ from dominate import tags as tag
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import fmt_number, fresh
+from common import BASELINE, CHORDATA, PLAIN_OCAML, comparison_title, speedup_label, fmt_number, fresh
 from stats import (
     MemoHashtableStat,
     MemoNodeStat,
@@ -193,9 +193,9 @@ def plot_scatter_for_kind(
     output_dir: Path,
     *,
     report_kind: str,
-    title: str = "Chordata vs Chordata (no memo)",
-    xlabel: str = "Chordata (no memo) baseline time (ns)",
-    ylabel: str = "Chordata time (ns)",
+    title: str = comparison_title("Timing scatter"),
+    xlabel: str = f"{BASELINE} time (ns)",
+    ylabel: str = f"{CHORDATA} time (ns)",
     output_name: str | None = None,
     guide_lines: Sequence[GuideLine] | None = None,
 ) -> str:
@@ -252,13 +252,17 @@ def plot_scatter_for_kind(
     )
 
 
-def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
+def plot_speedup_line(
+    ratios: Sequence[float], output_dir: Path, *,
+    title: str = comparison_title("Speedup by execution"),
+    ylabel: str = speedup_label(),
+) -> str:
     xs = list(range(1, len(ratios) + 1))
     return _save_plot(
         output_dir,
-        title=f"Speedup per Execution ({METRIC_LABEL}, log scale)",
-        xlabel="Execution number (nth run)",
-        ylabel="Speedup",
+        title=title,
+        xlabel="Execution index",
+        ylabel=ylabel,
         yscale="log",
         plotter=lambda ax: ax.plot(xs, ratios, marker="o", linewidth=1.5),
     )
@@ -266,8 +270,8 @@ def plot_speedup_line(ratios: Sequence[float], output_dir: Path) -> str:
 
 def plot_speedup_cdf(
     ratios: Sequence[float], output_dir: Path, *,
-    title: str = "Chordata vs Chordata (no memo): Speedup CDF",
-    xlabel: str = "Speedup (baseline / ours)",
+    title: str = comparison_title("Speedup CDF"),
+    xlabel: str = speedup_label(),
     output_name: str | None = None,
 ) -> str:
     if not ratios:
@@ -311,7 +315,8 @@ def plot_speedup_cdf(
 
 
 def plot_speedup_vs_size(
-    points: Sequence[tuple[int, float]], output_dir: Path, *, output_name: str = "speedup-vs-size.png"
+    points: Sequence[tuple[int, float]], output_dir: Path, *, output_name: str = "speedup-vs-size.png",
+    title: str = comparison_title("Speedup by input size"),
 ) -> str:
     if not points:
         raise ValueError("points is empty")
@@ -327,9 +332,9 @@ def plot_speedup_vs_size(
 
     return _save_plot(
         output_dir,
-        title="Memo vs CEK Speedup by Input Size",
+        title=title,
         xlabel="Input size",
-        ylabel="Speedup",
+        ylabel=speedup_label(),
         xscale="log",
         yscale="log",
         output_name=output_name,
@@ -342,7 +347,7 @@ def plot_entropy_speedup_lines(
     output_dir: Path,
     *,
     output_name: str = "speedup-vs-entropy.png",
-    title: str = "Memo vs CEK Speedup by Input Pattern",
+    title: str = comparison_title("Speedup by input size and pattern"),
 ) -> str:
     if not series:
         raise ValueError("series is empty")
@@ -368,7 +373,7 @@ def plot_entropy_speedup_lines(
         output_dir,
         title=title,
         xlabel="Input size",
-        ylabel="Speedup",
+        ylabel=speedup_label(),
         xscale="log",
         yscale="log",
         legend=True,
@@ -382,7 +387,7 @@ def plot_entropy_scatter(
     output_dir: Path,
     *,
     output_name: str = "entropy-scatter.png",
-    title: str = "Memo vs CEK by Input Pattern",
+    title: str = comparison_title("Timing scatter by input pattern"),
     guide_lines: Sequence[GuideLine] | None = None,
 ) -> str:
     if guide_lines is None:
@@ -416,8 +421,8 @@ def plot_entropy_scatter(
     return _save_plot(
         output_dir,
         title=title,
-        xlabel="CEK time (ns)",
-        ylabel="Memoized time (ns)",
+        xlabel=f"{BASELINE} time (ns)",
+        ylabel=f"{CHORDATA} time (ns)",
         xscale="log",
         yscale="log",
         legend=True,
@@ -435,7 +440,7 @@ def plot_depth_breakdown(
     counts = [node.node_count for node in depth_breakdown]
     return _save_plot(
         output_dir,
-        title="Memo stats by depth",
+        title="Chordata memo trie: Node count by depth",
         xlabel="Depth",
         ylabel="Node count",
         plotter=lambda ax: ax.plot(depths, counts, marker="o", linewidth=1.5),
@@ -460,9 +465,9 @@ def plot_depth_breakdown_cdf(
         cdf.append(100.0 * cumulative / total)
     return _save_plot(
         output_dir,
-        title="Memo stats CDF",
+        title="Chordata memo trie: Node-depth CDF",
         xlabel="Depth",
-        ylabel="Nodes <= depth (%)",
+        ylabel="Cumulative nodes (%)",
         plotter=lambda ax: ax.plot(depths, cdf, marker="o", linewidth=1.5),
     )
 
@@ -474,9 +479,9 @@ def plot_rule_stat(rule_stat: Sequence[MemoRuleStat], output_dir: Path) -> str:
     scs = [entry.sc for entry in rule_stat]
     return _save_plot(
         output_dir,
-        title="Memo rule size vs step count",
+        title="Chordata memo rules: Step count vs pattern size",
         xlabel="Pattern size",
-        ylabel="Step count (sc)",
+        ylabel="Step count",
         yscale="log",
         plotter=lambda ax: ax.scatter(sizes, scs, alpha=0.6),
     )
@@ -489,7 +494,7 @@ def plot_rule_stat_hits(rule_stat: Sequence[MemoRuleStat], output_dir: Path) -> 
     hits = [entry.hit_count for entry in rule_stat]
     return _save_plot(
         output_dir,
-        title="Memo rule size vs hit count",
+        title="Chordata memo rules: Hit count vs pattern size",
         xlabel="Pattern size",
         ylabel="Hit count",
         yscale="log",
@@ -506,9 +511,9 @@ def plot_rule_stat_insert_time(
     insert_times = [entry.insert_time for entry in rule_stat]
     return _save_plot(
         output_dir,
-        title="Memo rule size vs insert time",
+        title="Chordata memo rules: Insertion time vs pattern size",
         xlabel="Pattern size",
-        ylabel="Insert time (ns)",
+        ylabel="Insertion time (ns)",
         yscale="log" if REPORT_ABSOLUTE_TIME_LOG_SCALE else None,
         plotter=lambda ax: ax.scatter(sizes, insert_times, alpha=0.6),
     )
@@ -519,21 +524,16 @@ def plot_rule_stat_pvar_length_insert_time(
 ) -> str:
     if not rule_stat:
         raise ValueError("rule_stat is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
     pvar_lengths = [entry.pvar_length for entry in rule_stat]
     insert_times = [entry.insert_time for entry in rule_stat]
-    plt.scatter(pvar_lengths, insert_times, alpha=0.6)
-    if REPORT_ABSOLUTE_TIME_LOG_SCALE:
-        plt.yscale("log")
-    plt.xlabel("Pattern pvar length")
-    plt.ylabel("Insert time (ns)")
-    plt.title("Memo rule pvar length vs insert time")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    return _save_plot(
+        output_dir,
+        title="Chordata memo rules: Insertion time vs total hole size",
+        xlabel="Total pattern-hole size",
+        ylabel="Insertion time (ns)",
+        yscale="log" if REPORT_ABSOLUTE_TIME_LOG_SCALE else None,
+        plotter=lambda ax: ax.scatter(pvar_lengths, insert_times, alpha=0.6),
+    )
 
 
 def plot_rule_stat_depth_insert_time(
@@ -545,9 +545,9 @@ def plot_rule_stat_depth_insert_time(
     insert_times = [entry.insert_time for entry in rule_stat]
     return _save_plot(
         output_dir,
-        title="Memo rule depth vs insert time",
+        title="Chordata memo rules: Insertion time vs depth",
         xlabel="Depth",
-        ylabel="Insert time (ns)",
+        ylabel="Insertion time (ns)",
         yscale="log" if REPORT_ABSOLUTE_TIME_LOG_SCALE else None,
         plotter=lambda ax: ax.scatter(depths, insert_times, alpha=0.6),
     )
@@ -557,20 +557,16 @@ def plot_hashtable_stat_depth_size(
 ) -> str:
     if not hashtable_stat:
         raise ValueError("hashtable_stat is empty")
-    output_path = output_dir / _fresh_plot_name()
-    plt.figure(figsize=(6, 4.5))
     depths = [entry.depth for entry in hashtable_stat]
     sizes = [entry.size for entry in hashtable_stat]
-    plt.scatter(depths, sizes, alpha=0.6)
-    plt.xlabel("Depth")
-    plt.ylabel("Hashtable size")
-    plt.title("Memo hashtable size vs depth")
-    plt.yscale("log")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-    return output_path.name
+    return _save_plot(
+        output_dir,
+        title="Chordata memo trie: Hash-table size vs depth",
+        xlabel="Depth",
+        ylabel="Hash-table size",
+        yscale="log",
+        plotter=lambda ax: ax.scatter(depths, sizes, alpha=0.6),
+    )
 
 
 def _sum_profile(entries: Sequence[ProfileEntry], *, key_name: str) -> float:
@@ -689,7 +685,9 @@ def generate_plot(
     baselines, memos = pairs_from_result(result)
     pairs = list(zip(baselines, memos))
     stats, line_plot, scatter_plot = generate_plot_for_pairs(
-        pairs, output_dir, report_kind=report_kind
+        pairs, output_dir, report_kind=report_kind,
+        baseline_label=PLAIN_OCAML if REPORT_WALL_CLOCK_TIME else BASELINE,
+        metric_label="time (ns)" if REPORT_WALL_CLOCK_TIME else "evaluation steps",
     )
     return stats, line_plot, scatter_plot
 
@@ -699,16 +697,22 @@ def generate_plot_for_pairs(
     output_dir: Path,
     *,
     report_kind: str = DEFAULT_REPORT_KIND,
-    baseline_label: str = "Chordata (no memo)",
-    ours_label: str = "Chordata",
+    baseline_label: str = BASELINE,
+    ours_label: str = CHORDATA,
     metric_label: str = "time (ns)",
 ) -> tuple[SpeedupStats, str, str]:
     ratios, stats = compare_stats(pairs)
-    line_plot = plot_speedup_line(ratios, output_dir)
+    step_metric = metric_label == "evaluation steps"
+    speedup_metric = "Step speedup" if step_metric else "Speedup"
+    line_plot = plot_speedup_line(
+        ratios, output_dir,
+        title=comparison_title(f"{speedup_metric} by execution", ours=ours_label, baseline=baseline_label),
+        ylabel=speedup_label(ours=ours_label, baseline=baseline_label),
+    )
     scatter_plot = plot_scatter_for_kind(
         pairs, output_dir, report_kind=report_kind,
-        title=f"{ours_label} vs {baseline_label}",
-        xlabel=f"{baseline_label} baseline {metric_label}",
+        title=comparison_title("Step-count scatter" if step_metric else "Timing scatter", ours=ours_label, baseline=baseline_label),
+        xlabel=f"{baseline_label} {metric_label}",
         ylabel=f"{ours_label} {metric_label}",
     )
     return stats, line_plot, scatter_plot
