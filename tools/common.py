@@ -11,8 +11,8 @@ def fresh() -> int:
 
 
 def fmt_number(value: float) -> str:
-    """Format report measurements to three significant digits, retaining zeros."""
-    return f"{value:#.3g}".removesuffix(".")
+    """Format report measurements to two significant digits, retaining zeros."""
+    return f"{value:#.2g}".removesuffix(".")
 
 
 def fmt_speedup(value: float) -> str:
