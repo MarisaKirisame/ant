@@ -63,5 +63,30 @@ All CLI wiring lives in `bin/main.ml`.
 
 Generated modules under `generated/` are overwritten by `make run`; avoid editing them manually.
 
+## Cache Study
+
+Ordinary experiments memoise execution prefixes with cache eviction disabled.
+The separate `cache` study is the only experiment that enables eviction:
+
+```bash
+make cache         # run only the eviction-enabled configuration
+make cache-report  # regenerate its plots from saved measurements
+```
+
+The study reuses Baseline (our evaluator without memoisation) and ordinary
+Chordata measurements from `results/hazel/`. Each new run uses the existing
+input size and trace count; it does not rerun Baseline or external Hazel.
+New measurements go to `results/cache/`, and source-trace mismatches are errors.
+`NIGHTLY_ARGS="--smoke --locked"` limits the study to the first trace of each
+existing mode without changing its input size.
+
+`output/cache/index.html` contains exactly three plots: Chordata (eviction)
+versus Baseline timing scatter and speedup CDF, and Chordata (eviction) versus
+ordinary Chordata timing scatter. Scatter axes put the reference on x and the
+eviction-enabled evaluator on y; speedup is reference / eviction-enabled time.
+Each time geomean has a corresponding peak-memory overhead. The full `all`
+and `experiment` pipelines run this one additional configuration after the
+ordinary Hazel experiment, while ordinary runs keep eviction off.
+
 ## Contributing
 Pull requests are welcome. Please run `make build` before submitting and note any remaining warnings or TODOs in the description.

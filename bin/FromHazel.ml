@@ -1034,6 +1034,7 @@ let run_with_test ?(hazel_compare = None) ?(evict = false) ?(baseline = true) ?m
             in
             let extra_fields =
               [
+                ("cache_eviction", `Bool evict);
                 ("trace_exec_index", `Int memo_idx);
                 ("input_size", `Int input_size);
                 ("memo_start_live_words", `Int memo_result.memo_start_live_words);

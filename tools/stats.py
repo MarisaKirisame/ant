@@ -7,7 +7,7 @@ Each exec_time record is expected to include both step counts and profiles.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 
@@ -77,6 +77,11 @@ class ExecTimeRecord:
     cek_heap_words: int | None
     memo_resting_adjusted_live_words: int | None
     cek_resting_adjusted_live_words: int | None
+    input_size: int | None = None
+    trace_exec_index: int | None = None
+    trace_source_indices: list[int] | None = None
+    trace_source_exercise_ids: list[int | None] | None = None
+    cache_eviction: bool = False
 
 
 @dataclass(frozen=True)
@@ -151,6 +156,8 @@ def load_records(
                 rec = _require_dict(json.loads(line), ctx="record")
                 name = rec.get("name")
                 if name == "exec_time":
+                    if seen_memo_stats:
+                        raise ValueError("exec_time record appears after memo_stats")
                     step = _require_int(rec.get("step"), ctx="exec_time.step")
                     without_memo_step = _require_int(
                         rec.get("without_memo_step"), ctx="exec_time.without_memo_step"
@@ -189,6 +196,11 @@ def load_records(
                             cek_heap_words=cek_heap_words,
                             memo_resting_adjusted_live_words=memo_resting_adjusted_live_words,
                             cek_resting_adjusted_live_words=cek_resting_adjusted_live_words,
+                            input_size=rec.get("input_size"),
+                            trace_exec_index=rec.get("trace_exec_index"),
+                            trace_source_indices=rec.get("trace_source_indices"),
+                            trace_source_exercise_ids=rec.get("trace_source_exercise_ids"),
+                            cache_eviction=rec.get("cache_eviction", False),
                         )
                     )
                 elif name == "memo_stats":
@@ -331,3 +343,45 @@ def load_records(
         node_counts=node_counts,
         hashtable_stat=hashtable_stat,
     )
+
+
+def load_trace(path: Path, *, eviction: bool) -> Result:
+    result = load_records(path)
+    if result.node_counts is None:
+        raise ValueError(f"{path}: incomplete experiment (missing memo_stats)")
+    size = result.exec_times[0].input_size
+    for index, row in enumerate(result.exec_times):
+        if (type(size) is not int or size <= 0 or row.input_size != size
+                or row.trace_exec_index != index or not row.trace_source_indices
+                or row.trace_source_exercise_ids is None
+                or len(row.trace_source_indices) != len(row.trace_source_exercise_ids)):
+            raise ValueError(f"{path}: invalid or missing trace metadata at execution {index}")
+        if row.cache_eviction is not eviction:
+            raise ValueError(f"{path}: expected cache_eviction={eviction}")
+    return result
+
+
+def aligned_cache_results(cache_path: Path, reference_path: Path) -> tuple[Result, Result]:
+    cached = load_trace(cache_path, eviction=True)
+    reference = load_trace(reference_path, eviction=False)
+    fields = ("input_size", "trace_exec_index", "trace_source_indices", "trace_source_exercise_ids")
+    count = len(cached.exec_times)
+    if count > len(reference.exec_times) or any(
+        getattr(new, field) != getattr(old, field)
+        for new, old in zip(cached.exec_times, reference.exec_times) for field in fields
+    ):
+        raise ValueError(f"{cache_path} does not align with {reference_path}")
+    # A smoke run may reuse just the first execution of each reference trace.
+    return cached, replace(reference, exec_times=reference.exec_times[:count])
+
+
+def peak_memory_overhead(ours: Result, baseline: Result, *, baseline_key: str = "cek_resting_adjusted_live_words") -> float | None:
+    """Ratio of peak live memory over the same executions on each side."""
+    values = [
+        (new.memo_resting_adjusted_live_words, getattr(old, baseline_key))
+        for new, old in zip(ours.exec_times, baseline.exec_times, strict=True)
+    ]
+    measured = [(new, old) for new, old in values if new is not None and old is not None and new > 0 and old > 0]
+    if not measured:
+        return None
+    return max(new for new, _ in measured) / max(old for _, old in measured)

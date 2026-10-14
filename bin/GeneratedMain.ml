@@ -1,5 +1,6 @@
 let usage =
-  Printf.sprintf "Usage: GeneratedMain <%s|arith|entropy-scaling <size>|hazel-convert ...>"
+  Printf.sprintf
+    "Usage: GeneratedMain <%s|arith|cache <mode> <size> <candidates> <output>|entropy-scaling <size>|hazel-convert ...>"
     (String.concat "|" HazelExperiment.all_modes)
 
 let positive_int s = match int_of_string_opt s with Some n when n > 0 -> Some n | _ -> None
@@ -7,6 +8,15 @@ let nonnegative_int s = match int_of_string_opt s with Some n when n >= 0 -> Som
 
 let () =
   match Array.to_list Sys.argv with
+  | [ _; "cache"; mode; input_size; max_candidates; output ] -> (
+      match (positive_int input_size, positive_int max_candidates) with
+      | Some input_size, Some max_candidates ->
+          if not (HazelExperiment.run_cache_mode ~input_size ~max_candidates ~steps_file:output mode) then (
+            prerr_endline usage;
+            exit 1)
+      | _ ->
+          prerr_endline "Usage: GeneratedMain cache <mode> <positive-size> <positive-candidates> <output>";
+          exit 1)
   | _ :: "hazel-convert" :: _ as argv -> (
       try HazelBackConvert.run_cli argv
       with Invalid_argument msg ->

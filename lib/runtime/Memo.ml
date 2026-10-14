@@ -497,9 +497,6 @@ let insert_step_slot = Profile.register_slot Profile.memo_profile "insert_step"
 let lookup_step_slot = Profile.register_slot Profile.memo_profile "lookup_step"
 let eviction_policy = Eviction.make_eviction_policy ~retain_ratio:0.5 ~kll_k:100
 
-(* Requests for disabled eviction are rejected before evaluation starts. *)
-let eviction_enabled = false
-
 let instantiate (step : step) (state : state) : step =
   let minimum_size_for_instantiation = 5 in
   let join p v : Pattern.pattern =
@@ -528,8 +525,6 @@ let instantiate (step : step) (state : state) : step =
 let instantiate_slot = Profile.register_slot Profile.memo_profile "instantiate"
 
 let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) ~(evict : bool) : exec_result =
-  if evict && not eviction_enabled then
-    invalid_arg "Memo.exec_cek_memoized: cache eviction is disabled; evict:true is unsupported";
   let run () =
     m.epoch <- m.epoch + 1;
     let dbg_step_through step state =
@@ -597,7 +592,7 @@ let exec_cek_memoized (c : exp) (e : words Dynarray.t) (k : words) (m : memo) ~(
     let state = exec state in
     assert (Dynarray.length state.e = 1);
     ignore (fold_bin compose_slice None !hist);
-    if eviction_enabled && evict then (
+    if evict then (
       let evicted = Eviction.batch_evict_memo ~policy:eviction_policy ~state:m.eviction_state m in
       assert (Array.length evicted.entries = Array.length m.entries);
       m.entries <- evicted.entries;

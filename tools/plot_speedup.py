@@ -573,8 +573,8 @@ def _sum_profile(entries: Sequence[ProfileEntry], *, key_name: str) -> float:
     if not entries:
         raise ValueError(f"{key_name} must be non-empty")
     total = sum(entry.time_ns for entry in entries)
-    if total <= 0:
-        raise ValueError(f"{key_name} total must be positive")
+    if not math.isfinite(total) or total <= 0:
+        raise ValueError(f"{key_name} total must be finite and positive")
     return total
 
 

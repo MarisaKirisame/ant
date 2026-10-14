@@ -9,6 +9,8 @@ Inputs (written by bin/GeneratedMain via nightly.py; all JSONL, one
 row):
 
 - results/hazel/<mode>.json            memo + CEK + plain profiles
+- results/cache/<mode>.json            eviction-enabled memo profiles only;
+                                       references reused from results/hazel
 - results/hazel-compare/<mode>.json    same rows plus hazel_* fields from the
                                        official-Hazel baseline (timing pass)
                                        and its memory pass (heap/live/RSS)
@@ -33,6 +35,8 @@ Outputs:
                                         and summaries read by the paper macros
 - output/arith/…                        arith pages + arith_result.tex
 - output/scaling/…                      scaling + entropy pages and tex
+- output/cache/…                        cache study: two scatter plots, one
+                                        CDF, and paired time/memory summaries
 
 Conventions
 ===========
@@ -57,12 +61,14 @@ import os
 import shutil
 import statistics
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable, Iterator, List, Sequence, Tuple
 
 from dominate import document
 from dominate import tags as tag
-from common import BASELINE, CHORDATA, HAZEL, comparison_title, speedup_label, fmt_number, fmt_speedup, stat_card
+from common import BASELINE, CHORDATA, CHORDATA_CACHE, HAZEL, comparison_title, speedup_label, fmt_number, fmt_speedup, stat_card
+from stats import aligned_cache_results, peak_memory_overhead
 from plot_speedup import (
     SpeedupStats,
     compare_stats,
@@ -75,6 +81,7 @@ from plot_speedup import (
     plot_scatter_for_kind,
     pairs_from_profiles,
     pairs_from_steps,
+    profile_values_from_result,
 )
 import generate_speedup_index as speedup_module
 
@@ -148,8 +155,8 @@ def _render_html(
     description: str | None,
     summary: SpeedupStats | None,
     comparison_summaries: Sequence[Tuple[str, SpeedupStats]] | None,
-    combined_scatter_rel: str | None,
-    combined_cdf_rel: str | None,
+    plots: Sequence[Tuple[str, str]],
+    extra_stats: Sequence[Tuple[str, str]],
     css_href: str,
 ) -> str:
     doc = document(title=title)
@@ -182,12 +189,13 @@ def _render_html(
                     stat_card("End-to-end speedup", f"{fmt_speedup(summary.end_to_end)}x")
                     stat_card("Best speedup", f"{fmt_speedup(summary.maximum)}x")
                     stat_card("Lowest speedup", f"{fmt_speedup(summary.minimum)}x")
-            if combined_scatter_rel:
+            if extra_stats:
+                with tag.section(cls="stats"):
+                    for label, value in extra_stats:
+                        stat_card(label, value)
+            for label, rel in plots:
                 with tag.section(cls="plot"):
-                    tag.img(src=combined_scatter_rel, alt="Combined scatter plot across all benchmarks")
-            if combined_cdf_rel:
-                with tag.section(cls="plot"):
-                    tag.img(src=combined_cdf_rel, alt="Combined speedup CDF across all benchmarks")
+                    tag.img(src=rel, alt=label)
             with tag.section(cls="grid"):
                 for label, rel in entries:
                     with tag.a(href=rel, cls="card"):
@@ -204,6 +212,8 @@ def generate_html(
     description: str | None = None,
     css_source: Path,
     report_kind: str = "hazel",
+    plots: Sequence[Tuple[str, Path]] = (),
+    extra_stats: Sequence[Tuple[str, str]] = (),
 ) -> SpeedupStats | None:
     output.parent.mkdir(parents=True, exist_ok=True)
     entries_with_rel = _relativize(entries, output)
@@ -231,8 +241,7 @@ def generate_html(
         if all_pairs:
             ratios, summary = compare_stats(all_pairs)
 
-    combined_scatter_rel: str | None = None
-    combined_cdf_rel: str | None = None
+    plot_links = _relativize(plots, output)
     if all_pairs:
         scatter_name = plot_scatter_for_kind(
             all_pairs,
@@ -240,10 +249,10 @@ def generate_html(
             report_kind=report_kind,
             title=comparison_title("Timing scatter", context=title),
         )
-        combined_scatter_rel = os.path.relpath(output.parent / scatter_name, output.parent)
+        plot_links.append((comparison_title("Timing scatter", context=title), scatter_name))
     if ratios:
         cdf_name = plot_speedup_cdf(ratios, output.parent, title=comparison_title("Speedup CDF", context=title))
-        combined_cdf_rel = os.path.relpath(output.parent / cdf_name, output.parent)
+        plot_links.append((comparison_title("Speedup CDF", context=title), cdf_name))
 
     comparisons: list[tuple[str, list[tuple[float, float]]]] = [
         ("Chordata vs Baseline", []),
@@ -288,8 +297,8 @@ def generate_html(
             description,
             summary,
             comparison_summaries,
-            combined_scatter_rel,
-            combined_cdf_rel,
+            plot_links,
+            extra_stats,
             css_href,
         ),
         encoding="utf-8",
@@ -300,12 +309,15 @@ def generate_html(
 def generate_reports() -> None:
     generate_hazel_reports()
     generate_arith_reports()
+    cache_index = generate_cache_reports()
     css_source = Path(__file__).with_name("style.css")
     entries = [
         ("Hazel Report", Path("output/hazel/index.html")),
         ("Arith Report", Path("output/arith/index.html")),
         ("Scaling Report", Path("output/scaling/index.html")),
     ]
+    if cache_index is not None:
+        entries.append(("Cache Study", cache_index))
     entries = [(label, path) for label, path in entries if path.exists()]
     generate_html(
         title="Benchmark Reports",
@@ -313,6 +325,75 @@ def generate_reports() -> None:
         entries=entries,
         css_source=css_source,
     )
+
+
+def generate_cache_reports(
+    *, modes: Sequence[str] | None = None,
+    results_dir: Path = Path("results/cache"),
+    ordinary_dir: Path = Path("results/hazel"),
+    output_dir: Path = Path("output/cache"),
+) -> Path | None:
+    """Exactly three study plots, using one new eviction-enabled experiment."""
+    selected = sorted(modes) if modes is not None else sorted(path.stem for path in results_dir.glob("*.json"))
+    if not selected:
+        return None
+    pairs: dict[str, list[tuple[float, float]]] = {BASELINE: [], CHORDATA: []}
+    memory_ratios: dict[str, list[float]] = {BASELINE: [], CHORDATA: []}
+    for mode in selected:
+        cached, ordinary = aligned_cache_results(results_dir / f"{mode}.json", ordinary_dir / f"{mode}.json")
+        times = profile_values_from_result(cached, "memo_profile")
+        for reference, prefix in ((BASELINE, "cek"), (CHORDATA, "memo")):
+            pairs[reference].extend(zip(profile_values_from_result(ordinary, f"{prefix}_profile"), times, strict=True))
+            overhead = peak_memory_overhead(cached, ordinary, baseline_key=f"{prefix}_resting_adjusted_live_words")
+            if overhead is not None:
+                memory_ratios[reference].append(overhead)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plots: list[tuple[str, Path]] = []
+    cards: list[tuple[str, str]] = []
+    summaries = {}
+    for reference, slug in ((BASELINE, "baseline"), (CHORDATA, "chordata")):
+        ratios, stats = compare_stats(pairs[reference])
+        memory_overhead = _geometric_mean(memory_ratios[reference]) if memory_ratios[reference] else None
+        summaries[slug] = {
+            **asdict(stats), "geo_mean_memory_overhead": memory_overhead,
+            "memory_modes": len(memory_ratios[reference]),
+        }
+        label = f"{CHORDATA_CACHE} vs {reference}"
+        cards.append((f"{label}: Time geomean", f"{fmt_speedup(stats.geo_mean)}x"))
+        cards.append((f"{label}: Memory overhead (peak geomean)",
+                      f"{fmt_speedup(memory_overhead)}x" if memory_overhead is not None else MISSING_VALUE))
+        title = comparison_title("Timing scatter", ours=CHORDATA_CACHE, baseline=reference)
+        filename = plot_scatter_for_kind(
+            pairs[reference], output_dir, report_kind="hazel", title=title,
+            xlabel=f"{reference} time (ns)", ylabel=f"{CHORDATA_CACHE} time (ns)",
+            output_name=f"cache_vs_{slug}_scatter.png",
+            guide_lines=None if reference == BASELINE else [
+                (0.25, 0.5, "4x slower", (12, 10)),
+                (1.0, 1.0, None, (0, 0)),
+                (4.0, 0.5, "4x faster", (12, -12)),
+            ],
+        )
+        plots.append((title, output_dir / filename))
+        if reference == BASELINE:
+            title = comparison_title("Speedup CDF", ours=CHORDATA_CACHE, baseline=reference)
+            filename = plot_speedup_cdf(
+                ratios, output_dir, title=title,
+                xlabel=speedup_label(ours=CHORDATA_CACHE, baseline=reference),
+                output_name="cache_vs_baseline_cdf.png",
+            )
+            plots.append((title, output_dir / filename))
+
+    (output_dir / "summary.json").write_text(json.dumps(summaries, indent=2) + "\n", encoding="utf-8")
+    output = output_dir / "index.html"
+    generate_html(
+        title="Cache Study", output=output, entries=[], data_paths=[],
+        plots=plots, extra_stats=cards, downloads=[("Summary", output_dir / "summary.json")],
+        css_source=Path(__file__).with_name("style.css"),
+        description="Chordata (eviction) enables eviction for this study. Baseline (without memoisation) "
+                    "and ordinary Chordata (without eviction) reuse the existing Hazel-benchmark measurements.",
+    )
+    return output
 
 
 def _scaling_points(data_dirs: Sequence[Path], *, sizes: Sequence[int] = SCALING_SIZES) -> list[tuple[int, float, int]]:
@@ -678,24 +759,6 @@ def _tex_ratio(value: float, *, include_times_symbol: bool) -> str:
     return formatted
 
 
-def _memo_vs_cek_max_live_words(input_path: Path) -> tuple[int, int] | None:
-    result = load_records(input_path)
-    memo_live_words_values: list[int] = []
-    cek_live_words_values: list[int] = []
-    for record in result.exec_times:
-        memo_live_words = record.memo_resting_adjusted_live_words
-        cek_live_words = record.cek_resting_adjusted_live_words
-        if memo_live_words is None or cek_live_words is None:
-            continue
-        if memo_live_words <= 0 or cek_live_words <= 0:
-            continue
-        memo_live_words_values.append(memo_live_words)
-        cek_live_words_values.append(cek_live_words)
-    if not memo_live_words_values or not cek_live_words_values:
-        return None
-    return (max(memo_live_words_values), max(cek_live_words_values))
-
-
 def _max_memo_vs_cek_memory_overhead(input_path: Path) -> str:
     ratio = _max_memo_vs_cek_memory_overhead_ratio(input_path)
     if ratio is None:
@@ -704,13 +767,8 @@ def _max_memo_vs_cek_memory_overhead(input_path: Path) -> str:
 
 
 def _max_memo_vs_cek_memory_overhead_ratio(input_path: Path) -> float | None:
-    max_live_words = _memo_vs_cek_max_live_words(input_path)
-    if not max_live_words:
-        return None
-    max_memo_live_words, max_cek_live_words = max_live_words
-    if max_memo_live_words <= 0 or max_cek_live_words <= 0:
-        return None
-    return float(max_memo_live_words) / float(max_cek_live_words)
+    result = load_records(input_path)
+    return peak_memory_overhead(result, result)
 
 
 def _geometric_mean(values: Sequence[float]) -> float:

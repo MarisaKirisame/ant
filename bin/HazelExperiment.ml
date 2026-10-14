@@ -104,6 +104,11 @@ let run_mode ?(evict = false) ?(baseline = true) ?input_size ?steps_file ?max_ca
       run ~evict ~baseline ?input_size ?steps_file ?max_candidates ~dataset ~benchmark ();
       true
 
+(* The cache study is the only experiment that enables eviction. Reference
+   measurements are reused from the ordinary Hazel experiment. *)
+let run_cache_mode ~input_size ~max_candidates ~steps_file mode =
+  run_mode ~evict:true ~baseline:false ~input_size ~max_candidates ~steps_file mode
+
 let run_scaling_mode ?(evict = false) ?(baseline = true) ?max_candidates ~mode ~input_size ~steps_file () =
   match decode_mode mode with
   | None -> false

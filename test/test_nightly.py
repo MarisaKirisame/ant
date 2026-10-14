@@ -35,7 +35,7 @@ class CiPipelineTests(unittest.TestCase):
         stages = (
             "clean_results", "clean_output", "install_dependencies", "hazel_dependency",
             "build_project", "arith_project", "hazel_experiment_project",
-            "scaling_project", "entropy_scaling_project",
+            "cache_project", "scaling_project", "entropy_scaling_project",
         )
         with contextlib.ExitStack() as stack:
             mocks = {name: stack.enter_context(patch.object(nightly, name)) for name in stages}

@@ -2,6 +2,14 @@
 
 NIGHTLY_ARGS ?=
 
+.PHONY: cache cache-report
+
+cache:
+	uv run ./nightly.py cache $(NIGHTLY_ARGS)
+
+cache-report:
+	uv run ./nightly.py cache-report $(NIGHTLY_ARGS)
+
 .PHONY: dependency hazel-dependency build run profile compile-generated nightly all report experiment hazel-experiment hazel-tex arith-tex hazel hazel-report arith arith-report arith-scaling hazel-scaling scaling scaling-report entropy-scaling entropy-report website website-check website-clean website-serve
 
 dependency:

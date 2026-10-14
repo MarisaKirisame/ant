@@ -3,6 +3,7 @@ from dominate import tags as tag
 counter = 0
 
 CHORDATA = "Chordata"
+CHORDATA_CACHE = "Chordata (eviction)"
 BASELINE = "Baseline"
 HAZEL = "Hazel"
 PLAIN_OCAML = "Plain OCaml"

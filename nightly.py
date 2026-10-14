@@ -57,6 +57,7 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 import generate_report as report_module  # noqa: E402
+from stats import aligned_cache_results, load_trace  # noqa: E402
 
 
 @dataclasses.dataclass(frozen=True)
@@ -377,6 +378,34 @@ def hazel_project() -> None:
     run_modes(hazel_modes)
 
 
+def cache_project(*, generate_report: bool = True) -> None:
+    # Read and validate every reference before running anything. Never regenerate
+    # the ordinary Chordata, Baseline, or external Hazel measurements here.
+    configs = {}
+    for mode in hazel_modes:
+        rows = load_trace(_result_path_for_mode(mode), eviction=False).exec_times
+        configs[mode] = (rows[0].input_size, 1 if _smoke_run() else len(rows))
+    ensure_switch()
+    generate_ml_files()
+    for mode, (size, candidates) in configs.items():
+        output = Path("results/cache") / f"{mode}.json"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        print(f"Running {mode} cache study (size {size}, {candidates} candidates)...", flush=True)
+        try:
+            opam_exec([
+                "dune", "exec", "--profile", "release", "GeneratedMain", "--",
+                "cache", mode, str(size), str(candidates), str(output),
+            ])
+            cached, _ = aligned_cache_results(output, _result_path_for_mode(mode))
+            if len(cached.exec_times) != candidates:
+                raise ValueError(f"{output}: expected {candidates} candidates, got {len(cached.exec_times)}")
+        except Exception:
+            output.unlink(missing_ok=True)
+            raise
+    if generate_report:
+        report_module.generate_cache_reports(modes=hazel_modes)
+
+
 def _hazel_experiment_modes() -> tuple[str, ...]:
     return hazel_modes
 
@@ -513,6 +542,7 @@ def experiment_project() -> None:
     clean_output()
     arith_project()
     hazel_experiment_project(generate_report=False)
+    cache_project(generate_report=False)
     report_module.generate_reports()
 
 
@@ -560,7 +590,7 @@ def main(argv: Iterable[str]) -> int:
     usage = (
         "Usage: nightly.py "
         "[dependency|hazel-dependency|hazel-install|hazel-build|build|run|profile|hazel|hazel-experiment|"
-        "hazel-report|arith|arith-report|arith-scaling|hazel-scaling|"
+        "hazel-report|cache|cache-report|arith|arith-report|arith-scaling|hazel-scaling|"
         "scaling|scaling-report|entropy-scaling|entropy-report|report|experiment|"
         "hazel-tex|arith-tex|compile-generated|all] [--smoke] [--locked] [--skip-dependencies]\n"
         "--locked: use the committed dependencies without editor tools or source formatting.\n"
@@ -613,6 +643,10 @@ def main(argv: Iterable[str]) -> int:
         hazel_experiment_project()
     elif stage == "hazel-report":
         hazel_report_project()
+    elif stage == "cache":
+        cache_project()
+    elif stage == "cache-report":
+        report_module.generate_cache_reports(modes=hazel_modes)
     elif stage == "arith":
         arith_project()
     elif stage == "arith-report":
@@ -650,6 +684,7 @@ def main(argv: Iterable[str]) -> int:
         build_project()
         arith_project()
         hazel_experiment_project(generate_report=False)
+        cache_project(generate_report=False)
         scaling_project()
         entropy_scaling_project()
         report_module.generate_reports()

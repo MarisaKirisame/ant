@@ -1,6 +1,6 @@
 open Ant
 
-let test_eviction_disabled () =
+let test_eviction_opt_in () =
   Words.reset ();
   Words.set_constructor_degree 0 1;
   Memo.reset ();
@@ -16,25 +16,13 @@ let test_eviction_disabled () =
   Memo.add_exp step 1;
   let start = Memo.pc_to_exp (Common.Pc 1) in
   let memo = Memo.init_memo () in
-  let run config =
-    let result = Memo.exec_cek ?config start (Dynarray.of_list [ Memo.from_int 41 ]) (Memo.from_constructor 0) in
-    assert (Memo.to_word result.words = Word.Word.Int 42);
+  let run ?(input = 41) config =
+    let result = Memo.exec_cek ?config start (Dynarray.of_list [ Memo.from_int input ]) (Memo.from_constructor 0) in
+    assert (Memo.to_word result.words = Word.Word.Int (input + 1));
     assert (result.step = 1 && result.without_memo_step = 1)
   in
   run None;
   run (Some Memo.cek_config);
-  let executed_before_rejection = !executed in
-  let expect_rejection f =
-    match f () with
-    | _ -> failwith "evict:true should be rejected"
-    | exception Invalid_argument message ->
-        assert (message = "Memo.exec_cek_memoized: cache eviction is disabled; evict:true is unsupported")
-  in
-  expect_rejection (fun () -> run (Some (Memo.memo_config ~evict:true memo)));
-  expect_rejection (fun () ->
-      Memo.exec_cek_memoized start (Dynarray.of_list [ Memo.from_int 41 ]) (Memo.from_constructor 0) memo ~evict:true);
-  assert (!executed = executed_before_rejection);
-  assert (memo.size = 0 && memo.epoch = 0);
   run (Some (Memo.memo_config memo));
   let executed_after_first = !executed in
   run (Some (Memo.memo_config memo));
@@ -44,6 +32,18 @@ let test_eviction_disabled () =
   assert (memo.eviction_state.batch_count = 0);
   assert (memo.eviction_state.evict_count = 0);
   assert (memo.eviction_state.max_tree_size_seen = 0);
+  let eviction_memo = Memo.init_memo () in
+  run ~input:42 (Some (Memo.memo_config eviction_memo));
+  run ~input:43 (Some (Memo.memo_config eviction_memo));
+  run (Some (Memo.memo_config ~evict:true eviction_memo));
+  assert (eviction_memo.eviction_state.batch_count = 1);
+  assert (eviction_memo.eviction_state.evict_count = 1);
+  assert (eviction_memo.eviction_state.max_tree_size_seen > 0);
+  assert (eviction_memo.size < eviction_memo.eviction_state.max_tree_size_seen);
+  (* An ordinary call must not run eviction even after the study opted in. *)
+  let batches = eviction_memo.eviction_state.batch_count in
+  run (Some (Memo.memo_config eviction_memo));
+  assert (eviction_memo.eviction_state.batch_count = batches);
   Memo.reset ();
   Words.reset ()
 
@@ -124,7 +124,7 @@ module TestMonoidHash (M : Hash.MonoidHash) = struct
 end
 
 let _ =
-  test_eviction_disabled ();
+  test_eviction_opt_in ();
   test_mfvs ();
   let x = Intmap.create 32 in
   for i = 0 to 9 do
