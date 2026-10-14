@@ -70,7 +70,7 @@ The separate `cache` study is the only experiment that enables eviction:
 
 ```bash
 make cache         # run only the eviction-enabled configuration
-make cache-report  # regenerate its plots from saved measurements
+make cache-report  # regenerate plots and LaTeX macros from saved measurements
 ```
 
 The study reuses Baseline (our evaluator without memoisation) and ordinary
@@ -84,9 +84,23 @@ existing mode without changing its input size.
 versus Baseline timing scatter and speedup CDF, and Chordata (eviction) versus
 ordinary Chordata timing scatter. Scatter axes put the reference on x and the
 eviction-enabled evaluator on y; speedup is reference / eviction-enabled time.
-Each time geomean has a corresponding peak-memory overhead. The full `all`
-and `experiment` pipelines run this one additional configuration after the
-ordinary Hazel experiment, while ordinary runs keep eviction off.
+Each time geomean has a corresponding peak-memory ratio.
+`output/cache/cache_result.tex` provides `\cacheEvictionSpeedup` and
+`\cacheEvictionMemoryUsage`, both relative to ordinary Chordata without eviction:
+eviction runs the first factor as fast and uses the second factor as much memory.
+Speed is ordinary time / eviction time, aggregated geometrically over paired
+executions; memory is eviction peak / ordinary peak, aggregated geometrically
+over traces. Both use two significant digits.
+`\cacheBaselineGeoMean` and `\cacheBaselineMemoryOverhead` provide the same
+comparisons against Baseline. The LaTeX file replaces the former `summary.json`.
+`\cacheEvictionSpeedupTable` gives the eviction-versus-ordinary-Chordata
+comparison for each benchmark and user, using the same row and column layout
+as `\hazelSpeedupTable`. Its two column groups show time speedup and memory
+usage with the same ratio directions as the scalar macros; unavailable cells
+are marked `X`.
+
+The full `all` and `experiment` pipelines run this one additional configuration
+after the ordinary Hazel experiment, while ordinary runs keep eviction off.
 
 ## Contributing
 Pull requests are welcome. Please run `make build` before submitting and note any remaining warnings or TODOs in the description.

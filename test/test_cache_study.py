@@ -78,12 +78,17 @@ class CacheStudyTests(unittest.TestCase):
             load_trace(self.ordinary, eviction=False)
 
     def test_three_plots_use_reference_axes_and_paired_memory_overheads(self):
+        output_dir = self.root / "output"
+        output_dir.mkdir()
+        (output_dir / "summary.json").write_text("{}\n")
+        write_results(self.cached.parent / "user2_append.json", [measurement(eviction=True)])
+        write_results(self.ordinary.parent / "user2_append.json", [measurement()])
         with patch.object(report, "plot_scatter_for_kind", side_effect=lambda *a, **kw: kw["output_name"]) as scatter, patch.object(
             report, "plot_speedup_cdf", side_effect=lambda *a, **kw: kw["output_name"]
         ) as cdf:
             output = report.generate_cache_reports(
                 modes=["user1_append"], results_dir=self.cached.parent,
-                ordinary_dir=self.ordinary.parent, output_dir=self.root / "output",
+                ordinary_dir=self.ordinary.parent, output_dir=output_dir,
             )
         self.assertEqual(scatter.call_count, 2)
         self.assertEqual(cdf.call_count, 1)
@@ -93,10 +98,68 @@ class CacheStudyTests(unittest.TestCase):
         self.assertEqual(scatter.call_args_list[1].kwargs["xlabel"], "Chordata time (ns)")
         self.assertEqual(cdf.call_args.kwargs["xlabel"], "Speedup (Baseline / Chordata (eviction))")
         self.assertTrue(all(math.isclose(value, 100 / 30) for value in cdf.call_args.args[0]))
-        summary = json.loads((output.parent / "summary.json").read_text())
-        self.assertAlmostEqual(summary["baseline"]["geo_mean_memory_overhead"], 0.5)
-        self.assertAlmostEqual(summary["chordata"]["geo_mean_memory_overhead"], 1 / 3)
+        tex = (output.parent / "cache_result.tex").read_text()
+        for macro, value in (
+            ("cacheBaselineGeoMean", "3.3"),
+            ("cacheBaselineMemoryOverhead", "0.50"),
+            ("cacheEvictionSpeedup", "2.0"),
+            ("cacheEvictionMemoryUsage", "0.33"),
+        ):
+            self.assertIn(f"\\newcommand{{\\{macro}}}{{${value}\\times$}}", tex)
+        self.assertIn(r"\newcommand{\cacheEvictionSpeedupTable}{%", tex)
+        self.assertIn(r"\begin{tabular}{l|rrr|rrr}", tex)
+        self.assertIn(r"\multicolumn{3}{c|}{time speedup} & \multicolumn{3}{c}{memory usage}", tex)
+        self.assertIn(r"Benchmark & User 1 & User 2 & User 3 & User 1 & User 2 & User 3 \\", tex)
+        self.assertIn(r"Append & 2.0 & X & X & 0.33 & X & X \\", tex)
+        self.assertIn(r"Filter & X & X & X & X & X & X \\", tex)
+        self.assertFalse((output.parent / "summary.json").exists())
+        self.assertIn('href="cache_result.tex"', output.read_text())
         self.assertEqual(output.read_text().count("<img "), 3)
+
+    def test_per_mode_table_and_aggregate_peak_memory_usage(self):
+        for mode, cached_memory, ordinary_memory, ordinary_times in (
+            ("user1_append", [2, 10], [20, 10], [60, 240]),
+            ("user2_append", [18], [2], [90]),
+        ):
+            cached_rows = [measurement(i, eviction=True) for i in range(len(cached_memory))]
+            ordinary_rows = [measurement(i) for i in range(len(ordinary_memory))]
+            for rows, values in ((cached_rows, cached_memory), (ordinary_rows, ordinary_memory)):
+                for row, value in zip(rows, values, strict=True):
+                    row["memo_resting_adjusted_live_words"] = value
+            for row, duration in zip(ordinary_rows, ordinary_times, strict=True):
+                row["memo_profile"] = [["exec_cek", duration]]
+            write_results(self.cached.parent / f"{mode}.json", cached_rows)
+            write_results(self.ordinary.parent / f"{mode}.json", ordinary_rows)
+        with patch.object(report, "plot_scatter_for_kind", side_effect=lambda *a, **kw: kw["output_name"]), patch.object(
+            report, "plot_speedup_cdf", side_effect=lambda *a, **kw: kw["output_name"]
+        ):
+            output = report.generate_cache_reports(
+                results_dir=self.cached.parent, ordinary_dir=self.ordinary.parent,
+                output_dir=self.root / "output",
+            )
+        # Per-mode ratios are 10/20 and 18/2; their geometric mean is sqrt(4.5).
+        tex = (output.parent / "cache_result.tex").read_text()
+        self.assertIn(
+            r"\newcommand{\cacheEvictionMemoryUsage}{$2.1\times$}",
+            tex,
+        )
+        self.assertIn(r"Append & 4.0 & 3.0 & X & 0.50 & 9.0 & X \\", tex)
+
+    def test_missing_memory_is_exported_as_unavailable(self):
+        row = measurement(eviction=True)
+        del row["memo_resting_adjusted_live_words"]
+        write_results(self.cached, [row])
+        with patch.object(report, "plot_scatter_for_kind", side_effect=lambda *a, **kw: kw["output_name"]), patch.object(
+            report, "plot_speedup_cdf", side_effect=lambda *a, **kw: kw["output_name"]
+        ):
+            output = report.generate_cache_reports(
+                results_dir=self.cached.parent, ordinary_dir=self.ordinary.parent,
+                output_dir=self.root / "output",
+            )
+        tex = (output.parent / "cache_result.tex").read_text()
+        self.assertIn(r"\newcommand{\cacheBaselineMemoryOverhead}{timeout}", tex)
+        self.assertIn(r"\newcommand{\cacheEvictionMemoryUsage}{timeout}", tex)
+        self.assertIn(r"Append & 2.0 & X & X & X & X & X \\", tex)
 
     def test_cache_stage_runs_only_new_configuration_and_preserves_existing_data(self):
         original = self.ordinary.read_bytes()
