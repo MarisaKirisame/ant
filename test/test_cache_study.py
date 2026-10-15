@@ -110,8 +110,8 @@ class CacheStudyTests(unittest.TestCase):
         self.assertIn(r"\begin{tabular}{l|rrr|rrr}", tex)
         self.assertIn(r"\multicolumn{3}{c|}{time speedup} & \multicolumn{3}{c}{memory usage}", tex)
         self.assertIn(r"Benchmark & User 1 & User 2 & User 3 & User 1 & User 2 & User 3 \\", tex)
-        self.assertIn(r"Append & 2.0 & X & X & 0.33 & X & X \\", tex)
-        self.assertIn(r"Filter & X & X & X & X & X & X \\", tex)
+        self.assertIn(r"Append & 2.0 & T/O & T/O & 0.33 & T/O & T/O \\", tex)
+        self.assertIn(r"Filter & T/O & T/O & T/O & T/O & T/O & T/O \\", tex)
         self.assertFalse((output.parent / "summary.json").exists())
         self.assertIn('href="cache_result.tex"', output.read_text())
         self.assertEqual(output.read_text().count("<img "), 3)
@@ -143,7 +143,7 @@ class CacheStudyTests(unittest.TestCase):
             r"\newcommand{\cacheEvictionMemoryUsage}{$2.1\times$}",
             tex,
         )
-        self.assertIn(r"Append & 4.0 & 3.0 & X & 0.50 & 9.0 & X \\", tex)
+        self.assertIn(r"Append & 4.0 & 3.0 & T/O & 0.50 & 9.0 & T/O \\", tex)
 
     def test_missing_memory_is_exported_as_unavailable(self):
         row = measurement(eviction=True)
@@ -159,7 +159,7 @@ class CacheStudyTests(unittest.TestCase):
         tex = (output.parent / "cache_result.tex").read_text()
         self.assertIn(r"\newcommand{\cacheBaselineMemoryOverhead}{timeout}", tex)
         self.assertIn(r"\newcommand{\cacheEvictionMemoryUsage}{timeout}", tex)
-        self.assertIn(r"Append & 2.0 & X & X & X & X & X \\", tex)
+        self.assertIn(r"Append & 2.0 & T/O & T/O & T/O & T/O & T/O \\", tex)
 
     def test_cache_stage_runs_only_new_configuration_and_preserves_existing_data(self):
         original = self.ordinary.read_bytes()

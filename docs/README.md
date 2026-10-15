@@ -97,7 +97,7 @@ comparisons against Baseline. The LaTeX file replaces the former `summary.json`.
 comparison for each benchmark and user, using the same row and column layout
 as `\hazelSpeedupTable`. Its two column groups show time speedup and memory
 usage with the same ratio directions as the scalar macros; unavailable cells
-are marked `X`.
+are marked `T/O`.
 
 The full `all` and `experiment` pipelines run this one additional configuration
 after the ordinary Hazel experiment, while ordinary runs keep eviction off.

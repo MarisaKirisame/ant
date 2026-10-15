@@ -46,7 +46,7 @@ Conventions
 - Memory overheads are ours over the baseline: below 1 means we use less.
 - Per-benchmark memory uses one peak per configuration, ratios aggregated
   geometrically (matches the paper's methodology everywhere memory appears).
-- MISSING_VALUE marks unavailable cells; tables render it as X, scalar
+- MISSING_VALUE marks unavailable cells; tables render it as T/O, scalar
   macros emit it literally.
 
 Loading paths: typed rows go through stats.load_records (fixed schema —
@@ -122,7 +122,7 @@ HAZEL_COMPARE_EXCLUDED_MODES = frozenset()
 
 # Sentinel for a cell or macro whose data is unavailable (missing file,
 # deselected mode, or a run that never produced rows).  Tables render it as
-# X; scalar macros emit it literally.
+# T/O; scalar macros emit it literally.
 MISSING_VALUE = "timeout"
 
 # The three anonymized trace contributors.  Every per-user structure below
@@ -351,7 +351,7 @@ def generate_cache_reports(
                 memory_ratios[reference].append(overhead)
             if reference == CHORDATA:
                 _, stats = compare_stats(mode_pairs)
-                mode_values[mode] = (fmt_speedup(stats.geo_mean), fmt_speedup(overhead) if overhead is not None else "X")
+                mode_values[mode] = (fmt_speedup(stats.geo_mean), fmt_speedup(overhead) if overhead is not None else "T/O")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     plots: list[tuple[str, Path]] = []
@@ -401,7 +401,7 @@ def generate_cache_reports(
 
     body_rows = []
     for key, label in BASE_EXPERIMENTS:
-        values = [mode_values.get(f"user{user}_{key}", ("X", "X")) for user in USERS]
+        values = [mode_values.get(f"user{user}_{key}", ("T/O", "T/O")) for user in USERS]
         body_rows.append(" & ".join([label, *(speed for speed, _ in values), *(memory for _, memory in values)]) + r" \\")
     tex_lines.extend([
         "% Chordata (eviction) vs Chordata (eviction disabled), by benchmark and user.",
@@ -999,8 +999,8 @@ def generate_tex_table(
         for _, speedup_values, memory_overhead_values in rows:
             speedup = speedup_values[benchmark_idx]
             memory_overhead = memory_overhead_values[benchmark_idx]
-            speedup_row.append("X" if speedup == MISSING_VALUE else speedup)
-            memory_overhead_row.append("X" if memory_overhead == MISSING_VALUE else memory_overhead)
+            speedup_row.append("T/O" if speedup == MISSING_VALUE else speedup)
+            memory_overhead_row.append("T/O" if memory_overhead == MISSING_VALUE else memory_overhead)
         body_rows.append(" & ".join([benchmark_label, *speedup_row, *memory_overhead_row]) + " \\\\")
 
     escaped_variant_labels = [_escape_latex(variant_label) for variant_label, _, _ in rows]
@@ -1509,7 +1509,7 @@ def _hazel_baseline_table_lines(
 ) -> list[str]:
     """Rows of the Hazel-baseline-over-memo table, in the \\hazelSpeedupTable
     layout: per benchmark, per-user time-ratio geomeans, then per-user
-    peak-memory ratios (X when unavailable)."""
+    peak-memory ratios (T/O when unavailable)."""
     selected = set(modes) if modes is not None else None
     lines: list[str] = []
     for key, benchmark_label in BASE_EXPERIMENTS:
@@ -1522,8 +1522,8 @@ def _hazel_baseline_table_lines(
                 included = mode in selected
             else:
                 included = mode not in HAZEL_COMPARE_EXCLUDED_MODES
-            time_value = "X"
-            memory_value = "X"
+            time_value = "T/O"
+            memory_value = "T/O"
             if included and path.exists():
                 per_mode = _collect_memo_hazel_rows([path], profile_key=profile_key, live_key=live_key)
                 rows = per_mode.get(path.stem, [])
